@@ -1,0 +1,9 @@
+name = "bangumi-manager-api"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+BANGUMI_API_BASE = "https://api.bgm.tv"
+BANGUMI_CLIENT_ID = "bgm55406984768a97f68"
+BANGUMI_CLIENT_SECRET = "f7aa08e6bc60b33398e30f5ee061dee5"
+JWT_SECRET = "bangmio-secret-key-change-in-production"
