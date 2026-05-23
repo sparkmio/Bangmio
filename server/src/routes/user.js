@@ -6,7 +6,7 @@ const router = Router()
 
 const APP_ID = 'bgm61416a088eff71580'
 const APP_SECRET = '6b8055c0159fcc5e998059536813026f'
-const REDIRECT_URI = 'http://localhost:5173/login/callback'
+const REDIRECT_URI = process.env.OAUTH_REDIRECT_URI || 'http://localhost:5173/login/callback'
 
 router.post('/auth', async (req, res) => {
   try {

@@ -9,3 +9,5 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: OAUTH_REDIRECT_URI
+        value: https://sparkmio.github.io/Bangmio/login/callback
