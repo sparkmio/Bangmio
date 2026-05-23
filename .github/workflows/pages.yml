@@ -32,6 +32,8 @@ jobs:
       - name: Build
         working-directory: client
         run: npm run build
+        env:
+          VITE_BASE_URL: /Bangmio/
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
