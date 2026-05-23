@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: bangmio-api
+    env: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production

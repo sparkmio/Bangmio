@@ -1,7 +1,9 @@
 import axios from 'axios'
 
+const baseURL = import.meta.env.VITE_API_BASE || '/api/v1'
+
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL,
   timeout: 15000
 })
 
@@ -38,7 +40,7 @@ api.interceptors.response.use(
         if (!isRefreshing) {
           isRefreshing = true
           try {
-            const res = await axios.post('/api/v1/user/refresh-token', { refreshToken }, { timeout: 15000 })
+            const res = await axios.post(`${baseURL}/user/refresh-token`, { refreshToken }, { timeout: 15000 })
             const newToken = res.data.data.token
             localStorage.setItem('bangmio_token', newToken)
             if (res.data.data.refreshToken) {

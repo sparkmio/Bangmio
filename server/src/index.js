@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import fs from 'fs'
 import userRoutes from './routes/user.js'
 import animeRoutes from './routes/anime.js'
 import collectionRoutes from './routes/collection.js'
@@ -25,14 +26,16 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' })
 })
 
-// Serve static files from client dist in production
+// Serve static files from client dist in production (if available)
 const staticPath = path.resolve(__dirname, '../../client/dist')
-app.use(express.static(staticPath))
+if (fs.existsSync(staticPath)) {
+  app.use(express.static(staticPath))
 
-// SPA fallback: serve index.html for non-API routes
-app.get('*', (req, res) => {
-  res.sendFile(path.join(staticPath, 'index.html'))
-})
+  // SPA fallback: serve index.html for non-API routes
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(staticPath, 'index.html'))
+  })
+}
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`)
