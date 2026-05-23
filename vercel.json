@@ -1,1 +1,4 @@
-{}
+{
+  "framework": null,
+  "buildCommand": "cd server && npm install"
+}
