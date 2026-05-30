@@ -1,6 +1,5 @@
 {
   "framework": null,
-  "outputDirectory": ".",
-  "installCommand": "cd server && npm install",
-  "buildCommand": "echo done"
+  "ignoreCommand": "echo skip",
+  "installCommand": "cd server && npm install"
 }
