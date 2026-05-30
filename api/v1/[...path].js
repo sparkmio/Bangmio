@@ -1,5 +1,7 @@
-import app from '../../server/src/index.js'
-
 export default (req, res) => {
-  app(req, res)
+  res.json({
+    url: req.url,
+    method: req.method,
+    query: req.query
+  })
 }
