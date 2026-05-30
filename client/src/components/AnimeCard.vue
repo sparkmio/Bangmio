@@ -1,5 +1,5 @@
 <template>
-  <router-link :to="`/anime/${anime.id}`" class="group block">
+  <router-link :to="`/anime/${anime.id}`" class="group block" data-card ref="cardRef">
     <div class="anime-card rounded-xl overflow-hidden transition-all duration-300 group-hover:shadow-xl group-hover:-translate-y-1" :style="{ boxShadow: 'var(--shadow)', border: '1px solid var(--border)' }">
       <div class="relative aspect-[3/4]">
         <img
@@ -32,8 +32,16 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
+import { gsap } from 'gsap'
 const props = defineProps({ anime: { type: Object, required: true } })
 const imgError = ref(false)
 const imageSrc = computed(() => props.anime.images?.large || props.anime.images?.common || props.anime.image || null)
+const cardRef = ref(null)
+
+onMounted(() => {
+  if (cardRef.value) {
+    gsap.from(cardRef.value, { opacity: 0, y: 20, duration: 0.4, ease: 'power2.out' })
+  }
+})
 </script>

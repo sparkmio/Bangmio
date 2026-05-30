@@ -44,8 +44,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
+import { gsap } from 'gsap'
 import { commentsAPI } from '../api/endpoints'
 
 const route = useRoute()
@@ -64,6 +65,10 @@ async function fetchTopics() {
   } finally {
     loading.value = false
   }
+
+  nextTick(() => {
+    gsap.from('.space-y-2 > a', { opacity: 0, y: 15, stagger: 0.05, duration: 0.35, ease: 'power2.out' })
+  })
 }
 
 onMounted(fetchTopics)

@@ -127,8 +127,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
+import { gsap } from 'gsap'
 import { animeAPI, collectionAPI } from '../api/endpoints'
 import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toast'
@@ -192,6 +193,13 @@ async function fetchDetail() {
   finally { loading.value = false }
 
   if (auth.isLoggedIn) loadCollection()
+
+  nextTick(() => {
+    const tl = gsap.timeline({ defaults: { ease: 'power2.out' } })
+    tl.from('.max-w-5xl > .flex:first-child img', { opacity: 0, scale: 0.9, duration: 0.5 })
+      .from('.max-w-5xl > .flex:first-child .flex-1 > *', { opacity: 0, x: 20, stagger: 0.08, duration: 0.4 }, '-=0.3')
+      .from('.grid > .rounded-xl', { opacity: 0, y: 20, stagger: 0.1, duration: 0.4 }, '-=0.2')
+  })
 }
 
 async function loadCollection() {

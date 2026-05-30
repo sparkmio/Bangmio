@@ -1,7 +1,7 @@
 <template>
   <div class="max-w-4xl mx-auto">
     <div class="flex items-center gap-3 mb-6">
-      <router-link to="javascript:history.back()" class="text-sm hover:underline" style="color: var(--primary)">← 返回</router-link>
+      <a @click.prevent="$router.back()" class="text-sm hover:underline cursor-pointer" style="color: var(--primary)">← 返回</a>
       <h1 class="text-lg font-bold truncate" style="color: var(--text)">{{ topic.op?.title || '帖子详情' }}</h1>
       <a :href="`https://bgm.tv/subject/topic/${route.params.id}`" target="_blank" class="text-xs hover:underline ml-auto flex-shrink-0" style="color: var(--text-muted)">在 Bangumi 查看 →</a>
     </div>
@@ -72,8 +72,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
+import { gsap } from 'gsap'
 import { commentsAPI } from '../api/endpoints'
 
 const route = useRoute()
@@ -92,6 +93,12 @@ async function fetchTopic() {
   } finally {
     loading.value = false
   }
+
+  nextTick(() => {
+    const tl = gsap.timeline({ defaults: { ease: 'power2.out' } })
+    tl.from('.p-5.rounded-xl:first-child', { opacity: 0, y: 20, duration: 0.4 })
+    tl.from('.space-y-3 > div', { opacity: 0, y: 15, stagger: 0.06, duration: 0.35 }, '-=0.2')
+  })
 }
 
 onMounted(fetchTopic)
