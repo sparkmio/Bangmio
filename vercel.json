@@ -1,0 +1,5 @@
+{
+  "framework": null,
+  "installCommand": "cd server && npm install",
+  "buildCommand": "echo done"
+}
