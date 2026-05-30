@@ -1,8 +1,8 @@
 <template>
   <div>
-    <section class="mb-10" v-if="auth.isLoggedIn">
-      <div class="flex items-center justify-between mb-5">
-        <h2 class="text-xl font-bold text-base-content">正在追的番剧</h2>
+    <section class="mb-12" v-if="auth.isLoggedIn">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-xl font-semibold text-base-content">正在追的番剧</h2>
         <router-link to="/profile" class="btn btn-ghost btn-sm text-primary">查看全部</router-link>
       </div>
       <LoadingState :loading="watchingLoading" :error="watchingError" @retry="fetchWatching" />
@@ -17,9 +17,9 @@
       </div>
     </section>
 
-    <section class="mb-10">
-      <div class="flex items-center justify-between mb-5">
-        <h2 class="text-xl font-bold text-base-content">新番时间表</h2>
+    <section class="mb-12">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-xl font-semibold text-base-content">新番时间表</h2>
         <router-link to="/schedule" class="btn btn-ghost btn-sm text-primary">查看全部</router-link>
       </div>
       <LoadingState :loading="weekLoading" :error="weekError" @retry="fetchWeek" />

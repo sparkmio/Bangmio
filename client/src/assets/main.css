@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;700;800&family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -9,6 +9,12 @@
 html, body {
   font-family: 'Inter', 'Noto Sans SC', sans-serif;
   min-height: 100vh;
+  line-height: 1.6;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Overpass', 'Noto Sans SC', sans-serif;
+  line-height: 1.25;
 }
 
 ::-webkit-scrollbar { width: 6px; }
@@ -17,82 +23,19 @@ html, body {
 
 .anime-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1.25rem;
 }
 
 @media (max-width: 640px) {
   .anime-grid {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 1rem;
   }
 }
 
-/* ===== Glass utilities ===== */
-.glass-panel {
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  background: oklch(var(--b2) / 0.7);
-  border: 1px solid oklch(var(--b3) / 0.5);
-}
-.glass-card {
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  background: oklch(var(--b2) / 0.5);
-  border: 1px solid oklch(var(--b3) / 0.3);
-  border-radius: 16px;
-  transition: border-color 0.3s, box-shadow 0.3s;
-}
-.glass-card:hover {
-  border-color: oklch(var(--p) / 0.4);
-  box-shadow: 0 8px 32px oklch(var(--p) / 0.08);
-}
-
-/* ===== Animated gradient ===== */
-@keyframes gradient-shift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-.animated-gradient {
-  background: linear-gradient(135deg, #FF6B9D, #C44D8B, #7C3AED, #A78BFA, #FF6B9D);
-  background-size: 400% 400%;
-  animation: gradient-shift 15s ease infinite;
-}
-
-/* ===== Card color accents ===== */
-.card-accent-pink { --accent-color: #FF6B9D; }
-.card-accent-purple { --accent-color: #C44D8B; }
-.card-accent-indigo { --accent-color: #7C3AED; }
-.card-accent-violet { --accent-color: #A78BFA; }
-.card-accent-blue { --accent-color: #60A5FA; }
-
-/* ===== Skeleton ===== */
-.skeleton-line {
-  background: linear-gradient(90deg, oklch(var(--b3)), oklch(var(--b2)), oklch(var(--b3)));
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.5s ease-in-out infinite;
-  border-radius: 4px;
-}
-@keyframes skeleton-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-/* ===== Scroll fade ===== */
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-
-/* ===== Soft scrollbar for card lists ===== */
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* ===== Hover tilt hint ===== */
-.tilt-hover {
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  perspective: 1000px;
-}
-.tilt-hover:hover {
-  transform: translateY(-4px) rotateX(2deg) scale(1.02);
-  box-shadow: 0 16px 48px oklch(var(--p) / 0.12);
-}
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }

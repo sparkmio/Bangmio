@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h1 class="text-2xl font-bold mb-6 text-base-content">新番时间表</h1>
+    <h1 class="text-2xl font-semibold mb-6 text-base-content">新番时间表</h1>
 
     <LoadingState :loading="loading" :error="error" @retry="fetchCalendar" />
 
@@ -27,7 +27,7 @@
             v-for="item in currentDayItems"
             :key="item.id"
             :to="`/anime/${item.id}`"
-            class="card card-side bg-base-100 border border-base-300 hover:shadow-lg hover:border-primary transition-all duration-200 hover:-translate-y-0.5"
+            class="card card-side bg-base-100 border border-base-300 rounded-lg hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5"
           >
             <figure class="w-20 shrink-0">
               <img

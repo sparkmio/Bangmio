@@ -33,7 +33,7 @@
           </div>
 
           <div class="flex-1 min-w-0">
-            <h1 class="text-3xl md:text-4xl font-black mb-2 text-base-content tracking-tight">{{ anime.name_cn || anime.name }}</h1>
+            <h1 class="text-3xl md:text-4xl font-bold mb-2 text-base-content">{{ anime.name_cn || anime.name }}</h1>
             <p v-if="anime.name_cn && anime.name" class="text-base text-base-content/50 mb-4">{{ anime.name }}</p>
 
             <div class="flex flex-wrap items-center gap-2 mb-6">
@@ -47,8 +47,8 @@
               <span v-if="anime.eps" class="badge badge-lg badge-ghost">{{ anime.eps }}话</span>
             </div>
 
-            <div v-if="auth.isLoggedIn" class="glass-card p-5 mb-5">
-              <h3 class="text-sm font-bold mb-3 text-base-content/80">我的收藏</h3>
+            <div v-if="auth.isLoggedIn" class="bg-base-200 rounded-lg p-5 mb-5">
+              <h3 class="text-sm font-semibold mb-3 text-base-content/80">我的收藏</h3>
               <div class="flex flex-wrap items-center gap-4">
                 <CollectionButton :modelValue="collectionStatus" @update:modelValue="updateStatus" @remove="removeCollection" />
                 <div class="flex items-center gap-2">
@@ -62,7 +62,7 @@
             </div>
 
             <div v-if="anime.summary" class="mb-4">
-              <h3 class="text-sm font-bold mb-2 text-base-content/60 uppercase tracking-wider text-xs">简介</h3>
+              <h3 class="text-sm font-semibold mb-2 text-base-content/60 uppercase tracking-wider text-xs">简介</h3>
               <p class="text-sm leading-relaxed text-base-content/60">{{ anime.summary }}</p>
             </div>
 
@@ -77,8 +77,8 @@
     <!-- Content below hero -->
     <div class="max-w-5xl mx-auto px-4 md:px-8 mt-6">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8" v-if="anime.rating?.count || anime.collection">
-        <div v-if="anime.rating?.count" data-stats class="glass-card p-5">
-          <h3 class="font-bold mb-4 text-base-content/80 text-sm uppercase tracking-wider">评分分布</h3>
+        <div v-if="anime.rating?.count" data-stats class="bg-base-200 rounded-lg p-5">
+          <h3 class="font-semibold mb-4 text-base-content/80 text-sm uppercase tracking-wider">评分分布</h3>
           <div class="space-y-2">
             <div v-for="i in 10" :key="i" class="flex items-center gap-2 text-xs">
               <span class="w-4 text-right text-base-content/40 font-mono">{{ i }}</span>
@@ -89,19 +89,19 @@
             </div>
           </div>
         </div>
-        <div v-if="anime.collection" data-stats class="glass-card p-5">
-          <h3 class="font-bold mb-4 text-base-content/80 text-sm uppercase tracking-wider">收藏统计</h3>
+        <div v-if="anime.collection" data-stats class="bg-base-200 rounded-lg p-5">
+          <h3 class="font-semibold mb-4 text-base-content/80 text-sm uppercase tracking-wider">收藏统计</h3>
           <div class="grid grid-cols-2 gap-3">
-            <div class="text-center p-3 rounded-xl bg-base-300/30"><p class="text-xl font-black text-blue-400">{{ anime.collection.wish||0 }}</p><p class="text-xs mt-1 text-base-content/40">想看</p></div>
-            <div class="text-center p-3 rounded-xl bg-base-300/30"><p class="text-xl font-black text-emerald-400">{{ anime.collection.doing||0 }}</p><p class="text-xs mt-1 text-base-content/40">在看</p></div>
-            <div class="text-center p-3 rounded-xl bg-base-300/30"><p class="text-xl font-black text-primary">{{ anime.collection.collect||0 }}</p><p class="text-xs mt-1 text-base-content/40">看过</p></div>
-            <div class="text-center p-3 rounded-xl bg-base-300/30"><p class="text-xl font-black text-red-400">{{ anime.collection.dropped||0 }}</p><p class="text-xs mt-1 text-base-content/40">弃番</p></div>
+            <div class="text-center p-3 rounded-lg bg-base-300/30"><p class="text-xl font-bold text-blue-400">{{ anime.collection.wish||0 }}</p><p class="text-xs mt-1 text-base-content/40">想看</p></div>
+            <div class="text-center p-3 rounded-lg bg-base-300/30"><p class="text-xl font-bold text-emerald-400">{{ anime.collection.doing||0 }}</p><p class="text-xs mt-1 text-base-content/40">在看</p></div>
+            <div class="text-center p-3 rounded-lg bg-base-300/30"><p class="text-xl font-bold text-primary">{{ anime.collection.collect||0 }}</p><p class="text-xs mt-1 text-base-content/40">看过</p></div>
+            <div class="text-center p-3 rounded-lg bg-base-300/30"><p class="text-xl font-bold text-red-400">{{ anime.collection.dropped||0 }}</p><p class="text-xs mt-1 text-base-content/40">弃番</p></div>
           </div>
         </div>
       </div>
 
-      <div v-if="anime.infobox?.length" class="glass-card p-5 mb-8">
-        <h3 class="font-bold mb-4 text-base-content/80 text-sm uppercase tracking-wider">制作信息</h3>
+      <div v-if="anime.infobox?.length" class="bg-base-200 rounded-lg p-5 mb-8">
+        <h3 class="font-semibold mb-4 text-base-content/80 text-sm uppercase tracking-wider">制作信息</h3>
         <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
           <div v-for="info in anime.infobox.slice(0,15)" :key="info.key" class="text-sm">
             <span class="font-medium text-base-content/40">{{ info.key }}</span>
@@ -111,12 +111,12 @@
       </div>
 
       <div v-if="persons.length" class="mb-8">
-        <h2 class="text-lg font-black mb-4 text-base-content flex items-center gap-2">
+        <h2 class="text-lg font-semibold mb-4 text-base-content flex items-center gap-2">
           <span class="w-1 h-5 rounded-full bg-primary"></span>
           制作人员
         </h2>
         <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-          <router-link :to="`/person/${p.id}`" v-for="p in persons.slice(0,16)" :key="p.id" class="flex-shrink-0 glass-card p-4 w-28 text-center hover:border-primary transition-colors duration-300">
+          <router-link :to="`/person/${p.id}`" v-for="p in persons.slice(0,16)" :key="p.id" class="flex-shrink-0 bg-base-200 rounded-lg p-4 w-28 text-center border border-base-300 hover:border-primary transition-colors duration-300">
             <div class="avatar placeholder mb-2">
               <div class="w-12 h-12 rounded-full bg-primary/20">
                 <img v-if="p.images?.medium || p.images?.grid" :src="p.images.medium || p.images.grid" class="rounded-full" />
@@ -130,7 +130,7 @@
       </div>
 
       <div v-if="characters.length" class="mb-8">
-        <h2 class="text-lg font-black mb-4 text-base-content flex items-center gap-2">
+        <h2 class="text-lg font-semibold mb-4 text-base-content flex items-center gap-2">
           <span class="w-1 h-5 rounded-full bg-secondary"></span>
           角色
         </h2>
@@ -148,7 +148,7 @@
       </div>
 
       <div v-if="relations.length" class="mb-8">
-        <h2 class="text-lg font-black mb-4 text-base-content flex items-center gap-2">
+        <h2 class="text-lg font-semibold mb-4 text-base-content flex items-center gap-2">
           <span class="w-1 h-5 rounded-full bg-accent"></span>
           相关条目
         </h2>

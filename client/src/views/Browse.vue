@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="mb-6">
-      <h1 class="text-2xl font-bold mb-4 text-base-content">热门番剧</h1>
+      <h1 class="text-2xl font-semibold mb-4 text-base-content">热门番剧</h1>
 
       <div class="flex flex-wrap gap-3 items-center mb-4">
         <div class="relative flex-1 min-w-60 max-w-md">
