@@ -54,7 +54,7 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-      <div v-if="anime.rating?.count" class="rounded-xl p-5 border" :style="{ background: 'var(--bg-card)', borderColor: 'var(--border)' }">
+      <div v-if="anime.rating?.count" data-stats class="rounded-xl p-5 border" :style="{ background: 'var(--bg-card)', borderColor: 'var(--border)' }">
         <h3 class="font-bold mb-3" style="color: var(--text)">评分分布</h3>
         <div class="space-y-1.5">
           <div v-for="i in 10" :key="i" class="flex items-center gap-2 text-xs">
@@ -66,7 +66,7 @@
           </div>
         </div>
       </div>
-      <div v-if="anime.collection" class="rounded-xl p-5 border" :style="{ background: 'var(--bg-card)', borderColor: 'var(--border)' }">
+      <div v-if="anime.collection" data-stats class="rounded-xl p-5 border" :style="{ background: 'var(--bg-card)', borderColor: 'var(--border)' }">
         <h3 class="font-bold mb-3" style="color: var(--text)">收藏统计</h3>
         <div class="grid grid-cols-2 gap-3">
           <div class="text-center p-3 rounded-lg" :style="{ background: 'var(--bg-hover)' }"><p class="text-xl font-bold" style="color:#60a5fa">{{ anime.collection.wish||0 }}</p><p class="text-xs" style="color:var(--text-muted)">想看</p></div>
@@ -198,7 +198,7 @@ async function fetchDetail() {
     const tl = gsap.timeline({ defaults: { ease: 'power2.out' } })
     tl.from('.max-w-5xl > .flex:first-child img', { opacity: 0, scale: 0.9, duration: 0.5 })
       .from('.max-w-5xl > .flex:first-child .flex-1 > *', { opacity: 0, x: 20, stagger: 0.08, duration: 0.4 }, '-=0.3')
-      .from('.grid > .rounded-xl', { opacity: 0, y: 20, stagger: 0.1, duration: 0.4 }, '-=0.2')
+      .from('[data-stats].rounded-xl', { opacity: 0, y: 20, stagger: 0.1, duration: 0.4 }, '-=0.2')
   })
 }
 
