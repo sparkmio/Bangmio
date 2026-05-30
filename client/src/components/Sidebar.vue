@@ -1,31 +1,27 @@
 <template>
-  <aside class="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-56 z-40 bg-base-200 border-r border-base-300">
-    <div class="flex items-center gap-3 px-5 h-16 border-b border-base-300 shrink-0">
+  <aside class="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-56 z-40 bg-base-100/40 backdrop-blur-xl border-r border-base-300/30">
+    <div class="flex items-center gap-3 px-5 h-16 border-b border-base-300/30 shrink-0">
       <router-link to="/" class="flex items-center gap-3">
-        <img src="/logo.png" alt="Bangmio" class="w-8 h-8 rounded-lg" />
-        <span class="text-lg font-bold text-primary">Bangmio</span>
+        <img src="/logo.png" alt="Bangmio" class="w-8 h-8 rounded-xl ring-2 ring-primary/20" />
+        <span class="text-lg font-black tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Bangmio</span>
       </router-link>
     </div>
 
     <ul class="menu flex-1 py-4 px-3 gap-1">
       <li v-for="item in navItems" :key="item.path">
-        <router-link
-          :to="item.path"
-          :class="$route.path === item.path ? 'active' : ''"
-          class="gap-3"
-        >
+        <router-link :to="item.path" :class="$route.path === item.path ? 'active' : ''" class="gap-3 rounded-xl">
           <component :is="item.icon" class="w-5 h-5" />
-          <span>{{ item.label }}</span>
+          <span class="font-medium">{{ item.label }}</span>
         </router-link>
       </li>
     </ul>
 
-    <div class="px-3 py-4 border-t border-base-300 shrink-0">
+    <div class="px-3 py-4 border-t border-base-300/30 shrink-0">
       <template v-if="auth.isLoggedIn">
-        <router-link to="/profile" class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors">
+        <router-link to="/profile" class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-primary/5 hover:bg-primary/10 transition-colors">
           <div class="avatar">
-            <div class="w-8 h-8 rounded-full">
-              <img v-if="auth.user?.avatar?.medium || auth.user?.avatar?.large" :src="auth.user.avatar.medium || auth.user.avatar.large" />
+            <div class="w-8 h-8 rounded-full ring-2 ring-primary/20">
+              <img v-if="auth.user?.avatar?.medium || auth.user?.avatar?.large" :src="auth.user.avatar.medium || auth.user.avatar.large" class="rounded-full" />
               <div v-else class="w-8 h-8 rounded-full bg-primary text-primary-content flex items-center justify-center text-sm font-bold">
                 {{ auth.user?.nickname?.[0] || auth.user?.username?.[0]?.toUpperCase() }}
               </div>
@@ -33,20 +29,20 @@
           </div>
           <div class="min-w-0 flex-1">
             <p class="text-sm font-medium truncate text-base-content">{{ auth.user?.nickname || auth.user?.username }}</p>
-            <p class="text-xs truncate text-base-content/50">查看主页</p>
+            <p class="text-xs truncate text-base-content/40">查看主页</p>
           </div>
         </router-link>
-        <button @click="auth.logout()" class="btn btn-ghost btn-xs w-full mt-2 text-base-content/50 hover:text-error">
+        <button @click="auth.logout()" class="btn btn-ghost btn-xs w-full mt-2 text-base-content/40 hover:text-error rounded-full">
           退出登录
         </button>
       </template>
       <template v-else>
-        <router-link to="/login" class="btn btn-primary btn-sm w-full">
+        <router-link to="/login" class="btn btn-primary btn-sm w-full rounded-full shadow-lg shadow-primary/20">
           登录 Bangmio
         </router-link>
       </template>
 
-      <button @click="theme.toggle()" class="btn btn-ghost btn-xs w-full mt-3 gap-2">
+      <button @click="theme.toggle()" class="btn btn-ghost btn-xs w-full mt-3 gap-2 rounded-full">
         <svg v-if="theme.theme === 'dark'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
         <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
         {{ theme.theme === 'dark' ? '浅色模式' : '深色模式' }}
@@ -58,7 +54,6 @@
 <script setup>
 import { useAuthStore } from '../stores/auth'
 import { useThemeStore } from '../stores/theme'
-
 const auth = useAuthStore()
 const theme = useThemeStore()
 

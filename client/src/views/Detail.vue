@@ -8,139 +8,162 @@
     <button @click="fetchDetail" class="btn btn-ghost btn-sm text-primary">重试</button>
   </div>
 
-  <div v-else class="max-w-5xl mx-auto">
-    <div class="flex flex-col md:flex-row gap-8 mb-8">
-      <div class="flex-shrink-0 w-48 md:w-56 mx-auto md:mx-0">
-        <img v-if="anime.images?.large || anime.images?.common" :src="anime.images.large || anime.images.common" :alt="anime.name_cn || anime.name" class="w-full rounded-xl shadow-lg" />
+  <div v-else class="-mx-4 md:-mx-8 -mt-6">
+    <!-- Blur Hero Background -->
+    <div class="relative overflow-hidden mb-0">
+      <div class="absolute inset-0 overflow-hidden">
+        <img
+          v-if="anime.images?.large || anime.images?.common"
+          :src="anime.images.large || anime.images.common"
+          class="w-full h-full object-cover scale-110 blur-3xl opacity-30"
+        />
+        <div class="absolute inset-0 bg-gradient-to-b from-base-100/60 via-base-100/90 to-base-100"></div>
       </div>
 
-      <div class="flex-1 min-w-0">
-        <h1 class="text-2xl md:text-3xl font-bold mb-1 text-base-content">{{ anime.name_cn || anime.name }}</h1>
-        <p v-if="anime.name_cn && anime.name" class="mb-3 text-sm text-base-content/50">{{ anime.name }}</p>
+      <!-- Hero Content -->
+      <div class="relative max-w-5xl mx-auto px-4 md:px-8 py-10 md:py-16">
+        <div class="flex flex-col md:flex-row gap-8 items-start" ref="heroRef">
+          <div class="flex-shrink-0 w-48 md:w-60 mx-auto md:mx-0">
+            <img
+              v-if="anime.images?.large || anime.images?.common"
+              :src="anime.images.large || anime.images.common"
+              :alt="anime.name_cn || anime.name"
+              class="w-full rounded-xl shadow-2xl ring-1 ring-white/10"
+            />
+          </div>
 
-        <div class="flex flex-wrap items-center gap-2 mb-4">
-          <span v-if="anime.rating?.score" class="badge badge-lg gap-1 bg-amber-500/10 text-amber-500 border-amber-500/20 font-bold">
-            {{ anime.rating.score.toFixed(1) }}
-            <span class="text-xs font-normal text-base-content/40">({{ anime.rating.total }}人)</span>
-          </span>
-          <span v-if="anime.rank" class="badge badge-lg bg-primary/10 text-primary border-primary/20 font-medium">#{{ anime.rank }}</span>
-          <span class="badge badge-lg badge-ghost">{{ typeLabel }}</span>
-          <span v-if="anime.eps" class="badge badge-lg badge-ghost">{{ anime.eps }}话</span>
-        </div>
+          <div class="flex-1 min-w-0">
+            <h1 class="text-3xl md:text-4xl font-black mb-2 text-base-content tracking-tight">{{ anime.name_cn || anime.name }}</h1>
+            <p v-if="anime.name_cn && anime.name" class="text-base text-base-content/50 mb-4">{{ anime.name }}</p>
 
-        <div v-if="auth.isLoggedIn" class="card bg-base-200 border border-base-300 mb-4">
-          <div class="card-body p-4">
-            <h3 class="card-title text-sm">我的收藏</h3>
-            <div class="flex flex-wrap items-center gap-4">
-              <CollectionButton :modelValue="collectionStatus" @update:modelValue="updateStatus" @remove="removeCollection" />
-              <div class="flex items-center gap-2">
-                <span class="text-sm text-base-content/60">评分</span>
-                <StarRating v-model="collectionRating" :showValue="true" />
+            <div class="flex flex-wrap items-center gap-2 mb-6">
+              <span v-if="anime.rating?.score" class="badge badge-lg gap-1.5 font-bold border-0 bg-amber-500/15 text-amber-400">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                {{ anime.rating.score.toFixed(1) }}
+                <span class="text-xs font-normal text-base-content/40">({{ anime.rating.total }}人)</span>
+              </span>
+              <span v-if="anime.rank" class="badge badge-lg font-bold border-0 bg-primary/15 text-primary">#{{ anime.rank }}</span>
+              <span class="badge badge-lg badge-ghost">{{ typeLabel }}</span>
+              <span v-if="anime.eps" class="badge badge-lg badge-ghost">{{ anime.eps }}话</span>
+            </div>
+
+            <div v-if="auth.isLoggedIn" class="glass-card p-5 mb-5">
+              <h3 class="text-sm font-bold mb-3 text-base-content/80">我的收藏</h3>
+              <div class="flex flex-wrap items-center gap-4">
+                <CollectionButton :modelValue="collectionStatus" @update:modelValue="updateStatus" @remove="removeCollection" />
+                <div class="flex items-center gap-2">
+                  <span class="text-sm text-base-content/50">评分</span>
+                  <StarRating v-model="collectionRating" :showValue="true" />
+                </div>
+              </div>
+              <div class="mt-3">
+                <textarea v-model="collectionComment" @blur="updateComment" placeholder="写短评..." rows="2" class="textarea textarea-bordered textarea-sm w-full bg-base-200/50"></textarea>
               </div>
             </div>
-            <div class="mt-3">
-              <textarea v-model="collectionComment" @blur="updateComment" placeholder="写短评..." rows="2" class="textarea textarea-bordered textarea-sm w-full"></textarea>
+
+            <div v-if="anime.summary" class="mb-4">
+              <h3 class="text-sm font-bold mb-2 text-base-content/60 uppercase tracking-wider text-xs">简介</h3>
+              <p class="text-sm leading-relaxed text-base-content/60">{{ anime.summary }}</p>
+            </div>
+
+            <div v-if="anime.tags?.length" class="flex flex-wrap gap-1.5">
+              <span v-for="tag in anime.tags.slice(0,12)" :key="tag.name" class="badge badge-sm badge-ghost text-xs">{{ tag.name }}</span>
             </div>
           </div>
-        </div>
-
-        <div v-if="anime.summary" class="mb-4">
-          <h3 class="text-sm font-medium mb-1 text-base-content/60">简介</h3>
-          <p class="text-sm leading-relaxed text-base-content/70">{{ anime.summary }}</p>
-        </div>
-
-        <div v-if="anime.tags?.length" class="flex flex-wrap gap-2 mb-4">
-          <span v-for="tag in anime.tags" :key="tag.name" class="badge badge-sm badge-ghost">{{ tag.name }}</span>
         </div>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-      <div v-if="anime.rating?.count" data-stats class="card bg-base-100 border border-base-300">
-        <div class="card-body p-5">
-          <h3 class="card-title text-base">评分分布</h3>
-          <div class="space-y-1.5">
+    <!-- Content below hero -->
+    <div class="max-w-5xl mx-auto px-4 md:px-8 mt-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8" v-if="anime.rating?.count || anime.collection">
+        <div v-if="anime.rating?.count" data-stats class="glass-card p-5">
+          <h3 class="font-bold mb-4 text-base-content/80 text-sm uppercase tracking-wider">评分分布</h3>
+          <div class="space-y-2">
             <div v-for="i in 10" :key="i" class="flex items-center gap-2 text-xs">
-              <span class="w-4 text-right text-base-content/50">{{ i }}</span>
-              <div class="flex-1 h-3 rounded-full overflow-hidden bg-base-200">
-                <div class="h-full rounded-full" :style="{ width: barWidth(i) + '%', background: i >= 8 ? 'var(--p)' : i >= 5 ? 'var(--wa)' : 'var(--bc)' }"></div>
+              <span class="w-4 text-right text-base-content/40 font-mono">{{ i }}</span>
+              <div class="flex-1 h-2.5 rounded-full overflow-hidden bg-base-300/50">
+                <div class="h-full rounded-full transition-all duration-500" :style="{ width: barWidth(i) + '%', background: i >= 8 ? 'var(--p)' : i >= 5 ? 'var(--wa)' : 'var(--bc)' }"></div>
               </div>
-              <span class="w-8 text-right text-base-content/50">{{ anime.rating.count[i] || 0 }}</span>
+              <span class="w-7 text-right text-base-content/40 font-mono">{{ anime.rating.count[i] || 0 }}</span>
             </div>
           </div>
         </div>
-      </div>
-      <div v-if="anime.collection" data-stats class="card bg-base-100 border border-base-300">
-        <div class="card-body p-5">
-          <h3 class="card-title text-base">收藏统计</h3>
+        <div v-if="anime.collection" data-stats class="glass-card p-5">
+          <h3 class="font-bold mb-4 text-base-content/80 text-sm uppercase tracking-wider">收藏统计</h3>
           <div class="grid grid-cols-2 gap-3">
-            <div class="text-center p-3 rounded-lg bg-base-200"><p class="text-xl font-bold text-blue-400">{{ anime.collection.wish||0 }}</p><p class="text-xs text-base-content/50">想看</p></div>
-            <div class="text-center p-3 rounded-lg bg-base-200"><p class="text-xl font-bold text-emerald-400">{{ anime.collection.doing||0 }}</p><p class="text-xs text-base-content/50">在看</p></div>
-            <div class="text-center p-3 rounded-lg bg-base-200"><p class="text-xl font-bold text-primary">{{ anime.collection.collect||0 }}</p><p class="text-xs text-base-content/50">看过</p></div>
-            <div class="text-center p-3 rounded-lg bg-base-200"><p class="text-xl font-bold text-red-400">{{ anime.collection.dropped||0 }}</p><p class="text-xs text-base-content/50">弃番</p></div>
+            <div class="text-center p-3 rounded-xl bg-base-300/30"><p class="text-xl font-black text-blue-400">{{ anime.collection.wish||0 }}</p><p class="text-xs mt-1 text-base-content/40">想看</p></div>
+            <div class="text-center p-3 rounded-xl bg-base-300/30"><p class="text-xl font-black text-emerald-400">{{ anime.collection.doing||0 }}</p><p class="text-xs mt-1 text-base-content/40">在看</p></div>
+            <div class="text-center p-3 rounded-xl bg-base-300/30"><p class="text-xl font-black text-primary">{{ anime.collection.collect||0 }}</p><p class="text-xs mt-1 text-base-content/40">看过</p></div>
+            <div class="text-center p-3 rounded-xl bg-base-300/30"><p class="text-xl font-black text-red-400">{{ anime.collection.dropped||0 }}</p><p class="text-xs mt-1 text-base-content/40">弃番</p></div>
           </div>
         </div>
       </div>
-    </div>
 
-    <div v-if="anime.infobox?.length" class="card bg-base-100 border border-base-300 mb-8">
-      <div class="card-body p-5">
-        <h3 class="card-title text-base">制作信息</h3>
+      <div v-if="anime.infobox?.length" class="glass-card p-5 mb-8">
+        <h3 class="font-bold mb-4 text-base-content/80 text-sm uppercase tracking-wider">制作信息</h3>
         <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
-          <div v-for="info in anime.infobox.slice(0,12)" :key="info.key" class="text-sm">
-            <span class="font-medium text-base-content/50">{{ info.key }}</span>
+          <div v-for="info in anime.infobox.slice(0,15)" :key="info.key" class="text-sm">
+            <span class="font-medium text-base-content/40">{{ info.key }}</span>
             <span class="ml-1 text-base-content/70">{{ infoValue(info.value) }}</span>
           </div>
         </div>
       </div>
-    </div>
 
-    <div v-if="persons.length" class="mb-8">
-      <h2 class="text-lg font-bold mb-4 text-base-content">制作人员</h2>
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-        <router-link :to="`/person/${p.id}`" v-for="p in persons.slice(0,16)" :key="p.id" class="card bg-base-100 border border-base-300 hover:border-primary transition-all hover:brightness-110">
-          <div class="card-body p-3 items-center text-center">
-            <div class="avatar placeholder">
-              <div class="w-10 h-10 rounded-full bg-primary text-primary-content">
-                <img v-if="p.images?.medium || p.images?.grid" :src="p.images.medium || p.images.grid" />
-                <span v-else class="text-xs">{{ p.name?.[0] }}</span>
+      <div v-if="persons.length" class="mb-8">
+        <h2 class="text-lg font-black mb-4 text-base-content flex items-center gap-2">
+          <span class="w-1 h-5 rounded-full bg-primary"></span>
+          制作人员
+        </h2>
+        <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+          <router-link :to="`/person/${p.id}`" v-for="p in persons.slice(0,16)" :key="p.id" class="flex-shrink-0 glass-card p-4 w-28 text-center hover:border-primary transition-colors duration-300">
+            <div class="avatar placeholder mb-2">
+              <div class="w-12 h-12 rounded-full bg-primary/20">
+                <img v-if="p.images?.medium || p.images?.grid" :src="p.images.medium || p.images.grid" class="rounded-full" />
+                <span v-else class="text-lg font-bold text-primary">{{ p.name?.[0] }}</span>
               </div>
             </div>
             <p class="text-xs font-medium line-clamp-1 text-base-content">{{ p.name }}</p>
-            <p class="text-xs line-clamp-1 text-base-content/50">{{ p.relation || cvtCareer(p.career?.[0]) }}</p>
-          </div>
-        </router-link>
+            <p class="text-xs line-clamp-1 text-base-content/40">{{ p.relation || cvtCareer(p.career?.[0]) }}</p>
+          </router-link>
+        </div>
       </div>
-    </div>
 
-    <div v-if="characters.length" class="mb-8">
-      <h2 class="text-lg font-bold mb-4 text-base-content">角色</h2>
-      <div class="flex gap-4 overflow-x-auto pb-2">
-        <router-link v-for="char in characters.slice(0,12)" :key="char.id" :to="`/character/${char.id}`" class="flex-shrink-0 text-center w-20 group">
-          <div class="avatar">
-            <div class="w-16 h-16 rounded-full ring ring-base-300 group-hover:ring-primary transition-all">
-              <img :src="char.images?.grid || char.images?.medium" />
+      <div v-if="characters.length" class="mb-8">
+        <h2 class="text-lg font-black mb-4 text-base-content flex items-center gap-2">
+          <span class="w-1 h-5 rounded-full bg-secondary"></span>
+          角色
+        </h2>
+        <div class="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+          <router-link v-for="char in characters.slice(0,14)" :key="char.id" :to="`/character/${char.id}`" class="flex-shrink-0 text-center w-20 group">
+            <div class="avatar">
+              <div class="w-16 h-16 rounded-full ring-2 ring-base-300 group-hover:ring-primary transition-all duration-300">
+                <img :src="char.images?.grid || char.images?.medium" />
+              </div>
             </div>
-          </div>
-          <p class="text-xs mt-1 truncate group-hover:underline text-base-content/70">{{ char.name }}</p>
-          <p class="text-xs truncate text-base-content/40">{{ char.relation }}</p>
+            <p class="text-xs mt-1.5 truncate text-base-content/60 group-hover:text-base-content transition-colors">{{ char.name }}</p>
+            <p class="text-xs truncate text-base-content/30">{{ char.relation }}</p>
+          </router-link>
+        </div>
+      </div>
+
+      <div v-if="relations.length" class="mb-8">
+        <h2 class="text-lg font-black mb-4 text-base-content flex items-center gap-2">
+          <span class="w-1 h-5 rounded-full bg-accent"></span>
+          相关条目
+        </h2>
+        <div class="anime-grid"><AnimeCard v-for="rel in relations.slice(0,8)" :key="rel.id" :anime="rel" /></div>
+      </div>
+
+      <CommentSection type="subject" :id="anime.id" />
+      <div class="flex flex-col sm:flex-row gap-3 mt-8 pb-8">
+        <router-link :to="`/anime/${anime.id}/talkbox`" class="btn glass btn-sm flex-1 text-base-content/60 hover:text-base-content">
+          查看吐槽箱 →
+        </router-link>
+        <router-link :to="`/anime/${anime.id}/topics`" class="btn glass btn-sm flex-1 text-base-content/60 hover:text-base-content">
+          查看讨论版 →
         </router-link>
       </div>
-    </div>
-
-    <div v-if="relations.length" class="mb-8">
-      <h2 class="text-lg font-bold mb-4 text-base-content">相关条目</h2>
-      <div class="anime-grid"><AnimeCard v-for="rel in relations.slice(0,8)" :key="rel.id" :anime="rel" /></div>
-    </div>
-
-    <CommentSection type="subject" :id="anime.id" />
-    <div class="flex flex-col sm:flex-row gap-3 mt-8">
-      <router-link :to="`/anime/${anime.id}/talkbox`" class="btn btn-outline btn-sm flex-1 border-base-300">
-        查看吐槽箱 →
-      </router-link>
-      <router-link :to="`/anime/${anime.id}/topics`" class="btn btn-outline btn-sm flex-1 border-base-300">
-        查看讨论版 →
-      </router-link>
     </div>
   </div>
 </template>
@@ -171,6 +194,7 @@ const error = ref('')
 const collectionStatus = ref(0)
 const collectionRating = ref(0)
 const collectionComment = ref('')
+const heroRef = ref(null)
 
 const typeLabel = computed(() => ({ 1:'书籍',2:'动画',3:'音乐',4:'游戏',6:'三次元' })[anime.value.type] || '其他')
 
@@ -203,9 +227,7 @@ async function fetchDetail() {
     anime.value = dRes?.data?.data || dRes?.data || {}
     characters.value = (cRes?.data?.data || cRes?.data || []).sort((a, b) => {
       const order = { '主角': 0, '配角': 1, '客串': 2 }
-      const ao = order[a.relation] ?? 99
-      const bo = order[b.relation] ?? 99
-      return ao - bo
+      return (order[a.relation] ?? 99) - (order[b.relation] ?? 99)
     })
     persons.value = pRes?.data?.data || pRes?.data || []
     relations.value = rRes?.data?.data || rRes?.data || []
@@ -215,10 +237,10 @@ async function fetchDetail() {
   if (auth.isLoggedIn) loadCollection()
 
   nextTick(() => {
-    const tl = gsap.timeline({ defaults: { ease: 'power2.out' } })
-    tl.from('.max-w-5xl > .flex:first-child img', { opacity: 0, scale: 0.9, duration: 0.5 })
-      .from('.max-w-5xl > .flex:first-child .flex-1 > *', { opacity: 0, x: 20, stagger: 0.08, duration: 0.4 }, '-=0.3')
-      .from('[data-stats]', { opacity: 0, y: 20, stagger: 0.1, duration: 0.4 }, '-=0.2')
+    if (heroRef.value) {
+      gsap.from(heroRef.value.children, { opacity: 0, y: 30, stagger: 0.1, duration: 0.6, ease: 'power3.out' })
+    }
+    gsap.from('[data-stats]', { opacity: 0, y: 25, stagger: 0.12, duration: 0.5, ease: 'power2.out', delay: 0.3 })
   })
 }
 
@@ -231,9 +253,7 @@ async function loadCollection() {
       collectionRating.value = col.rating || col.rate || 0
       collectionComment.value = col.comment || ''
     } else {
-      collectionStatus.value = 0
-      collectionRating.value = 0
-      collectionComment.value = ''
+      collectionStatus.value = 0; collectionRating.value = 0; collectionComment.value = ''
     }
   } catch (err) {
     const msg = err.response?.data?.error
@@ -243,12 +263,7 @@ async function loadCollection() {
 
 async function saveCollectionBody(extra = {}) {
   try {
-    await collectionAPI.save(route.params.id, {
-      status: collectionStatus.value,
-      rating: collectionRating.value,
-      comment: collectionComment.value,
-      ...extra
-    })
+    await collectionAPI.save(route.params.id, { status: collectionStatus.value, rating: collectionRating.value, comment: collectionComment.value, ...extra })
   } catch (err) {
     const msg = err.response?.data?.error || '保存失败'
     toast.error(msg)
@@ -282,9 +297,7 @@ async function removeCollection() {
 
 watch(() => route.params.id, (newId, oldId) => {
   if (newId && newId !== oldId) {
-    collectionStatus.value = 0
-    collectionRating.value = 0
-    collectionComment.value = ''
+    collectionStatus.value = 0; collectionRating.value = 0; collectionComment.value = ''
     fetchDetail()
   }
 })
