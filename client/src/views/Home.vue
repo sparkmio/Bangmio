@@ -51,11 +51,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { animeAPI, collectionAPI } from '../api/endpoints'
 import { useAuthStore } from '../stores/auth'
 import AnimeCard from '../components/AnimeCard.vue'
 import LoadingState from '../components/LoadingState.vue'
+import { gsap } from 'gsap'
 
 const auth = useAuthStore()
 
@@ -97,5 +98,11 @@ async function fetchWeek() {
   finally { weekLoading.value = false }
 }
 
-onMounted(() => { fetchWeek(); if (auth.isLoggedIn) fetchWatching() })
+onMounted(() => {
+  fetchWeek()
+  if (auth.isLoggedIn) fetchWatching()
+  nextTick(() => {
+    gsap.from('section', { opacity: 0, y: 25, stagger: 0.12, duration: 0.5, ease: 'power2.out' })
+  })
+})
 </script>

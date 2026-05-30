@@ -6,7 +6,7 @@
           v-if="imageSrc && !imgError"
           :src="imageSrc"
           :alt="anime.name_cn || anime.name"
-          class="w-full h-full object-cover"
+          class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           loading="lazy"
           @error="imgError = true"
         />

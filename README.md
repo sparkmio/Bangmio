@@ -2,7 +2,12 @@
 
 Bangumi (bgm.tv) 第三方客户端。支持 OAuth 登录、动画浏览与搜索、新番时间表、收藏管理、吐槽箱与讨论版查看。
 
+🔗 **在线体验**：https://bangmio.vercel.app
+
 ## 关于
+
+半个作者的碎碎念
+> *还有半个是AI*
 
 这是一个高中生好玩做的 VibeCoding 项目，主要是用 DeepSeek V4 Pro 和 MiMo-V2.5-Pro 做的，用了快 7000 万 tokens，要不是 D 便宜根本负担不起......
 
@@ -60,6 +65,12 @@ cd client && npm run build
 # 部署到 Vercel
 vercel --prod
 ```
+
+## 相关链接
+
+- 🌐 网站：https://bangmio.vercel.app
+- 📦 GitHub：https://github.com/sparkmio/Bangmio
+- 👤 作者 Bangumi 主页：https://bgm.tv/user/acgpzh
 
 ## 项目结构
 
