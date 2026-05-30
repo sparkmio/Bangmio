@@ -1,65 +1,36 @@
 <template>
   <div>
-    <!-- Hero Banner -->
-    <div class="-mx-4 md:-mx-8 -mt-6 mb-10 overflow-hidden">
-      <div class="relative py-16 md:py-24 px-4 md:px-8">
-        <div class="absolute inset-0 animated-gradient opacity-10"></div>
-        <div class="absolute inset-0 bg-gradient-to-b from-transparent via-base-100/40 to-base-100"></div>
-        <div class="relative max-w-3xl mx-auto text-center">
-          <img src="/logo.png" alt="Bangmio" class="w-20 h-20 mx-auto rounded-2xl mb-6 shadow-2xl ring-1 ring-white/10" />
-          <h1 class="text-4xl md:text-5xl font-black mb-3 text-base-content tracking-tight">
-            探索 <span class="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">二次元</span> 世界
-          </h1>
-          <p class="text-base text-base-content/50 mb-8 max-w-md mx-auto">
-            番剧发现、收藏管理、讨论社区，一站式动漫追踪
-          </p>
-          <div class="flex justify-center">
-            <router-link to="/anime" class="btn btn-primary btn-lg rounded-full px-8 shadow-lg shadow-primary/25">
-              开始探索
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-            </router-link>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Watching -->
     <section class="mb-10" v-if="auth.isLoggedIn">
       <div class="flex items-center justify-between mb-5">
-        <h2 class="text-xl font-black text-base-content flex items-center gap-2">
-          <span class="w-1.5 h-6 rounded-full bg-primary"></span>
-          正在追的番剧
-        </h2>
+        <h2 class="text-xl font-bold text-base-content">正在追的番剧</h2>
         <router-link to="/profile" class="btn btn-ghost btn-sm text-primary">查看全部</router-link>
       </div>
       <LoadingState :loading="watchingLoading" :error="watchingError" @retry="fetchWatching" />
       <div v-if="!watchingLoading && !watchingError && watchingList.length" class="anime-grid">
         <AnimeCard v-for="anime in watchingList" :key="anime.id" :anime="anime" />
       </div>
-      <div v-else-if="!watchingLoading && watchingList.length === 0" class="glass-card text-center py-12">
-        <p class="text-base-content/40">还没有在追的番剧</p>
-        <router-link to="/anime" class="btn btn-primary btn-sm mt-3 rounded-full">去探索</router-link>
+      <div v-else-if="!watchingLoading && watchingList.length === 0" class="card bg-base-200 border border-base-300">
+        <div class="card-body items-center text-center py-10">
+          <p class="text-base-content/50">还没有在追的番剧</p>
+          <router-link to="/anime" class="btn btn-primary btn-sm mt-2">去探索</router-link>
+        </div>
       </div>
     </section>
 
-    <!-- Schedule -->
     <section class="mb-10">
       <div class="flex items-center justify-between mb-5">
-        <h2 class="text-xl font-black text-base-content flex items-center gap-2">
-          <span class="w-1.5 h-6 rounded-full bg-secondary"></span>
-          新番时间表
-        </h2>
+        <h2 class="text-xl font-bold text-base-content">新番时间表</h2>
         <router-link to="/schedule" class="btn btn-ghost btn-sm text-primary">查看全部</router-link>
       </div>
       <LoadingState :loading="weekLoading" :error="weekError" @retry="fetchWeek" />
 
       <div v-if="!weekLoading && !weekError && weekData.length">
-        <div class="flex gap-1.5 mb-5 overflow-x-auto pb-2 scrollbar-hide">
+        <div class="flex gap-1.5 mb-5 overflow-x-auto pb-2">
           <button
             v-for="(day, idx) in dayLabels"
             :key="idx"
             @click="activeDay = idx + 1"
-            class="btn btn-sm rounded-full px-4 whitespace-nowrap"
+            class="btn btn-sm rounded-lg whitespace-nowrap"
             :class="activeDay === idx + 1 ? 'btn-primary' : 'btn-ghost'"
           >
             {{ day }}
@@ -69,8 +40,10 @@
         <div v-if="currentDayItems.length" class="anime-grid">
           <AnimeCard v-for="item in currentDayItems.slice(0, 8)" :key="item.id" :anime="mapAnime(item)" />
         </div>
-        <div v-else class="glass-card text-center py-12">
-          <p class="text-base-content/40">当天暂无番剧播出</p>
+        <div v-else class="card bg-base-200 border border-base-300">
+          <div class="card-body items-center text-center py-10">
+            <p class="text-base-content/50">当天暂无番剧播出</p>
+          </div>
         </div>
       </div>
     </section>

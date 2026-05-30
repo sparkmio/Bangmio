@@ -17,7 +17,6 @@
           </transition>
         </router-view>
       </main>
-      <Footer />
     </div>
     <Toast />
   </div>
@@ -28,7 +27,6 @@ import { onMounted } from 'vue'
 import { gsap } from 'gsap'
 import Navbar from './components/Navbar.vue'
 import Sidebar from './components/Sidebar.vue'
-import Footer from './components/Footer.vue'
 import Toast from './components/Toast.vue'
 import { useAuthStore } from './stores/auth'
 
