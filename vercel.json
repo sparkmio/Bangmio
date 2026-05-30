@@ -1,5 +1,6 @@
 {
   "framework": null,
+  "outputDirectory": ".",
   "installCommand": "cd server && npm install",
   "buildCommand": "echo done"
 }
