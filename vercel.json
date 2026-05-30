@@ -1,7 +1,4 @@
 {
   "framework": null,
-  "buildCommand": "cd server && npm install && mkdir -p public && echo '<html></html>' > public/index.html",
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/v1/$1" }
-  ]
+  "buildCommand": "cd server && npm install && mkdir -p public && echo '<html></html>' > public/index.html"
 }
