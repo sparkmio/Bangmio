@@ -2,34 +2,36 @@
   <div>
     <section class="mb-10" v-if="auth.isLoggedIn">
       <div class="flex items-center justify-between mb-5">
-        <h2 class="text-xl font-bold" style="color: var(--text)">正在追的番剧</h2>
-        <router-link to="/profile" class="text-sm font-medium hover:underline" style="color: var(--primary)">查看全部</router-link>
+        <h2 class="text-xl font-bold text-base-content">正在追的番剧</h2>
+        <router-link to="/profile" class="btn btn-ghost btn-sm text-primary">查看全部</router-link>
       </div>
       <LoadingState :loading="watchingLoading" :error="watchingError" @retry="fetchWatching" />
       <div v-if="!watchingLoading && !watchingError && watchingList.length" class="anime-grid">
         <AnimeCard v-for="anime in watchingList" :key="anime.id" :anime="anime" />
       </div>
-      <div v-else-if="!watchingLoading && watchingList.length === 0" class="text-center py-10 text-sm rounded-xl border" :style="{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-muted)' }">
-        <p>还没有在追的番剧</p>
-        <router-link to="/anime" class="mt-1 inline-block hover:underline" style="color: var(--primary)">去探索</router-link>
+      <div v-else-if="!watchingLoading && watchingList.length === 0" class="card bg-base-200 border border-base-300">
+        <div class="card-body items-center text-center py-10">
+          <p class="text-base-content/50">还没有在追的番剧</p>
+          <router-link to="/anime" class="btn btn-primary btn-sm mt-2">去探索</router-link>
+        </div>
       </div>
     </section>
 
     <section class="mb-10">
       <div class="flex items-center justify-between mb-5">
-        <h2 class="text-xl font-bold" style="color: var(--text)">新番时间表</h2>
-        <router-link to="/schedule" class="text-sm font-medium hover:underline" style="color: var(--primary)">查看全部</router-link>
+        <h2 class="text-xl font-bold text-base-content">新番时间表</h2>
+        <router-link to="/schedule" class="btn btn-ghost btn-sm text-primary">查看全部</router-link>
       </div>
       <LoadingState :loading="weekLoading" :error="weekError" @retry="fetchWeek" />
 
       <div v-if="!weekLoading && !weekError && weekData.length">
-        <div class="flex gap-1.5 mb-5 overflow-x-auto pb-2">
+        <div class="tabs tabs-boxed bg-base-200 mb-5 overflow-x-auto">
           <button
             v-for="(day, idx) in dayLabels"
             :key="idx"
             @click="activeDay = idx + 1"
-            class="px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all flex-shrink-0"
-            :style="activeDay === idx + 1 ? { background: 'var(--primary)', color: '#fff' } : { background: 'var(--bg-hover)', color: 'var(--text-secondary)' }"
+            class="tab tab-sm whitespace-nowrap"
+            :class="activeDay === idx + 1 ? 'tab-active' : ''"
           >
             {{ day }}
           </button>
@@ -38,8 +40,10 @@
         <div v-if="currentDayItems.length" class="anime-grid">
           <AnimeCard v-for="item in currentDayItems.slice(0, 6)" :key="item.id" :anime="mapAnime(item)" />
         </div>
-        <div v-else class="text-center py-10 text-sm rounded-xl border" :style="{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-muted)' }">
-          当天暂无番剧播出
+        <div v-else class="card bg-base-200 border border-base-300">
+          <div class="card-body items-center text-center py-10">
+            <p class="text-base-content/50">当天暂无番剧播出</p>
+          </div>
         </div>
       </div>
     </section>

@@ -1,12 +1,16 @@
 <template>
   <div class="max-w-md mx-auto mt-6">
-    <div v-if="error" class="rounded-2xl p-8 border text-center" :style="{ background: 'var(--bg-card)', borderColor: 'var(--border)' }">
-      <p class="text-lg mb-2" style="color: var(--danger)">{{ error }}</p>
-      <router-link to="/login" class="text-sm hover:underline" style="color: var(--primary)">返回登录</router-link>
+    <div v-if="error" class="card bg-base-100 border border-base-300">
+      <div class="card-body p-8 text-center">
+        <p class="text-lg mb-2 text-error">{{ error }}</p>
+        <router-link to="/login" class="btn btn-ghost btn-sm text-primary">返回登录</router-link>
+      </div>
     </div>
-    <div v-else class="rounded-2xl p-8 border text-center" :style="{ background: 'var(--bg-card)', borderColor: 'var(--border)' }">
-      <div class="w-10 h-10 border-2 rounded-full animate-spin mx-auto mb-4" :style="{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }"></div>
-      <p style="color: var(--text-secondary)">正在完成授权...</p>
+    <div v-else class="card bg-base-100 border border-base-300">
+      <div class="card-body p-8 text-center">
+        <span class="loading loading-spinner loading-lg text-primary mx-auto mb-4"></span>
+        <p class="text-base-content/60">正在完成授权...</p>
+      </div>
     </div>
   </div>
 </template>

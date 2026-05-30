@@ -14,6 +14,7 @@ export const useThemeStore = defineStore('theme', () => {
 
   watchEffect(() => {
     const root = document.documentElement
+    root.setAttribute('data-theme', theme.value)
     root.classList.toggle('dark', theme.value === 'dark')
     root.classList.toggle('light', theme.value === 'light')
     localStorage.setItem('theme', theme.value)

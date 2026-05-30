@@ -1,16 +1,16 @@
 <template>
   <div>
     <div class="mb-6">
-      <h1 class="text-2xl font-bold mb-4" style="color: var(--text)">热门番剧</h1>
+      <h1 class="text-2xl font-bold mb-4 text-base-content">热门番剧</h1>
 
       <div class="flex flex-wrap gap-3 items-center mb-4">
         <div class="relative flex-1 min-w-60 max-w-md">
-          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-muted)">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
           </svg>
-          <input v-model="keyword" @keyup.enter="search" placeholder="搜索番剧..." class="input-field pl-9" />
+          <input v-model="keyword" @keyup.enter="search" placeholder="搜索番剧..." class="input input-bordered input-sm w-full pl-9" />
         </div>
-        <select v-model="filterType" @change="page = 1; browse()" class="input-field w-auto">
+        <select v-model="filterType" @change="page = 1; browse()" class="select select-bordered select-sm w-auto">
           <option :value="2">动画</option>
           <option :value="1">书籍</option>
           <option :value="3">音乐</option>
@@ -19,24 +19,32 @@
       </div>
 
       <div class="flex flex-wrap gap-2" v-if="tags.length">
-        <button v-for="tag in tags" :key="tag.name" @click="toggleTag(tag.name)" class="px-2.5 py-1 rounded-full text-xs font-medium transition-all" :style="selectedTags.includes(tag.name) ? { background: 'var(--primary)', color: '#fff' } : { background: 'var(--bg-hover)', color: 'var(--text-secondary)' }">{{ tag.name }}</button>
+        <button
+          v-for="tag in tags"
+          :key="tag.name"
+          @click="toggleTag(tag.name)"
+          class="badge badge-lg cursor-pointer transition-all"
+          :class="selectedTags.includes(tag.name) ? 'badge-primary' : 'badge-ghost'"
+        >
+          {{ tag.name }}
+        </button>
       </div>
     </div>
 
     <LoadingState :loading="loading" :error="error" @retry="browse" />
 
     <div v-if="!loading && !error">
-      <div v-if="animeList.length === 0" class="text-center py-20" style="color: var(--text-muted)">
+      <div v-if="animeList.length === 0" class="py-20 text-center text-base-content/50">
         <p class="text-lg mb-2">暂无结果</p>
         <p class="text-sm">尝试其他关键词或筛选条件</p>
       </div>
       <div v-else class="anime-grid">
         <AnimeCard v-for="anime in animeList" :key="anime.id" :anime="anime" />
       </div>
-      <div class="flex justify-center gap-2 mt-8" v-if="totalPages > 1">
-        <button @click="goPage(page - 1)" :disabled="page <= 1" class="px-3 py-2 rounded-lg text-sm border disabled:opacity-30" :style="{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-secondary)' }">上一页</button>
-        <button v-for="p in visiblePages" :key="p" @click="goPage(p)" class="w-9 h-9 rounded-lg text-sm font-medium" :style="p === page ? { background: 'var(--primary)', color: '#fff' } : { background: 'var(--bg-card)', color: 'var(--text-secondary)' }">{{ p }}</button>
-        <button @click="goPage(page + 1)" :disabled="page >= totalPages" class="px-3 py-2 rounded-lg text-sm border disabled:opacity-30" :style="{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-secondary)' }">下一页</button>
+      <div class="join mt-8 flex justify-center" v-if="totalPages > 1">
+        <button @click="goPage(page - 1)" :disabled="page <= 1" class="join-item btn btn-sm">«</button>
+        <button v-for="p in visiblePages" :key="p" @click="goPage(p)" class="join-item btn btn-sm" :class="p === page ? 'btn-active' : ''">{{ p }}</button>
+        <button @click="goPage(page + 1)" :disabled="page >= totalPages" class="join-item btn btn-sm">»</button>
       </div>
     </div>
   </div>

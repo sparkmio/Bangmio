@@ -1,22 +1,22 @@
 <template>
   <div>
-    <h1 class="text-2xl font-bold mb-6" style="color: var(--text)">新番时间表</h1>
+    <h1 class="text-2xl font-bold mb-6 text-base-content">新番时间表</h1>
 
     <LoadingState :loading="loading" :error="error" @retry="fetchCalendar" />
 
     <div v-if="!loading && !error">
-      <div v-if="Object.keys(byDay).length === 0" class="py-20 text-center" style="color: var(--text-muted)">
+      <div v-if="Object.keys(byDay).length === 0" class="py-20 text-center text-base-content/50">
         <p>暂无番剧数据</p>
       </div>
 
       <div v-else>
-        <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
+        <div class="tabs tabs-boxed bg-base-200 mb-6 overflow-x-auto">
           <button
             v-for="(day, idx) in dayLabels"
             :key="idx"
             @click="activeDay = idx + 1"
-            class="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors"
-            :style="activeDay === idx + 1 ? { background: 'var(--primary)', color: '#fff' } : { background: 'var(--bg-hover)', color: 'var(--text-secondary)' }"
+            class="tab whitespace-nowrap"
+            :class="activeDay === idx + 1 ? 'tab-active' : ''"
           >
             {{ day }}
           </button>
@@ -27,29 +27,28 @@
             v-for="item in currentDayItems"
             :key="item.id"
             :to="`/anime/${item.id}`"
-            class="flex gap-4 p-4 rounded-xl border transition-all duration-200 hover:-translate-y-0.5"
-            :style="{ background: 'var(--bg-card)', borderColor: 'var(--border)' }"
-            @mouseenter="e => { e.currentTarget.style.boxShadow = 'var(--shadow-lg)'; e.currentTarget.style.borderColor = 'var(--primary)' }"
-            @mouseleave="e => { e.currentTarget.style.boxShadow = 'var(--shadow)'; e.currentTarget.style.borderColor = 'var(--border)' }"
+            class="card card-side bg-base-100 border border-base-300 hover:shadow-lg hover:border-primary transition-all duration-200 hover:-translate-y-0.5"
           >
-            <img
-              v-if="item.images?.common || item.image"
-              :src="item.images?.common || item.image"
-              class="w-20 h-24 object-cover rounded-lg flex-shrink-0"
-            />
-            <div class="min-w-0 flex-1">
-              <h3 class="font-semibold line-clamp-2" style="color: var(--text)">{{ item.name_cn || item.name }}</h3>
-              <p class="text-xs mt-1 truncate" style="color: var(--text-muted)">{{ item.name }}</p>
-              <div class="flex items-center gap-2 mt-2">
-                <span v-if="item.rating?.score" class="text-xs font-bold" style="color: var(--star)">{{ item.rating.score.toFixed(1) }}</span>
-                <span v-if="item.eps" class="text-xs" style="color: var(--text-muted)">{{ item.eps }}话</span>
-                <span class="text-xs px-1.5 py-0.5 rounded" :style="{ background: 'var(--bg-hover)', color: 'var(--text-muted)' }">{{ typeLabel(item.type) }}</span>
+            <figure class="w-20 shrink-0">
+              <img
+                v-if="item.images?.common || item.image"
+                :src="item.images?.common || item.image"
+                class="w-20 h-28 object-cover"
+              />
+            </figure>
+            <div class="card-body p-4 py-3">
+              <h3 class="card-title text-sm line-clamp-2 text-base-content">{{ item.name_cn || item.name }}</h3>
+              <p class="text-xs truncate text-base-content/50">{{ item.name }}</p>
+              <div class="flex items-center gap-2 mt-1">
+                <span v-if="item.rating?.score" class="text-xs font-bold text-amber-500">{{ item.rating.score.toFixed(1) }}</span>
+                <span v-if="item.eps" class="text-xs text-base-content/50">{{ item.eps }}话</span>
+                <span class="badge badge-xs">{{ typeLabel(item.type) }}</span>
               </div>
             </div>
           </router-link>
         </div>
 
-        <div v-if="currentDayItems.length === 0" class="text-center py-10" style="color: var(--text-muted)">
+        <div v-if="currentDayItems.length === 0" class="py-10 text-center text-base-content/50">
           当天暂无番剧播出
         </div>
       </div>

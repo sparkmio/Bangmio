@@ -9,76 +9,74 @@
             v-if="person.images?.large || person.images?.medium"
             :src="person.images.large || person.images.medium"
             :alt="person.name"
-            class="w-full rounded-xl" style="box-shadow: var(--shadow-lg)"
+            class="w-full rounded-xl shadow-lg"
           />
         </div>
 
         <div class="flex-1 min-w-0">
-          <h1 class="text-2xl md:text-3xl font-bold mb-1" style="color: var(--text)">{{ person.name }}</h1>
-          <p class="text-sm mb-3" style="color: var(--text-muted)">
+          <h1 class="text-2xl md:text-3xl font-bold mb-1 text-base-content">{{ person.name }}</h1>
+          <p class="text-sm mb-3 text-base-content/50">
             {{ typeLabel }}
             <span v-if="careerLabels.length"> · {{ careerLabels.join(' / ') }}</span>
             <span v-if="person.gender" class="ml-2"> · {{ person.gender === 'male' ? '♂ 男' : person.gender === 'female' ? '♀ 女' : person.gender }}</span>
             <span v-if="person.blood_type" class="ml-2"> · {{ ['','A','B','AB','O'][person.blood_type] }}型血</span>
           </p>
-          <p v-if="person.birth_year" class="text-sm mb-3" style="color: var(--text-muted)">
+          <p v-if="person.birth_year" class="text-sm mb-3 text-base-content/50">
             {{ person.birth_year }}{{ person.birth_mon ? '-' + String(person.birth_mon).padStart(2,'0') : '' }}{{ person.birth_day ? '-' + String(person.birth_day).padStart(2,'0') : '' }}
           </p>
 
           <div v-if="person.summary" class="mb-4">
-            <h3 class="text-sm font-medium mb-1" style="color: var(--text-secondary)">简介</h3>
-            <p class="text-sm leading-relaxed" style="color: var(--text-secondary)">{{ person.summary }}</p>
+            <h3 class="text-sm font-medium mb-1 text-base-content/60">简介</h3>
+            <p class="text-sm leading-relaxed text-base-content/70">{{ person.summary }}</p>
           </div>
 
           <div v-if="person.stat" class="flex gap-6 mb-4">
             <div class="text-center">
-              <p class="text-xl font-bold" style="color: var(--star)">{{ person.stat.comments || 0 }}</p>
-              <p class="text-xs" style="color: var(--text-muted)">评论</p>
+              <p class="text-xl font-bold text-amber-500">{{ person.stat.comments || 0 }}</p>
+              <p class="text-xs text-base-content/50">评论</p>
             </div>
             <div class="text-center">
-              <p class="text-xl font-bold" style="color: var(--primary)">{{ person.stat.collects || 0 }}</p>
-              <p class="text-xs" style="color: var(--text-muted)">收藏</p>
+              <p class="text-xl font-bold text-primary">{{ person.stat.collects || 0 }}</p>
+              <p class="text-xs text-base-content/50">收藏</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div v-if="person.infobox?.length" class="rounded-xl p-5 border mb-8" :style="{ background: 'var(--bg-card)', borderColor: 'var(--border)' }">
-        <h3 class="font-bold mb-3" style="color: var(--text)">详细信息</h3>
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
-          <div v-for="info in person.infobox.slice(0, 18)" :key="info.key" class="text-sm">
-            <span class="font-medium" style="color: var(--text-muted)">{{ info.key }}</span>
-            <span class="ml-1" style="color: var(--text-secondary)">{{ formatInfoValue(info.value) }}</span>
+      <div v-if="person.infobox?.length" class="card bg-base-100 border border-base-300 mb-8">
+        <div class="card-body p-5">
+          <h3 class="card-title text-base">详细信息</h3>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+            <div v-for="info in person.infobox.slice(0, 18)" :key="info.key" class="text-sm">
+              <span class="font-medium text-base-content/50">{{ info.key }}</span>
+              <span class="ml-1 text-base-content/70">{{ formatInfoValue(info.value) }}</span>
+            </div>
           </div>
         </div>
       </div>
 
       <div v-if="subjects.length" class="mb-8">
-        <h2 class="text-lg font-bold mb-4" style="color: var(--text)">参与作品</h2>
+        <h2 class="text-lg font-bold mb-4 text-base-content">参与作品</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <router-link
-            v-for="subj in subjects"
-            :key="subj.id"
-            :to="`/anime/${subj.id}`"
-            class="flex gap-3 p-3 rounded-xl border transition-all hover:brightness-110"
-            :style="{ background: 'var(--bg-card)', borderColor: 'var(--border)' }"
-          >
-            <img v-if="subj.image" :src="subj.image" class="w-12 h-16 object-cover rounded-lg" />
-            <div class="min-w-0">
-              <p class="text-sm font-medium line-clamp-1" style="color: var(--text)">{{ subj.name_cn || subj.name }}</p>
-              <p class="text-xs" style="color: var(--text-muted)">{{ subj.staff || '' }}</p>
+          <router-link v-for="subj in subjects" :key="subj.id" :to="`/anime/${subj.id}`" class="card card-side bg-base-100 border border-base-300 hover:border-primary transition-all">
+            <figure class="w-12 shrink-0">
+              <img v-if="subj.image" :src="subj.image" class="w-12 h-16 object-cover" />
+            </figure>
+            <div class="card-body p-3 py-2">
+              <p class="text-sm font-medium line-clamp-1 text-base-content">{{ subj.name_cn || subj.name }}</p>
+              <p class="text-xs text-base-content/50">{{ subj.staff || '' }}</p>
             </div>
           </router-link>
         </div>
       </div>
 
       <div class="flex gap-2 mb-8">
-        <a :href="`https://bgm.tv/person/${person.id}`" target="_blank" class="px-4 py-2 rounded-lg text-sm transition-all hover:brightness-110" :style="{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }">
+        <a :href="`https://bgm.tv/person/${person.id}`" target="_blank" class="btn btn-ghost btn-sm text-base-content/60">
           在 Bangumi 查看完整信息 →
         </a>
       </div>
 
-      <router-link :to="`/person/${person.id}/talkbox`" class="block p-5 rounded-xl border text-center transition-all hover:brightness-110" :style="{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-secondary)' }">
+      <router-link :to="`/person/${person.id}/talkbox`" class="btn btn-outline btn-sm w-full border-base-300">
         查看吐槽箱 →
       </router-link>
     </div>

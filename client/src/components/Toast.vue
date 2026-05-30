@@ -5,13 +5,13 @@
         v-for="toast in toasts"
         :key="toast.id"
         :class="[
-          'px-4 py-3 rounded-lg shadow-lg text-sm font-medium min-w-60 backdrop-blur',
-          toast.type === 'success' ? 'bg-green-600/90 text-white' :
-          toast.type === 'error' ? 'bg-red-600/90 text-white' :
-          'bg-gray-800/90 text-gray-100'
+          'alert shadow-lg text-sm min-w-60',
+          toast.type === 'success' ? 'alert-success' :
+          toast.type === 'error' ? 'alert-error' :
+          'alert-info'
         ]"
       >
-        {{ toast.message }}
+        <span>{{ toast.message }}</span>
       </div>
     </transition-group>
   </div>

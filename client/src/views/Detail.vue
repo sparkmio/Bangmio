@@ -1,125 +1,144 @@
 <template>
   <div v-if="loading" class="py-20 text-center">
-    <div class="w-10 h-10 border-2 rounded-full animate-spin mx-auto" :style="{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }"></div>
+    <span class="loading loading-spinner loading-lg text-primary"></span>
   </div>
 
   <div v-else-if="error" class="py-20 text-center">
-    <p class="text-lg mb-2" style="color: var(--danger)">{{ error }}</p>
-    <button @click="fetchDetail" class="text-sm hover:underline" style="color: var(--primary)">重试</button>
+    <p class="text-lg mb-2 text-error">{{ error }}</p>
+    <button @click="fetchDetail" class="btn btn-ghost btn-sm text-primary">重试</button>
   </div>
 
   <div v-else class="max-w-5xl mx-auto">
     <div class="flex flex-col md:flex-row gap-8 mb-8">
       <div class="flex-shrink-0 w-48 md:w-56 mx-auto md:mx-0">
-        <img v-if="anime.images?.large || anime.images?.common" :src="anime.images.large || anime.images.common" :alt="anime.name_cn || anime.name" class="w-full rounded-xl" style="box-shadow: var(--shadow-lg)" />
+        <img v-if="anime.images?.large || anime.images?.common" :src="anime.images.large || anime.images.common" :alt="anime.name_cn || anime.name" class="w-full rounded-xl shadow-lg" />
       </div>
 
       <div class="flex-1 min-w-0">
-        <h1 class="text-2xl md:text-3xl font-bold mb-1" style="color: var(--text)">{{ anime.name_cn || anime.name }}</h1>
-        <p v-if="anime.name_cn && anime.name" class="mb-3 text-sm" style="color: var(--text-muted)">{{ anime.name }}</p>
+        <h1 class="text-2xl md:text-3xl font-bold mb-1 text-base-content">{{ anime.name_cn || anime.name }}</h1>
+        <p v-if="anime.name_cn && anime.name" class="mb-3 text-sm text-base-content/50">{{ anime.name }}</p>
 
         <div class="flex flex-wrap items-center gap-2 mb-4">
-          <span v-if="anime.rating?.score" class="flex items-center gap-1 px-2 py-1 rounded-lg text-sm font-bold" :style="{ background: 'var(--accent-bg)', color: 'var(--star)' }">
+          <span v-if="anime.rating?.score" class="badge badge-lg gap-1 bg-amber-500/10 text-amber-500 border-amber-500/20 font-bold">
             {{ anime.rating.score.toFixed(1) }}
-            <span class="text-xs font-normal" style="color: var(--text-muted)">({{ anime.rating.total }}人)</span>
+            <span class="text-xs font-normal text-base-content/40">({{ anime.rating.total }}人)</span>
           </span>
-          <span v-if="anime.rank" class="px-2 py-1 rounded-lg text-sm font-medium" :style="{ background: 'var(--primary-bg)', color: 'var(--primary)' }">#{{ anime.rank }}</span>
-          <span class="px-2 py-1 rounded-lg text-sm" :style="{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }">{{ typeLabel }}</span>
-          <span v-if="anime.eps" class="px-2 py-1 rounded-lg text-sm" :style="{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }">{{ anime.eps }}话</span>
+          <span v-if="anime.rank" class="badge badge-lg bg-primary/10 text-primary border-primary/20 font-medium">#{{ anime.rank }}</span>
+          <span class="badge badge-lg badge-ghost">{{ typeLabel }}</span>
+          <span v-if="anime.eps" class="badge badge-lg badge-ghost">{{ anime.eps }}话</span>
         </div>
 
-        <div v-if="auth.isLoggedIn" class="p-4 rounded-xl border mb-4" :style="{ background: 'var(--bg-card)', borderColor: 'var(--border)' }">
-          <h3 class="text-sm font-semibold mb-3" style="color: var(--text)">我的收藏</h3>
-          <div class="flex flex-wrap items-center gap-4">
-            <CollectionButton :modelValue="collectionStatus" @update:modelValue="updateStatus" @remove="removeCollection" />
-            <div class="flex items-center gap-2">
-              <span class="text-sm" style="color: var(--text-secondary)">评分</span>
-              <StarRating v-model="collectionRating" :showValue="true" />
+        <div v-if="auth.isLoggedIn" class="card bg-base-200 border border-base-300 mb-4">
+          <div class="card-body p-4">
+            <h3 class="card-title text-sm">我的收藏</h3>
+            <div class="flex flex-wrap items-center gap-4">
+              <CollectionButton :modelValue="collectionStatus" @update:modelValue="updateStatus" @remove="removeCollection" />
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-base-content/60">评分</span>
+                <StarRating v-model="collectionRating" :showValue="true" />
+              </div>
             </div>
-          </div>
-          <div class="mt-3">
-            <textarea v-model="collectionComment" @blur="updateComment" placeholder="写短评..." rows="2" class="input-field resize-none"></textarea>
+            <div class="mt-3">
+              <textarea v-model="collectionComment" @blur="updateComment" placeholder="写短评..." rows="2" class="textarea textarea-bordered textarea-sm w-full"></textarea>
+            </div>
           </div>
         </div>
 
         <div v-if="anime.summary" class="mb-4">
-          <h3 class="text-sm font-medium mb-1" style="color: var(--text-secondary)">简介</h3>
-          <p class="text-sm leading-relaxed" style="color: var(--text-secondary)">{{ anime.summary }}</p>
+          <h3 class="text-sm font-medium mb-1 text-base-content/60">简介</h3>
+          <p class="text-sm leading-relaxed text-base-content/70">{{ anime.summary }}</p>
         </div>
 
         <div v-if="anime.tags?.length" class="flex flex-wrap gap-2 mb-4">
-          <span v-for="tag in anime.tags" :key="tag.name" class="px-2 py-0.5 rounded-full text-xs" :style="{ background: 'var(--bg-hover)', color: 'var(--text-muted)' }">{{ tag.name }}</span>
+          <span v-for="tag in anime.tags" :key="tag.name" class="badge badge-sm badge-ghost">{{ tag.name }}</span>
         </div>
       </div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-      <div v-if="anime.rating?.count" data-stats class="rounded-xl p-5 border" :style="{ background: 'var(--bg-card)', borderColor: 'var(--border)' }">
-        <h3 class="font-bold mb-3" style="color: var(--text)">评分分布</h3>
-        <div class="space-y-1.5">
-          <div v-for="i in 10" :key="i" class="flex items-center gap-2 text-xs">
-            <span class="w-4 text-right" style="color: var(--text-muted)">{{ i }}</span>
-            <div class="flex-1 h-3 rounded-full overflow-hidden" style="background: var(--bg-hover)">
-              <div class="h-full rounded-full" :style="{ width: barWidth(i) + '%', background: i >= 8 ? 'var(--primary)' : i >= 5 ? 'var(--star)' : 'var(--text-muted)' }"></div>
+      <div v-if="anime.rating?.count" data-stats class="card bg-base-100 border border-base-300">
+        <div class="card-body p-5">
+          <h3 class="card-title text-base">评分分布</h3>
+          <div class="space-y-1.5">
+            <div v-for="i in 10" :key="i" class="flex items-center gap-2 text-xs">
+              <span class="w-4 text-right text-base-content/50">{{ i }}</span>
+              <div class="flex-1 h-3 rounded-full overflow-hidden bg-base-200">
+                <div class="h-full rounded-full" :style="{ width: barWidth(i) + '%', background: i >= 8 ? 'var(--p)' : i >= 5 ? 'var(--wa)' : 'var(--bc)' }"></div>
+              </div>
+              <span class="w-8 text-right text-base-content/50">{{ anime.rating.count[i] || 0 }}</span>
             </div>
-            <span class="w-8 text-right" style="color: var(--text-muted)">{{ anime.rating.count[i] || 0 }}</span>
           </div>
         </div>
       </div>
-      <div v-if="anime.collection" data-stats class="rounded-xl p-5 border" :style="{ background: 'var(--bg-card)', borderColor: 'var(--border)' }">
-        <h3 class="font-bold mb-3" style="color: var(--text)">收藏统计</h3>
-        <div class="grid grid-cols-2 gap-3">
-          <div class="text-center p-3 rounded-lg" :style="{ background: 'var(--bg-hover)' }"><p class="text-xl font-bold" style="color:#60a5fa">{{ anime.collection.wish||0 }}</p><p class="text-xs" style="color:var(--text-muted)">想看</p></div>
-          <div class="text-center p-3 rounded-lg" :style="{ background: 'var(--bg-hover)' }"><p class="text-xl font-bold" style="color:#34d399">{{ anime.collection.doing||0 }}</p><p class="text-xs" style="color:var(--text-muted)">在看</p></div>
-          <div class="text-center p-3 rounded-lg" :style="{ background: 'var(--bg-hover)' }"><p class="text-xl font-bold" style="color:var(--primary)">{{ anime.collection.collect||0 }}</p><p class="text-xs" style="color:var(--text-muted)">看过</p></div>
-          <div class="text-center p-3 rounded-lg" :style="{ background: 'var(--bg-hover)' }"><p class="text-xl font-bold" style="color:#f87171">{{ anime.collection.dropped||0 }}</p><p class="text-xs" style="color:var(--text-muted)">弃番</p></div>
+      <div v-if="anime.collection" data-stats class="card bg-base-100 border border-base-300">
+        <div class="card-body p-5">
+          <h3 class="card-title text-base">收藏统计</h3>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="text-center p-3 rounded-lg bg-base-200"><p class="text-xl font-bold text-blue-400">{{ anime.collection.wish||0 }}</p><p class="text-xs text-base-content/50">想看</p></div>
+            <div class="text-center p-3 rounded-lg bg-base-200"><p class="text-xl font-bold text-emerald-400">{{ anime.collection.doing||0 }}</p><p class="text-xs text-base-content/50">在看</p></div>
+            <div class="text-center p-3 rounded-lg bg-base-200"><p class="text-xl font-bold text-primary">{{ anime.collection.collect||0 }}</p><p class="text-xs text-base-content/50">看过</p></div>
+            <div class="text-center p-3 rounded-lg bg-base-200"><p class="text-xl font-bold text-red-400">{{ anime.collection.dropped||0 }}</p><p class="text-xs text-base-content/50">弃番</p></div>
+          </div>
         </div>
       </div>
     </div>
 
-    <div v-if="anime.infobox?.length" class="rounded-xl p-5 border mb-8" :style="{ background: 'var(--bg-card)', borderColor: 'var(--border)' }">
-      <h3 class="font-bold mb-3" style="color: var(--text)">制作信息</h3>
-      <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
-        <div v-for="info in anime.infobox.slice(0,12)" :key="info.key" class="text-sm">
-          <span class="font-medium" style="color:var(--text-muted)">{{ info.key }}</span>
-          <span class="ml-1" style="color:var(--text-secondary)">{{ infoValue(info.value) }}</span>
+    <div v-if="anime.infobox?.length" class="card bg-base-100 border border-base-300 mb-8">
+      <div class="card-body p-5">
+        <h3 class="card-title text-base">制作信息</h3>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+          <div v-for="info in anime.infobox.slice(0,12)" :key="info.key" class="text-sm">
+            <span class="font-medium text-base-content/50">{{ info.key }}</span>
+            <span class="ml-1 text-base-content/70">{{ infoValue(info.value) }}</span>
+          </div>
         </div>
       </div>
     </div>
 
     <div v-if="persons.length" class="mb-8">
-      <h2 class="text-lg font-bold mb-4" style="color: var(--text)">制作人员</h2>
+      <h2 class="text-lg font-bold mb-4 text-base-content">制作人员</h2>
       <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-        <router-link :to="`/person/${p.id}`" v-for="p in persons.slice(0,16)" :key="p.id" class="p-3 rounded-xl border transition-all hover:brightness-110 block" :style="{ background:'var(--bg-card)', borderColor:'var(--border)' }">
-          <img v-if="p.images?.medium || p.images?.grid" :src="p.images.medium || p.images.grid" class="w-10 h-10 rounded-full object-cover mb-2 mx-auto" />
-          <p class="text-xs font-medium text-center line-clamp-1" style="color:var(--text)">{{ p.name }}</p>
-          <p class="text-xs text-center line-clamp-1" style="color:var(--text-muted)">{{ p.relation || cvtCareer(p.career?.[0]) }}</p>
+        <router-link :to="`/person/${p.id}`" v-for="p in persons.slice(0,16)" :key="p.id" class="card bg-base-100 border border-base-300 hover:border-primary transition-all hover:brightness-110">
+          <div class="card-body p-3 items-center text-center">
+            <div class="avatar placeholder">
+              <div class="w-10 h-10 rounded-full bg-primary text-primary-content">
+                <img v-if="p.images?.medium || p.images?.grid" :src="p.images.medium || p.images.grid" />
+                <span v-else class="text-xs">{{ p.name?.[0] }}</span>
+              </div>
+            </div>
+            <p class="text-xs font-medium line-clamp-1 text-base-content">{{ p.name }}</p>
+            <p class="text-xs line-clamp-1 text-base-content/50">{{ p.relation || cvtCareer(p.career?.[0]) }}</p>
+          </div>
         </router-link>
       </div>
     </div>
 
     <div v-if="characters.length" class="mb-8">
-      <h2 class="text-lg font-bold mb-4" style="color: var(--text)">角色</h2>
+      <h2 class="text-lg font-bold mb-4 text-base-content">角色</h2>
       <div class="flex gap-4 overflow-x-auto pb-2">
         <router-link v-for="char in characters.slice(0,12)" :key="char.id" :to="`/character/${char.id}`" class="flex-shrink-0 text-center w-20 group">
-          <img :src="char.images?.grid || char.images?.medium" class="w-16 h-16 rounded-full object-cover mx-auto border group-hover:ring-2" :style="{ borderColor:'var(--border)' }" />
-          <p class="text-xs mt-1 truncate group-hover:underline" style="color:var(--text-secondary)">{{ char.name }}</p>
-          <p class="text-xs truncate" style="color:var(--text-muted)">{{ char.relation }}</p>
+          <div class="avatar">
+            <div class="w-16 h-16 rounded-full ring ring-base-300 group-hover:ring-primary transition-all">
+              <img :src="char.images?.grid || char.images?.medium" />
+            </div>
+          </div>
+          <p class="text-xs mt-1 truncate group-hover:underline text-base-content/70">{{ char.name }}</p>
+          <p class="text-xs truncate text-base-content/40">{{ char.relation }}</p>
         </router-link>
       </div>
     </div>
 
     <div v-if="relations.length" class="mb-8">
-      <h2 class="text-lg font-bold mb-4" style="color: var(--text)">相关条目</h2>
+      <h2 class="text-lg font-bold mb-4 text-base-content">相关条目</h2>
       <div class="anime-grid"><AnimeCard v-for="rel in relations.slice(0,8)" :key="rel.id" :anime="rel" /></div>
     </div>
 
     <CommentSection type="subject" :id="anime.id" />
-    <div class="flex flex-col sm:flex-row gap-3 mt-8 p-5 rounded-xl border" :style="{ background: 'var(--bg-card)', borderColor: 'var(--border)' }">
-      <router-link :to="`/anime/${anime.id}/talkbox`" class="flex-1 py-3 rounded-lg text-center text-sm font-medium transition-all hover:brightness-110" :style="{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }">
+    <div class="flex flex-col sm:flex-row gap-3 mt-8">
+      <router-link :to="`/anime/${anime.id}/talkbox`" class="btn btn-outline btn-sm flex-1 border-base-300">
         查看吐槽箱 →
       </router-link>
-      <router-link :to="`/anime/${anime.id}/topics`" class="flex-1 py-3 rounded-lg text-center text-sm font-medium transition-all hover:brightness-110" :style="{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }">
+      <router-link :to="`/anime/${anime.id}/topics`" class="btn btn-outline btn-sm flex-1 border-base-300">
         查看讨论版 →
       </router-link>
     </div>
@@ -136,6 +155,7 @@ import { useToastStore } from '../stores/toast'
 import CollectionButton from '../components/CollectionButton.vue'
 import StarRating from '../components/StarRating.vue'
 import AnimeCard from '../components/AnimeCard.vue'
+import CommentSection from '../components/CommentSection.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -198,7 +218,7 @@ async function fetchDetail() {
     const tl = gsap.timeline({ defaults: { ease: 'power2.out' } })
     tl.from('.max-w-5xl > .flex:first-child img', { opacity: 0, scale: 0.9, duration: 0.5 })
       .from('.max-w-5xl > .flex:first-child .flex-1 > *', { opacity: 0, x: 20, stagger: 0.08, duration: 0.4 }, '-=0.3')
-      .from('[data-stats].rounded-xl', { opacity: 0, y: 20, stagger: 0.1, duration: 0.4 }, '-=0.2')
+      .from('[data-stats]', { opacity: 0, y: 20, stagger: 0.1, duration: 0.4 }, '-=0.2')
   })
 }
 

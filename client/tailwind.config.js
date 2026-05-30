@@ -6,22 +6,59 @@ export default {
     "./src/**/*.{vue,js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {
-      colors: {
-        sidebar: {
-          dark: '#0B0E14',
-          light: '#F8F9FB',
-        },
-        surface: {
-          dark: '#151A22',
-          light: '#FFFFFF',
-        },
-        card: {
-          dark: '#1A1F2A',
-          light: '#F3F4F6',
-        }
-      }
-    },
+    extend: {},
   },
-  plugins: [],
+  plugins: [require("daisyui")],
+  daisyui: {
+    themes: [
+      {
+        light: {
+          "primary": "#E8909C",
+          "primary-content": "#ffffff",
+          "secondary": "#D4768A",
+          "secondary-content": "#ffffff",
+          "accent": "#D4768A",
+          "accent-content": "#ffffff",
+          "neutral": "#18181b",
+          "neutral-content": "#fafafa",
+          "base-100": "#fafafa",
+          "base-200": "#f4f4f5",
+          "base-300": "#e4e4e7",
+          "base-content": "#18181b",
+          "info": "#60a5fa",
+          "info-content": "#ffffff",
+          "success": "#34d399",
+          "success-content": "#ffffff",
+          "warning": "#fbbf24",
+          "warning-content": "#18181b",
+          "error": "#f87171",
+          "error-content": "#ffffff",
+        },
+      },
+      {
+        dark: {
+          "primary": "#FFB7C5",
+          "primary-content": "#18181b",
+          "secondary": "#FF9BB0",
+          "secondary-content": "#18181b",
+          "accent": "#FF9BB0",
+          "accent-content": "#18181b",
+          "neutral": "#27272a",
+          "neutral-content": "#fafafa",
+          "base-100": "#09090b",
+          "base-200": "#121212",
+          "base-300": "#18181b",
+          "base-content": "#fafafa",
+          "info": "#60a5fa",
+          "info-content": "#09090b",
+          "success": "#34d399",
+          "success-content": "#09090b",
+          "warning": "#fbbf24",
+          "warning-content": "#09090b",
+          "error": "#f87171",
+          "error-content": "#09090b",
+        },
+      },
+    ],
+  },
 }
