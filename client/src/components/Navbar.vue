@@ -1,5 +1,5 @@
 <template>
-  <nav class="lg:hidden sticky top-0 z-50 border-b backdrop-blur-md transition-colors duration-300" :style="{ background: 'var(--bg-secondary)', borderColor: 'var(--border)' }">
+  <nav class="md:hidden sticky top-0 z-50 border-b backdrop-blur-md transition-colors duration-300" :style="{ background: 'var(--bg-secondary)', borderColor: 'var(--border)' }">
     <div class="px-4 h-14 flex items-center justify-between max-w-7xl mx-auto">
       <router-link to="/" class="flex items-center gap-2">
         <img src="/logo.png" alt="Bangmio" class="w-7 h-7 rounded-md object-cover" />
@@ -31,7 +31,7 @@
     </div>
   </nav>
 
-  <nav class="lg:hidden fixed bottom-0 left-0 right-0 z-50 border-t backdrop-blur-md transition-colors duration-300" :style="{ background: 'var(--bg-secondary)', borderColor: 'var(--border)' }">
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t backdrop-blur-md transition-colors duration-300" :style="{ background: 'var(--bg-secondary)', borderColor: 'var(--border)' }">
     <div class="flex items-center justify-around h-14 px-2 max-w-7xl mx-auto">
       <router-link to="/" class="flex flex-col items-center gap-0.5 text-xs transition-colors" :class="$route.path === '/' ? 'active' : ''" :style="{ color: $route.path === '/' ? 'var(--primary)' : 'var(--text-muted)' }">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>

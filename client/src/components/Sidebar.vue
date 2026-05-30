@@ -1,5 +1,5 @@
 <template>
-  <aside class="hidden lg:flex flex-col fixed left-0 top-0 bottom-0 w-56 z-40 border-r transition-colors duration-300" :style="{ background: 'var(--bg-secondary)', borderColor: 'var(--border)' }">
+  <aside class="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-56 z-40 border-r transition-colors duration-300" :style="{ background: 'var(--bg-secondary)', borderColor: 'var(--border)' }">
     <router-link to="/" class="flex items-center gap-3 px-5 h-16 border-b transition-colors duration-300 shrink-0" :style="{ borderColor: 'var(--border)' }">
       <img src="/logo.png" alt="Bangmio" class="w-8 h-8 rounded-lg object-cover" />
       <span class="text-lg font-bold" style="color: var(--primary)">Bangmio</span>
