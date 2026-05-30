@@ -1,4 +1,4 @@
 {
   "framework": null,
-  "buildCommand": "cd server && npm install && mkdir -p public && echo '<html></html>' > public/index.html"
+  "buildCommand": "mkdir -p public && echo '<html></html>' > public/index.html && cd server && npm install"
 }
