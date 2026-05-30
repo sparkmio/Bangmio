@@ -1,5 +1,4 @@
 {
   "framework": null,
-  "ignoreCommand": "echo skip",
-  "installCommand": "cd server && npm install"
+  "buildCommand": "cd server && npm install && mkdir -p public && echo '<html></html>' > public/index.html"
 }
