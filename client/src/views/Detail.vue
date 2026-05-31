@@ -265,17 +265,19 @@ async function loadCollection() {
 async function saveCollectionBody(extra = {}) {
   try {
     await collectionAPI.save(route.params.id, { status: collectionStatus.value, rating: collectionRating.value, comment: collectionComment.value, ...extra })
+    return true
   } catch (err) {
     const msg = err.response?.data?.error || '保存失败'
     toast.error(msg)
+    return false
   }
 }
 
 async function updateStatus(status) {
   if (!auth.isLoggedIn) return toast.error('请先登录')
   collectionStatus.value = status
-  await saveCollectionBody({ status })
-  toast.success('状态已更新')
+  const ok = await saveCollectionBody({ status })
+  if (ok) toast.success('状态已更新')
 }
 
 async function updateComment() {

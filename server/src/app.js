@@ -16,7 +16,7 @@ app.use('/api/v1/*', async (c, next) => {
     if (ct.includes('json')) {
       try {
         const text = await c.res.text()
-        const replaced = text.replace(/lain\.bgm\.tv/g, 'lain.bangumi.one')
+        const replaced = text.replace(/lain\.bgm\.tv/g, 'lain.bangumi.one').replace(/bgm\.tv\/(img|pic|avatar|user)/g, 'bangumi.one/$1')
         if (replaced !== text) {
           const h = new Headers(c.res.headers)
           h.delete('content-length')

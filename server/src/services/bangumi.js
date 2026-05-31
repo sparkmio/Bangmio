@@ -10,7 +10,13 @@ async function bgmGet(path, token, params) {
   const url = new URL(`${BANGUMI_API}${path}`)
   if (params) Object.entries(params).forEach(([k, v]) => v != null && url.searchParams.set(k, v))
   const res = await fetch(url.toString(), { headers: headers(token) })
-  return res.json()
+  const data = await res.json()
+  if (!res.ok) {
+    const err = new Error(`Bangumi API ${res.status}`)
+    err.response = { status: res.status, data }
+    throw err
+  }
+  return data
 }
 
 async function bgmPost(path, body, token, params) {
@@ -21,7 +27,13 @@ async function bgmPost(path, body, token, params) {
     headers: { ...headers(token), 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   })
-  return res.json()
+  const data = await res.json()
+  if (!res.ok) {
+    const err = new Error(`Bangumi API ${res.status}`)
+    err.response = { status: res.status, data }
+    throw err
+  }
+  return data
 }
 
 function buildSearchBody(keyword, params = {}) {
