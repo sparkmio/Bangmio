@@ -7,9 +7,8 @@
     "start": "node src/index.js"
   },
   "dependencies": {
-    "axios": "^1.7.7",
     "cheerio": "^1.2.0",
-    "cors": "^2.8.5",
-    "express": "^4.21.1"
+    "hono": "^4.9.0",
+    "@hono/node-server": "^1.17.0"
   }
 }

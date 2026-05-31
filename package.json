@@ -12,10 +12,12 @@
     "install:all": "npm install && npm install --prefix server && npm install --prefix client"
   },
   "dependencies": {
+    "@hono/node-server": "^2.0.4",
     "axios": "^1.7.7",
     "cheerio": "^1.2.0",
     "cors": "^2.8.5",
-    "express": "^4.21.1"
+    "express": "^4.21.1",
+    "hono": "^4.12.23"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

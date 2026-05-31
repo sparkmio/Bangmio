@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Hono } from 'hono'
 import {
   searchAnime, browseAnime, getAnimeDetail, getAnimeEpisodes,
   getAnimeCharacters, getAnimePersons, getAnimeRelations, getAnimeCalendar, getAnimeTags,
@@ -6,21 +6,21 @@ import {
   getPersonDetail, getPersonSubjects
 } from '../controllers/animeController.js'
 
-const router = Router()
+const app = new Hono()
 
-router.get('/search', searchAnime)
-router.get('/browse', browseAnime)
-router.get('/calendar', getAnimeCalendar)
-router.get('/tags', getAnimeTags)
-router.get('/character/:id', getCharacterDetail)
-router.get('/character/:id/subjects', getCharacterSubjects)
-router.get('/character/:id/persons', getCharacterPersons)
-router.get('/person/:id', getPersonDetail)
-router.get('/person/:id/subjects', getPersonSubjects)
-router.get('/:id', getAnimeDetail)
-router.get('/:id/episodes', getAnimeEpisodes)
-router.get('/:id/characters', getAnimeCharacters)
-router.get('/:id/persons', getAnimePersons)
-router.get('/:id/relations', getAnimeRelations)
+app.get('/search', searchAnime)
+app.get('/browse', browseAnime)
+app.get('/calendar', getAnimeCalendar)
+app.get('/tags', getAnimeTags)
+app.get('/character/:id', getCharacterDetail)
+app.get('/character/:id/subjects', getCharacterSubjects)
+app.get('/character/:id/persons', getCharacterPersons)
+app.get('/person/:id', getPersonDetail)
+app.get('/person/:id/subjects', getPersonSubjects)
+app.get('/:id', getAnimeDetail)
+app.get('/:id/episodes', getAnimeEpisodes)
+app.get('/:id/characters', getAnimeCharacters)
+app.get('/:id/persons', getAnimePersons)
+app.get('/:id/relations', getAnimeRelations)
 
-export default router
+export default app

@@ -1,74 +1,70 @@
-import { Router } from 'express'
+import { Hono } from 'hono'
 import { getClient } from '../services/bangumi.js'
 
-const router = Router()
+const app = new Hono()
 
-function extractToken(req) {
-  return (req.headers.authorization || '').replace('Bearer ', '')
+function extractToken(c) {
+  return (c.req.header('Authorization') || '').replace('Bearer ', '')
 }
 
-function extractUsername(req) {
-  return req.headers['x-bangumi-username'] || ''
+function extractUsername(c) {
+  return c.req.header('X-Bangumi-Username') || ''
 }
 
-function bangumiError(err, fallback) {
-  const status = err.response?.status
-  const detail = err.response?.data
-  console.error(`[Bangumi] ${fallback} - status:${status}`, JSON.stringify(detail || err.message))
+function errorResult(status, detail, fallback) {
   if (status === 401) return { code: 401, error: '登录已过期，请重新登录' }
   if (status === 403) return { code: 403, error: '无权限访问' }
   if (status === 404) return { code: 404, error: null }
   return { code: 500, error: detail?.description || detail?.message || fallback }
 }
 
-router.get('/list', async (req, res) => {
+app.get('/list', async (c) => {
   try {
-    const token = extractToken(req)
-    const username = extractUsername(req)
-    if (!token) return res.status(401).json({ error: '未登录' })
-    if (!username) return res.status(400).json({ error: '缺少用户名' })
+    const token = extractToken(c)
+    const username = extractUsername(c)
+    if (!token) return c.json({ error: '未登录' }, 401)
+    if (!username) return c.json({ error: '缺少用户名' }, 400)
     const client = getClient(token)
-    const params = { offset: Number(req.query.offset) || 0, limit: Number(req.query.limit) || 30 }
-    if (req.query.subject_type) params.subject_type = Number(req.query.subject_type)
-    if (req.query.type) params.type = Number(req.query.type)
-    const { data } = await client.get(`/v0/users/${username}/collections`, { params })
-    res.json({ data: data.data || [], total: data.total || 0 })
+    const params = { offset: Number(c.req.query('offset')) || 0, limit: Number(c.req.query('limit')) || 30 }
+    const st = c.req.query('subject_type')
+    const t = c.req.query('type')
+    if (st) params.subject_type = Number(st)
+    if (t) params.type = Number(t)
+    const data = await client.get(`/v0/users/${username}/collections`, params)
+    return c.json({ data: data.data || [], total: data.total || 0 })
   } catch (err) {
-    const { code, error } = bangumiError(err, '获取收藏列表失败')
-    res.status(code).json({ error })
+    const r = errorResult(err.response?.status, err.response?.data, '获取收藏列表失败')
+    return c.json({ error: r.error }, r.code)
   }
 })
 
-router.get('/stats', async (req, res) => {
+app.get('/stats', async (c) => {
   try {
-    const token = extractToken(req)
-    const username = extractUsername(req)
-    if (!token) return res.status(401).json({ error: '未登录' })
-    if (!username) return res.status(400).json({ error: '缺少用户名' })
+    const token = extractToken(c)
+    const username = extractUsername(c)
+    if (!token) return c.json({ error: '未登录' }, 401)
+    if (!username) return c.json({ error: '缺少用户名' }, 400)
     const client = getClient(token)
+    const fetchTotal = (type) => client.get(`/v0/users/${username}/collections`, { type, limit: 1 }).then(r => r.total).catch(() => 0)
     const [wish, collect, doing, on_hold, dropped] = await Promise.all([
-      client.get(`/v0/users/${username}/collections`, { params: { type: 1, limit: 1 } }).then(r => r.data.total).catch(() => 0),
-      client.get(`/v0/users/${username}/collections`, { params: { type: 2, limit: 1 } }).then(r => r.data.total).catch(() => 0),
-      client.get(`/v0/users/${username}/collections`, { params: { type: 3, limit: 1 } }).then(r => r.data.total).catch(() => 0),
-      client.get(`/v0/users/${username}/collections`, { params: { type: 4, limit: 1 } }).then(r => r.data.total).catch(() => 0),
-      client.get(`/v0/users/${username}/collections`, { params: { type: 5, limit: 1 } }).then(r => r.data.total).catch(() => 0),
+      fetchTotal(1), fetchTotal(2), fetchTotal(3), fetchTotal(4), fetchTotal(5)
     ])
-    res.json({ data: { want: wish, completed: collect, watching: doing, on_hold, dropped, total: wish + collect + doing + on_hold + dropped } })
+    return c.json({ data: { want: wish, completed: collect, watching: doing, on_hold, dropped, total: wish + collect + doing + on_hold + dropped } })
   } catch (err) {
-    const { code, error } = bangumiError(err, '获取统计失败')
-    res.status(code).json({ error })
+    const r = errorResult(err.response?.status, err.response?.data, '获取统计失败')
+    return c.json({ error: r.error }, r.code)
   }
 })
 
-router.get('/:animeId', async (req, res) => {
+app.get('/:animeId', async (c) => {
   try {
-    const token = extractToken(req)
-    const username = extractUsername(req)
-    if (!token) return res.status(401).json({ error: '未登录' })
-    if (!username) return res.status(400).json({ error: '缺少用户名' })
+    const token = extractToken(c)
+    const username = extractUsername(c)
+    if (!token) return c.json({ error: '未登录' }, 401)
+    if (!username) return c.json({ error: '缺少用户名' }, 400)
     const client = getClient(token)
-    const { data: collection } = await client.get(`/v0/users/${username}/collections/${req.params.animeId}`)
-    res.json({
+    const collection = await client.get(`/v0/users/${username}/collections/${c.req.param('animeId')}`)
+    return c.json({
       data: {
         anime_id: collection.subject_id,
         status: collection.type,
@@ -80,73 +76,69 @@ router.get('/:animeId', async (req, res) => {
       }
     })
   } catch (err) {
-    const result = bangumiError(err, '获取收藏状态失败')
-    if (result.code === 404) return res.json({ data: null })
-    res.status(result.code).json({ error: result.error })
+    const r = errorResult(err.response?.status, err.response?.data, '获取收藏状态失败')
+    if (r.code === 404) return c.json({ data: null })
+    return c.json({ error: r.error }, r.code)
   }
 })
 
-router.post('/:animeId', async (req, res) => {
+app.post('/:animeId', async (c) => {
   try {
-    const token = extractToken(req)
-    const username = extractUsername(req)
-    if (!token) return res.status(401).json({ error: '未登录' })
+    const token = extractToken(c)
+    const username = extractUsername(c)
+    if (!token) return c.json({ error: '未登录' }, 401)
     const client = getClient(token)
+    const body = await c.req.json()
 
-    const body = {}
-    if (req.body.status !== undefined && req.body.status >= 1) body.type = Number(req.body.status)
-    if (req.body.rating !== undefined) body.rate = Number(req.body.rating)
-    if (req.body.comment !== undefined && req.body.comment !== null) body.comment = String(req.body.comment)
+    const payload = {}
+    if (body.status !== undefined && body.status >= 1) payload.type = Number(body.status)
+    if (body.rating !== undefined) payload.rate = Number(body.rating)
+    if (body.comment !== undefined && body.comment !== null) payload.comment = String(body.comment)
 
-    if (!body.type) {
+    if (!payload.type) {
       try {
         if (username) {
-          const { data: current } = await client.get(`/v0/users/${username}/collections/${req.params.animeId}`)
-          if (current?.type) body.type = current.type
+          const current = await client.get(`/v0/users/${username}/collections/${c.req.param('animeId')}`)
+          if (current?.type) payload.type = current.type
         }
-      } catch { body.type = 3 }
+      } catch { payload.type = 3 }
     }
-
-    console.log(`[Collection] POST /${req.params.animeId} body:`, JSON.stringify(body))
-    await client.post(`/v0/users/-/collections/${req.params.animeId}`, body)
+    await client.post(`/v0/users/-/collections/${c.req.param('animeId')}`, payload)
 
     if (username) {
       try {
-        const { data: collection } = await client.get(`/v0/users/${username}/collections/${req.params.animeId}`)
-        res.json({
+        const collection = await client.get(`/v0/users/${username}/collections/${c.req.param('animeId')}`)
+        return c.json({
           data: {
-            anime_id: collection.subject_id,
-            status: collection.type,
-            rating: collection.rate || 0,
-            comment: collection.comment || '',
-            episode: collection.ep_status || 0,
-            subject: collection.subject || null,
+            anime_id: collection.subject_id, status: collection.type,
+            rating: collection.rate || 0, comment: collection.comment || '',
+            episode: collection.ep_status || 0, subject: collection.subject || null,
             updated_at: collection.updated_at
           }
         })
       } catch {
-        res.json({ data: { status: body.type, rating: body.rate || 0, comment: body.comment || '', updated: true } })
+        return c.json({ data: { status: payload.type, rating: payload.rate || 0, comment: payload.comment || '', updated: true } })
       }
     } else {
-      res.json({ data: { status: body.type, rating: body.rate || 0, comment: body.comment || '', updated: true } })
+      return c.json({ data: { status: payload.type, rating: payload.rate || 0, comment: payload.comment || '', updated: true } })
     }
   } catch (err) {
-    const result = bangumiError(err, '保存收藏失败')
-    res.status(result.code).json({ error: result.error })
+    const r = errorResult(err.response?.status, err.response?.data, '保存收藏失败')
+    return c.json({ error: r.error }, r.code)
   }
 })
 
-router.delete('/:animeId', async (req, res) => {
+app.delete('/:animeId', async (c) => {
   try {
-    const token = extractToken(req)
-    if (!token) return res.status(401).json({ error: '未登录' })
+    const token = extractToken(c)
+    if (!token) return c.json({ error: '未登录' }, 401)
     const client = getClient(token)
-    await client.delete(`/v0/users/-/collections/${req.params.animeId}`)
-    res.json({ message: '已删除' })
+    await client.delete(`/v0/users/-/collections/${c.req.param('animeId')}`)
+    return c.json({ message: '已删除' })
   } catch (err) {
-    const result = bangumiError(err, '删除收藏失败')
-    res.status(result.code).json({ error: result.error })
+    const r = errorResult(err.response?.status, err.response?.data, '删除收藏失败')
+    return c.json({ error: r.error }, r.code)
   }
 })
 
-export default router
+export default app
