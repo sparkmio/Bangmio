@@ -17,7 +17,7 @@ export async function browseAnime(c) {
     const q = c.req.query()
     const params = {}
     if (q.sort) params.sort = q.sort
-    if (q.type) params.type = q.type
+    if (q.type && Number(q.type) > 0) params.type = q.type
     if (q.page) params.page = q.page
     if (q.limit) params.limit = q.limit
     if (q.tag) params.tag = q.tag

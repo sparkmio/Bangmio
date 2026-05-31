@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="mb-6">
-      <h1 class="text-2xl font-semibold mb-4 text-base-content">热门番剧</h1>
+      <h1 class="text-2xl font-semibold mb-4 text-base-content">热门</h1>
 
       <div class="flex flex-wrap gap-3 items-center mb-4">
         <div class="relative flex-1 min-w-60 max-w-md">
@@ -10,13 +10,18 @@
           </svg>
           <input v-model="keyword" @keyup.enter="search" placeholder="搜索番剧..." class="input input-bordered input-sm w-full pl-9" />
         </div>
-        <select v-model="filterType" @change="page = 1; browse()" class="select select-bordered select-sm w-auto">
-          <option :value="0">全部</option>
-          <option :value="2">动画</option>
-          <option :value="1">书籍</option>
-          <option :value="3">音乐</option>
-          <option :value="4">游戏</option>
-        </select>
+      </div>
+
+      <div class="flex gap-1.5 mb-4 overflow-x-auto pb-1">
+        <button
+          v-for="t in typeOptions"
+          :key="t.value"
+          @click="filterType = t.value; page = 1; browse()"
+          class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-all"
+          :class="filterType === t.value ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60 hover:bg-base-300'"
+        >
+          {{ t.label }}
+        </button>
       </div>
 
       <div class="flex flex-wrap gap-2" v-if="tags.length">
@@ -67,6 +72,13 @@ const tags = ref([])
 const selectedTags = ref([])
 const sortType = ref('heat')
 const filterType = ref(Number(route.query.type) || 0)
+const typeOptions = [
+  { label: '全部', value: 0 },
+  { label: '动画', value: 2 },
+  { label: '书籍', value: 1 },
+  { label: '音乐', value: 3 },
+  { label: '游戏', value: 4 },
+]
 const page = ref(Number(route.query.page) || 1)
 const total = ref(0)
 const loading = ref(false)

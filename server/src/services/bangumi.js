@@ -28,7 +28,10 @@ function buildSearchBody(keyword, params = {}) {
   const validSorts = ['match', 'heat', 'rank', 'score']
   const sort = validSorts.includes(params.sort) ? params.sort : 'rank'
   const filter = {}
-  if (params.type) filter.type = Array.isArray(params.type) ? params.type.map(Number) : [Number(params.type)]
+  if (params.type) {
+    const t = Number(params.type)
+    if (t > 0) filter.type = Array.isArray(params.type) ? params.type.map(Number) : [t]
+  }
   if (params.tag) filter.tag = Array.isArray(params.tag) ? params.tag : params.tag.split(',')
   const body = { keyword: keyword || '', sort, filter }
   const limit = Number(params.limit) || 20

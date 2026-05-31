@@ -2,7 +2,7 @@ const CACHE_TTL = 30 * 24 * 60 * 60 // 30 days
 
 export const onRequest = async (ctx) => {
   const url = new URL(ctx.request.url)
-  const upstream = `https://lain.bgm.tv${url.pathname}${url.search}`
+  const upstream = `https://bgmimg.anibt.net${url.pathname}${url.search}`
 
   const cache = caches.default
   const cacheKey = new Request(upstream, { method: 'GET' })
