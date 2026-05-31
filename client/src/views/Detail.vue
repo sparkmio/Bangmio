@@ -117,7 +117,7 @@
           制作人员
         </h2>
         <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-          <router-link :to="`/person/${p.id}`" v-for="p in persons.slice(0,16)" :key="p.id" class="flex-shrink-0 bg-base-200 rounded-lg p-4 w-28 text-center border border-base-300 hover:border-primary transition-colors duration-300">
+          <router-link :to="`/person/${p.id}`" v-for="p in persons.slice(0,16)" :key="p.id" class="flex-shrink-0 bg-base-200/50 rounded-lg p-4 w-28 text-center hover-bg-slide transition-all duration-200">
             <div class="avatar placeholder mb-2">
               <div class="w-12 h-12 rounded-full bg-primary/20">
                 <img v-if="p.images?.medium || p.images?.grid" :src="p.images.medium || p.images.grid" class="rounded-full" />
@@ -137,9 +137,9 @@
         </h2>
         <div class="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
           <router-link v-for="char in characters.slice(0,14)" :key="char.id" :to="`/character/${char.id}`" class="flex-shrink-0 text-center w-20 group">
-            <div class="avatar">
-              <div class="w-16 h-16 rounded-full ring-2 ring-base-300 group-hover:ring-primary transition-all duration-300">
-                <img :src="char.images?.grid || char.images?.medium" />
+            <div class="relative">
+              <div class="w-16 h-16 rounded-full overflow-hidden mx-auto ring-2 ring-base-300 group-hover:ring-primary group-hover:ring-offset-2 transition-all duration-300">
+                <img :src="char.images?.grid || char.images?.medium" class="w-full h-full object-cover" />
               </div>
             </div>
             <p class="text-xs mt-1.5 truncate text-base-content/60 group-hover:text-base-content transition-colors">{{ char.name }}</p>

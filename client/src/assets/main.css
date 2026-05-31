@@ -4,6 +4,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===== Reset ===== */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 html, body {
@@ -15,29 +16,112 @@ html, body {
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Overpass', 'Noto Sans SC', sans-serif;
   line-height: 1.25;
+  letter-spacing: -0.02em;
 }
 
+/* ===== DaisyUI variable overrides ===== */
+:root {
+  --rounded-box: 8px;
+  --rounded-btn: 6px;
+  --rounded-badge: 4px;
+  --border-btn: 1px;
+  --tab-border: 1px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 2px 8px rgba(0,0,0,.06);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,.08);
+}
+
+/* ===== Custom scrollbar ===== */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: oklch(var(--p) / 0.3); border-radius: 3px; }
 
+/* ===== Anime grid ===== */
 .anime-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 1.15rem;
 }
 
 @media (max-width: 640px) {
   .anime-grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 0.85rem;
   }
 }
 
+/* ===== Scrollbar hide ===== */
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* ===== Fade transition ===== */
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 
+/* ===== Text utilities ===== */
 .break-words { overflow-wrap: break-word; word-break: break-word; }
+
+/* ===== Custom hover: underline wipe ===== */
+.hover-underline-wipe {
+  position: relative;
+  text-decoration: none;
+}
+.hover-underline-wipe::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: oklch(var(--p));
+  transition: width 0.3s ease;
+}
+.hover-underline-wipe:hover::after {
+  width: 100%;
+}
+
+/* ===== Custom hover: bg slide-in from left ===== */
+.hover-bg-slide {
+  position: relative;
+  overflow: hidden;
+}
+.hover-bg-slide::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: oklch(var(--p) / 0.06);
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+  z-index: -1;
+}
+.hover-bg-slide:hover::before {
+  transform: translateX(0);
+}
+
+/* ===== Card hover: lift + shadow ===== */
+.card-lift {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.card-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.1);
+}
+
+/* ===== Skeleton loading ===== */
+.skeleton {
+  background: linear-gradient(90deg, oklch(var(--b2)) 25%, oklch(var(--b3)) 50%, oklch(var(--b2)) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--rounded-box);
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ===== Decorative accent bar ===== */
+.accent-bar {
+  width: 3px;
+  border-radius: 2px;
+  background: oklch(var(--p));
+}

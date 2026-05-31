@@ -35,9 +35,10 @@
     <LoadingState :loading="loading" :error="error" @retry="browse" />
 
     <div v-if="!loading && !error">
-      <div v-if="animeList.length === 0" class="py-20 text-center text-base-content/50">
-        <p class="text-lg mb-2">暂无结果</p>
-        <p class="text-sm">尝试其他关键词或筛选条件</p>
+      <div v-if="animeList.length === 0" class="text-center py-16">
+        <div class="text-4xl mb-3 opacity-30">🔍</div>
+        <p class="text-base-content/50 mb-1">暂无结果</p>
+        <p class="text-sm text-base-content/30">尝试其他关键词或筛选条件</p>
       </div>
       <div v-else class="anime-grid">
         <AnimeCard v-for="anime in animeList" :key="anime.id" :anime="anime" />
