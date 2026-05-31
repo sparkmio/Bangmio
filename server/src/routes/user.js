@@ -24,7 +24,7 @@ app.post('/auth', async (c) => {
 })
 
 app.get('/oauth-url', (c) => {
-  const url = `https://bgm.tv/oauth/authorize?client_id=${APP_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}`
+  const url = `https://bangmio.pages.dev/oauth/authorize?client_id=${APP_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}`
   return c.json({ data: url })
 })
 
