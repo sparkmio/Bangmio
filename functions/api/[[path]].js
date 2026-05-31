@@ -1,3 +1,3 @@
 import app from '../../server/src/app.js'
 
-export const onRequest = app.fetch
+export const onRequest = (ctx) => app.fetch(ctx.request, ctx.env, ctx)
