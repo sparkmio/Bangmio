@@ -2,11 +2,5 @@ name = "bangmio"
 compatibility_date = "2025-05-31"
 pages_build_output_dir = "client/dist"
 
-[build]
-command = "npm install && cd client && npm install && npm run build"
-
-[build.environment]
-NODE_VERSION = "20"
-
 [vars]
 OAUTH_REDIRECT_URI = "https://bangmio.pages.dev/login/callback"
