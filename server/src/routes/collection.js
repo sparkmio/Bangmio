@@ -3,6 +3,10 @@ import { getClient } from '../services/bangumi.js'
 
 const app = new Hono()
 
+function isChina(c) {
+  return (c.env?.CF_IP_COUNTRY || '') === 'CN'
+}
+
 function extractToken(c) {
   return (c.req.header('Authorization') || '').replace('Bearer ', '')
 }
@@ -24,7 +28,7 @@ app.get('/list', async (c) => {
     const username = extractUsername(c)
     if (!token) return c.json({ error: '未登录' }, 401)
     if (!username) return c.json({ error: '缺少用户名' }, 400)
-    const client = getClient(token)
+    const client = getClient(token, isChina(c))
     const params = { offset: Number(c.req.query('offset')) || 0, limit: Number(c.req.query('limit')) || 30 }
     const st = c.req.query('subject_type')
     const t = c.req.query('type')
@@ -44,7 +48,7 @@ app.get('/stats', async (c) => {
     const username = extractUsername(c)
     if (!token) return c.json({ error: '未登录' }, 401)
     if (!username) return c.json({ error: '缺少用户名' }, 400)
-    const client = getClient(token)
+    const client = getClient(token, isChina(c))
     const fetchTotal = (type) => client.get(`/v0/users/${username}/collections`, { type, limit: 1 }).then(r => r.total).catch(() => 0)
     const [wish, collect, doing, on_hold, dropped] = await Promise.all([
       fetchTotal(1), fetchTotal(2), fetchTotal(3), fetchTotal(4), fetchTotal(5)
@@ -62,7 +66,7 @@ app.get('/:animeId', async (c) => {
     const username = extractUsername(c)
     if (!token) return c.json({ error: '未登录' }, 401)
     if (!username) return c.json({ error: '缺少用户名' }, 400)
-    const client = getClient(token)
+    const client = getClient(token, isChina(c))
     const collection = await client.get(`/v0/users/${username}/collections/${c.req.param('animeId')}`)
     return c.json({
       data: {
@@ -87,7 +91,7 @@ app.post('/:animeId', async (c) => {
     const token = extractToken(c)
     const username = extractUsername(c)
     if (!token) return c.json({ error: '未登录' }, 401)
-    const client = getClient(token)
+    const client = getClient(token, isChina(c))
     const body = await c.req.json()
 
     const payload = {}
@@ -132,7 +136,7 @@ app.delete('/:animeId', async (c) => {
   try {
     const token = extractToken(c)
     if (!token) return c.json({ error: '未登录' }, 401)
-    const client = getClient(token)
+    const client = getClient(token, isChina(c))
     await client.delete(`/v0/users/-/collections/${c.req.param('animeId')}`)
     return c.json({ message: '已删除' })
   } catch (err) {

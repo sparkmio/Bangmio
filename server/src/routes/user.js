@@ -6,15 +6,23 @@ const app = new Hono()
 const APP_ID = 'bgm61416a088eff71580'
 const APP_SECRET = '6b8055c0159fcc5e998059536813026f'
 
+function isChina(c) {
+  return (c.env?.CF_IP_COUNTRY || '') === 'CN'
+}
+
 function redirectUri(c) {
   return c.env?.OAUTH_REDIRECT_URI || 'http://localhost:5173/login/callback'
+}
+
+function oauthBase(c) {
+  return isChina(c) ? 'https://bangumi.one' : 'https://bgm.tv'
 }
 
 app.post('/auth', async (c) => {
   try {
     const { token } = await c.req.json()
     if (!token) return c.json({ error: '请输入 Access Token' }, 400)
-    const client = getClient(token)
+    const client = getClient(token, isChina(c))
     const user = await client.get('/v0/me')
     return c.json({ data: { user, token } })
   } catch (err) {
@@ -24,7 +32,7 @@ app.post('/auth', async (c) => {
 })
 
 app.get('/oauth-url', (c) => {
-  const url = `https://bangumi.one/oauth/authorize?client_id=${APP_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}`
+  const url = `${oauthBase(c)}/oauth/authorize?client_id=${APP_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}`
   return c.json({ data: url })
 })
 
@@ -39,7 +47,7 @@ app.post('/oauth-callback', async (c) => {
       code,
       redirect_uri: redirectUri(c)
     })
-    const tokenRes = await fetch('https://bangumi.one/oauth/access_token', {
+    const tokenRes = await fetch(`${oauthBase(c)}/oauth/access_token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString()
@@ -48,7 +56,7 @@ app.post('/oauth-callback', async (c) => {
     const accessToken = tokenData.access_token
     const refreshToken = tokenData.refresh_token
     if (!accessToken) return c.json({ error: '获取 Token 失败', detail: tokenData }, 400)
-    const client = getClient(accessToken)
+    const client = getClient(accessToken, isChina(c))
     const user = await client.get('/v0/me')
     return c.json({ data: { user, token: accessToken, refreshToken: refreshToken || '' } })
   } catch (err) {
@@ -67,7 +75,7 @@ app.post('/refresh-token', async (c) => {
       refresh_token: refreshToken,
       redirect_uri: redirectUri(c)
     })
-    const tokenRes = await fetch('https://bangumi.one/oauth/access_token', {
+    const tokenRes = await fetch(`${oauthBase(c)}/oauth/access_token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString()
@@ -76,7 +84,7 @@ app.post('/refresh-token', async (c) => {
     const accessToken = tokenData.access_token
     const newRefreshToken = tokenData.refresh_token || refreshToken
     if (!accessToken) return c.json({ error: '刷新 Token 失败' }, 400)
-    const client = getClient(accessToken)
+    const client = getClient(accessToken, isChina(c))
     const user = await client.get('/v0/me')
     return c.json({ data: { user, token: accessToken, refreshToken: newRefreshToken } })
   } catch (err) {
@@ -88,7 +96,7 @@ app.get('/me', async (c) => {
   try {
     const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
     if (!token) return c.json({ error: '未登录' }, 401)
-    const client = getClient(token)
+    const client = getClient(token, isChina(c))
     const user = await client.get('/v0/me')
     return c.json({ data: user })
   } catch (err) {

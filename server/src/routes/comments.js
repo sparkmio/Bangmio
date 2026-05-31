@@ -1,9 +1,17 @@
 import { Hono } from 'hono'
+import { parseHTML } from 'linkedom'
 
 const app = new Hono()
 
 const cache = new Map()
 const CACHE_TTL = 5 * 60 * 1000
+
+const BGM_TV = 'https://bgm.tv'
+const BGM_PROXY = 'https://bangumi.one'
+
+function getBase(isChina) {
+  return isChina ? BGM_PROXY : BGM_TV
+}
 
 async function fetchHTML(url) {
   const res = await fetch(url, {
@@ -17,140 +25,153 @@ async function fetchHTML(url) {
   return new TextDecoder('utf-8').decode(buf)
 }
 
-function getAttr(html, tag, attr) {
-  const m = html.match(new RegExp(`<${tag}[^>]*${attr}="([^"]*)"`, 'i'))
-  return m ? m[1] : ''
-}
-
-function getText(html) {
-  return html.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ').trim()
-}
-
-function parseUserBlock(block) {
-  const userLink = block.match(/<strong[^>]*>\s*<a[^>]*href="\/user\/([^"]*)"[^>]*>([^<]*)<\/a>/i)
-  const avatarMatch = block.match(/url\(['"]?(https?:\/\/[^'"()]+|\/\/[^'"()]+)['"]?\)/i)
+function parseUserLink(el) {
+  const link = el.querySelector('strong > a[href^="/user/"], strong.userName > a[href^="/user/"]')
+  const avatarEl = el.querySelector('.avatarNeue')
+  const avatarStyle = avatarEl ? (avatarEl.getAttribute('style') || '') : ''
+  const avatarMatch = avatarStyle.match(/url\(['"]?([^'"()]+)['"]?\)/)
   let avatar = ''
   if (avatarMatch) {
     avatar = avatarMatch[1].startsWith('//') ? 'https:' + avatarMatch[1] : avatarMatch[1]
     avatar = avatar.replace('lain.bgm.tv', 'lain.bangumi.one')
   }
   return {
-    username: userLink ? userLink[2].trim() : '',
-    url: userLink ? '/user/' + userLink[1] : '',
+    username: link ? link.textContent.trim() : '',
+    url: link ? link.getAttribute('href') || '' : '',
     avatar
   }
 }
 
-function parseTalkbox(html) {
-  const comments = []
-  const rows = html.split(/<div[^>]*id="post_\d+"[^>]*class="[^"]*row_reply[^"]*"/i)
-  for (let i = 1; i < rows.length && comments.length < 50; i++) {
-    const row = rows[i]
-    const idMatch = row.match(/^(\d+)/)
-    const id = idMatch ? idMatch[1] : String(i)
-    const floorMatch = row.match(/class="floor-anchor"[^>]*>#?(\d+)/i)
-    const floor = floorMatch ? floorMatch[1] : ''
-    const timeMatch = row.match(/class="floor-anchor"[^>]*>[^<]*<\/a>\s*<span[^>]*>([^<]*)<\/span>/i)
-    const timestamp = timeMatch ? timeMatch[1].trim().replace(/^-\s*/, '') : ''
-    const user = parseUserBlock(row)
-    const contentMatch = row.match(/class="message"[^>]*>([\s\S]*?)<\/div>/i)
-    const content = contentMatch ? getText(contentMatch[1]) : ''
+function parseSubReplies($doc, el) {
+  const replies = []
+  const subReplies = el.querySelectorAll('.topic_sub_reply .sub_reply_bg')
+  subReplies.forEach((subEl, j) => {
+    const floorEl = subEl.querySelector('.floor-anchor')
+    const floor = floorEl ? floorEl.textContent.replace('#', '').trim() : ''
+    const actionText = floorEl ? floorEl.parentElement.textContent : ''
+    const timestamp = actionText.replace(/#[\d-]+[\s-]*/, '').trim()
+    const user = parseUserLink(subEl)
+    const contentEl = subEl.querySelector('.cmt_sub_content')
+    const content = contentEl ? contentEl.textContent.trim() : ''
     if (user.username && content) {
-      comments.push({ id, floor, user, content, timestamp, replies: [] })
+      replies.push({ id: subEl.id?.replace('post_', '') || String(j), floor, user, content, timestamp })
     }
-  }
+  })
+  return replies
+}
+
+function parseTalkbox(html) {
+  const { document } = parseHTML(html)
+  const comments = []
+  const rows = document.querySelectorAll('#comment_list > .row_reply')
+  rows.forEach((el, i) => {
+    const floorEl = el.querySelector('.post_actions .floor-anchor')
+    const floor = floorEl ? floorEl.textContent.replace('#', '').trim() : ''
+    const actionText = floorEl ? floorEl.parentElement.textContent : ''
+    const timestamp = actionText.replace(/#\S+\s*-?\s*/, '').trim()
+    const user = parseUserLink(el)
+    const contentEl = el.querySelector('.inner .message, .inner .reply_content .message')
+    const content = contentEl ? contentEl.textContent.trim() : ''
+    const replies = parseSubReplies(document, el)
+    if (user.username && content) {
+      comments.push({ id: el.id?.replace('post_', '') || String(i), floor, user, content, timestamp, replies })
+    }
+  })
   return comments
 }
 
 function parseSubjectTalkbox(html) {
+  const { document } = parseHTML(html)
   const comments = []
-  const items = html.split(/<div[^>]*class="[^"]*item[^"]*"[^>]*>/i)
-  for (let i = 1; i < items.length && comments.length < 50; i++) {
-    const item = items[i]
-    const userLink = item.match(/<a[^>]*class="l"[^>]*href="\/user\/([^"]*)"[^>]*>([^<]*)<\/a>/i)
-    if (!userLink) continue
-    const avatarMatch = item.match(/url\(['"]?(https?:\/\/[^'"()]+|\/\/[^'"()]+)['"]?\)/i)
+  const items = document.querySelectorAll('#comment_box > .item')
+  items.forEach((el, i) => {
+    const userLink = el.querySelector('a.l[href^="/user/"]')
+    if (!userLink) return
+    const avatarEl = el.querySelector('.avatarNeue')
+    const avatarStyle = avatarEl ? (avatarEl.getAttribute('style') || '') : ''
+    const avatarMatch = avatarStyle.match(/url\(['"]?([^'"()]+)['"]?\)/)
     let avatar = ''
     if (avatarMatch) {
       avatar = avatarMatch[1].startsWith('//') ? 'https:' + avatarMatch[1] : avatarMatch[1]
       avatar = avatar.replace('lain.bgm.tv', 'lain.bangumi.one')
     }
-    const starMatch = item.match(/stars(\d+)/i)
-    const timeMatch = item.match(/<small[^>]*class="grey"[^>]*>([^<]*)<\/small>/gi)
-    const timestamp = timeMatch ? timeMatch[timeMatch.length - 1].replace(/<[^>]+>/g, '').trim().replace(/^@\s*/, '') : ''
-    const contentMatch = item.match(/<p[^>]*class="comment"[^>]*>([\s\S]*?)<\/p>/i)
-    const content = contentMatch ? getText(contentMatch[1]) : '(无文字评价)'
+    const starEl = el.querySelector('.starlight')
+    const starClass = starEl ? (starEl.getAttribute('class') || '') : ''
+    const starMatch = starClass.match(/stars(\d+)/)
+    const timeEls = el.querySelectorAll('small.grey')
+    const timestamp = timeEls.length ? timeEls[timeEls.length - 1].textContent.trim().replace(/^@\s*/, '') : ''
+    const contentEl = el.querySelector('p.comment')
+    const content = contentEl ? contentEl.textContent.trim() : '(无文字评价)'
     comments.push({
       id: String(i),
-      user: { username: userLink[2].trim(), url: '/user/' + userLink[1], avatar },
+      user: { username: userLink.textContent.trim(), url: userLink.getAttribute('href') || '', avatar },
       rating: starMatch ? parseInt(starMatch[1]) : 0,
       content,
       timestamp
     })
-  }
+  })
   return comments
 }
 
 function parseTopics(html) {
+  const { document } = parseHTML(html)
   const topics = []
-  const rows = html.split(/<tr[^>]*>/i)
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i]
-    const titleLink = row.match(/<td[^>]*class="[^"]*subject[^"]*"[^>]*>\s*<a[^>]*href="([^"]*)"[^>]*(?:title="([^"]*)")?[^>]*>([^<]*)<\/a>/i)
-    if (!titleLink) continue
-    const href = titleLink[1]
-    const title = titleLink[2] || titleLink[3]
-    if (!href || !title) continue
-    const authorLink = row.match(/<td[^>]*>\s*<a[^>]*href="\/user\/[^"]*"[^>]*>([^<]*)<\/a>/i)
-    const repliesMatch = row.match(/class="grey"[^>]*>.*?(\d+).*?回复/i)
-    const dateMatch = row.match(/<td[^>]*>\s*<small[^>]*class="grey"[^>]*>([^<]*)<\/small>/gi)
-    const dateText = dateMatch ? dateMatch[dateMatch.length - 1].replace(/<[^>]+>/g, '').trim() : ''
+  const rows = document.querySelectorAll('table.topic_list tbody tr')
+  rows.forEach((el) => {
+    const titleLink = el.querySelector('td.subject a')
+    const href = titleLink ? titleLink.getAttribute('href') || '' : ''
+    const title = titleLink ? (titleLink.getAttribute('title') || titleLink.textContent.trim()) : ''
+    if (!href || !title) return
+    const authorLink = el.querySelector('td:nth-child(2) a')
+    const repliesEl = el.querySelector('td:nth-child(3) small.grey')
+    const repliesText = repliesEl ? repliesEl.textContent.trim() : ''
+    const repliesMatch = repliesText.match(/(\d+)/)
+    const dateEl = el.querySelector('td:nth-child(4) small.grey')
+    const dateText = dateEl ? dateEl.textContent.trim() : ''
     topics.push({
       id: href.split('/').pop(),
-      title: title.trim(),
+      title,
       href: `https://bgm.tv${href}`,
-      author: authorLink ? authorLink[1].trim() : '',
+      author: authorLink ? authorLink.textContent.trim() : '',
       replies: repliesMatch ? parseInt(repliesMatch[1]) : 0,
       date: dateText
     })
-  }
+  })
   return topics
 }
 
 function parseTopicPage(html) {
-  const titleMatch = html.match(/<h1[^>]*class="[^"]*nameSingle[^"]*"[^>]*>\s*<a[^>]*>([^<]*)<\/a>/i) ||
-                     html.match(/<title[^>]*>([^<]*)<\/title>/i)
-  const title = titleMatch ? titleMatch[1].trim() : ''
+  const { document } = parseHTML(html)
 
-  const opBlock = html.match(/<div[^>]*class="[^"]*postTopic[^"]*"[^>]*>([\s\S]*?)(?=<div[^>]*id="comment_list")/i)
+  const $op = document.querySelector('.postTopic')
   const op = {
-    user: opBlock ? parseUserBlock(opBlock[0]) : { username: '', url: '', avatar: '' },
-    content: opBlock ? getText((opBlock[0].match(/class="topic_content"[^>]*>([\s\S]*?)<\/div>/i) || ['', ''])[1]) : '',
-    timestamp: opBlock ? (opBlock[0].match(/class="action"[^>]*>.*?<small[^>]*>([^<]*)<\/small>/is) || ['', ''])[1].replace(/#\d+\s*-?\s*/, '').trim() : '',
-    title
+    user: $op ? parseUserLink($op) : { username: '', url: '', avatar: '' },
+    content: $op ? ($op.querySelector('.topic_content') || { textContent: '' }).textContent.trim() : '',
+    timestamp: $op ? ($op.querySelector('.post_actions .action small') || { textContent: '' }).textContent.replace(/#\d+\s*-?\s*/, '').trim() : '',
+    title: (document.querySelector('h1.nameSingle a, .headerNeueInner h1, title') || { textContent: '' }).textContent.trim()
   }
 
   const replies = []
-  const replyBlocks = html.split(/<div[^>]*id="post_\d+"[^>]*class="[^"]*row_reply[^"]*"/i)
-  for (let i = 1; i < replyBlocks.length && replies.length < 100; i++) {
-    const block = replyBlocks[i]
-    const idMatch = block.match(/^(\d+)/)
-    const floorMatch = block.match(/class="floor-anchor"[^>]*>#?(\d+)/i)
-    const timeMatch = block.match(/class="floor-anchor"[^>]*>[^<]*<\/a>\s*<span[^>]*>([^<]*)<\/span>/i)
-    const user = parseUserBlock(block)
-    const contentMatch = block.match(/class="message"[^>]*>([\s\S]*?)<\/div>/i)
-    const content = contentMatch ? getText(contentMatch[1]) : ''
+  const replyRows = document.querySelectorAll('#comment_list > .row_reply')
+  replyRows.forEach((el, i) => {
+    const floorEl = el.querySelector('.post_actions .floor-anchor')
+    const floor = floorEl ? floorEl.textContent.replace('#', '').trim() : ''
+    const actionText = floorEl ? floorEl.parentElement.textContent : ''
+    const timestamp = actionText.replace(/#\S+\s*-?\s*/, '').trim()
+    const user = parseUserLink(el)
+    const contentEl = el.querySelector('.message')
+    const content = contentEl ? contentEl.textContent.trim() : ''
     if (user.username && content) {
       replies.push({
-        id: idMatch ? idMatch[1] : String(i),
-        floor: floorMatch ? floorMatch[1] : '',
+        id: el.id?.replace('post_', '') || String(i),
+        floor,
         user,
         content,
-        timestamp: timeMatch ? timeMatch[1].trim().replace(/^-\s*/, '') : '',
-        replies: []
+        timestamp,
+        replies: parseSubReplies(document, el)
       })
     }
-  }
+  })
 
   return { op, replies }
 }
@@ -164,19 +185,16 @@ function setCache(key, data) {
 }
 
 app.get('/test', async (c) => {
-  return c.json({ ok: true })
+  return c.json({ ok: true, country: c.env?.CF_IP_COUNTRY || 'unknown' })
 })
 
 app.get('/character/:id', async (c) => {
   try {
-    const key = `char_${c.req.param('id')}`
+    const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
+    const key = `char_${c.req.param('id')}_${isChina}`
     const cached = getCached(key)
     if (cached) return c.json({ data: cached })
-    const res = await fetch(`https://bgm.tv/character/${c.req.param('id')}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      redirect: 'follow'
-    })
-    const html = await res.text()
+    const html = await fetchHTML(`${getBase(isChina)}/character/${c.req.param('id')}`)
     const comments = parseTalkbox(html)
     setCache(key, comments)
     return c.json({ data: comments })
@@ -187,10 +205,11 @@ app.get('/character/:id', async (c) => {
 
 app.get('/subject/:id', async (c) => {
   try {
-    const key = `subj_${c.req.param('id')}`
+    const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
+    const key = `subj_${c.req.param('id')}_${isChina}`
     const cached = getCached(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`https://bgm.tv/subject/${c.req.param('id')}`)
+    const html = await fetchHTML(`${getBase(isChina)}/subject/${c.req.param('id')}`)
     const comments = parseSubjectTalkbox(html)
     setCache(key, comments)
     return c.json({ data: comments })
@@ -201,10 +220,11 @@ app.get('/subject/:id', async (c) => {
 
 app.get('/subject/:id/topics', async (c) => {
   try {
-    const key = `topics_${c.req.param('id')}`
+    const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
+    const key = `topics_${c.req.param('id')}_${isChina}`
     const cached = getCached(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`https://bgm.tv/subject/${c.req.param('id')}/board`)
+    const html = await fetchHTML(`${getBase(isChina)}/subject/${c.req.param('id')}/board`)
     const topics = parseTopics(html)
     setCache(key, topics)
     return c.json({ data: topics })
@@ -215,10 +235,11 @@ app.get('/subject/:id/topics', async (c) => {
 
 app.get('/topic/:topicId', async (c) => {
   try {
-    const key = `topic_${c.req.param('topicId')}`
+    const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
+    const key = `topic_${c.req.param('topicId')}_${isChina}`
     const cached = getCached(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`https://bgm.tv/subject/topic/${c.req.param('topicId')}`)
+    const html = await fetchHTML(`${getBase(isChina)}/subject/topic/${c.req.param('topicId')}`)
     const topic = parseTopicPage(html)
     setCache(key, topic)
     return c.json({ data: topic })
@@ -229,10 +250,11 @@ app.get('/topic/:topicId', async (c) => {
 
 app.get('/person/:id', async (c) => {
   try {
-    const key = `person_${c.req.param('id')}`
+    const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
+    const key = `person_${c.req.param('id')}_${isChina}`
     const cached = getCached(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`https://bgm.tv/person/${c.req.param('id')}`)
+    const html = await fetchHTML(`${getBase(isChina)}/person/${c.req.param('id')}`)
     const comments = parseTalkbox(html)
     setCache(key, comments)
     return c.json({ data: comments })

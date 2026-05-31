@@ -1,4 +1,5 @@
-const BANGUMI_API = 'https://api.bgm.tv'
+const BGM_API = 'https://api.bgm.tv'
+const BGM_PROXY = 'https://api.bangumi.one'
 
 function rewriteImageUrls(data) {
   if (typeof data === 'string') return data.replace(/lain\.bgm\.tv/g, 'lain.bangumi.one')
@@ -17,11 +18,13 @@ function headers(token) {
     : { 'User-Agent': 'Bangmio/anime-manager' }
 }
 
-async function bgmGet(path, token, params) {
-  const url = new URL(`${BANGUMI_API}${path}`)
+async function bgmGet(path, token, params, isChina = false) {
+  const base = isChina ? BGM_PROXY : BGM_API
+  const url = new URL(`${base}${path}`)
   if (params) Object.entries(params).forEach(([k, v]) => v != null && url.searchParams.set(k, v))
   const res = await fetch(url.toString(), { headers: headers(token) })
-  const data = await res.json()
+  const text = await res.text()
+  const data = text ? JSON.parse(text) : {}
   if (!res.ok) {
     const err = new Error(`Bangumi API ${res.status}`)
     err.response = { status: res.status, data }
@@ -30,15 +33,17 @@ async function bgmGet(path, token, params) {
   return rewriteImageUrls(data)
 }
 
-async function bgmPost(path, body, token, params) {
-  const url = new URL(`${BANGUMI_API}${path}`)
+async function bgmPost(path, body, token, params, isChina = false) {
+  const base = isChina ? BGM_PROXY : BGM_API
+  const url = new URL(`${base}${path}`)
   if (params) Object.entries(params).forEach(([k, v]) => v != null && url.searchParams.set(k, v))
   const res = await fetch(url.toString(), {
     method: 'POST',
     headers: { ...headers(token), 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   })
-  const data = await res.json()
+  const text = await res.text()
+  const data = text ? JSON.parse(text) : {}
   if (!res.ok) {
     const err = new Error(`Bangumi API ${res.status}`)
     err.response = { status: res.status, data }
@@ -62,35 +67,45 @@ function buildSearchBody(keyword, params = {}) {
   return { body, limit, offset: (page - 1) * limit }
 }
 
+export function getIsChina(c) {
+  return (c.env?.CF_IP_COUNTRY || '') === 'CN'
+}
+
 export async function searchAnime(keyword, opts = {}) {
   const { body, limit, offset } = buildSearchBody(keyword, opts)
-  const d = await bgmPost('/v0/search/subjects', body, null, { limit, offset })
+  const d = await bgmPost('/v0/search/subjects', body, null, { limit, offset }, opts.isChina)
   return { data: d.data || [], total: d.total || 0 }
 }
 
 export async function browseAnime(params = {}) {
   const { body, limit, offset } = buildSearchBody('', params)
-  const d = await bgmPost('/v0/search/subjects', body, null, { limit, offset })
+  const d = await bgmPost('/v0/search/subjects', body, null, { limit, offset }, params.isChina)
   return { data: d.data || [], total: d.total || 0 }
 }
 
-export function getClient(token) {
+export function getClient(token, isChina = false) {
   return {
-    get: (path, params) => bgmGet(path, token, params),
-    post: (path, body, params) => bgmPost(path, body, token, params),
-    delete: (path) => fetch(`${BANGUMI_API}${path}`, { method: 'DELETE', headers: headers(token) }).then(r => r.json())
+    get: (path, params) => bgmGet(path, token, params, isChina),
+    post: (path, body, params) => bgmPost(path, body, token, params, isChina),
+    delete: (path) => {
+      const base = isChina ? BGM_PROXY : BGM_API
+      return fetch(`${base}${path}`, { method: 'DELETE', headers: headers(token) }).then(r => {
+        const t = r.text()
+        return t ? JSON.parse(t) : {}
+      })
+    }
   }
 }
 
-export async function getAnimeDetail(id) { return bgmGet(`/v0/subjects/${id}`) }
-export async function getAnimeEpisodes(id, { offset = 0, limit = 100 } = {}) {
-  const d = await bgmGet('/v0/episodes', null, { subject_id: id, offset, limit })
+export async function getAnimeDetail(id, opts) { return bgmGet(`/v0/subjects/${id}`, null, null, opts?.isChina) }
+export async function getAnimeEpisodes(id, { offset = 0, limit = 100, isChina } = {}) {
+  const d = await bgmGet('/v0/episodes', null, { subject_id: id, offset, limit }, isChina)
   return { data: d.data || [], total: d.total || 0 }
 }
-export async function getAnimeCharacters(id) { return bgmGet(`/v0/subjects/${id}/characters`) }
-export async function getAnimeRelations(id) { return bgmGet(`/v0/subjects/${id}/subjects`) }
-export async function getAnimePersons(id) { return bgmGet(`/v0/subjects/${id}/persons`) }
-export async function getAnimeCalendar() { return bgmGet('/calendar') }
+export async function getAnimeCharacters(id, opts) { return bgmGet(`/v0/subjects/${id}/characters`, null, null, opts?.isChina) }
+export async function getAnimeRelations(id, opts) { return bgmGet(`/v0/subjects/${id}/subjects`, null, null, opts?.isChina) }
+export async function getAnimePersons(id, opts) { return bgmGet(`/v0/subjects/${id}/persons`, null, null, opts?.isChina) }
+export async function getAnimeCalendar(opts) { return bgmGet('/calendar', null, null, opts?.isChina) }
 export async function getAnimeTags() {
   return [
     { name: '恋爱' }, { name: '搞笑' }, { name: '战斗' }, { name: '奇幻' },
@@ -100,10 +115,10 @@ export async function getAnimeTags() {
     { name: '耽美' }, { name: '异世界' }, { name: '机甲' }, { name: '穿越' }
   ]
 }
-export async function getCharacterDetail(id) {
-  return bgmGet(`/v0/characters/${id}`)
+export async function getCharacterDetail(id, opts) {
+  return bgmGet(`/v0/characters/${id}`, null, null, opts?.isChina)
 }
-export async function getCharacterSubjects(id) { return bgmGet(`/v0/characters/${id}/subjects`) }
-export async function getCharacterPersons(id) { return bgmGet(`/v0/characters/${id}/persons`) }
-export async function getPersonDetail(id) { return bgmGet(`/v0/persons/${id}`) }
-export async function getPersonSubjects(id) { return bgmGet(`/v0/persons/${id}/subjects`) }
+export async function getCharacterSubjects(id, opts) { return bgmGet(`/v0/characters/${id}/subjects`, null, null, opts?.isChina) }
+export async function getCharacterPersons(id, opts) { return bgmGet(`/v0/characters/${id}/persons`, null, null, opts?.isChina) }
+export async function getPersonDetail(id, opts) { return bgmGet(`/v0/persons/${id}`, null, null, opts?.isChina) }
+export async function getPersonSubjects(id, opts) { return bgmGet(`/v0/persons/${id}/subjects`, null, null, opts?.isChina) }

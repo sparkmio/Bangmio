@@ -17,7 +17,8 @@
     "cheerio": "^1.2.0",
     "cors": "^2.8.5",
     "express": "^4.21.1",
-    "hono": "^4.12.23"
+    "hono": "^4.12.23",
+    "linkedom": "^0.18.12"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
