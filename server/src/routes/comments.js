@@ -23,7 +23,7 @@ function parseUserLink($el) {
   const avatarEl = $el.find('.avatarNeue')
   const avatarStyle = avatarEl.attr('style') || ''
   const avatarMatch = avatarStyle.match(/url\(['"]?([^'"()]+)['"]?\)/)
-  const avatar = avatarMatch ? (avatarMatch[1].startsWith('//') ? 'https:' + avatarMatch[1] : avatarMatch[1]) : ''
+  const avatar = avatarMatch ? (avatarMatch[1].startsWith('//') ? 'https:' + avatarMatch[1] : avatarMatch[1]).replace('lain.bgm.tv', 'lain.bangumi.one') : ''
   return { username: link.text().trim(), url: link.attr('href') || '', avatar }
 }
 
@@ -70,7 +70,7 @@ function parseSubjectTalkbox(html) {
     const avatarEl = $el.find('.avatarNeue')
     const avatarStyle = avatarEl.attr('style') || ''
     const avatarMatch = avatarStyle.match(/url\(['"]?([^'"()]+)['"]?\)/)
-    const avatar = avatarMatch ? (avatarMatch[1].startsWith('//') ? 'https:' + avatarMatch[1] : avatarMatch[1]) : ''
+    const avatar = avatarMatch ? (avatarMatch[1].startsWith('//') ? 'https:' + avatarMatch[1] : avatarMatch[1]).replace('lain.bgm.tv', 'lain.bangumi.one') : ''
     const starMatch = ($el.find('.starlight').attr('class') || '').match(/stars(\d+)/)
     const timeEl = $el.find('small.grey')
     if (userLink.length) {
@@ -98,7 +98,7 @@ function parseTopics(html) {
     const authorLink = $el.find('td:nth-child(2) a')
     const repliesMatch = $el.find('td:nth-child(3) small.grey').text().trim().match(/(\d+)/)
     const dateText = $el.find('td:nth-child(4) small.grey').text().trim()
-    topics.push({ id: href.split('/').pop(), title, href: `https://bangumi.one${href}`, author: authorLink.text().trim(), replies: repliesMatch ? parseInt(repliesMatch[1]) : 0, date: dateText })
+    topics.push({ id: href.split('/').pop(), title, href: `https://bgm.tv${href}`, author: authorLink.text().trim(), replies: repliesMatch ? parseInt(repliesMatch[1]) : 0, date: dateText })
   })
   return topics
 }
@@ -140,7 +140,7 @@ app.get('/character/:id', async (c) => {
     const key = `char_${c.req.param('id')}`
     const cached = getCached(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`https://bangumi.one/character/${c.req.param('id')}`)
+    const html = await fetchHTML(`https://bgm.tv/character/${c.req.param('id')}`)
     const comments = parseTalkbox(html)
     setCache(key, comments)
     return c.json({ data: comments })
@@ -154,7 +154,7 @@ app.get('/subject/:id', async (c) => {
     const key = `subj_${c.req.param('id')}`
     const cached = getCached(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`https://bangumi.one/subject/${c.req.param('id')}`)
+    const html = await fetchHTML(`https://bgm.tv/subject/${c.req.param('id')}`)
     const comments = parseSubjectTalkbox(html)
     setCache(key, comments)
     return c.json({ data: comments })
@@ -168,7 +168,7 @@ app.get('/subject/:id/topics', async (c) => {
     const key = `topics_${c.req.param('id')}`
     const cached = getCached(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`https://bangumi.one/subject/${c.req.param('id')}/board`)
+    const html = await fetchHTML(`https://bgm.tv/subject/${c.req.param('id')}/board`)
     const topics = parseTopics(html)
     setCache(key, topics)
     return c.json({ data: topics })
@@ -182,7 +182,7 @@ app.get('/topic/:topicId', async (c) => {
     const key = `topic_${c.req.param('topicId')}`
     const cached = getCached(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`https://bangumi.one/subject/topic/${c.req.param('topicId')}`)
+    const html = await fetchHTML(`https://bgm.tv/subject/topic/${c.req.param('topicId')}`)
     const topic = parseTopicPage(html)
     setCache(key, topic)
     return c.json({ data: topic })
@@ -196,7 +196,7 @@ app.get('/person/:id', async (c) => {
     const key = `person_${c.req.param('id')}`
     const cached = getCached(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`https://bangumi.one/person/${c.req.param('id')}`)
+    const html = await fetchHTML(`https://bgm.tv/person/${c.req.param('id')}`)
     const comments = parseTalkbox(html)
     setCache(key, comments)
     return c.json({ data: comments })
