@@ -24,7 +24,7 @@ app.post('/auth', async (c) => {
 })
 
 app.get('/oauth-url', (c) => {
-  const url = `https://bgm.tv/oauth/authorize?client_id=${APP_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}`
+  const url = `https://bangumi.one/oauth/authorize?client_id=${APP_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}`
   return c.json({ data: url })
 })
 
@@ -39,7 +39,7 @@ app.post('/oauth-callback', async (c) => {
       code,
       redirect_uri: redirectUri(c)
     })
-    const tokenRes = await fetch('https://bgm.tv/oauth/access_token', {
+    const tokenRes = await fetch('https://bangumi.one/oauth/access_token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString()
@@ -67,7 +67,7 @@ app.post('/refresh-token', async (c) => {
       refresh_token: refreshToken,
       redirect_uri: redirectUri(c)
     })
-    const tokenRes = await fetch('https://bgm.tv/oauth/access_token', {
+    const tokenRes = await fetch('https://bangumi.one/oauth/access_token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString()
