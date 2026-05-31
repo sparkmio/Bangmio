@@ -17,7 +17,7 @@
               <span class="text-base-content/40">{{ c.timestamp }}</span>
               <span class="badge badge-xs">#{{ c.floor }}</span>
             </div>
-            <p class="text-sm leading-relaxed text-base-content/70">{{ c.content }}</p>
+            <p class="text-sm leading-relaxed break-words text-base-content/70">{{ c.content }}</p>
 
             <div v-if="c.replies?.length" class="mt-2 ml-1 pl-2 border-l-2 border-base-300">
               <div v-for="sub in c.replies.slice(0, 3)" :key="sub.id" class="py-1">
@@ -25,7 +25,7 @@
                   <a :href="`https://bgm.tv${sub.user?.url}`" target="_blank" class="font-medium hover:underline text-base-content/50">{{ sub.user?.username }}</a>
                   <span class="text-base-content/40">{{ sub.timestamp }}</span>
                 </div>
-                <p class="text-xs text-base-content/70">{{ sub.content }}</p>
+                <p class="text-xs break-words text-base-content/70">{{ sub.content }}</p>
               </div>
               <p v-if="c.replies.length > 3" class="text-xs mt-1 text-base-content/40">还有 {{ c.replies.length - 3 }} 条回复...</p>
             </div>

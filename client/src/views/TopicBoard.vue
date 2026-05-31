@@ -68,7 +68,7 @@ async function fetchTopics() {
   }
 
   nextTick(() => {
-    gsap.from('.space-y-2 > a', { opacity: 0, y: 15, stagger: 0.05, duration: 0.35, ease: 'power2.out' })
+    gsap.fromTo('.space-y-2 > a', { opacity: 0, y: 15 }, { opacity: 1, y: 0, stagger: 0.05, duration: 0.35, ease: 'power2.out' })
   })
 }
 

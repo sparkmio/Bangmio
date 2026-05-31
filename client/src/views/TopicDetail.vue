@@ -30,7 +30,7 @@
               <span class="text-xs ml-2 text-base-content/50">{{ topic.op.timestamp }}</span>
             </div>
           </div>
-          <div class="text-sm leading-relaxed whitespace-pre-wrap text-base-content/70">{{ topic.op.content }}</div>
+          <div class="text-sm leading-relaxed whitespace-pre-wrap break-words text-base-content/70">{{ topic.op.content }}</div>
         </div>
       </div>
 
@@ -52,7 +52,7 @@
                     <span class="badge badge-xs">#{{ r.floor }}</span>
                     <span class="text-xs text-base-content/50">{{ r.timestamp }}</span>
                   </div>
-                  <p class="text-sm leading-relaxed whitespace-pre-wrap text-base-content/70">{{ r.content }}</p>
+                  <p class="text-sm leading-relaxed whitespace-pre-wrap break-words text-base-content/70">{{ r.content }}</p>
 
                   <div v-if="r.replies?.length" class="mt-3 ml-2 pl-3 border-l-2 border-base-300">
                     <div v-for="sub in r.replies" :key="sub.id" class="flex items-start gap-2 py-2">
@@ -106,8 +106,8 @@ async function fetchTopic() {
 
   nextTick(() => {
     const tl = gsap.timeline({ defaults: { ease: 'power2.out' } })
-    tl.from('.card:first-child', { opacity: 0, y: 20, duration: 0.4 })
-    tl.from('.space-y-3 > .card', { opacity: 0, y: 15, stagger: 0.06, duration: 0.35 }, '-=0.2')
+    tl.fromTo('.card:first-child', { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4 })
+    tl.fromTo('.space-y-3 > .card', { opacity: 0, y: 15 }, { opacity: 1, y: 0, stagger: 0.06, duration: 0.35 }, '-=0.2')
   })
 }
 

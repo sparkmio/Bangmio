@@ -4,7 +4,10 @@ export async function searchAnime(req, res) {
   try {
     const { keyword, type, page, limit } = req.query
     if (!keyword) return res.status(400).json({ error: '请输入搜索关键词' })
-    const result = await bangumiService.searchAnime(keyword, { type: Number(type) || 2, page: Number(page) || 1, limit: Number(limit) || 20 })
+    const typeNum = type ? Number(type) : 0
+    const opts = { page: Number(page) || 1, limit: Number(limit) || 20 }
+    if (typeNum > 0) opts.type = typeNum
+    const result = await bangumiService.searchAnime(keyword, opts)
     res.json({ data: result.data, total: result.total })
   } catch (err) {
     res.status(500).json({ error: '搜索失败' })

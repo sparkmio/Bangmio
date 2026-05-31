@@ -3,6 +3,7 @@
     <LoadingState :loading="loading" :error="error" @retry="fetchCharacter" />
 
     <div v-if="!loading && !error && character.id" class="max-w-4xl mx-auto">
+      <a @click.prevent="$router.back()" class="btn btn-ghost btn-sm text-primary mb-6 cursor-pointer inline-flex items-center gap-1">← 返回</a>
       <div class="flex flex-col md:flex-row gap-8 mb-8">
         <div class="flex-shrink-0 w-44 md:w-52 mx-auto md:mx-0">
           <img

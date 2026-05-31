@@ -11,6 +11,7 @@
           <input v-model="keyword" @keyup.enter="search" placeholder="搜索番剧..." class="input input-bordered input-sm w-full pl-9" />
         </div>
         <select v-model="filterType" @change="page = 1; browse()" class="select select-bordered select-sm w-auto">
+          <option :value="0">全部</option>
           <option :value="2">动画</option>
           <option :value="1">书籍</option>
           <option :value="3">音乐</option>
@@ -65,7 +66,7 @@ const animeList = ref([])
 const tags = ref([])
 const selectedTags = ref([])
 const sortType = ref('heat')
-const filterType = ref(Number(route.query.type) || 2)
+const filterType = ref(Number(route.query.type) || 0)
 const page = ref(Number(route.query.page) || 1)
 const total = ref(0)
 const loading = ref(false)
@@ -95,7 +96,7 @@ async function search() {
   selectedTags.value = []; page.value = 1
   if (keyword.value.trim()) {
     loading.value = true; error.value = ''
-    try { const res = await animeAPI.search({ keyword: keyword.value.trim(), page: page.value, limit }); animeList.value = res.data.data || []; total.value = res.data.total || 0 }
+    try { const res = await animeAPI.search({ keyword: keyword.value.trim(), page: page.value, limit, type: filterType.value || undefined }); animeList.value = res.data.data || []; total.value = res.data.total || 0 }
     catch { error.value = '搜索失败' }
     finally { loading.value = false }
   } else { browse() }
@@ -105,7 +106,7 @@ async function browse() {
   const params = { sort: sortType.value, type: filterType.value, page: page.value, limit }
   if (selectedTags.value.length) params.tag = selectedTags.value.join(',')
   try {
-    if (keyword.value.trim()) { const res = await animeAPI.search({ keyword: keyword.value.trim(), page: page.value, limit }); animeList.value = res.data.data || []; total.value = res.data.total || 0 }
+    if (keyword.value.trim()) { const res = await animeAPI.search({ keyword: keyword.value.trim(), page: page.value, limit, type: filterType.value || undefined }); animeList.value = res.data.data || []; total.value = res.data.total || 0 }
     else { const res = await animeAPI.browse(params); animeList.value = res.data.data || []; total.value = res.data.total || 0 }
   } catch { error.value = '加载失败' }
   finally { loading.value = false }

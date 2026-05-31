@@ -22,6 +22,7 @@
 
       <!-- Hero Content -->
       <div class="relative max-w-5xl mx-auto px-4 md:px-8 py-10 md:py-16">
+        <a @click.prevent="$router.back()" class="btn btn-ghost btn-sm text-primary/80 mb-4 cursor-pointer inline-flex items-center gap-1">← 返回</a>
         <div class="flex flex-col md:flex-row gap-8 items-start" ref="heroRef">
           <div class="flex-shrink-0 w-48 md:w-60 mx-auto md:mx-0">
             <img
@@ -63,7 +64,7 @@
 
             <div v-if="anime.summary" class="mb-4">
               <h3 class="text-sm font-semibold mb-2 text-base-content/60 uppercase tracking-wider text-xs">简介</h3>
-              <p class="text-sm leading-relaxed text-base-content/60">{{ anime.summary }}</p>
+              <p class="text-sm leading-relaxed text-base-content/60 break-words">{{ anime.summary }}</p>
             </div>
 
             <div v-if="anime.tags?.length" class="flex flex-wrap gap-1.5">

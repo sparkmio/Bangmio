@@ -3,7 +3,7 @@
     <section class="mb-12" v-if="auth.isLoggedIn">
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-semibold text-base-content">正在追的番剧</h2>
-        <router-link to="/profile" class="btn btn-ghost btn-sm text-primary">查看全部</router-link>
+        <router-link to="/watching?type=anime" class="btn btn-ghost btn-sm text-primary">查看全部</router-link>
       </div>
       <LoadingState :loading="watchingLoading" :error="watchingError" @retry="fetchWatching" />
       <div v-if="!watchingLoading && !watchingError && watchingList.length" class="anime-grid">
@@ -13,6 +13,23 @@
         <div class="card-body items-center text-center py-10">
           <p class="text-base-content/50">还没有在追的番剧</p>
           <router-link to="/anime" class="btn btn-primary btn-sm mt-2">去探索</router-link>
+        </div>
+      </div>
+    </section>
+
+    <section class="mb-12" v-if="auth.isLoggedIn">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-xl font-semibold text-base-content">正在追的书籍</h2>
+        <router-link to="/watching?type=book" class="btn btn-ghost btn-sm text-primary">查看全部</router-link>
+      </div>
+      <LoadingState :loading="watchingBooksLoading" :error="watchingBooksError" @retry="fetchWatchingBooks" />
+      <div v-if="!watchingBooksLoading && !watchingBooksError && watchingBooks.length" class="anime-grid">
+        <AnimeCard v-for="book in watchingBooks" :key="book.id" :anime="book" />
+      </div>
+      <div v-else-if="!watchingBooksLoading && watchingBooks.length === 0" class="card bg-base-200 border border-base-300">
+        <div class="card-body items-center text-center py-10">
+          <p class="text-base-content/50">还没有在追的书籍</p>
+          <router-link to="/anime?type=1" class="btn btn-primary btn-sm mt-2">去探索</router-link>
         </div>
       </div>
     </section>
@@ -64,6 +81,10 @@ const watchingList = ref([])
 const watchingLoading = ref(false)
 const watchingError = ref('')
 
+const watchingBooks = ref([])
+const watchingBooksLoading = ref(false)
+const watchingBooksError = ref('')
+
 const weekData = ref([])
 const activeDay = ref(new Date().getDay() || 7)
 const weekLoading = ref(true)
@@ -80,15 +101,28 @@ function mapAnime(item) {
   return { ...item, images: item.images || (item.image ? { common: item.image, large: item.image } : null) }
 }
 
+function mapCollection(data) {
+  return data.map(c => ({ ...(c.subject || {}), id: c.subject?.id || c.anime_id, rating: c.subject?.rating || { score: 0 } })).filter(item => item.id)
+}
+
 async function fetchWatching() {
   if (!auth.isLoggedIn) return
   watchingLoading.value = true; watchingError.value = ''
   try {
     const res = await collectionAPI.getList({ type: 3, subject_type: 2, limit: 12 })
-    const data = res.data?.data || []
-    watchingList.value = data.map(c => ({ ...(c.subject || {}), id: c.subject?.id || c.anime_id, rating: c.subject?.rating || { score: 0 } })).filter(item => item.id)
+    watchingList.value = mapCollection(res.data?.data || [])
   } catch { watchingError.value = '加载失败' }
   finally { watchingLoading.value = false }
+}
+
+async function fetchWatchingBooks() {
+  if (!auth.isLoggedIn) return
+  watchingBooksLoading.value = true; watchingBooksError.value = ''
+  try {
+    const res = await collectionAPI.getList({ type: 3, subject_type: 1, limit: 12 })
+    watchingBooks.value = mapCollection(res.data?.data || [])
+  } catch { watchingBooksError.value = '加载失败' }
+  finally { watchingBooksLoading.value = false }
 }
 
 async function fetchWeek() {
@@ -100,7 +134,7 @@ async function fetchWeek() {
 
 onMounted(() => {
   fetchWeek()
-  if (auth.isLoggedIn) fetchWatching()
+  if (auth.isLoggedIn) { fetchWatching(); fetchWatchingBooks() }
   nextTick(() => {
     gsap.from('section', { opacity: 0, y: 25, stagger: 0.12, duration: 0.5, ease: 'power2.out' })
   })

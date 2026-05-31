@@ -39,3 +39,5 @@ h1, h2, h3, h4, h5, h6 {
 
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
+
+.break-words { overflow-wrap: break-word; word-break: break-word; }

@@ -59,7 +59,7 @@
                   {{ col.rating || col.rate }}
                 </span>
                 <span v-if="col.episode || col.ep_status" class="text-xs text-base-content/50">{{ col.episode || col.ep_status }}话</span>
-                <span v-if="col.comment" class="text-xs truncate max-w-40 inline-block text-base-content/50">"{{ col.comment }}"</span>
+                <span v-if="col.comment" class="text-xs line-clamp-1 text-base-content/50">"{{ col.comment }}"</span>
               </div>
             </div>
             <router-link :to="`/anime/${col.subject?.id || col.anime_id}`" class="btn btn-ghost btn-xs text-primary self-center">

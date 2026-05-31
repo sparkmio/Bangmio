@@ -27,8 +27,6 @@ function buildSearchBody(keyword, params = {}) {
 
   if (params.type) {
     filter.type = Array.isArray(params.type) ? params.type.map(Number) : [Number(params.type)]
-  } else {
-    filter.type = [2]
   }
 
   if (params.tag) {
