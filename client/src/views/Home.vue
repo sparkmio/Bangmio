@@ -42,7 +42,7 @@
               </div>
             </router-link>
           </div>
-          <div v-else-if="!watchingLoading && watchingList.length === 0" class="text-center py-8 rounded-lg bg-base-200/50">
+          <div v-else-if="!watchingLoading && watchingList.length === 0" class="text-center py-8 rounded-lg glass-card">
             <p class="text-sm text-base-content/40">还没有在追的番剧</p>
             <router-link to="/anime" class="text-sm text-primary mt-1 inline-block hover-underline-wipe">去探索</router-link>
           </div>
@@ -71,7 +71,7 @@
               </div>
             </router-link>
           </div>
-          <div v-else-if="!watchingBooksLoading && watchingBooks.length === 0" class="text-center py-8 rounded-lg bg-base-200/50">
+          <div v-else-if="!watchingBooksLoading && watchingBooks.length === 0" class="text-center py-8 rounded-lg glass-card">
             <p class="text-sm text-base-content/40">还没有在追的书籍</p>
           </div>
         </div>
@@ -102,7 +102,7 @@
         <div v-if="currentDayItems.length" class="anime-grid">
           <AnimeCard v-for="item in currentDayItems.slice(0, 8)" :key="item.id" :anime="mapAnime(item)" />
         </div>
-        <div v-else class="text-center py-10 rounded-lg bg-base-200/50">
+        <div v-else class="text-center py-10 rounded-lg glass-card">
           <p class="text-sm text-base-content/40">当天暂无番剧播出</p>
         </div>
       </div>

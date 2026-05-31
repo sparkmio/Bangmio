@@ -25,7 +25,7 @@
           v-for="col in collections"
           :key="col.subject?.id || col.subject_id || col.anime_id"
           :to="`/anime/${col.subject?.id || col.subject_id || col.anime_id}`"
-          class="group flex gap-4 p-4 rounded-lg bg-base-200/50 border border-base-300/50 card-lift"
+          class="group flex gap-4 p-4 rounded-lg glass-card hover-glow"
         >
           <div class="w-16 h-22 rounded overflow-hidden flex-shrink-0 bg-base-300">
             <img v-if="col.subject?.images?.common || col.subject?.images?.grid" :src="col.subject?.images?.common || col.subject?.images?.grid" class="w-full h-full object-cover" />

@@ -8,9 +8,9 @@
           <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
           </svg>
-          <input v-model="keyword" @keyup.enter="search" placeholder="搜索番剧..." class="input input-bordered input-sm w-full pl-9" />
+          <input v-model="keyword" @keyup.enter="search" placeholder="搜索番剧..." class="input input-bordered input-sm w-full pl-9 glass input-premium" />
         </div>
-        <select v-model="filterType" @change="page = 1; browse()" class="select select-bordered select-sm w-auto">
+        <select v-model="filterType" @change="page = 1; browse()" class="select select-bordered select-sm w-auto glass input-premium">
           <option :value="0">全部</option>
           <option :value="2">动画</option>
           <option :value="1">书籍</option>

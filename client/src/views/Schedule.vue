@@ -27,7 +27,7 @@
             v-for="item in currentDayItems"
             :key="item.id"
             :to="`/anime/${item.id}`"
-            class="flex gap-4 p-4 rounded-lg bg-base-200/50 border border-base-300/50 card-lift group"
+            class="flex gap-4 p-4 rounded-lg glass-card hover-glow group"
           >
             <figure class="w-20 shrink-0">
               <img

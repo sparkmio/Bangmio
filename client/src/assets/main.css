@@ -26,9 +26,9 @@ h1, h2, h3, h4, h5, h6 {
   --rounded-badge: 4px;
   --border-btn: 1px;
   --tab-border: 1px;
-  --shadow-sm: 0 1px 2px rgba(0,0,0,.04);
-  --shadow-md: 0 2px 8px rgba(0,0,0,.06);
-  --shadow-lg: 0 4px 16px rgba(0,0,0,.08);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.08);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,.12);
 }
 
 /* ===== Custom scrollbar ===== */
@@ -61,6 +61,43 @@ h1, h2, h3, h4, h5, h6 {
 /* ===== Text utilities ===== */
 .break-words { overflow-wrap: break-word; word-break: break-word; }
 
+/* ===== Glass morphism ===== */
+.glass {
+  background: oklch(var(--b1) / 0.7);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+}
+
+.glass-card {
+  background: oklch(var(--b2) / 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid oklch(var(--b3) / 0.4);
+  transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+}
+.glass-card:hover {
+  border-color: oklch(var(--p) / 0.3);
+  box-shadow: 0 8px 32px oklch(var(--p) / 0.08);
+}
+
+/* ===== Card hover: lift + glow shadow ===== */
+.card-lift {
+  transition: transform 0.3s cubic-bezier(0.23,1,0.32,1), box-shadow 0.3s cubic-bezier(0.23,1,0.32,1);
+}
+.card-lift:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 40px rgba(0,0,0,.15), 0 0 0 1px oklch(var(--p) / 0.1);
+}
+
+/* ===== Glow border on hover ===== */
+.hover-glow {
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+.hover-glow:hover {
+  box-shadow: 0 0 20px oklch(var(--p) / 0.15), 0 0 60px oklch(var(--p) / 0.05);
+  border-color: oklch(var(--p) / 0.4);
+}
+
 /* ===== Custom hover: underline wipe ===== */
 .hover-underline-wipe {
   position: relative;
@@ -73,8 +110,9 @@ h1, h2, h3, h4, h5, h6 {
   left: 0;
   width: 0;
   height: 2px;
-  background: oklch(var(--p));
+  background: linear-gradient(90deg, oklch(var(--p)), oklch(var(--s)));
   transition: width 0.3s ease;
+  border-radius: 1px;
 }
 .hover-underline-wipe:hover::after {
   width: 100%;
@@ -89,22 +127,13 @@ h1, h2, h3, h4, h5, h6 {
   content: '';
   position: absolute;
   inset: 0;
-  background: oklch(var(--p) / 0.06);
+  background: linear-gradient(90deg, oklch(var(--p) / 0.08), transparent);
   transform: translateX(-100%);
-  transition: transform 0.3s ease;
+  transition: transform 0.35s cubic-bezier(0.23,1,0.32,1);
   z-index: -1;
 }
 .hover-bg-slide:hover::before {
   transform: translateX(0);
-}
-
-/* ===== Card hover: lift + shadow ===== */
-.card-lift {
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
-}
-.card-lift:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0,0,0,.1);
 }
 
 /* ===== Skeleton loading ===== */
@@ -123,5 +152,25 @@ h1, h2, h3, h4, h5, h6 {
 .accent-bar {
   width: 3px;
   border-radius: 2px;
-  background: oklch(var(--p));
+  background: linear-gradient(180deg, oklch(var(--p)), oklch(var(--s)));
+}
+
+/* ===== Premium input focus ===== */
+.input-premium {
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.input-premium:focus {
+  border-color: oklch(var(--p));
+  box-shadow: 0 0 0 3px oklch(var(--p) / 0.15);
+}
+
+/* ===== Subtle noise texture overlay ===== */
+.noise-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.015;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1;
 }
