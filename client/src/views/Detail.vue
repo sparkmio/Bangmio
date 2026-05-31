@@ -38,17 +38,17 @@
             <p v-if="anime.name_cn && anime.name" class="text-base text-base-content/50 mb-4">{{ anime.name }}</p>
 
             <div class="flex flex-wrap items-center gap-2 mb-6">
-              <span v-if="anime.rating?.score" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md font-bold text-sm bg-amber-500/10 text-amber-400 border border-amber-500/20 backdrop-blur-sm">
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+              <span v-if="anime.rating?.score" class="badge badge-lg gap-1.5 font-bold border-0 bg-amber-500/15 text-amber-400">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
                 {{ anime.rating.score.toFixed(1) }}
-                <span class="text-xs font-normal opacity-60">({{ anime.rating.total }}人)</span>
+                <span class="text-xs font-normal text-base-content/40">({{ anime.rating.total }}人)</span>
               </span>
-              <span v-if="anime.rank" class="inline-flex items-center px-3 py-1.5 rounded-md font-bold text-sm bg-primary/10 text-primary border border-primary/20 backdrop-blur-sm">#{{ anime.rank }}</span>
-              <span class="px-3 py-1.5 rounded-md text-sm bg-base-200/50 text-base-content/60 backdrop-blur-sm">{{ typeLabel }}</span>
-              <span v-if="anime.eps" class="px-3 py-1.5 rounded-md text-sm bg-base-200/50 text-base-content/60 backdrop-blur-sm">{{ anime.eps }}话</span>
+              <span v-if="anime.rank" class="badge badge-lg font-bold border-0 bg-primary/15 text-primary">#{{ anime.rank }}</span>
+              <span class="badge badge-lg badge-ghost">{{ typeLabel }}</span>
+              <span v-if="anime.eps" class="badge badge-lg badge-ghost">{{ anime.eps }}话</span>
             </div>
 
-            <div v-if="auth.isLoggedIn" class="glass-card p-5 mb-5">
+            <div v-if="auth.isLoggedIn" class="bg-base-200 rounded-lg p-5 mb-5">
               <h3 class="text-sm font-semibold mb-3 text-base-content/80">我的收藏</h3>
               <div class="flex flex-wrap items-center gap-4">
                 <CollectionButton :modelValue="collectionStatus" @update:modelValue="updateStatus" @remove="removeCollection" />
@@ -78,7 +78,7 @@
     <!-- Content below hero -->
     <div class="max-w-5xl mx-auto px-4 md:px-8 mt-6">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8" v-if="anime.rating?.count || anime.collection">
-        <div v-if="anime.rating?.count" data-stats class="glass-card p-5">
+        <div v-if="anime.rating?.count" data-stats class="bg-base-200 rounded-lg p-5">
           <h3 class="font-semibold mb-4 text-base-content/80 text-sm uppercase tracking-wider">评分分布</h3>
           <div class="space-y-2">
             <div v-for="i in 10" :key="i" class="flex items-center gap-2 text-xs">
@@ -90,7 +90,7 @@
             </div>
           </div>
         </div>
-        <div v-if="anime.collection" data-stats class="glass-card p-5">
+        <div v-if="anime.collection" data-stats class="bg-base-200 rounded-lg p-5">
           <h3 class="font-semibold mb-4 text-base-content/80 text-sm uppercase tracking-wider">收藏统计</h3>
           <div class="grid grid-cols-2 gap-3">
             <div class="text-center p-3 rounded-lg bg-base-300/30"><p class="text-xl font-bold text-blue-400">{{ anime.collection.wish||0 }}</p><p class="text-xs mt-1 text-base-content/40">想看</p></div>
@@ -101,7 +101,7 @@
         </div>
       </div>
 
-      <div v-if="anime.infobox?.length" class="glass-card p-5 mb-8">
+      <div v-if="anime.infobox?.length" class="bg-base-200 rounded-lg p-5 mb-8">
         <h3 class="font-semibold mb-4 text-base-content/80 text-sm uppercase tracking-wider">制作信息</h3>
         <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
           <div v-for="info in anime.infobox.slice(0,15)" :key="info.key" class="text-sm">
@@ -117,7 +117,7 @@
           制作人员
         </h2>
         <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-          <router-link :to="`/person/${p.id}`" v-for="p in persons.slice(0,16)" :key="p.id" class="flex-shrink-0 bg-base-200/50 rounded-lg p-4 w-28 text-center hover-bg-slide transition-all duration-200">
+          <router-link :to="`/person/${p.id}`" v-for="p in persons.slice(0,16)" :key="p.id" class="flex-shrink-0 bg-base-200 rounded-lg p-4 w-28 text-center border border-base-300 hover:border-primary transition-colors duration-300">
             <div class="avatar placeholder mb-2">
               <div class="w-12 h-12 rounded-full bg-primary/20">
                 <img v-if="p.images?.medium || p.images?.grid" :src="p.images.medium || p.images.grid" class="rounded-full" />
@@ -137,9 +137,9 @@
         </h2>
         <div class="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
           <router-link v-for="char in characters.slice(0,14)" :key="char.id" :to="`/character/${char.id}`" class="flex-shrink-0 text-center w-20 group">
-            <div class="relative">
-              <div class="w-16 h-16 rounded-full overflow-hidden mx-auto ring-2 ring-base-300 group-hover:ring-primary group-hover:ring-offset-2 transition-all duration-300">
-                <img :src="char.images?.grid || char.images?.medium" class="w-full h-full object-cover" />
+            <div class="avatar">
+              <div class="w-16 h-16 rounded-full ring-2 ring-base-300 group-hover:ring-primary transition-all duration-300">
+                <img :src="char.images?.grid || char.images?.medium" />
               </div>
             </div>
             <p class="text-xs mt-1.5 truncate text-base-content/60 group-hover:text-base-content transition-colors">{{ char.name }}</p>

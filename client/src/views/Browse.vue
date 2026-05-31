@@ -8,9 +8,9 @@
           <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
           </svg>
-          <input v-model="keyword" @keyup.enter="search" placeholder="搜索番剧..." class="input input-bordered input-sm w-full pl-9 glass input-premium" />
+          <input v-model="keyword" @keyup.enter="search" placeholder="搜索番剧..." class="input input-bordered input-sm w-full pl-9" />
         </div>
-        <select v-model="filterType" @change="page = 1; browse()" class="select select-bordered select-sm w-auto glass input-premium">
+        <select v-model="filterType" @change="page = 1; browse()" class="select select-bordered select-sm w-auto">
           <option :value="0">全部</option>
           <option :value="2">动画</option>
           <option :value="1">书籍</option>
@@ -35,10 +35,9 @@
     <LoadingState :loading="loading" :error="error" @retry="browse" />
 
     <div v-if="!loading && !error">
-      <div v-if="animeList.length === 0" class="text-center py-16">
-        <div class="text-4xl mb-3 opacity-30">🔍</div>
-        <p class="text-base-content/50 mb-1">暂无结果</p>
-        <p class="text-sm text-base-content/30">尝试其他关键词或筛选条件</p>
+      <div v-if="animeList.length === 0" class="py-20 text-center text-base-content/50">
+        <p class="text-lg mb-2">暂无结果</p>
+        <p class="text-sm">尝试其他关键词或筛选条件</p>
       </div>
       <div v-else class="anime-grid">
         <AnimeCard v-for="anime in animeList" :key="anime.id" :anime="anime" />
