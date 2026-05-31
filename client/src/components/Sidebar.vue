@@ -64,7 +64,7 @@ const IconAbout = { template: '<svg fill="none" stroke="currentColor" viewBox="0
 
 const navItems = [
   { path: '/', label: '首页', icon: IconHome },
-  { path: '/anime', label: '热门番剧', icon: IconBrowse },
+  { path: '/anime', label: '热门', icon: IconBrowse },
   { path: '/schedule', label: '新番时间表', icon: IconCalendar },
   { path: '/about', label: '关于我们', icon: IconAbout },
 ]

@@ -2,7 +2,8 @@ const CACHE_TTL = 30 * 24 * 60 * 60 // 30 days
 
 export const onRequest = async (ctx) => {
   const url = new URL(ctx.request.url)
-  const upstream = `https://bgmimg.anibt.net${url.pathname}${url.search}`
+  const path = url.pathname.replace(/^\/img/, '') || '/'
+  const upstream = `https://bgmimg.anibt.net${path}${url.search}`
 
   const cache = caches.default
   const cacheKey = new Request(upstream, { method: 'GET' })
