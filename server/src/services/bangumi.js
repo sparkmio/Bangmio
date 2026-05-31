@@ -1,5 +1,16 @@
 const BANGUMI_API = 'https://api.bgm.tv'
 
+function rewriteImageUrls(data) {
+  if (typeof data === 'string') return data.replace(/lain\.bgm\.tv/g, 'lain.bangumi.one')
+  if (Array.isArray(data)) return data.map(rewriteImageUrls)
+  if (data && typeof data === 'object') {
+    const out = {}
+    for (const [k, v] of Object.entries(data)) out[k] = rewriteImageUrls(v)
+    return out
+  }
+  return data
+}
+
 function headers(token) {
   return token
     ? { 'User-Agent': 'Bangmio/anime-manager', 'Authorization': `Bearer ${token}` }
@@ -16,7 +27,7 @@ async function bgmGet(path, token, params) {
     err.response = { status: res.status, data }
     throw err
   }
-  return data
+  return rewriteImageUrls(data)
 }
 
 async function bgmPost(path, body, token, params) {
@@ -33,7 +44,7 @@ async function bgmPost(path, body, token, params) {
     err.response = { status: res.status, data }
     throw err
   }
-  return data
+  return rewriteImageUrls(data)
 }
 
 function buildSearchBody(keyword, params = {}) {

@@ -1,5 +1,6 @@
 name = "bangmio"
 compatibility_date = "2025-05-31"
+compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "client/dist"
 
 [vars]

@@ -9,24 +9,6 @@ const app = new Hono()
 
 app.use('*', cors())
 
-app.use('/api/v1/*', async (c, next) => {
-  await next()
-  if (c.res && c.res.ok) {
-    const ct = c.res.headers.get('content-type') || ''
-    if (ct.includes('json')) {
-      try {
-        const text = await c.res.text()
-        const replaced = text.replace(/lain\.bgm\.tv/g, 'lain.bangumi.one').replace(/bgm\.tv\/(img|pic|avatar|user)/g, 'bangumi.one/$1')
-        if (replaced !== text) {
-          const h = new Headers(c.res.headers)
-          h.delete('content-length')
-          c.res = new Response(replaced, { status: c.res.status, headers: h })
-        }
-      } catch { /* ignore */ }
-    }
-  }
-})
-
 app.route('/api/v1/user', userRoutes)
 app.route('/api/v1/anime', animeRoutes)
 app.route('/api/v1/collection', collectionRoutes)

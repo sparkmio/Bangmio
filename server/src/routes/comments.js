@@ -1,5 +1,4 @@
 import { Hono } from 'hono'
-import * as cheerio from 'cheerio'
 
 const app = new Hono()
 
@@ -18,112 +17,141 @@ async function fetchHTML(url) {
   return new TextDecoder('utf-8').decode(buf)
 }
 
-function parseUserLink($el) {
-  const link = $el.find('strong > a[href^="/user/"], strong.userName > a[href^="/user/"]')
-  const avatarEl = $el.find('.avatarNeue')
-  const avatarStyle = avatarEl.attr('style') || ''
-  const avatarMatch = avatarStyle.match(/url\(['"]?([^'"()]+)['"]?\)/)
-  const avatar = avatarMatch ? (avatarMatch[1].startsWith('//') ? 'https:' + avatarMatch[1] : avatarMatch[1]).replace('lain.bgm.tv', 'lain.bangumi.one') : ''
-  return { username: link.text().trim(), url: link.attr('href') || '', avatar }
+function getAttr(html, tag, attr) {
+  const m = html.match(new RegExp(`<${tag}[^>]*${attr}="([^"]*)"`, 'i'))
+  return m ? m[1] : ''
 }
 
-function parseSubReplies($, $el) {
-  const replies = []
-  $el.find('.topic_sub_reply .sub_reply_bg').each((j, subEl) => {
-    const $sub = $(subEl)
-    const floor = $sub.find('.floor-anchor').text().replace('#', '').trim()
-    const actionText = $sub.find('.floor-anchor').parent().text()
-    const timestamp = actionText.replace(/#[\d-]+[\s-]*/, '').trim()
-    const user = parseUserLink($sub)
-    const content = $sub.find('.cmt_sub_content').text().trim()
-    if (user.username && content) {
-      replies.push({ id: $sub.attr('id')?.replace('post_', '') || String(j), floor, user, content, timestamp })
-    }
-  })
-  return replies
+function getText(html) {
+  return html.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ').trim()
+}
+
+function parseUserBlock(block) {
+  const userLink = block.match(/<strong[^>]*>\s*<a[^>]*href="\/user\/([^"]*)"[^>]*>([^<]*)<\/a>/i)
+  const avatarMatch = block.match(/url\(['"]?(https?:\/\/[^'"()]+|\/\/[^'"()]+)['"]?\)/i)
+  let avatar = ''
+  if (avatarMatch) {
+    avatar = avatarMatch[1].startsWith('//') ? 'https:' + avatarMatch[1] : avatarMatch[1]
+    avatar = avatar.replace('lain.bgm.tv', 'lain.bangumi.one')
+  }
+  return {
+    username: userLink ? userLink[2].trim() : '',
+    url: userLink ? '/user/' + userLink[1] : '',
+    avatar
+  }
 }
 
 function parseTalkbox(html) {
-  const $ = cheerio.load(html)
   const comments = []
-  $('#comment_list > .row_reply').each((i, el) => {
-    const $el = $(el)
-    const floor = $el.find('> .post_actions .floor-anchor').text().replace('#', '').trim()
-    const actionText = $el.find('> .post_actions .floor-anchor').parent().text()
-    const timestamp = actionText.replace(/#\S+\s*-?\s*/, '').trim()
-    const user = parseUserLink($el)
-    const content = $el.find('> .inner .message, > .inner .reply_content .message').text().trim()
-    const replies = parseSubReplies($, $el)
+  const rows = html.split(/<div[^>]*id="post_\d+"[^>]*class="[^"]*row_reply[^"]*"/i)
+  for (let i = 1; i < rows.length && comments.length < 50; i++) {
+    const row = rows[i]
+    const idMatch = row.match(/^(\d+)/)
+    const id = idMatch ? idMatch[1] : String(i)
+    const floorMatch = row.match(/class="floor-anchor"[^>]*>#?(\d+)/i)
+    const floor = floorMatch ? floorMatch[1] : ''
+    const timeMatch = row.match(/class="floor-anchor"[^>]*>[^<]*<\/a>\s*<span[^>]*>([^<]*)<\/span>/i)
+    const timestamp = timeMatch ? timeMatch[1].trim().replace(/^-\s*/, '') : ''
+    const user = parseUserBlock(row)
+    const contentMatch = row.match(/class="message"[^>]*>([\s\S]*?)<\/div>/i)
+    const content = contentMatch ? getText(contentMatch[1]) : ''
     if (user.username && content) {
-      comments.push({ id: $el.attr('id')?.replace('post_', '') || String(i), floor, user, content, timestamp, replies })
+      comments.push({ id, floor, user, content, timestamp, replies: [] })
     }
-  })
+  }
   return comments
 }
 
 function parseSubjectTalkbox(html) {
-  const $ = cheerio.load(html)
   const comments = []
-  $('#comment_box > .item').each((i, el) => {
-    const $el = $(el)
-    const userLink = $el.find('a.l[href^="/user/"]')
-    const avatarEl = $el.find('.avatarNeue')
-    const avatarStyle = avatarEl.attr('style') || ''
-    const avatarMatch = avatarStyle.match(/url\(['"]?([^'"()]+)['"]?\)/)
-    const avatar = avatarMatch ? (avatarMatch[1].startsWith('//') ? 'https:' + avatarMatch[1] : avatarMatch[1]).replace('lain.bgm.tv', 'lain.bangumi.one') : ''
-    const starMatch = ($el.find('.starlight').attr('class') || '').match(/stars(\d+)/)
-    const timeEl = $el.find('small.grey')
-    if (userLink.length) {
-      comments.push({
-        id: String(i),
-        user: { username: userLink.text().trim(), url: userLink.attr('href') || '', avatar },
-        rating: starMatch ? parseInt(starMatch[1]) : 0,
-        content: $el.find('p.comment').text().trim() || '(无文字评价)',
-        timestamp: timeEl.last().text().trim().replace(/^@\s*/, '')
-      })
+  const items = html.split(/<div[^>]*class="[^"]*item[^"]*"[^>]*>/i)
+  for (let i = 1; i < items.length && comments.length < 50; i++) {
+    const item = items[i]
+    const userLink = item.match(/<a[^>]*class="l"[^>]*href="\/user\/([^"]*)"[^>]*>([^<]*)<\/a>/i)
+    if (!userLink) continue
+    const avatarMatch = item.match(/url\(['"]?(https?:\/\/[^'"()]+|\/\/[^'"()]+)['"]?\)/i)
+    let avatar = ''
+    if (avatarMatch) {
+      avatar = avatarMatch[1].startsWith('//') ? 'https:' + avatarMatch[1] : avatarMatch[1]
+      avatar = avatar.replace('lain.bgm.tv', 'lain.bangumi.one')
     }
-  })
+    const starMatch = item.match(/stars(\d+)/i)
+    const timeMatch = item.match(/<small[^>]*class="grey"[^>]*>([^<]*)<\/small>/gi)
+    const timestamp = timeMatch ? timeMatch[timeMatch.length - 1].replace(/<[^>]+>/g, '').trim().replace(/^@\s*/, '') : ''
+    const contentMatch = item.match(/<p[^>]*class="comment"[^>]*>([\s\S]*?)<\/p>/i)
+    const content = contentMatch ? getText(contentMatch[1]) : '(无文字评价)'
+    comments.push({
+      id: String(i),
+      user: { username: userLink[2].trim(), url: '/user/' + userLink[1], avatar },
+      rating: starMatch ? parseInt(starMatch[1]) : 0,
+      content,
+      timestamp
+    })
+  }
   return comments
 }
 
 function parseTopics(html) {
-  const $ = cheerio.load(html)
   const topics = []
-  $('table.topic_list tbody tr').each((i, el) => {
-    const $el = $(el)
-    const titleLink = $el.find('td.subject a')
-    const href = titleLink.attr('href') || ''
-    const title = titleLink.attr('title') || titleLink.text().trim()
-    if (!href || !title) return
-    const authorLink = $el.find('td:nth-child(2) a')
-    const repliesMatch = $el.find('td:nth-child(3) small.grey').text().trim().match(/(\d+)/)
-    const dateText = $el.find('td:nth-child(4) small.grey').text().trim()
-    topics.push({ id: href.split('/').pop(), title, href: `https://bgm.tv${href}`, author: authorLink.text().trim(), replies: repliesMatch ? parseInt(repliesMatch[1]) : 0, date: dateText })
-  })
+  const rows = html.split(/<tr[^>]*>/i)
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]
+    const titleLink = row.match(/<td[^>]*class="[^"]*subject[^"]*"[^>]*>\s*<a[^>]*href="([^"]*)"[^>]*(?:title="([^"]*)")?[^>]*>([^<]*)<\/a>/i)
+    if (!titleLink) continue
+    const href = titleLink[1]
+    const title = titleLink[2] || titleLink[3]
+    if (!href || !title) continue
+    const authorLink = row.match(/<td[^>]*>\s*<a[^>]*href="\/user\/[^"]*"[^>]*>([^<]*)<\/a>/i)
+    const repliesMatch = row.match(/class="grey"[^>]*>.*?(\d+).*?回复/i)
+    const dateMatch = row.match(/<td[^>]*>\s*<small[^>]*class="grey"[^>]*>([^<]*)<\/small>/gi)
+    const dateText = dateMatch ? dateMatch[dateMatch.length - 1].replace(/<[^>]+>/g, '').trim() : ''
+    topics.push({
+      id: href.split('/').pop(),
+      title: title.trim(),
+      href: `https://bgm.tv${href}`,
+      author: authorLink ? authorLink[1].trim() : '',
+      replies: repliesMatch ? parseInt(repliesMatch[1]) : 0,
+      date: dateText
+    })
+  }
   return topics
 }
 
 function parseTopicPage(html) {
-  const $ = cheerio.load(html)
-  const $op = $('.postTopic')
+  const titleMatch = html.match(/<h1[^>]*class="[^"]*nameSingle[^"]*"[^>]*>\s*<a[^>]*>([^<]*)<\/a>/i) ||
+                     html.match(/<title[^>]*>([^<]*)<\/title>/i)
+  const title = titleMatch ? titleMatch[1].trim() : ''
+
+  const opBlock = html.match(/<div[^>]*class="[^"]*postTopic[^"]*"[^>]*>([\s\S]*?)(?=<div[^>]*id="comment_list")/i)
   const op = {
-    user: parseUserLink($op),
-    content: $op.find('.topic_content').text().trim(),
-    timestamp: $op.find('.post_actions .action small').text().replace(/#\d+\s*-?\s*/, '').trim(),
-    title: $('h1.nameSingle a, .headerNeueInner h1, title').first().text().trim()
+    user: opBlock ? parseUserBlock(opBlock[0]) : { username: '', url: '', avatar: '' },
+    content: opBlock ? getText((opBlock[0].match(/class="topic_content"[^>]*>([\s\S]*?)<\/div>/i) || ['', ''])[1]) : '',
+    timestamp: opBlock ? (opBlock[0].match(/class="action"[^>]*>.*?<small[^>]*>([^<]*)<\/small>/is) || ['', ''])[1].replace(/#\d+\s*-?\s*/, '').trim() : '',
+    title
   }
+
   const replies = []
-  $('#comment_list > .row_reply').each((i, el) => {
-    const $el = $(el)
-    const floor = $el.find('> .post_actions .floor-anchor').text().replace('#', '').trim()
-    const actionText = $el.find('> .post_actions .floor-anchor').parent().text()
-    const timestamp = actionText.replace(/#\S+\s*-?\s*/, '').trim()
-    const user = parseUserLink($el)
-    const content = $el.find('.message').text().trim()
+  const replyBlocks = html.split(/<div[^>]*id="post_\d+"[^>]*class="[^"]*row_reply[^"]*"/i)
+  for (let i = 1; i < replyBlocks.length && replies.length < 100; i++) {
+    const block = replyBlocks[i]
+    const idMatch = block.match(/^(\d+)/)
+    const floorMatch = block.match(/class="floor-anchor"[^>]*>#?(\d+)/i)
+    const timeMatch = block.match(/class="floor-anchor"[^>]*>[^<]*<\/a>\s*<span[^>]*>([^<]*)<\/span>/i)
+    const user = parseUserBlock(block)
+    const contentMatch = block.match(/class="message"[^>]*>([\s\S]*?)<\/div>/i)
+    const content = contentMatch ? getText(contentMatch[1]) : ''
     if (user.username && content) {
-      replies.push({ id: $el.attr('id')?.replace('post_', '') || String(i), floor, user, content, timestamp, replies: parseSubReplies($, $el) })
+      replies.push({
+        id: idMatch ? idMatch[1] : String(i),
+        floor: floorMatch ? floorMatch[1] : '',
+        user,
+        content,
+        timestamp: timeMatch ? timeMatch[1].trim().replace(/^-\s*/, '') : '',
+        replies: []
+      })
     }
-  })
+  }
+
   return { op, replies }
 }
 
@@ -135,17 +163,25 @@ function setCache(key, data) {
   cache.set(key, { data, time: Date.now() })
 }
 
+app.get('/test', async (c) => {
+  return c.json({ ok: true })
+})
+
 app.get('/character/:id', async (c) => {
   try {
     const key = `char_${c.req.param('id')}`
     const cached = getCached(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`https://bgm.tv/character/${c.req.param('id')}`)
+    const res = await fetch(`https://bgm.tv/character/${c.req.param('id')}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      redirect: 'follow'
+    })
+    const html = await res.text()
     const comments = parseTalkbox(html)
     setCache(key, comments)
     return c.json({ data: comments })
   } catch (err) {
-    return c.json({ error: '获取评论失败' }, 500)
+    return c.json({ error: '获取评论失败', detail: String(err) }, 500)
   }
 })
 
@@ -159,7 +195,7 @@ app.get('/subject/:id', async (c) => {
     setCache(key, comments)
     return c.json({ data: comments })
   } catch (err) {
-    return c.json({ error: '获取评论失败' }, 500)
+    return c.json({ error: '获取评论失败', detail: String(err) }, 500)
   }
 })
 
@@ -173,7 +209,7 @@ app.get('/subject/:id/topics', async (c) => {
     setCache(key, topics)
     return c.json({ data: topics })
   } catch (err) {
-    return c.json({ error: '获取讨论版失败' }, 500)
+    return c.json({ error: '获取讨论版失败', detail: String(err) }, 500)
   }
 })
 
@@ -187,7 +223,7 @@ app.get('/topic/:topicId', async (c) => {
     setCache(key, topic)
     return c.json({ data: topic })
   } catch (err) {
-    return c.json({ error: '获取帖子内容失败' }, 500)
+    return c.json({ error: '获取帖子内容失败', detail: String(err) }, 500)
   }
 })
 
@@ -201,7 +237,7 @@ app.get('/person/:id', async (c) => {
     setCache(key, comments)
     return c.json({ data: comments })
   } catch (err) {
-    return c.json({ error: '获取评论失败' }, 500)
+    return c.json({ error: '获取评论失败', detail: String(err) }, 500)
   }
 })
 
