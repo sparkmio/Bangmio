@@ -1,69 +1,97 @@
 <template>
   <div>
-    <!-- Watching anime: horizontal scroll -->
+    <!-- Watching panel: Bangumi-style split layout -->
     <section class="mb-10" v-if="auth.isLoggedIn">
       <div class="flex items-center justify-between mb-4">
-        <h2 class="text-xl font-semibold text-base-content">正在追的番剧</h2>
-        <router-link to="/watching?type=anime" class="text-sm text-primary hover:underline">查看全部 →</router-link>
+        <h2 class="text-xl font-semibold text-base-content">在看</h2>
+        <router-link to="/watching" class="text-sm text-primary hover-underline-wipe">查看全部 →</router-link>
       </div>
-      <LoadingState :loading="watchingLoading" :error="watchingError" @retry="fetchWatching" />
-      <div v-if="!watchingLoading && !watchingError && watchingList.length" class="flex gap-3 overflow-x-auto pb-3 scrollbar-hide">
-        <router-link
-          v-for="anime in watchingList"
-          :key="anime.id"
-          :to="`/anime/${anime.id}`"
-          class="flex-shrink-0 w-32 sm:w-36 group"
+
+      <!-- Type tabs -->
+      <div class="flex gap-1.5 mb-5 overflow-x-auto scrollbar-hide">
+        <button
+          v-for="t in typeTabs"
+          :key="t.value"
+          @click="switchType(t.value)"
+          class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-all"
+          :class="watchingType === t.value ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60 hover:bg-base-300'"
         >
-          <div class="relative overflow-hidden rounded-lg bg-base-300 transition-all duration-200 group-hover:-translate-y-1 group-hover:shadow-md">
-            <div class="aspect-[2/3] relative overflow-hidden">
+          {{ t.label }}
+        </button>
+      </div>
+
+      <LoadingState :loading="watchingLoading" :error="watchingError" @retry="fetchWatching" />
+
+      <div v-if="!watchingLoading && !watchingError && watchingList.length" class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5">
+        <!-- Left: anime list -->
+        <div class="lg:col-span-4">
+          <div class="space-y-0.5 max-h-[420px] overflow-y-auto pr-1 scrollbar-hide">
+            <button
+              v-for="item in watchingList"
+              :key="item.id"
+              @click="selectWatching(item)"
+              class="w-full flex items-center gap-3 p-2 rounded-lg text-left transition-all duration-200"
+              :class="selectedWatching?.id === item.id
+                ? 'bg-primary/10 border-l-2 border-primary'
+                : 'hover:bg-base-200/60 border-l-2 border-transparent'"
+            >
               <img
-                v-if="anime.images?.large || anime.images?.common"
-                :src="anime.images.large || anime.images.common"
-                class="w-full h-full object-cover"
-                loading="lazy"
+                v-if="item.images?.common || item.images?.large"
+                :src="item.images.common || item.images.large"
+                class="w-10 h-14 rounded object-cover flex-shrink-0"
               />
-              <div v-else class="w-full h-full flex items-center justify-center bg-base-200">
-                <span class="text-xs text-base-content/30">暂无</span>
+              <div class="min-w-0 flex-1">
+                <p class="text-[13px] font-medium text-base-content line-clamp-1">{{ item.name_cn || item.name }}</p>
+                <p class="text-xs text-primary font-semibold mt-0.5">[{{ item.ep_status || 0 }}/{{ item.total_episodes || '?' }}]</p>
               </div>
-              <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-              <div class="absolute inset-x-0 bottom-0 p-2.5">
-                <h3 class="text-[12px] font-semibold text-white line-clamp-2 leading-snug">{{ anime.name_cn || anime.name }}</h3>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: detail panel -->
+        <div class="lg:col-span-8">
+          <div v-if="selectedWatching" class="rounded-lg bg-base-200/40 p-5">
+            <div class="flex gap-5 mb-4">
+              <img
+                v-if="selectedWatching.images?.large || selectedWatching.images?.common"
+                :src="selectedWatching.images.large || selectedWatching.images.common"
+                class="w-24 h-32 sm:w-28 sm:h-40 rounded-lg object-cover shadow-md flex-shrink-0"
+              />
+              <div class="min-w-0 flex-1">
+                <h3 class="text-lg font-semibold text-base-content mb-1">{{ selectedWatching.name_cn || selectedWatching.name }}</h3>
+                <p class="text-sm text-base-content/50 mb-3">{{ selectedWatching.name }}</p>
+                <div class="flex gap-3 text-sm">
+                  <router-link :to="`/anime/${selectedWatching.id}/topics`" class="text-primary hover-underline-wipe">参与讨论</router-link>
+                  <router-link :to="`/anime/${selectedWatching.id}/talkbox`" class="text-primary hover-underline-wipe">观吐槽</router-link>
+                  <router-link :to="`/anime/${selectedWatching.id}`" class="text-primary hover-underline-wipe">详情页</router-link>
+                </div>
+              </div>
+            </div>
+
+            <!-- Episode progress -->
+            <div v-if="selectedWatching.total_episodes" class="mt-4">
+              <p class="text-xs text-base-content/40 mb-2">播放进度 · 已看 {{ selectedWatching.ep_status || 0 }} / {{ selectedWatching.total_episodes }}</p>
+              <div class="flex flex-wrap gap-1.5">
+                <span
+                  v-for="ep in Math.min(selectedWatching.total_episodes, 24)"
+                  :key="ep"
+                  class="w-8 h-7 rounded text-xs font-bold flex items-center justify-center"
+                  :class="ep <= (selectedWatching.ep_status || 0) ? 'bg-primary text-white' : 'bg-base-300 text-base-content/40'"
+                >
+                  {{ String(ep).padStart(2, '0') }}
+                </span>
               </div>
             </div>
           </div>
-        </router-link>
+          <div v-else class="py-12 text-center text-base-content/30 text-sm rounded-lg bg-base-200/30">
+            选择左侧的番剧查看详情
+          </div>
+        </div>
       </div>
-      <div v-else-if="!watchingLoading && watchingList.length === 0" class="text-center py-8 rounded-lg bg-base-200/50">
-        <p class="text-sm text-base-content/40">还没有在追的番剧</p>
-        <router-link to="/anime" class="text-sm text-primary mt-1 inline-block hover:underline">去探索</router-link>
-      </div>
-    </section>
 
-    <!-- Watching books: compact list -->
-    <section class="mb-10" v-if="auth.isLoggedIn">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-xl font-semibold text-base-content">正在追的书籍</h2>
-        <router-link to="/watching?type=book" class="text-sm text-primary hover:underline">查看全部 →</router-link>
-      </div>
-      <LoadingState :loading="watchingBooksLoading" :error="watchingBooksError" @retry="fetchWatchingBooks" />
-      <div v-if="!watchingBooksLoading && !watchingBooksError && watchingBooks.length" class="space-y-2">
-        <router-link
-          v-for="book in watchingBooks"
-          :key="book.id"
-          :to="`/anime/${book.id}`"
-          class="flex items-center gap-3 p-2.5 rounded-lg bg-base-200/50 hover:bg-base-200 transition-colors"
-        >
-          <div class="w-10 h-14 rounded overflow-hidden flex-shrink-0 bg-base-300">
-            <img v-if="book.images?.common || book.images?.large" :src="book.images.common || book.images.large" class="w-full h-full object-cover" />
-          </div>
-          <div class="min-w-0 flex-1">
-            <p class="text-sm font-medium text-base-content line-clamp-1">{{ book.name_cn || book.name }}</p>
-            <p v-if="book.rating?.score" class="text-xs text-amber-500 mt-0.5">★ {{ book.rating.score.toFixed(1) }}</p>
-          </div>
-        </router-link>
-      </div>
-      <div v-else-if="!watchingBooksLoading && watchingBooks.length === 0" class="text-center py-8 rounded-lg bg-base-200/50">
-        <p class="text-sm text-base-content/40">还没有在追的书籍</p>
+      <div v-else-if="!watchingLoading && watchingList.length === 0" class="text-center py-10 rounded-lg bg-base-200/30">
+        <p class="text-sm text-base-content/40">还没有在看的内容</p>
+        <router-link to="/anime" class="text-sm text-primary mt-1 inline-block hover-underline-wipe">去探索</router-link>
       </div>
     </section>
 
@@ -71,7 +99,7 @@
     <section class="mb-10">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-xl font-semibold text-base-content">新番时间表</h2>
-        <router-link to="/schedule" class="text-sm text-primary hover:underline">查看全部 →</router-link>
+        <router-link to="/schedule" class="text-sm text-primary hover-underline-wipe">查看全部 →</router-link>
       </div>
       <LoadingState :loading="weekLoading" :error="weekError" @retry="fetchWeek" />
 
@@ -91,7 +119,7 @@
         <div v-if="currentDayItems.length" class="anime-grid">
           <AnimeCard v-for="item in currentDayItems.slice(0, 8)" :key="item.id" :anime="mapAnime(item)" />
         </div>
-        <div v-else class="text-center py-10 rounded-lg bg-base-200/50">
+        <div v-else class="text-center py-10 rounded-lg bg-base-200/30">
           <p class="text-sm text-base-content/40">当天暂无番剧播出</p>
         </div>
       </div>
@@ -109,13 +137,18 @@ import { gsap } from 'gsap'
 
 const auth = useAuthStore()
 
+const typeTabs = [
+  { label: '全部', value: 0 },
+  { label: '动画', value: 2 },
+  { label: '三次元', value: 6 },
+  { label: '书籍', value: 1 },
+]
+
+const watchingType = ref(0)
 const watchingList = ref([])
+const selectedWatching = ref(null)
 const watchingLoading = ref(false)
 const watchingError = ref('')
-
-const watchingBooks = ref([])
-const watchingBooksLoading = ref(false)
-const watchingBooksError = ref('')
 
 const weekData = ref([])
 const activeDay = ref(new Date().getDay() || 7)
@@ -133,28 +166,37 @@ function mapAnime(item) {
   return { ...item, images: item.images || (item.image ? { common: item.image, large: item.image } : null) }
 }
 
-function mapCollection(data) {
-  return data.map(c => ({ ...(c.subject || {}), id: c.subject?.id || c.anime_id, rating: c.subject?.rating || { score: 0 } })).filter(item => item.id)
+function selectWatching(item) {
+  selectedWatching.value = item
+}
+
+function switchType(val) {
+  watchingType.value = val
+  watchingList.value = []
+  selectedWatching.value = null
+  fetchWatching()
 }
 
 async function fetchWatching() {
   if (!auth.isLoggedIn) return
   watchingLoading.value = true; watchingError.value = ''
   try {
-    const res = await collectionAPI.getList({ type: 3, subject_type: 2, limit: 12 })
-    watchingList.value = mapCollection(res.data?.data || [])
+    const params = { type: 3, limit: 30 }
+    if (watchingType.value) params.subject_type = watchingType.value
+    const res = await collectionAPI.getList(params)
+    const data = res.data?.data || []
+    watchingList.value = data
+      .map(c => ({
+        ...(c.subject || {}),
+        id: c.subject?.id || c.anime_id,
+        ep_status: c.ep_status || c.episode || 0,
+        total_episodes: c.subject?.eps || c.subject?.total_episodes || 0,
+        rating: c.subject?.rating || { score: 0 }
+      }))
+      .filter(item => item.id)
+    if (watchingList.value.length > 0) selectedWatching.value = watchingList.value[0]
   } catch { watchingError.value = '加载失败' }
   finally { watchingLoading.value = false }
-}
-
-async function fetchWatchingBooks() {
-  if (!auth.isLoggedIn) return
-  watchingBooksLoading.value = true; watchingBooksError.value = ''
-  try {
-    const res = await collectionAPI.getList({ type: 3, subject_type: 1, limit: 12 })
-    watchingBooks.value = mapCollection(res.data?.data || [])
-  } catch { watchingBooksError.value = '加载失败' }
-  finally { watchingBooksLoading.value = false }
 }
 
 async function fetchWeek() {
@@ -166,9 +208,9 @@ async function fetchWeek() {
 
 onMounted(() => {
   fetchWeek()
-  if (auth.isLoggedIn) { fetchWatching(); fetchWatchingBooks() }
+  if (auth.isLoggedIn) fetchWatching()
   nextTick(() => {
-    gsap.fromTo('section', { opacity: 0, y: 20 }, { opacity: 1, y: 0, stagger: 0.1, duration: 0.4, ease: 'power2.out' })
+    gsap.fromTo('section', { opacity: 0, y: 20 }, { opacity: 1, y: 0, stagger: 0.12, duration: 0.4, ease: 'power2.out' })
   })
 })
 </script>

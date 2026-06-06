@@ -1,18 +1,18 @@
 <template>
-  <div class="max-w-6xl mx-auto">
-    <div class="flex items-center gap-3 mb-6">
-      <a @click.prevent="$router.back()" class="btn btn-ghost btn-sm text-primary cursor-pointer">← 返回</a>
+  <div class="max-w-5xl mx-auto">
+    <div class="flex items-center gap-3 mb-5">
+      <a @click.prevent="$router.back()" class="text-sm text-primary hover-underline-wipe cursor-pointer">← 返回</a>
       <h1 class="text-2xl font-semibold text-base-content">在看</h1>
     </div>
 
     <!-- Type tabs -->
-    <div class="flex gap-1.5 mb-6 overflow-x-auto">
+    <div class="flex gap-1.5 mb-5 overflow-x-auto scrollbar-hide">
       <button
         v-for="t in typeTabs"
         :key="t.value"
         @click="switchType(t.value)"
-        class="px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap"
-        :class="activeType === t.value ? 'bg-primary text-white shadow-sm' : 'bg-base-200 text-base-content/60 hover:bg-base-300'"
+        class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-all"
+        :class="activeType === t.value ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60 hover:bg-base-300'"
       >
         {{ t.label }}
       </button>
@@ -22,30 +22,30 @@
 
     <div v-if="!loading && !error">
       <div v-if="!collections.length" class="py-16 text-center text-base-content/40">
-        <p class="text-lg">暂无在看内容</p>
+        <p>暂无在看内容</p>
       </div>
 
-      <div v-else class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
+      <div v-else class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5">
         <!-- Left: anime list -->
         <div class="lg:col-span-4">
-          <div class="space-y-1 max-h-[calc(100vh-200px)] overflow-y-auto pr-1">
+          <div class="space-y-0.5 max-h-[calc(100vh-180px)] overflow-y-auto pr-1 scrollbar-hide">
             <button
               v-for="col in collections"
               :key="col.subject?.id || col.anime_id"
               @click="selectItem(col)"
-              class="w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-all duration-200"
+              class="w-full flex items-center gap-3 p-2 rounded-lg text-left transition-all duration-200"
               :class="selectedId === (col.subject?.id || col.anime_id)
                 ? 'bg-primary/10 border-l-2 border-primary'
-                : 'hover:bg-base-200/80 border-l-2 border-transparent'"
+                : 'hover:bg-base-200/60 border-l-2 border-transparent'"
             >
               <img
                 v-if="col.subject?.images?.common || col.subject?.images?.grid"
                 :src="col.subject.images.common || col.subject.images.grid"
-                class="w-12 h-16 rounded object-cover flex-shrink-0"
+                class="w-10 h-14 rounded object-cover flex-shrink-0"
               />
               <div class="min-w-0 flex-1">
-                <p class="text-sm font-medium text-base-content line-clamp-2">{{ col.subject?.name_cn || col.subject?.name }}</p>
-                <p v-if="col.ep_status || col.subject?.total_episodes" class="text-xs text-primary font-semibold mt-0.5">[{{ col.ep_status || 0 }}/{{ col.subject?.total_episodes || '?' }}]</p>
+                <p class="text-[13px] font-medium text-base-content line-clamp-1">{{ col.subject?.name_cn || col.subject?.name }}</p>
+                <p class="text-xs text-primary font-semibold mt-0.5">[{{ col.ep_status || 0 }}/{{ col.subject?.eps || col.subject?.total_episodes || '?' }}]</p>
               </div>
             </button>
           </div>
@@ -56,53 +56,46 @@
 
         <!-- Right: detail panel -->
         <div class="lg:col-span-8">
-          <div v-if="selected" class="rounded-lg bg-base-200/50 p-5">
-            <div class="flex gap-5 mb-5">
+          <div v-if="selected" class="rounded-lg bg-base-200/40 p-5">
+            <div class="flex gap-5 mb-4">
               <img
-                v-if="selected.subject?.images?.common || selected.subject?.images?.large"
-                :src="selected.subject.images.common || selected.subject.images.large"
-                class="w-24 h-32 sm:w-32 sm:h-44 rounded-lg object-cover shadow-md flex-shrink-0"
+                v-if="selected.subject?.images?.large || selected.subject?.images?.common"
+                :src="selected.subject.images.large || selected.subject.images.common"
+                class="w-28 h-40 rounded-lg object-cover shadow-md flex-shrink-0"
               />
-              <div class="min-w-0">
-                <h2 class="text-lg sm:text-xl font-semibold text-base-content mb-1">{{ selected.subject?.name_cn || selected.subject?.name }}</h2>
+              <div class="min-w-0 flex-1">
+                <h2 class="text-lg font-semibold text-base-content mb-1">{{ selected.subject?.name_cn || selected.subject?.name }}</h2>
                 <p class="text-sm text-base-content/50 mb-3">{{ selected.subject?.name }}</p>
-
-                <!-- Action links -->
-                <div class="flex gap-3 text-sm mb-3">
-                  <router-link v-if="selected.subject?.id" :to="`/anime/${selected.subject.id}/topics`" class="text-primary hover:underline">参与讨论</router-link>
-                  <router-link v-if="selected.subject?.id" :to="`/anime/${selected.subject.id}/talkbox`" class="text-primary hover:underline">观吐槽</router-link>
-                  <span class="text-base-content/30">|</span>
-                  <router-link v-if="selected.subject?.id" :to="`/anime/${selected.subject.id}`" class="text-primary hover:underline">详情页</router-link>
+                <div class="flex gap-3 text-sm">
+                  <router-link v-if="selected.subject?.id" :to="`/anime/${selected.subject.id}/topics`" class="text-primary hover-underline-wipe">参与讨论</router-link>
+                  <router-link v-if="selected.subject?.id" :to="`/anime/${selected.subject.id}/talkbox`" class="text-primary hover-underline-wipe">观吐槽</router-link>
+                  <router-link v-if="selected.subject?.id" :to="`/anime/${selected.subject.id}`" class="text-primary hover-underline-wipe">详情页</router-link>
                 </div>
               </div>
             </div>
 
             <!-- Episode progress -->
-            <div v-if="selected.subject?.total_episodes" class="mb-5">
-              <p class="text-xs text-base-content/50 mb-2">播放进度 · 已看 {{ selected.ep_status || 0 }} / {{ selected.subject.total_episodes }}</p>
+            <div v-if="selected.subject?.eps || selected.subject?.total_episodes" class="mt-4">
+              <p class="text-xs text-base-content/40 mb-2">播放进度 · 已看 {{ selected.ep_status || 0 }} / {{ selected.subject?.eps || selected.subject?.total_episodes }}</p>
               <div class="flex flex-wrap gap-1.5">
-                <button
-                  v-for="ep in selected.subject.total_episodes"
+                <span
+                  v-for="ep in Math.min(selected.subject?.eps || selected.subject?.total_episodes || 0, 24)"
                   :key="ep"
-                  class="w-9 h-7 rounded text-xs font-bold transition-all"
-                  :class="ep <= (selected.ep_status || 0) ? 'bg-primary text-white' : 'bg-base-300 text-base-content/50 hover:bg-base-300/80'"
+                  class="w-8 h-7 rounded text-xs font-bold flex items-center justify-center"
+                  :class="ep <= (selected.ep_status || 0) ? 'bg-primary text-white' : 'bg-base-300 text-base-content/40'"
                 >
                   {{ String(ep).padStart(2, '0') }}
-                </button>
+                </span>
               </div>
             </div>
 
-            <!-- Episode info bar -->
-            <div class="flex items-center justify-between text-sm">
-              <div class="flex items-center gap-3">
-                <span v-if="selected.rating || selected.rate" class="text-amber-500 font-bold">★ {{ selected.rating || selected.rate }}</span>
-                <span class="text-base-content/40">{{ statusLabel(selected.status || selected.type) }}</span>
-              </div>
-              <router-link v-if="selected.subject?.id" :to="`/anime/${selected.subject.id}`" class="text-sm text-primary hover-underline-wipe">查看详情 →</router-link>
+            <div class="flex items-center justify-between text-sm mt-4 pt-3 border-t border-base-300">
+              <span v-if="selected.rating || selected.rate" class="text-amber-500 font-bold">★ {{ selected.rating || selected.rate }}</span>
+              <router-link v-if="selected.subject?.id" :to="`/anime/${selected.subject.id}`" class="text-primary hover-underline-wipe">查看详情 →</router-link>
             </div>
           </div>
 
-          <div v-else class="py-16 text-center text-base-content/30 text-sm">
+          <div v-else class="py-12 text-center text-base-content/30 text-sm rounded-lg bg-base-200/30">
             选择左侧的番剧查看详情
           </div>
         </div>
@@ -137,12 +130,8 @@ const limit = 30
 
 const selectedId = computed(() => selected.value?.subject?.id || selected.value?.anime_id)
 
-function statusLabel(s) {
-  return { 1: '想看', 2: '看过', 3: '在看', 4: '搁置', 5: '弃番' }[s] || '未知'
-}
-
-function switchType(value) {
-  activeType.value = value
+function switchType(val) {
+  activeType.value = val
   page.value = 0
   collections.value = []
   selected.value = null
@@ -157,12 +146,13 @@ function selectItem(col) {
 async function fetchCollections() {
   loading.value = true; error.value = ''
   try {
-    const params = { offset: page.value * limit, limit, subject_type: activeType.value || undefined, type: 3 }
+    const params = { offset: page.value * limit, limit, type: 3 }
+    if (activeType.value) params.subject_type = activeType.value
     const res = await collectionAPI.getList(params)
     const data = res.data?.data || []
     if (page.value === 0) {
       collections.value = data
-      if (data.length > 0 && !selected.value) selected.value = data[0]
+      if (data.length && !selected.value) selected.value = data[0]
     } else {
       collections.value.push(...data)
     }
@@ -172,9 +162,7 @@ async function fetchCollections() {
   finally { loading.value = false }
 }
 
-function loadMore() {
-  fetchCollections()
-}
+function loadMore() { fetchCollections() }
 
 onMounted(fetchCollections)
 </script>
