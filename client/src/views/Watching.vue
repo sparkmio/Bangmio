@@ -2,7 +2,7 @@
   <div>
     <div class="flex items-center gap-3 mb-5">
       <a @click.prevent="$router.back()" class="text-sm text-primary hover-underline-wipe cursor-pointer">← 返回</a>
-      <h1 class="text-2xl font-semibold text-base-content">在看</h1>
+      <h1 class="text-2xl font-semibold text-base-content">在追</h1>
     </div>
 
     <!-- Type tabs -->
@@ -22,7 +22,7 @@
 
     <div v-if="!loading && !error">
       <div v-if="!collections.length" class="py-16 text-center text-base-content/40">
-        <p>暂无在看内容</p>
+        <p>暂无在追内容</p>
       </div>
 
       <div v-else class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5">
@@ -44,7 +44,7 @@
                 class="w-10 h-14 rounded object-cover flex-shrink-0"
               />
               <div class="min-w-0 flex-1">
-                <p class="text-[13px] font-medium text-base-content line-clamp-1">{{ col.subject?.name_cn || col.subject?.name }}</p>
+                <p class="text-[13px] font-medium text-base-content line-clamp-1 hover:text-primary transition-colors cursor-pointer">{{ col.subject?.name_cn || col.subject?.name }}</p>
                 <p class="text-xs text-primary font-semibold mt-0.5">[{{ col.ep_status || 0 }}/{{ col.subject?.eps || col.subject?.total_episodes || '?' }}]</p>
               </div>
             </button>

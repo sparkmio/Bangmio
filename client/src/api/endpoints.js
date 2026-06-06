@@ -37,5 +37,12 @@ export const commentsAPI = {
   getSubjectComments(id) { return api.get(`/comments/subject/${id}`) },
   getSubjectTopics(id) { return api.get(`/comments/subject/${id}/topics`) },
   getTopicDetail(topicId) { return api.get(`/comments/topic/${topicId}`) },
-  getPersonComments(id) { return api.get(`/comments/person/${id}`) }
+  getPersonComments(id) { return api.get(`/comments/person/${id}`) },
+  postComment(subjectId, body) { return api.post(`/comments/subject/${subjectId}/comment`, body) },
+  postReply(topicId, body) { return api.post(`/comments/topic/${topicId}/reply`, body) },
+  postTalkbox(subjectId, body) { return api.post(`/comments/subject/${subjectId}/talkbox`, body) },
+}
+
+export const doubanAPI = {
+  getRating(id) { return api.get(`/douban/${id}`) },
 }

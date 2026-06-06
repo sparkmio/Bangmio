@@ -3,7 +3,7 @@
     <!-- Watching panel: Bangumi-style split layout -->
     <section class="mb-10" v-if="auth.isLoggedIn">
       <div class="flex items-center justify-between mb-4">
-        <h2 class="text-xl font-semibold text-base-content">在看</h2>
+        <h2 class="text-xl font-semibold text-base-content">在追</h2>
         <router-link to="/watching" class="text-sm text-primary hover-underline-wipe">查看全部 →</router-link>
       </div>
 
@@ -41,7 +41,7 @@
                 class="w-10 h-14 rounded object-cover flex-shrink-0"
               />
               <div class="min-w-0 flex-1">
-                <p class="text-[13px] font-medium text-base-content line-clamp-1">{{ item.name_cn || item.name }}</p>
+                <p class="text-[13px] font-medium text-base-content line-clamp-1 hover:text-primary transition-colors cursor-pointer">{{ item.name_cn || item.name }}</p>
                 <p class="text-xs text-primary font-semibold mt-0.5">[{{ item.ep_status || 0 }}/{{ item.total_episodes || '?' }}]</p>
               </div>
             </button>
@@ -91,7 +91,7 @@
       </div>
 
       <div v-else-if="!watchingLoading && watchingList.length === 0" class="text-center py-10 rounded-lg bg-base-200/30">
-        <p class="text-sm text-base-content/40">还没有在看的内容</p>
+        <p class="text-sm text-base-content/40">还没有在追的内容</p>
         <router-link to="/anime" class="text-sm text-primary mt-1 inline-block hover-underline-wipe">去探索</router-link>
       </div>
     </section>

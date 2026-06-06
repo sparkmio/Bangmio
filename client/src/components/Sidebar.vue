@@ -65,7 +65,7 @@ const IconSettings = { template: '<svg fill="none" stroke="currentColor" viewBox
 
 const navItems = [
   { path: '/', label: '首页', icon: IconHome },
-  { path: '/anime', label: '热门', icon: IconBrowse },
+  { path: '/anime', label: '搜索', icon: IconBrowse },
   { path: '/schedule', label: '新番时间表', icon: IconCalendar },
   { path: '/about', label: '关于我们', icon: IconAbout },
   { path: '/settings', label: '设置', icon: IconSettings },

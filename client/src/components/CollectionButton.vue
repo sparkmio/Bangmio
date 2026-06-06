@@ -42,7 +42,7 @@ const open = ref(false)
 const statusOptions = [
   { label: '想看', value: 1 },
   { label: '看过', value: 2 },
-  { label: '在看', value: 3 },
+  { label: '在追', value: 3 },
   { label: '搁置', value: 4 },
   { label: '弃番', value: 5 }
 ]

@@ -77,6 +77,19 @@
           </div>
         </div>
       </div>
+
+      <!-- Reply input -->
+      <div v-if="auth.isLoggedIn" class="card bg-base-100 border border-base-300">
+        <div class="card-body p-4">
+          <form @submit.prevent="submitReply" class="flex gap-2">
+            <input v-model="newReply" type="text" placeholder="回复这条讨论..." class="input input-bordered input-sm flex-1" :disabled="sending" />
+            <button type="submit" :disabled="!newReply.trim() || sending" class="btn btn-primary btn-sm">
+              <span v-if="sending" class="loading loading-spinner loading-xs"></span>
+              发送
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -86,11 +99,17 @@ import { ref, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { gsap } from 'gsap'
 import { commentsAPI } from '../api/endpoints'
+import { useAuthStore } from '../stores/auth'
+import { useToastStore } from '../stores/toast'
 
 const route = useRoute()
+const auth = useAuthStore()
+const toast = useToastStore()
 const topic = ref({ op: null, replies: [] })
 const loading = ref(true)
 const error = ref('')
+const newReply = ref('')
+const sending = ref(false)
 
 async function fetchTopic() {
   loading.value = true
@@ -109,6 +128,21 @@ async function fetchTopic() {
     tl.fromTo('.card:first-child', { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4 })
     tl.fromTo('.space-y-3 > .card', { opacity: 0, y: 15 }, { opacity: 1, y: 0, stagger: 0.06, duration: 0.35 }, '-=0.2')
   })
+}
+
+async function submitReply() {
+  if (!newReply.value.trim()) return
+  sending.value = true
+  try {
+    await commentsAPI.postReply(route.params.id, { content: newReply.value.trim() })
+    newReply.value = ''
+    toast.success('回复成功')
+    await fetchTopic()
+  } catch (err) {
+    toast.error(err.response?.data?.error || '发送失败')
+  } finally {
+    sending.value = false
+  }
 }
 
 onMounted(fetchTopic)

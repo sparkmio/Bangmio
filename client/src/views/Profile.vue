@@ -34,7 +34,7 @@
           <select v-model="filterType" @change="fetchCollections" class="select select-bordered select-xs">
             <option :value="0">全部</option>
             <option :value="1">想看</option>
-            <option :value="3">在看</option>
+            <option :value="3">在追</option>
             <option :value="2">看过</option>
             <option :value="4">搁置</option>
             <option :value="5">弃番</option>
@@ -96,14 +96,14 @@ const limit = 30
 
 const statItems = [
   { key: 'want', label: '想看', color: '#60a5fa' },
-  { key: 'watching', label: '在看', color: '#34d399' },
+  { key: 'watching', label: '在追', color: '#34d399' },
   { key: 'completed', label: '看过', color: '#f472b6' },
   { key: 'on_hold', label: '搁置', color: '#fbbf24' },
   { key: 'dropped', label: '弃番', color: '#f87171' }
 ]
 
 function statusLabel(s) {
-  return { 1: '想看', 2: '看过', 3: '在看', 4: '搁置', 5: '弃番' }[s] || '未知'
+  return { 1: '想看', 2: '看过', 3: '在追', 4: '搁置', 5: '弃番' }[s] || '未知'
 }
 
 async function fetchCollections(reset = true) {

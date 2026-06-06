@@ -13,14 +13,17 @@ function getBase(isChina) {
   return isChina ? BGM_PROXY : BGM_TV
 }
 
-async function fetchHTML(url) {
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml',
-      'Accept-Language': 'zh-CN,zh;q=0.9'
-    }
-  })
+async function fetchHTML(url, token) {
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml',
+    'Accept-Language': 'zh-CN,zh;q=0.9'
+  }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+    headers['Cookie'] = `chii_auth=${token}`
+  }
+  const res = await fetch(url, { headers })
   const buf = await res.arrayBuffer()
   return new TextDecoder('utf-8').decode(buf)
 }
@@ -260,6 +263,140 @@ app.get('/person/:id', async (c) => {
     return c.json({ data: comments })
   } catch (err) {
     return c.json({ error: '获取评论失败', detail: String(err) }, 500)
+  }
+})
+
+// ===== POST routes for comment posting =====
+
+function extractFormhash(html) {
+  const m = html.match(/name="formhash"\s+value="([^"]+)"/i)
+  return m ? m[1] : null
+}
+
+function extractChiiAuth(token) {
+  return `chii_auth=${token}; chii_cookietime=2592000`
+}
+
+app.post('/subject/:id/comment', async (c) => {
+  try {
+    const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
+    const base = getBase(isChina)
+    const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
+    if (!token) return c.json({ error: '未登录' }, 401)
+    const { content } = await c.req.json()
+    if (!content) return c.json({ error: '内容不能为空' }, 400)
+
+    const subjectId = c.req.param('id')
+    const pageHtml = await fetchHTML(`${base}/subject/${subjectId}/comments`, token)
+    const formhash = extractFormhash(pageHtml)
+    if (!formhash) return c.json({ error: '无法获取表单 token，请重新登录' }, 400)
+
+    const cookie = extractChiiAuth(token)
+    const params = new URLSearchParams()
+    params.append('formhash', formhash)
+    params.append('comment_content', content)
+    params.append('submit', 'submit')
+
+    const res = await fetch(`${base}/subject/${subjectId}/comment`, {
+      method: 'POST',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Cookie': cookie,
+        'Referer': `${base}/subject/${subjectId}`
+      },
+      body: params.toString(),
+      redirect: 'manual'
+    })
+
+    if (res.status >= 300 && res.status < 400) return c.json({ success: true })
+    if (res.ok) return c.json({ success: true })
+    const body = await res.text()
+    return c.json({ error: '发送失败', detail: body.slice(0, 200) }, 400)
+  } catch (err) {
+    return c.json({ error: '发送失败', detail: String(err) }, 500)
+  }
+})
+
+app.post('/topic/:topicId/reply', async (c) => {
+  try {
+    const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
+    const base = getBase(isChina)
+    const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
+    if (!token) return c.json({ error: '未登录' }, 401)
+    const { content } = await c.req.json()
+    if (!content) return c.json({ error: '内容不能为空' }, 400)
+
+    const topicId = c.req.param('topicId')
+    const pageHtml = await fetchHTML(`${base}/subject/topic/${topicId}`, token)
+    const formhash = extractFormhash(pageHtml)
+    if (!formhash) return c.json({ error: '无法获取表单 token，请重新登录' }, 400)
+
+    const cookie = extractChiiAuth(token)
+    const params = new URLSearchParams()
+    params.append('formhash', formhash)
+    params.append('content', content)
+    params.append('submit', 'submit')
+
+    const res = await fetch(`${base}/subject/topic/${topicId}/new_reply`, {
+      method: 'POST',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Cookie': cookie,
+        'Referer': `${base}/subject/topic/${topicId}`
+      },
+      body: params.toString(),
+      redirect: 'manual'
+    })
+
+    if (res.status >= 300 && res.status < 400) return c.json({ success: true })
+    if (res.ok) return c.json({ success: true })
+    const body = await res.text()
+    return c.json({ error: '发送失败', detail: body.slice(0, 200) }, 400)
+  } catch (err) {
+    return c.json({ error: '发送失败', detail: String(err) }, 500)
+  }
+})
+
+app.post('/subject/:id/talkbox', async (c) => {
+  try {
+    const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
+    const base = getBase(isChina)
+    const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
+    if (!token) return c.json({ error: '未登录' }, 401)
+    const { content } = await c.req.json()
+    if (!content) return c.json({ error: '内容不能为空' }, 400)
+
+    const subjectId = c.req.param('id')
+    const pageHtml = await fetchHTML(`${base}/subject/${subjectId}/talkbox`, token)
+    const formhash = extractFormhash(pageHtml)
+    if (!formhash) return c.json({ error: '无法获取表单 token，请重新登录' }, 400)
+
+    const cookie = extractChiiAuth(token)
+    const params = new URLSearchParams()
+    params.append('formhash', formhash)
+    params.append('content', content)
+    params.append('submit', 'submit')
+
+    const res = await fetch(`${base}/subject/${subjectId}/talkbox`, {
+      method: 'POST',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Cookie': cookie,
+        'Referer': `${base}/subject/${subjectId}/talkbox`
+      },
+      body: params.toString(),
+      redirect: 'manual'
+    })
+
+    if (res.status >= 300 && res.status < 400) return c.json({ success: true })
+    if (res.ok) return c.json({ success: true })
+    const body = await res.text()
+    return c.json({ error: '发送失败', detail: body.slice(0, 200) }, 400)
+  } catch (err) {
+    return c.json({ error: '发送失败', detail: String(err) }, 500)
   }
 })
 
