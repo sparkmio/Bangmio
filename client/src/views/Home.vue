@@ -22,10 +22,10 @@
 
       <LoadingState :loading="watchingLoading" :error="watchingError" @retry="fetchWatching" />
 
-      <div v-if="!watchingLoading && !watchingError && watchingList.length" class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5">
+      <div v-if="!watchingLoading && !watchingError && watchingList.length" class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-start">
         <!-- Left: anime list -->
         <div class="lg:col-span-4">
-          <div class="space-y-0.5 max-h-[420px] overflow-y-auto pr-1 scrollbar-hide">
+          <div class="space-y-0.5 overflow-y-auto pr-1 scrollbar-hide" style="max-height: 420px">
             <button
               v-for="item in watchingList"
               :key="item.id"
