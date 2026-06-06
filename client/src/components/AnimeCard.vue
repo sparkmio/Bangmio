@@ -1,6 +1,6 @@
 <template>
   <router-link :to="`/anime/${anime.id}`" class="group block" ref="cardRef">
-    <div class="relative overflow-hidden rounded-lg bg-base-300 transition-all duration-300 group-hover:-translate-y-1.5 group-hover:shadow-lg">
+    <div class="relative overflow-hidden rounded-lg bg-base-300 transition-all duration-200 group-hover:-translate-y-1.5 group-hover:shadow-lg">
       <div class="aspect-[2/3] relative">
         <img
           v-if="imageSrc && !imgError"
@@ -28,7 +28,7 @@
 
         <div class="absolute inset-x-0 bottom-0 p-3 z-10">
           <h3 class="text-[13px] font-semibold text-white line-clamp-2 leading-snug">{{ anime.name_cn || anime.name }}</h3>
-          <p v-if="anime.name_cn && anime.name" class="text-[11px] text-white/60 mt-0.5 line-clamp-1">{{ anime.name }}</p>
+          <p v-if="anime.name_cn && anime.name" class="text-[11px] text-white/50 mt-0.5 line-clamp-1">{{ anime.name }}</p>
         </div>
       </div>
     </div>
@@ -45,7 +45,7 @@ const cardRef = ref(null)
 
 onMounted(() => {
   if (cardRef.value) {
-    gsap.from(cardRef.value, { opacity: 0, y: 20, duration: 0.4, ease: 'power2.out' })
+    gsap.fromTo(cardRef.value, { opacity: 0, y: 15 }, { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out' })
   }
 })
 </script>
