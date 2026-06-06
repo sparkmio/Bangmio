@@ -27,7 +27,7 @@
 
       <div v-else class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5">
         <!-- Left: anime list -->
-        <div class="lg:col-span-4">
+        <div class="lg:col-span-3">
           <div class="space-y-0.5 max-h-[calc(100vh-180px)] overflow-y-auto pr-1 scrollbar-hide">
             <button
               v-for="col in collections"
@@ -55,7 +55,7 @@
         </div>
 
         <!-- Right: detail panel -->
-        <div class="lg:col-span-8">
+        <div class="lg:col-span-9">
           <div v-if="selected" class="rounded-lg bg-base-200/40 p-5">
             <div class="flex gap-5 mb-4">
               <img
@@ -233,7 +233,7 @@ function openEpisode(ep) {
     episode: ep,
     name: epData?.name_cn || epData?.name || `第${ep}话`,
     airdate: epData?.airdate || '',
-    duration: epData?.duration || 0,
+    duration: epData?.duration_seconds || 0,
   }
 }
 

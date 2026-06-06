@@ -79,6 +79,11 @@ const routes = [
     name: 'Watching',
     component: () => import('../views/Watching.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: () => import('../views/Settings.vue')
   }
 ]
 

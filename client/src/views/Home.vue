@@ -24,7 +24,7 @@
 
       <div v-if="!watchingLoading && !watchingError && watchingList.length" class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-start">
         <!-- Left: anime list -->
-        <div class="lg:col-span-4">
+        <div class="lg:col-span-3">
           <div class="space-y-0.5 overflow-y-auto pr-1 scrollbar-hide" style="max-height: 420px">
             <button
               v-for="item in watchingList"
@@ -49,7 +49,7 @@
         </div>
 
         <!-- Right: detail panel -->
-        <div class="lg:col-span-8">
+        <div class="lg:col-span-9">
           <div v-if="selectedWatching" class="rounded-lg bg-base-200/40 p-5">
             <div class="flex gap-5 mb-4">
               <img
@@ -257,7 +257,7 @@ function openEpisode(ep) {
     episode: ep,
     name: epData?.name_cn || epData?.name || `第${ep}话`,
     airdate: epData?.airdate || '',
-    duration: epData?.duration || 0,
+    duration: epData?.duration_seconds || 0,
   }
 }
 
