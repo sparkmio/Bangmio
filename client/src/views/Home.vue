@@ -72,14 +72,15 @@
             <div v-if="selectedWatching.total_episodes" class="mt-4">
               <p class="text-xs text-base-content/40 mb-2">播放进度 · 已看 {{ selectedWatching.ep_status || 0 }} / {{ selectedWatching.total_episodes }}</p>
               <div class="flex flex-wrap gap-1.5">
-                <span
+                <button
                   v-for="ep in Math.min(selectedWatching.total_episodes, 24)"
                   :key="ep"
-                  class="w-8 h-7 rounded text-xs font-bold flex items-center justify-center"
-                  :class="ep <= (selectedWatching.ep_status || 0) ? 'bg-primary text-white' : 'bg-base-300 text-base-content/40'"
+                  @click="openEpisode(ep)"
+                  class="w-8 h-7 rounded text-xs font-bold flex items-center justify-center transition-all hover:scale-110 cursor-pointer"
+                  :class="ep <= (selectedWatching.ep_status || 0) ? 'bg-primary text-white' : 'bg-base-300 text-base-content/40 hover:bg-base-300/80'"
                 >
                   {{ String(ep).padStart(2, '0') }}
-                </span>
+                </button>
               </div>
             </div>
           </div>
@@ -124,6 +125,54 @@
         </div>
       </div>
     </section>
+
+    <!-- Episode detail popup -->
+    <div v-if="episodePopup" class="fixed inset-0 z-50 flex items-center justify-center" @click.self="closeEpisode">
+      <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" @click="closeEpisode"></div>
+      <div class="relative bg-base-100 rounded-xl shadow-2xl w-full max-w-sm mx-4 p-5 z-10 border border-base-300">
+        <button @click="closeEpisode" class="absolute top-3 right-3 text-base-content/40 hover:text-base-content transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+
+        <h3 class="text-base font-semibold text-base-content mb-4 pr-8">
+          ep.{{ episodePopup.episode }} {{ episodePopup.name }}
+        </h3>
+
+        <div class="flex flex-wrap gap-2 mb-4">
+          <button
+            v-for="s in epStatusOptions"
+            :key="s.value"
+            @click="updateWatchingStatus(s.value)"
+            class="px-3 py-1.5 rounded-md text-sm font-medium transition-all"
+            :class="selectedWatching?.type === s.value ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60 hover:bg-base-300'"
+          >
+            {{ s.label }}
+          </button>
+        </div>
+
+        <div class="space-y-2 text-sm text-base-content/60">
+          <div class="flex justify-between">
+            <span>首播</span>
+            <span class="text-base-content">{{ episodePopup.airdate || '未知' }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span>时长</span>
+            <span class="text-base-content">{{ formatDuration(episodePopup.duration) }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span>讨论</span>
+            <router-link
+              v-if="selectedWatching?.id"
+              :to="`/anime/${selectedWatching.id}/topics`"
+              class="text-primary hover-underline-wipe"
+              @click="closeEpisode"
+            >
+              参与讨论
+            </router-link>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -144,6 +193,13 @@ const typeTabs = [
   { label: '书籍', value: 1 },
 ]
 
+const epStatusOptions = [
+  { label: '想看', value: 1 },
+  { label: '看过', value: 2 },
+  { label: '看到', value: 3 },
+  { label: '抛弃', value: 5 },
+]
+
 const watchingType = ref(0)
 const watchingList = ref([])
 const selectedWatching = ref(null)
@@ -157,6 +213,9 @@ const weekError = ref('')
 
 const dayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 
+const episodes = ref([])
+const episodePopup = ref(null)
+
 const currentDayItems = computed(() => {
   const day = weekData.value.find(d => d.weekday?.id === activeDay.value)
   return day?.items || []
@@ -166,14 +225,62 @@ function mapAnime(item) {
   return { ...item, images: item.images || (item.image ? { common: item.image, large: item.image } : null) }
 }
 
+function formatDuration(dur) {
+  if (!dur) return '未知'
+  const total = Number(dur)
+  if (total >= 60) {
+    const h = Math.floor(total / 60)
+    const m = total % 60
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`
+  }
+  return `00:${String(total).padStart(2, '0')}:00`
+}
+
 function selectWatching(item) {
   selectedWatching.value = item
+  episodePopup.value = null
+  if (item.id) fetchEpisodes(item.id)
+}
+
+async function fetchEpisodes(subjectId) {
+  try {
+    const res = await animeAPI.getEpisodes(subjectId)
+    episodes.value = res.data?.data || res.data || []
+  } catch {
+    episodes.value = []
+  }
+}
+
+function openEpisode(ep) {
+  const epData = episodes.value.find(e => e.sort === ep)
+  episodePopup.value = {
+    episode: ep,
+    name: epData?.name_cn || epData?.name || `第${ep}话`,
+    airdate: epData?.airdate || '',
+    duration: epData?.duration || 0,
+  }
+}
+
+function closeEpisode() {
+  episodePopup.value = null
+}
+
+async function updateWatchingStatus(status) {
+  if (!selectedWatching.value?.id) return
+  try {
+    await collectionAPI.save(selectedWatching.value.id, { status })
+    const idx = watchingList.value.findIndex(item => item.id === selectedWatching.value.id)
+    if (idx >= 0) watchingList.value[idx] = { ...watchingList.value[idx], type: status }
+    selectedWatching.value = { ...selectedWatching.value, type: status }
+    closeEpisode()
+  } catch {}
 }
 
 function switchType(val) {
   watchingType.value = val
   watchingList.value = []
   selectedWatching.value = null
+  episodes.value = []
   fetchWatching()
 }
 
@@ -194,7 +301,10 @@ async function fetchWatching() {
         rating: c.subject?.rating || { score: 0 }
       }))
       .filter(item => item.id)
-    if (watchingList.value.length > 0) selectedWatching.value = watchingList.value[0]
+    if (watchingList.value.length > 0) {
+      selectedWatching.value = watchingList.value[0]
+      if (watchingList.value[0].id) fetchEpisodes(watchingList.value[0].id)
+    }
   } catch { watchingError.value = '加载失败' }
   finally { watchingLoading.value = false }
 }
