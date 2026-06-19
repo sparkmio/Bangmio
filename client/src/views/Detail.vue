@@ -76,14 +76,19 @@
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6" v-if="anime.rating?.count || anime.collection">
           <div v-if="anime.rating?.count" data-stats class="bg-base-200/40 rounded-lg p-5">
-            <h3 class="font-semibold mb-4 text-base-content/80 text-sm">评分分布</h3>
-            <div class="space-y-2">
-              <div v-for="i in 10" :key="i" class="flex items-center gap-2 text-xs">
-                <span class="w-4 text-right text-base-content/40 font-mono">{{ i }}</span>
-                <div class="flex-1 h-2.5 rounded-full overflow-hidden bg-base-300/50">
-                  <div class="h-full rounded-full" :style="{ width: barWidth(i) + '%', background: i >= 8 ? 'var(--p)' : i >= 5 ? 'var(--wa)' : 'var(--bc)' }"></div>
+            <div class="flex items-center gap-4 mb-4">
+              <div class="text-center">
+                <p class="text-3xl font-black" :class="anime.rating.score >= 8 ? 'text-success' : anime.rating.score >= 5 ? 'text-warning' : 'text-base-content/50'">{{ anime.rating?.score?.toFixed(1) || '-' }}</p>
+                <p class="text-xs text-base-content/40 mt-0.5">{{ anime.rating.total }}人评</p>
+              </div>
+              <div class="flex-1 space-y-1.5">
+                <div v-for="i in 10" :key="i" class="flex items-center gap-1.5 text-xs">
+                  <span class="w-4 text-right text-base-content/40 font-mono">{{ 11 - i }}</span>
+                  <div class="flex-1 h-1.5 rounded-full overflow-hidden bg-base-300/50">
+                    <div class="h-full rounded-full transition-all duration-500" :style="{ width: barWidth(11 - i) + '%', background: (11 - i) >= 8 ? 'var(--p)' : (11 - i) >= 5 ? 'var(--wa)' : 'var(--bc)' }"></div>
+                  </div>
+                  <span class="w-6 text-right text-base-content/40 font-mono">{{ anime.rating.count[11 - i] || 0 }}</span>
                 </div>
-                <span class="w-7 text-right text-base-content/40 font-mono">{{ anime.rating.count[i] || 0 }}</span>
               </div>
             </div>
           </div>
@@ -199,9 +204,50 @@
       </div>
 
       <!-- 讨论版 -->
-      <div v-show="activeTab === 'topics'" class="text-center py-10">
-        <router-link :to="`/anime/${anime.id}/topics`" class="btn btn-sm btn-outline">查看讨论版</router-link>
-        <a :href="`https://bangumi.one/subject/${anime.id}/board`" target="_blank" class="btn btn-sm btn-ghost mt-3">在 Bangumi 发表讨论 →</a>
+      <div v-show="activeTab === 'topics'">
+        <div v-if="auth.isLoggedIn" class="mb-4">
+          <button @click="showNewTopicModal = true" class="btn btn-sm btn-primary">发表新讨论</button>
+        </div>
+        <div v-if="topicLoading" class="flex justify-center py-10">
+          <span class="loading loading-spinner loading-lg text-primary"></span>
+        </div>
+        <div v-else-if="topics.length === 0" class="py-10 text-center text-base-content/50">
+          <p>暂无讨论帖</p>
+        </div>
+        <div v-else class="space-y-2">
+          <router-link v-for="topic in topics" :key="topic.id" :to="`/topic/${topic.id}`" class="card bg-base-100 border border-base-300 hover:border-primary transition-all hover:brightness-110 block">
+            <div class="card-body p-4 flex-row items-center justify-between">
+              <div class="min-w-0 flex-1">
+                <h3 class="text-sm font-medium truncate text-base-content">{{ topic.title }}</h3>
+                <div class="flex items-center gap-3 mt-1">
+                  <span class="text-xs text-base-content/50">{{ topic.author }}</span>
+                  <span class="text-xs text-base-content/50">{{ topic.date }}</span>
+                </div>
+              </div>
+              <div class="flex-shrink-0 ml-4">
+                <span class="badge badge-sm" :class="topic.replies > 0 ? 'badge-primary' : 'badge-ghost'">{{ topic.replies }} 回复</span>
+              </div>
+            </div>
+          </router-link>
+        </div>
+        <router-link :to="`/anime/${anime.id}/topics`" class="btn btn-sm btn-outline mt-4 w-full">查看全部讨论</router-link>
+        <a :href="`https://bangumi.one/subject/${anime.id}/board`" target="_blank" class="btn btn-sm btn-ghost mt-2 w-full">在 Bangumi 发表讨论 →</a>
+
+        <dialog v-if="showNewTopicModal" class="modal modal-open">
+          <div class="modal-box">
+            <h3 class="text-lg font-bold mb-4">发表新讨论</h3>
+            <input v-model="newTopicTitle" placeholder="标题" class="input input-bordered w-full mb-3" />
+            <textarea v-model="newTopicContent" placeholder="内容..." rows="5" class="textarea textarea-bordered w-full mb-4"></textarea>
+            <div class="flex gap-2 justify-end">
+              <button @click="showNewTopicModal = false" class="btn btn-ghost btn-sm">取消</button>
+              <button @click="postNewTopic" :disabled="newTopicPosting" class="btn btn-primary btn-sm">
+                <span v-if="newTopicPosting" class="loading loading-spinner loading-xs"></span>
+                发布
+              </button>
+            </div>
+          </div>
+          <div class="modal-backdrop" @click="showNewTopicModal = false"></div>
+        </dialog>
       </div>
 
       <!-- wiki -->
@@ -220,25 +266,69 @@
 
       <!-- 豆瓣 -->
       <div v-show="activeTab === 'douban'">
-        <div v-if="doubanData" class="bg-base-200/40 rounded-lg p-5">
-          <div class="flex items-start gap-6">
-            <div class="text-center flex-shrink-0">
-              <p class="text-4xl font-black text-amber-500">{{ doubanData.rate }}</p>
-              <div class="flex items-center gap-1 mt-1">
-                <template v-for="i in 5" :key="i">
-                  <svg class="w-4 h-4" :class="i <= Math.round(doubanData.star / 2) ? 'text-amber-400' : 'text-base-300'" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                </template>
+        <div v-if="doubanDetails" class="space-y-5">
+          <div class="bg-base-200/40 rounded-lg p-5">
+            <div class="flex items-center gap-6 mb-4">
+              <div class="text-center flex-shrink-0">
+                <p class="text-4xl font-black text-amber-500">{{ doubanDetails.rate }}</p>
+                <div class="flex items-center gap-0.5 mt-1 justify-center">
+                  <svg v-for="i in 5" :key="i" class="w-4 h-4" :class="i <= Math.round(parseFloat(doubanDetails.rate) / 2) ? 'text-amber-400' : 'text-base-300'" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                </div>
+                <p class="text-xs text-base-content/50 mt-1">豆瓣评分</p>
               </div>
-              <p class="text-xs text-base-content/50 mt-1">豆瓣评分</p>
+              <div class="flex-1 space-y-1.5" v-if="Object.keys(doubanDetails.rating_distribution).length">
+                <div v-for="star in ['5','4','3','2','1']" :key="star" class="flex items-center gap-1.5 text-xs">
+                  <span class="w-4 text-right text-base-content/40 font-mono">{{ star }}星</span>
+                  <div class="flex-1 h-1.5 rounded-full overflow-hidden bg-base-300/50">
+                    <div class="h-full rounded-full bg-amber-400" :style="{ width: (doubanDetails.rating_distribution[star] || 0) + '%' }"></div>
+                  </div>
+                  <span class="w-10 text-right text-base-content/40 font-mono">{{ doubanDetails.rating_distribution[star] || 0 }}%</span>
+                </div>
+              </div>
             </div>
-            <div v-if="doubanData.short_comment" class="flex-1 min-w-0">
-              <p class="text-sm text-base-content/70 italic">"{{ doubanData.short_comment.content }}"</p>
-              <p class="text-xs text-base-content/40 mt-2">— {{ doubanData.short_comment.author }}</p>
+            <div v-if="doubanDetails.short_comment" class="border-t border-base-300/30 pt-3">
+              <p class="text-sm text-base-content/70 italic">"{{ doubanDetails.short_comment.content }}"</p>
+              <p class="text-xs text-base-content/40 mt-1.5">— {{ doubanDetails.short_comment.author }}</p>
             </div>
           </div>
-          <a :href="doubanData.url" target="_blank" class="btn btn-sm btn-ghost mt-4 w-full">在豆瓣查看详情 →</a>
+
+          <div v-if="doubanDetails.short_reviews.length">
+            <h3 class="text-sm font-semibold text-base-content/60 mb-3">短评</h3>
+            <div class="space-y-3 max-h-96 overflow-y-auto">
+              <div v-for="r in doubanDetails.short_reviews" :key="r.id" class="bg-base-200/40 rounded-lg p-3">
+                <div class="flex items-center gap-2 mb-1.5">
+                  <span class="text-xs font-medium text-base-content">{{ r.author }}</span>
+                  <span class="badge badge-xs" :class="r.rating >= 4 ? 'badge-success' : r.rating >= 2 ? 'badge-warning' : 'badge-error'">{{ '★'.repeat(r.rating) }}</span>
+                  <span class="text-xs text-base-content/30 ml-auto">{{ r.votes }} 有用</span>
+                </div>
+                <p class="text-sm text-base-content/70 leading-relaxed line-clamp-4">{{ r.content }}</p>
+                <p class="text-xs text-base-content/40 mt-1">{{ r.date }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="doubanDetails.discussions?.length">
+            <h3 class="text-sm font-semibold text-base-content/60 mb-3">小组讨论</h3>
+            <div class="space-y-2 max-h-80 overflow-y-auto">
+              <a v-for="d in doubanDetails.discussions" :key="d.title" :href="d.url" target="_blank" class="flex items-center justify-between p-3 rounded-lg bg-base-200/40 hover:bg-base-200/60 transition-colors">
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-medium text-base-content line-clamp-1">{{ d.title }}</p>
+                  <div class="flex items-center gap-3 mt-1">
+                    <span class="text-xs text-base-content/50">{{ d.author }}</span>
+                    <span class="text-xs text-base-content/30">{{ d.lastUpdate }}</span>
+                  </div>
+                </div>
+                <span class="badge badge-sm flex-shrink-0 ml-2" :class="d.replies > 0 ? 'badge-primary' : 'badge-ghost'">{{ d.replies }} 回复</span>
+              </a>
+            </div>
+          </div>
+
+          <a :href="doubanDetails.url" target="_blank" class="btn btn-sm btn-ghost w-full">在豆瓣查看详情 →</a>
         </div>
-        <div v-else class="py-10 text-center text-base-content/40 text-sm">暂无豆瓣评分信息</div>
+        <div v-else class="py-10 text-center text-base-content/40 text-sm">
+          <span v-if="doubanLoading" class="loading loading-spinner loading-sm"></span>
+          <span v-else>暂无豆瓣评分信息</span>
+        </div>
       </div>
 
       <!-- 音乐 -->
@@ -267,6 +357,44 @@
         <div v-else class="py-10 text-center text-base-content/40 text-sm">暂无相关音乐</div>
       </div>
 
+      <!-- 在线观看 -->
+      <div v-show="activeTab === 'streaming'">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <a v-for="site in streamingSites" :key="site.name" :href="site.url(anime.name_cn || anime.name)" target="_blank" class="flex items-center gap-4 p-4 rounded-lg bg-base-200/40 hover:bg-base-200/60 transition-colors">
+            <div class="avatar placeholder">
+              <div class="w-10 h-10 rounded-lg text-white font-bold" :class="site.color">{{ site.icon }}</div>
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium text-base-content">{{ site.name }}</p>
+              <p class="text-xs text-base-content/50">{{ site.desc }}</p>
+            </div>
+            <svg class="w-4 h-4 text-base-content/30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </a>
+        </div>
+        <p class="text-xs text-base-content/30 text-center mt-6">以上链接均为第三方网站，本站不存储任何视频内容</p>
+      </div>
+
+      <!-- 萌娘百科 -->
+      <div v-show="activeTab === 'moegirl'">
+        <div v-if="moegirlLoading" class="flex justify-center py-10">
+          <span class="loading loading-spinner loading-lg text-primary"></span>
+        </div>
+        <div v-else-if="moegirlPage" class="space-y-4">
+          <div class="flex items-center gap-2">
+            <button @click="moegirlPage = null; moegirlResults = []; fetchMoegirlSearch()" class="btn btn-ghost btn-sm text-primary">← 返回搜索</button>
+          </div>
+          <div class="bg-base-200/40 rounded-lg p-5 moegirl-content prose prose-sm max-w-none" v-html="moegirlPage.html"></div>
+          <a :href="moegirlPage.pageUrl" target="_blank" class="btn btn-sm btn-ghost w-full">在萌娘百科查看完整页面 →</a>
+        </div>
+        <div v-else-if="moegirlResults.length" class="space-y-2">
+          <button v-for="r in moegirlResults" :key="r.title" @click="fetchMoegirlPage(r.title)" class="card bg-base-200/40 hover:bg-base-200/60 transition-colors w-full text-left p-4 block">
+            <h4 class="text-sm font-medium text-base-content">{{ r.title }}</h4>
+            <p class="text-xs text-base-content/50 mt-1 line-clamp-2">{{ r.description }}</p>
+          </button>
+        </div>
+        <div v-else class="py-10 text-center text-base-content/40 text-sm">暂无萌娘百科相关条目</div>
+      </div>
+
     </div>
   </div>
 </template>
@@ -275,7 +403,7 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { gsap } from 'gsap'
-import { animeAPI, collectionAPI, doubanAPI } from '../api/endpoints'
+import { animeAPI, collectionAPI, doubanAPI, commentsAPI, moegirlAPI } from '../api/endpoints'
 import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toast'
 import CollectionButton from '../components/CollectionButton.vue'
@@ -298,6 +426,8 @@ const tabs = [
   { key: 'wiki', label: 'wiki' },
   { key: 'douban', label: '豆瓣' },
   { key: 'music', label: '音乐' },
+  { key: 'streaming', label: '在线观看' },
+  { key: 'moegirl', label: '萌娘百科' },
 ]
 
 const activeTab = ref('overview')
@@ -306,13 +436,35 @@ const characters = ref([])
 const persons = ref([])
 const relations = ref([])
 const episodeList = ref([])
-const doubanData = ref(null)
+const doubanDetails = ref(null)
+const doubanLoading = ref(false)
+const topics = ref([])
+const topicLoading = ref(false)
+const moegirlResults = ref([])
+const moegirlPage = ref(null)
+const moegirlLoading = ref(false)
+const showNewTopicModal = ref(false)
+const newTopicTitle = ref('')
+const newTopicContent = ref('')
+const newTopicPosting = ref(false)
 const loading = ref(true)
 const error = ref('')
 const collectionStatus = ref(0)
 const collectionRating = ref(0)
 const collectionComment = ref('')
 const heroRef = ref(null)
+
+const streamingSites = [
+  { name: 'AGE动漫', desc: '高清在线', icon: 'A', color: 'bg-blue-500', url: (q) => `https://www.agemys.org/search?query=${encodeURIComponent(q)}` },
+  { name: '樱花动漫', desc: '在线播放', icon: '樱', color: 'bg-pink-500', url: (q) => `https://www.yhdm.so/search/${encodeURIComponent(q)}` },
+  { name: '哔哩哔哩', desc: '正版授权', icon: 'B', color: 'bg-blue-400', url: (q) => `https://search.bilibili.com/all?keyword=${encodeURIComponent(q)}` },
+  { name: 'Netflix', desc: '国际平台', icon: 'N', color: 'bg-red-600', url: (q) => `https://www.netflix.com/search?q=${encodeURIComponent(q)}` },
+  { name: 'Crunchyroll', desc: '欧美平台', icon: 'C', color: 'bg-orange-500', url: (q) => `https://www.crunchyroll.com/search?q=${encodeURIComponent(q)}` },
+  { name: '巴哈姆特动画疯', desc: '台湾平台', icon: '巴', color: 'bg-yellow-500', url: (q) => `https://ani.gamer.com.tw/search.php?keyword=${encodeURIComponent(q)}` },
+  { name: 'Aniwatch', desc: '英文社区', icon: 'W', color: 'bg-purple-500', url: (q) => `https://aniwatch.to/search?keyword=${encodeURIComponent(q)}` },
+  { name: 'Gogoanime', desc: '多语言', icon: 'G', color: 'bg-teal-500', url: (q) => `https://gogoanimehd.io/search.html?keyword=${encodeURIComponent(q)}` },
+  { name: 'MyAnimeList', desc: '资料站', icon: 'M', color: 'bg-indigo-500', url: (q) => `https://myanimelist.net/anime.php?q=${encodeURIComponent(q)}` },
+]
 
 const typeLabel = computed(() => ({ 1:'书籍',2:'动画',3:'音乐',4:'游戏',6:'三次元' })[anime.value.type] || '其他')
 const musicItems = computed(() => relations.value.filter(r => r.type === 3))
@@ -348,12 +500,81 @@ async function fetchEpisodes(id) {
   } catch { episodeList.value = [] }
 }
 
-async function fetchDouban() {
+async function fetchDoubanDetails() {
+  if (doubanDetails.value || doubanLoading.value) return
+  doubanLoading.value = true
   try {
     const id = route.params.id
-    const res = await doubanAPI.getRating(id)
-    doubanData.value = res.data?.data || null
-  } catch { doubanData.value = null }
+    const res = await doubanAPI.getDetails(id)
+    doubanDetails.value = res.data?.data || null
+  } catch { doubanDetails.value = null }
+  doubanLoading.value = false
+}
+
+async function fetchTopics() {
+  if (topicLoading.value) return
+  topicLoading.value = true
+  try {
+    const res = await commentsAPI.getSubjectTopics(route.params.id)
+    topics.value = res.data?.data || []
+  } catch { topics.value = [] }
+  topicLoading.value = false
+}
+
+async function fetchMoegirlSearch() {
+  moegirlLoading.value = true
+  try {
+    const names = [anime.value.name_cn, anime.value.name].filter(Boolean)
+    let results = []
+    for (const name of names) {
+      if (!name || results.length) break
+      const res = await moegirlAPI.search(name)
+      results = res.data?.data || []
+    }
+    if (!results.length && names[0]) {
+      const clean = names[0].replace(/[（(].+[)）]|第[一二三四五六七八九十\d]+季|OVA|剧场版|特别篇/g, '').trim()
+      if (clean && clean !== names[0]) {
+        const res = await moegirlAPI.search(clean)
+        results = res.data?.data || []
+      }
+    }
+    moegirlResults.value = results
+  } catch { moegirlResults.value = [] }
+  moegirlLoading.value = false
+}
+
+async function fetchMoegirlPage(title) {
+  moegirlLoading.value = true
+  try {
+    const res = await moegirlAPI.getPage(title)
+    moegirlPage.value = res.data?.data || null
+  } catch { moegirlPage.value = null }
+  moegirlLoading.value = false
+}
+
+async function postNewTopic() {
+  if (!newTopicTitle.value.trim() || !newTopicContent.value.trim()) return
+  newTopicPosting.value = true
+  try {
+    const res = await commentsAPI.postTopic(route.params.id, {
+      title: newTopicTitle.value.trim(),
+      content: newTopicContent.value.trim()
+    })
+    if (res.data?.success) {
+      toast.success('发布成功')
+      showNewTopicModal.value = false
+      newTopicTitle.value = ''
+      newTopicContent.value = ''
+      topicLoading.value = false
+      topics.value = []
+      fetchTopics()
+    } else {
+      toast.error(res.data?.error || '发布失败')
+    }
+  } catch {
+    toast.error('发布失败')
+  }
+  newTopicPosting.value = false
 }
 
 async function fetchDetail() {
@@ -375,7 +596,6 @@ async function fetchDetail() {
     persons.value = pRes?.data?.data || pRes?.data || []
     relations.value = rRes?.data?.data || rRes?.data || []
     fetchEpisodes(id)
-    fetchDouban()
   } catch { error.value = '加载失败' }
   finally { loading.value = false }
 
@@ -441,9 +661,16 @@ async function removeCollection() {
   } catch { toast.error('操作失败') }
 }
 
+watch(activeTab, (tab) => {
+  if (tab === 'topics' && topics.value.length === 0 && !topicLoading.value) fetchTopics()
+  if (tab === 'douban' && !doubanDetails.value && !doubanLoading.value) fetchDoubanDetails()
+  if (tab === 'moegirl' && moegirlResults.value.length === 0 && !moegirlPage.value && !moegirlLoading.value) fetchMoegirlSearch()
+})
+
 watch(() => route.params.id, (newId, oldId) => {
   if (newId && newId !== oldId) {
     collectionStatus.value = 0; collectionRating.value = 0; collectionComment.value = ''
+    topics.value = []; doubanDetails.value = null; moegirlResults.value = []; moegirlPage.value = null
     activeTab.value = 'overview'
     fetchDetail()
   }
@@ -451,3 +678,50 @@ watch(() => route.params.id, (newId, oldId) => {
 
 onMounted(fetchDetail)
 </script>
+
+<style scoped>
+.moegirl-content :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+}
+.moegirl-content :deep(td),
+.moegirl-content :deep(th) {
+  border: 1px solid hsl(var(--b3) / 0.3);
+  padding: 0.4rem 0.6rem;
+  font-size: 0.8rem;
+}
+.moegirl-content :deep(th) {
+  background: hsl(var(--b3) / 0.15);
+}
+.moegirl-content :deep(img) {
+  max-width: 100%;
+  height: auto;
+}
+.moegirl-content :deep(a) {
+  color: hsl(var(--p));
+}
+.moegirl-content :deep(h2) {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid hsl(var(--b3) / 0.2);
+  padding-bottom: 0.25rem;
+}
+.moegirl-content :deep(h3) {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 0.8rem;
+  margin-bottom: 0.4rem;
+}
+.moegirl-content :deep(.mw-headline) {
+  font-weight: 600;
+}
+.moegirl-content :deep(ul), .moegirl-content :deep(ol) {
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+.moegirl-content :deep(li) {
+  margin: 0.2rem 0;
+}
+</style>

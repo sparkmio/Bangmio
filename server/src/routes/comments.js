@@ -400,4 +400,47 @@ app.post('/subject/:id/talkbox', async (c) => {
   }
 })
 
+app.post('/subject/:id/topic', async (c) => {
+  try {
+    const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
+    const base = getBase(isChina)
+    const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
+    if (!token) return c.json({ error: '未登录' }, 401)
+    const { title, content } = await c.req.json()
+    if (!title) return c.json({ error: '标题不能为空' }, 400)
+    if (!content) return c.json({ error: '内容不能为空' }, 400)
+
+    const subjectId = c.req.param('id')
+    const pageHtml = await fetchHTML(`${base}/subject/${subjectId}/board`, token)
+    const formhash = extractFormhash(pageHtml)
+    if (!formhash) return c.json({ error: '无法获取表单 token，请重新登录' }, 400)
+
+    const cookie = extractChiiAuth(token)
+    const params = new URLSearchParams()
+    params.append('formhash', formhash)
+    params.append('title', title)
+    params.append('content', content)
+    params.append('submit', 'submit')
+
+    const res = await fetch(`${base}/subject/${subjectId}/board/new`, {
+      method: 'POST',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Cookie': cookie,
+        'Referer': `${base}/subject/${subjectId}/board`
+      },
+      body: params.toString(),
+      redirect: 'manual'
+    })
+
+    if (res.status >= 300 && res.status < 400) return c.json({ success: true })
+    if (res.ok) return c.json({ success: true })
+    const body = await res.text()
+    return c.json({ error: '发送失败', detail: body.slice(0, 200) }, 400)
+  } catch (err) {
+    return c.json({ error: '发送失败', detail: String(err) }, 500)
+  }
+})
+
 export default app

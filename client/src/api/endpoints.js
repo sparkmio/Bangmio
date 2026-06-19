@@ -41,8 +41,15 @@ export const commentsAPI = {
   postComment(subjectId, body) { return api.post(`/comments/subject/${subjectId}/comment`, body) },
   postReply(topicId, body) { return api.post(`/comments/topic/${topicId}/reply`, body) },
   postTalkbox(subjectId, body) { return api.post(`/comments/subject/${subjectId}/talkbox`, body) },
+  postTopic(subjectId, body) { return api.post(`/comments/subject/${subjectId}/topic`, body) },
 }
 
 export const doubanAPI = {
   getRating(id) { return api.get(`/douban/${id}`) },
+  getDetails(id) { return api.get(`/douban/${id}/details`) },
+}
+
+export const moegirlAPI = {
+  search(q) { return api.get('/moegirl/search', { params: { q } }) },
+  getPage(title) { return api.get('/moegirl/page', { params: { title } }) },
 }
