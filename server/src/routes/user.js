@@ -104,4 +104,17 @@ app.get('/me', async (c) => {
   }
 })
 
+app.get('/:username', async (c) => {
+  try {
+    const username = c.req.param('username')
+    if (!username) return c.json({ error: '缺少用户名' }, 400)
+    const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
+    const client = token ? getClient(token, isChina(c)) : getClient('', isChina(c))
+    const user = await client.get(`/v0/users/${username}`)
+    return c.json({ data: user })
+  } catch {
+    return c.json({ data: null })
+  }
+})
+
 export default app

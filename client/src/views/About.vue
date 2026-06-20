@@ -10,7 +10,7 @@
           <span class="w-1 h-4 rounded-full bg-primary"></span>关于
         </h2>
         <p class="mb-2"><em>半个作者的碎碎念 <span class="text-base-content/30">还有半个是AI</span></em></p>
-        <p class="mb-3">这是一个高中生好玩做的 VibeCoding 项目，主要是用 DeepSeek V4 Pro 和 MiMo-V2.5-Pro 做的，用了快 7000 万 tokens，要不是 D 便宜根本负担不起......</p>
+        <p class="mb-3">这是一个高中生好玩做的 VibeCoding 项目，主要是用 DeepSeek V4 Pro 和 MiMo-V2.5-Pro 做的，用了快 2亿 tokens，要不是 D 便宜根本负担不起......</p>
         <p class="mb-3">本项目使用了 <a href="https://bgm.tv" target="_blank" class="link link-primary">Bangumi</a> 的 API，前端用了 Vue 3 + Vite + Pinia + TailwindCSS，还通过网页抓取解决了吐槽版和讨论版之类的小问题。国内没啥合适的平台所以部署在 Cloudflare Pages，不限带宽，全球 CDN 加速。</p>
         <p>这是一个几乎不懂 CSS 的人用 AI 做的网站，各位可以提出批评，但也别骂的太狠。也感谢 Bangumi 现在还活着，给我提供了一个这么全的数据库，只让我做了点前端工作。</p>
       </div>

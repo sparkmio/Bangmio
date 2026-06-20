@@ -359,19 +359,13 @@
 
       <!-- 在线观看 -->
       <div v-show="activeTab === 'streaming'">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <a v-for="site in streamingSites" :key="site.name" :href="site.url(anime.name_cn || anime.name)" target="_blank" class="flex items-center gap-4 p-4 rounded-lg bg-base-200/40 hover:bg-base-200/60 transition-colors">
-            <div class="avatar placeholder">
-              <div class="w-10 h-10 rounded-lg text-white font-bold" :class="site.color">{{ site.icon }}</div>
-            </div>
-            <div class="min-w-0 flex-1">
-              <p class="text-sm font-medium text-base-content">{{ site.name }}</p>
-              <p class="text-xs text-base-content/50">{{ site.desc }}</p>
-            </div>
-            <svg class="w-4 h-4 text-base-content/30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-          </a>
-        </div>
-        <p class="text-xs text-base-content/30 text-center mt-6">以上链接均为第三方网站，本站不存储任何视频内容</p>
+        <iframe
+          :src="`/api/v1/moegirl/proxy?url=${encodeURIComponent('https://girigirilove.com/index.php/vod/search.html?wd=' + encodeURIComponent(anime.name_cn || anime.name))}`"
+          class="w-full rounded-lg border border-base-300"
+          style="height:75vh"
+          sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+        ></iframe>
+        <p class="text-xs text-base-content/30 text-center mt-4">内容来自第三方网站，本站不存储任何视频内容</p>
       </div>
 
       <!-- 萌娘百科 -->
@@ -384,7 +378,7 @@
             <button @click="moegirlUrl = null; moegirlResults = []; fetchMoegirlSearch()" class="btn btn-ghost btn-sm text-primary">← 返回搜索</button>
             <a :href="moegirlUrl" target="_blank" class="btn btn-ghost btn-sm text-xs">在新窗口打开</a>
           </div>
-          <iframe :src="moegirlUrl" class="w-full rounded-lg border border-base-300" style="height:70vh" sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
+          <iframe :src="`/api/v1/moegirl/proxy?url=${encodeURIComponent(moegirlUrl)}`" class="w-full rounded-lg border border-base-300" style="height:70vh" sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
         </div>
         <div v-else-if="moegirlResults.length" class="space-y-2">
           <button v-for="r in moegirlResults" :key="r.title" @click="moegirlUrl = r.url; moegirlLoading = false" class="card bg-base-200/40 hover:bg-base-200/60 transition-colors w-full text-left p-4 block">
@@ -453,17 +447,6 @@ const collectionStatus = ref(0)
 const collectionRating = ref(0)
 const collectionComment = ref('')
 const heroRef = ref(null)
-
-const streamingSites = [
-  { name: 'AGE动漫', desc: '高清在线', icon: 'A', color: 'bg-blue-500', url: (q) => `https://www.agemys.org/search?query=${encodeURIComponent(q)}` },
-  { name: '樱花动漫', desc: '在线播放', icon: '樱', color: 'bg-pink-500', url: (q) => `https://www.yhdm.so/search/${encodeURIComponent(q)}` },
-  { name: 'MX动漫', desc: 'MX动漫', icon: 'M', color: 'bg-purple-500', url: (q) => `https://mxdm.com/search/${encodeURIComponent(q)}` },
-  { name: '次元城', desc: '次元城动漫', icon: '次', color: 'bg-teal-500', url: (q) => `https://ciyuancheng.cc/search/${encodeURIComponent(q)}` },
-  { name: 'omofun', desc: 'omofun', icon: 'O', color: 'bg-orange-500', url: (q) => `https://omofunz.com/search/${encodeURIComponent(q)}` },
-  { name: '小风动漫', desc: '小风动漫', icon: '小', color: 'bg-green-500', url: (q) => `https://xfdm.net/search/${encodeURIComponent(q)}` },
-  { name: '咕咕动漫', desc: '咕咕动漫', icon: '咕', color: 'bg-cyan-500', url: (q) => `https://gugu3.com/search/${encodeURIComponent(q)}` },
-  { name: '奇番动漫', desc: '奇番动漫', icon: '奇', color: 'bg-red-500', url: (q) => `https://qifun.me/search/${encodeURIComponent(q)}` },
-]
 
 const typeLabel = computed(() => ({ 1:'书籍',2:'动画',3:'音乐',4:'游戏',6:'三次元' })[anime.value.type] || '其他')
 const musicItems = computed(() => relations.value.filter(r => r.type === 3))

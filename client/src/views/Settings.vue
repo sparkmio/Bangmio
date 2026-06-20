@@ -5,7 +5,6 @@
       <h1 class="text-2xl font-semibold text-base-content">设置</h1>
     </div>
 
-    <!-- Appearance -->
     <div class="rounded-xl bg-base-200/40 p-5 mb-4">
       <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">外观</h2>
 
@@ -35,7 +34,29 @@
       </div>
     </div>
 
-    <!-- Reset -->
+    <div class="rounded-xl bg-base-200/40 p-5 mb-4">
+      <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">内容</h2>
+
+      <div class="flex items-center justify-between py-3 border-b border-base-300/50">
+        <span class="text-sm text-base-content">番名显示</span>
+        <div class="flex gap-2">
+          <button @click="theme.setNameLang('cn')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.nameLang === 'cn' ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">优先中文</button>
+          <button @click="theme.setNameLang('original')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.nameLang === 'original' ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">优先原名</button>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between py-3">
+        <div>
+          <span class="text-sm text-base-content">NSFW 内容</span>
+          <p class="text-xs text-base-content/40 mt-0.5">隐藏成人向内容</p>
+        </div>
+        <div class="flex gap-2">
+          <button @click="theme.setNsfw('hide')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.nsfw === 'hide' ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">隐藏</button>
+          <button @click="theme.setNsfw('show')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.nsfw === 'show' ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">显示</button>
+        </div>
+      </div>
+    </div>
+
     <div class="rounded-xl bg-base-200/40 p-5">
       <button @click="theme.reset()" class="w-full py-2 text-sm text-base-content/60 hover:text-error transition-colors text-center">
         恢复默认设置

@@ -47,7 +47,7 @@
                 <p class="text-[13px] font-medium text-base-content line-clamp-1 hover:text-primary transition-colors cursor-pointer">{{ col.subject?.name_cn || col.subject?.name }}</p>
                 <div class="flex items-center gap-1.5 mt-0.5">
                   <p class="text-xs text-primary font-semibold">[{{ col.ep_status || 0 }}/{{ col.subject?.eps || col.subject?.total_episodes || '?' }}]</p>
-                  <span class="badge badge-xs" :class="col.subject?.type === 1 ? 'badge-info' : col.subject?.type === 6 ? 'badge-warning' : 'badge-success'">{{ subjectTypeLabel(col.subject?.type) }}</span>
+                  <span class="badge badge-xs" :class="col.subject_type === 1 ? 'badge-info' : col.subject_type === 6 ? 'badge-warning' : 'badge-success'">{{ subjectTypeLabel(col.subject_type) }}</span>
                 </div>
               </div>
             </button>
@@ -266,7 +266,7 @@ async function fetchCollections() {
     const params = { offset: page.value * limit, limit, type: 3 }
     if (activeType.value) params.subject_type = activeType.value
     const res = await collectionAPI.getList(params)
-    const data = (res.data?.data || []).filter(c => c.subject?.type !== 4)
+    const data = (res.data?.data || []).filter(c => c.subject_type !== 4)
     if (page.value === 0) {
       collections.value = data
       if (data.length && !selected.value) {

@@ -7,6 +7,11 @@ const routes = [
     component: () => import('../views/Home.vue')
   },
   {
+    path: '/trending',
+    name: 'Trending',
+    component: () => import('../views/Trending.vue')
+  },
+  {
     path: '/anime',
     name: 'Browse',
     component: () => import('../views/Browse.vue')

@@ -78,4 +78,31 @@ app.get('/search', async (c) => {
   }
 })
 
+app.get('/proxy', async (c) => {
+  try {
+    const raw = c.req.query('url')
+    if (!raw) return c.json({ error: 'no url' }, 400)
+    const url = decodeURIComponent(raw)
+
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html',
+        'Accept-Language': 'zh-CN,zh;q=0.9'
+      }
+    })
+    if (!res.ok) return c.text('Failed to fetch', { status: 502 })
+
+    let html = await res.text()
+    const origin = new URL(url).origin
+    html = html.replace('<head>', `<head><base href="${origin}/">`)
+
+    const headers = new Headers()
+    headers.set('Content-Type', 'text/html; charset=utf-8')
+    return new Response(html, { headers })
+  } catch (e) {
+    return c.text('Proxy error: ' + String(e), { status: 500 })
+  }
+})
+
 export default app

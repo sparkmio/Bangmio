@@ -5,6 +5,8 @@ export const useThemeStore = defineStore('theme', () => {
   const theme = ref(localStorage.getItem('theme') || 'light')
   const fontSize = ref(Number(localStorage.getItem('fontSize')) || 14)
   const density = ref(localStorage.getItem('density') || 'comfortable')
+  const nameLang = ref(localStorage.getItem('nameLang') || 'cn')
+  const nsfw = ref(localStorage.getItem('nsfw') || 'hide')
 
   function toggle() {
     theme.value = theme.value === 'dark' ? 'light' : 'dark'
@@ -22,12 +24,26 @@ export const useThemeStore = defineStore('theme', () => {
     density.value = d
   }
 
+  function setNameLang(v) {
+    nameLang.value = v
+    localStorage.setItem('nameLang', v)
+  }
+
+  function setNsfw(v) {
+    nsfw.value = v
+    localStorage.setItem('nsfw', v)
+  }
+
   function reset() {
     theme.value = 'light'
     fontSize.value = 14
     density.value = 'comfortable'
+    nameLang.value = 'cn'
+    nsfw.value = 'hide'
     localStorage.removeItem('fontSize')
     localStorage.removeItem('density')
+    localStorage.removeItem('nameLang')
+    localStorage.removeItem('nsfw')
   }
 
   watchEffect(() => {
@@ -48,5 +64,5 @@ export const useThemeStore = defineStore('theme', () => {
     localStorage.setItem('density', density.value)
   })
 
-  return { theme, fontSize, density, toggle, setTheme, setFontSize, setDensity, reset }
+  return { theme, fontSize, density, nameLang, nsfw, toggle, setTheme, setFontSize, setDensity, setNameLang, setNsfw, reset }
 })

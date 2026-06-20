@@ -4,7 +4,8 @@ export const userAPI = {
   auth(token) { return api.post('/user/auth', { token }) },
   getMe() { return api.get('/user/me') },
   getOAuthUrl() { return api.get('/user/oauth-url') },
-  oauthCallback(code) { return api.post('/user/oauth-callback', { code }) }
+  oauthCallback(code) { return api.post('/user/oauth-callback', { code }) },
+  getUser(username) { return api.get(`/user/${username}`) }
 }
 
 export const animeAPI = {
