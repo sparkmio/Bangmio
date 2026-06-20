@@ -51,5 +51,4 @@ export const doubanAPI = {
 
 export const moegirlAPI = {
   search(q) { return api.get('/moegirl/search', { params: { q } }) },
-  getPage(title) { return api.get('/moegirl/page', { params: { title } }) },
 }

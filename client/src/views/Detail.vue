@@ -379,15 +379,15 @@
         <div v-if="moegirlLoading" class="flex justify-center py-10">
           <span class="loading loading-spinner loading-lg text-primary"></span>
         </div>
-        <div v-else-if="moegirlPage" class="space-y-4">
+        <div v-else-if="moegirlUrl" class="space-y-3">
           <div class="flex items-center gap-2">
-            <button @click="moegirlPage = null; moegirlResults = []; fetchMoegirlSearch()" class="btn btn-ghost btn-sm text-primary">← 返回搜索</button>
+            <button @click="moegirlUrl = null; moegirlResults = []; fetchMoegirlSearch()" class="btn btn-ghost btn-sm text-primary">← 返回搜索</button>
+            <a :href="moegirlUrl" target="_blank" class="btn btn-ghost btn-sm text-xs">在新窗口打开</a>
           </div>
-          <div class="bg-base-200/40 rounded-lg p-5 moegirl-content prose prose-sm max-w-none" v-html="moegirlPage.html"></div>
-          <a :href="moegirlPage.pageUrl" target="_blank" class="btn btn-sm btn-ghost w-full">在萌娘百科查看完整页面 →</a>
+          <iframe :src="moegirlUrl" class="w-full rounded-lg border border-base-300" style="height:70vh" sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
         </div>
         <div v-else-if="moegirlResults.length" class="space-y-2">
-          <button v-for="r in moegirlResults" :key="r.title" @click="fetchMoegirlPage(r.title)" class="card bg-base-200/40 hover:bg-base-200/60 transition-colors w-full text-left p-4 block">
+          <button v-for="r in moegirlResults" :key="r.title" @click="moegirlUrl = r.url; moegirlLoading = false" class="card bg-base-200/40 hover:bg-base-200/60 transition-colors w-full text-left p-4 block">
             <h4 class="text-sm font-medium text-base-content">{{ r.title }}</h4>
             <p class="text-xs text-base-content/50 mt-1 line-clamp-2">{{ r.description }}</p>
           </button>
@@ -441,7 +441,7 @@ const doubanLoading = ref(false)
 const topics = ref([])
 const topicLoading = ref(false)
 const moegirlResults = ref([])
-const moegirlPage = ref(null)
+const moegirlUrl = ref(null)
 const moegirlLoading = ref(false)
 const showNewTopicModal = ref(false)
 const newTopicTitle = ref('')
@@ -457,13 +457,12 @@ const heroRef = ref(null)
 const streamingSites = [
   { name: 'AGE动漫', desc: '高清在线', icon: 'A', color: 'bg-blue-500', url: (q) => `https://www.agemys.org/search?query=${encodeURIComponent(q)}` },
   { name: '樱花动漫', desc: '在线播放', icon: '樱', color: 'bg-pink-500', url: (q) => `https://www.yhdm.so/search/${encodeURIComponent(q)}` },
-  { name: '哔哩哔哩', desc: '正版授权', icon: 'B', color: 'bg-blue-400', url: (q) => `https://search.bilibili.com/all?keyword=${encodeURIComponent(q)}` },
-  { name: 'Netflix', desc: '国际平台', icon: 'N', color: 'bg-red-600', url: (q) => `https://www.netflix.com/search?q=${encodeURIComponent(q)}` },
-  { name: 'Crunchyroll', desc: '欧美平台', icon: 'C', color: 'bg-orange-500', url: (q) => `https://www.crunchyroll.com/search?q=${encodeURIComponent(q)}` },
-  { name: '巴哈姆特动画疯', desc: '台湾平台', icon: '巴', color: 'bg-yellow-500', url: (q) => `https://ani.gamer.com.tw/search.php?keyword=${encodeURIComponent(q)}` },
-  { name: 'Aniwatch', desc: '英文社区', icon: 'W', color: 'bg-purple-500', url: (q) => `https://aniwatch.to/search?keyword=${encodeURIComponent(q)}` },
-  { name: 'Gogoanime', desc: '多语言', icon: 'G', color: 'bg-teal-500', url: (q) => `https://gogoanimehd.io/search.html?keyword=${encodeURIComponent(q)}` },
-  { name: 'MyAnimeList', desc: '资料站', icon: 'M', color: 'bg-indigo-500', url: (q) => `https://myanimelist.net/anime.php?q=${encodeURIComponent(q)}` },
+  { name: 'MX动漫', desc: 'MX动漫', icon: 'M', color: 'bg-purple-500', url: (q) => `https://mxdm.com/search/${encodeURIComponent(q)}` },
+  { name: '次元城', desc: '次元城动漫', icon: '次', color: 'bg-teal-500', url: (q) => `https://ciyuancheng.cc/search/${encodeURIComponent(q)}` },
+  { name: 'omofun', desc: 'omofun', icon: 'O', color: 'bg-orange-500', url: (q) => `https://omofunz.com/search/${encodeURIComponent(q)}` },
+  { name: '小风动漫', desc: '小风动漫', icon: '小', color: 'bg-green-500', url: (q) => `https://xfdm.net/search/${encodeURIComponent(q)}` },
+  { name: '咕咕动漫', desc: '咕咕动漫', icon: '咕', color: 'bg-cyan-500', url: (q) => `https://gugu3.com/search/${encodeURIComponent(q)}` },
+  { name: '奇番动漫', desc: '奇番动漫', icon: '奇', color: 'bg-red-500', url: (q) => `https://qifun.me/search/${encodeURIComponent(q)}` },
 ]
 
 const typeLabel = computed(() => ({ 1:'书籍',2:'动画',3:'音乐',4:'游戏',6:'三次元' })[anime.value.type] || '其他')
@@ -540,15 +539,6 @@ async function fetchMoegirlSearch() {
     }
     moegirlResults.value = results
   } catch { moegirlResults.value = [] }
-  moegirlLoading.value = false
-}
-
-async function fetchMoegirlPage(title) {
-  moegirlLoading.value = true
-  try {
-    const res = await moegirlAPI.getPage(title)
-    moegirlPage.value = res.data?.data || null
-  } catch { moegirlPage.value = null }
   moegirlLoading.value = false
 }
 
@@ -664,13 +654,13 @@ async function removeCollection() {
 watch(activeTab, (tab) => {
   if (tab === 'topics' && topics.value.length === 0 && !topicLoading.value) fetchTopics()
   if (tab === 'douban' && !doubanDetails.value && !doubanLoading.value) fetchDoubanDetails()
-  if (tab === 'moegirl' && moegirlResults.value.length === 0 && !moegirlPage.value && !moegirlLoading.value) fetchMoegirlSearch()
+  if (tab === 'moegirl' && moegirlResults.value.length === 0 && !moegirlUrl.value && !moegirlLoading.value) fetchMoegirlSearch()
 })
 
 watch(() => route.params.id, (newId, oldId) => {
   if (newId && newId !== oldId) {
     collectionStatus.value = 0; collectionRating.value = 0; collectionComment.value = ''
-    topics.value = []; doubanDetails.value = null; moegirlResults.value = []; moegirlPage.value = null
+    topics.value = []; doubanDetails.value = null; moegirlResults.value = []; moegirlUrl.value = null
     activeTab.value = 'overview'
     fetchDetail()
   }

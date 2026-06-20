@@ -45,7 +45,10 @@
               />
               <div class="min-w-0 flex-1">
                 <p class="text-[13px] font-medium text-base-content line-clamp-1 hover:text-primary transition-colors cursor-pointer">{{ col.subject?.name_cn || col.subject?.name }}</p>
-                <p class="text-xs text-primary font-semibold mt-0.5">[{{ col.ep_status || 0 }}/{{ col.subject?.eps || col.subject?.total_episodes || '?' }}]</p>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                  <p class="text-xs text-primary font-semibold">[{{ col.ep_status || 0 }}/{{ col.subject?.eps || col.subject?.total_episodes || '?' }}]</p>
+                  <span class="badge badge-xs" :class="col.subject?.type === 1 ? 'badge-info' : col.subject?.type === 6 ? 'badge-warning' : 'badge-success'">{{ subjectTypeLabel(col.subject?.type) }}</span>
+                </div>
               </div>
             </button>
           </div>
@@ -191,6 +194,11 @@ const episodePopup = ref(null)
 
 const selectedId = computed(() => selected.value?.subject?.id || selected.value?.anime_id)
 
+function subjectTypeLabel(type) {
+  const map = { 1: '书籍', 2: '动画', 3: '音乐', 6: '三次元' }
+  return map[type] || ''
+}
+
 function formatDuration(dur) {
   if (!dur) return '未知'
   const total = Number(dur)
@@ -258,7 +266,7 @@ async function fetchCollections() {
     const params = { offset: page.value * limit, limit, type: 3 }
     if (activeType.value) params.subject_type = activeType.value
     const res = await collectionAPI.getList(params)
-    const data = res.data?.data || []
+    const data = (res.data?.data || []).filter(c => c.subject?.type !== 4)
     if (page.value === 0) {
       collections.value = data
       if (data.length && !selected.value) {

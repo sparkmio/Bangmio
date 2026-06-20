@@ -78,32 +78,4 @@ app.get('/search', async (c) => {
   }
 })
 
-app.get('/page', async (c) => {
-  try {
-    const title = c.req.query('title')
-    if (!title) return c.json({ data: null })
-    const cacheKey = `moepage_${title}`
-    const cached = getCached(cacheKey)
-    if (cached) return c.json({ data: cached })
-
-    const apiBase = getMoegirlApi(c)
-    const params = `action=parse&page=${encodeURIComponent(title)}&prop=text&format=json&disableeditsection=1`
-    let json = await fetchMoegirlJSON(apiBase, params)
-    if (!json?.parse) {
-      const fallback = apiBase === MOEGIRL_CN ? MOEGIRL_INTL : MOEGIRL_CN
-      json = await fetchMoegirlJSON(fallback, params)
-    }
-
-    const data = {
-      title: json?.parse?.title || title,
-      html: json?.parse?.text?.['*'] || '',
-      pageUrl: `${getMoegirlBase(c)}/${encodeURIComponent(title)}`
-    }
-    setCache(cacheKey, data)
-    return c.json({ data })
-  } catch {
-    return c.json({ data: null })
-  }
-})
-
 export default app
