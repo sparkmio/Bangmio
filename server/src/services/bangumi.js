@@ -87,12 +87,11 @@ export function getClient(token, isChina = false) {
   return {
     get: (path, params) => bgmGet(path, token, params, isChina),
     post: (path, body, params) => bgmPost(path, body, token, params, isChina),
-    delete: (path) => {
+    delete: async (path) => {
       const base = isChina ? BGM_PROXY : BGM_API
-      return fetch(`${base}${path}`, { method: 'DELETE', headers: headers(token) }).then(r => {
-        const t = r.text()
-        return t ? JSON.parse(t) : {}
-      })
+      const r = await fetch(`${base}${path}`, { method: 'DELETE', headers: headers(token) })
+      const t = await r.text()
+      return t ? JSON.parse(t) : {}
     }
   }
 }

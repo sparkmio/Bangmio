@@ -9,6 +9,7 @@
     "dev:server": "npm run dev --prefix server",
     "start": "node server/src/index.js",
     "build": "npm run build --prefix client",
+    "postinstall": "npm install --prefix client",
     "install:all": "npm install && npm install --prefix server && npm install --prefix client"
   },
   "dependencies": {
@@ -21,6 +22,7 @@
     "linkedom": "^0.18.12"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "wrangler": "^4.103.0"
   }
 }
