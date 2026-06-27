@@ -1,8 +1,9 @@
 {
   "appId": "com.bangmio.app",
   "productName": "Bangmio",
+  "forceCodeSigning": false,
   "directories": {
-    "output": "release",
+    "output": "bangmio-pc",
     "buildResources": "build"
   },
   "files": [
@@ -11,7 +12,8 @@
   ],
   "win": {
     "target": ["nsis"],
-    "icon": "client/public/logo.png"
+    "icon": "client/public/logo.png",
+    "signAndEditExecutable": false
   },
   "nsis": {
     "oneClick": false,

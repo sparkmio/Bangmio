@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell } = require('electron')
+const { app, BrowserWindow, shell, globalShortcut } = require('electron')
 const path = require('path')
 
 let mainWindow
@@ -9,13 +9,13 @@ function createWindow() {
     height: 800,
     minWidth: 900,
     minHeight: 600,
+    frame: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false
     },
     icon: path.join(__dirname, '../client/public/logo.png'),
-    titleBarStyle: 'default',
     title: 'Bangmio'
   })
 
@@ -31,7 +31,12 @@ function createWindow() {
   })
 }
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  createWindow()
+  globalShortcut.register('CommandOrControl+Q', () => {
+    if (mainWindow) mainWindow.close()
+  })
+})
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

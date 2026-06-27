@@ -55,10 +55,10 @@ export const useAuthStore = defineStore('auth', () => {
   async function doRefresh() {
     const params = new URLSearchParams({
       grant_type: 'refresh_token',
-      client_id: 'bgm61416a088eff71580',
-      client_secret: '6b8055c0159fcc5e998059536813026f',
+      client_id: 'bgm64516a3fcf799a59a',
+      client_secret: '88c4a18cc34de8d1d87599482a54d3cf',
       refresh_token: refreshToken.value,
-      redirect_uri: window.location.origin + '/login/callback'
+      redirect_uri: 'http://localhost:5173/login/callback'
     })
     const tokenRes = await fetch('https://bgm.tv/oauth/access_token', {
       method: 'POST',
@@ -93,10 +93,10 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const params = new URLSearchParams({
         grant_type: 'authorization_code',
-        client_id: 'bgm61416a088eff71580',
-        client_secret: '6b8055c0159fcc5e998059536813026f',
+        client_id: 'bgm64516a3fcf799a59a',
+        client_secret: '88c4a18cc34de8d1d87599482a54d3cf',
         code,
-        redirect_uri: window.location.origin + '/login/callback'
+        redirect_uri: 'http://localhost:5173/login/callback'
       })
       const tokenRes = await fetch('https://bgm.tv/oauth/access_token', {
         method: 'POST',
