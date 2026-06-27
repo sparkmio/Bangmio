@@ -52,10 +52,22 @@ function parseSearchResults(json) {
   return results
 }
 
+async function fetchPageExtract(apiBase, title) {
+  const params = `action=query&titles=${encodeURIComponent(title)}&prop=extracts&format=json`
+  const json = await fetchMoegirlJSON(apiBase, params)
+  if (!json?.query?.pages) return null
+  const pages = Object.values(json.query.pages)
+  if (!pages[0]?.extract) return null
+  return {
+    title: pages[0].title,
+    html: pages[0].extract
+  }
+}
+
 app.get('/search', async (c) => {
   try {
     const q = c.req.query('q')
-    if (!q) return c.json({ data: [] })
+    if (!q) return c.json({ data: { results: [] } })
     const cacheKey = `moesearch_${q}`
     const cached = getCached(cacheKey)
     if (cached) return c.json({ data: cached })
@@ -71,37 +83,23 @@ app.get('/search', async (c) => {
       results = parseSearchResults(json)
     }
 
-    setCache(cacheKey, results)
-    return c.json({ data: results })
-  } catch {
-    return c.json({ data: [] })
-  }
-})
-
-app.get('/proxy', async (c) => {
-  try {
-    const raw = c.req.query('url')
-    if (!raw) return c.json({ error: 'no url' }, 400)
-    const url = decodeURIComponent(raw)
-
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'text/html',
-        'Accept-Language': 'zh-CN,zh;q=0.9'
+    let page = null
+    if (results.length) {
+      const extract = await fetchPageExtract(apiBase, results[0].title)
+      if (extract) {
+        page = {
+          title: extract.title,
+          html: extract.html,
+          url: `${getMoegirlBase(c)}/${encodeURIComponent(results[0].title)}`
+        }
       }
-    })
-    if (!res.ok) return c.text('Failed to fetch', { status: 502 })
+    }
 
-    let html = await res.text()
-    const origin = new URL(url).origin
-    html = html.replace('<head>', `<head><base href="${origin}/">`)
-
-    const headers = new Headers()
-    headers.set('Content-Type', 'text/html; charset=utf-8')
-    return new Response(html, { headers })
-  } catch (e) {
-    return c.text('Proxy error: ' + String(e), { status: 500 })
+    const data = { results, page }
+    setCache(cacheKey, data)
+    return c.json({ data })
+  } catch {
+    return c.json({ data: { results: [] } })
   }
 })
 
