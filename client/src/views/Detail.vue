@@ -200,7 +200,7 @@
       <!-- 吐槽 -->
       <div v-show="activeTab === 'talkbox'">
         <CommentSection type="subject" :id="anime.id" />
-        <a :href="`https://bangumi.one/subject/${anime.id}`" target="_blank" class="btn btn-sm btn-outline mt-4 w-full">在 Bangumi 发表评论 →</a>
+        <a :href="`https://bangumi.lol/subject/${anime.id}`" target="_blank" class="btn btn-sm btn-outline mt-4 w-full">在 Bangumi 发表评论 →</a>
       </div>
 
       <!-- 讨论版 -->
@@ -231,7 +231,7 @@
           </router-link>
         </div>
         <router-link :to="`/anime/${anime.id}/topics`" class="btn btn-sm btn-outline mt-4 w-full">查看全部讨论</router-link>
-        <a :href="`https://bangumi.one/subject/${anime.id}/board`" target="_blank" class="btn btn-sm btn-ghost mt-2 w-full">在 Bangumi 发表讨论 →</a>
+        <a :href="`https://bangumi.lol/subject/${anime.id}/board`" target="_blank" class="btn btn-sm btn-ghost mt-2 w-full">在 Bangumi 发表讨论 →</a>
 
         <dialog v-if="showNewTopicModal" class="modal modal-open">
           <div class="modal-box">
@@ -260,7 +260,7 @@
             </div>
           </div>
         </div>
-        <a :href="`https://bangumi.one/subject/${anime.id}`" target="_blank" class="btn btn-sm btn-ghost mt-4 w-full">在 Bangumi 查看完整 Wiki →</a>
+        <a :href="`https://bangumi.lol/subject/${anime.id}`" target="_blank" class="btn btn-sm btn-ghost mt-4 w-full">在 Bangumi 查看完整 Wiki →</a>
       </div>
       <div v-show="activeTab === 'wiki'" v-else class="py-10 text-center text-base-content/40 text-sm">暂无制作信息</div>
 
@@ -316,13 +316,14 @@
 
       <!-- 在线观看 -->
       <div v-show="activeTab === 'streaming'">
-        <iframe
-          :src="`https://ani.girigirilove.com/search/-------------.html?wd=${encodeURIComponent(anime.name_cn || anime.name)}`"
-          class="w-full rounded-lg border border-base-300"
-          style="height:75vh"
-          sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-        ></iframe>
-        <p class="text-xs text-base-content/30 text-center mt-4">内容来自第三方网站，本站不存储任何视频内容</p>
+        <a
+          :href="`https://ani.girigirilove.com/search/-------------.html?wd=${encodeURIComponent(anime.name_cn || anime.name)}`"
+          target="_blank"
+          class="btn btn-primary w-full"
+        >
+          前往 girigirilove 搜索观看 →
+        </a>
+        <p class="text-xs text-base-content/30 text-center mt-4">点击跳转至第三方网站，本站不存储任何视频内容</p>
       </div>
 
       <!-- 萌娘百科 -->

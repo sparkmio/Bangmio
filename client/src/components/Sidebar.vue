@@ -68,7 +68,6 @@ const navItems = [
   { path: '/', label: '首页', icon: IconHome },
   { path: '/trending', label: '热门新番', icon: IconTrending },
   { path: '/anime', label: '搜索', icon: IconBrowse },
-  { path: '/schedule', label: '新番时间表', icon: IconCalendar },
   { path: '/about', label: '关于我们', icon: IconAbout },
   { path: '/settings', label: '设置', icon: IconSettings },
 ]

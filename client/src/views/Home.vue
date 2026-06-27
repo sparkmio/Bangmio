@@ -96,36 +96,6 @@
       </div>
     </section>
 
-    <!-- Schedule -->
-    <section class="mb-10">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-xl font-semibold text-base-content">新番时间表</h2>
-        <router-link to="/schedule" class="text-sm text-primary hover-underline-wipe">查看全部 →</router-link>
-      </div>
-      <LoadingState :loading="weekLoading" :error="weekError" @retry="fetchWeek" />
-
-      <div v-if="!weekLoading && !weekError && weekData.length">
-        <div class="flex gap-1.5 mb-5 overflow-x-auto pb-2 scrollbar-hide">
-          <button
-            v-for="(day, idx) in dayLabels"
-            :key="idx"
-            @click="activeDay = idx + 1"
-            class="btn btn-sm rounded-lg whitespace-nowrap"
-            :class="activeDay === idx + 1 ? 'btn-primary' : 'btn-ghost'"
-          >
-            {{ day }}
-          </button>
-        </div>
-
-        <div v-if="currentDayItems.length" class="anime-grid">
-          <AnimeCard v-for="item in currentDayItems.slice(0, 8)" :key="item.id" :anime="mapAnime(item)" />
-        </div>
-        <div v-else class="text-center py-10 rounded-lg bg-base-200/30">
-          <p class="text-sm text-base-content/40">当天暂无番剧播出</p>
-        </div>
-      </div>
-    </section>
-
     <!-- Episode detail popup -->
     <div v-if="episodePopup" class="fixed inset-0 z-50 flex items-center justify-center" @click.self="closeEpisode">
       <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" @click="closeEpisode"></div>
@@ -206,24 +176,8 @@ const selectedWatching = ref(null)
 const watchingLoading = ref(false)
 const watchingError = ref('')
 
-const weekData = ref([])
-const activeDay = ref(new Date().getDay() || 7)
-const weekLoading = ref(true)
-const weekError = ref('')
-
-const dayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-
 const episodes = ref([])
 const episodePopup = ref(null)
-
-const currentDayItems = computed(() => {
-  const day = weekData.value.find(d => d.weekday?.id === activeDay.value)
-  return day?.items || []
-})
-
-function mapAnime(item) {
-  return { ...item, images: item.images || (item.image ? { common: item.image, large: item.image } : null) }
-}
 
 function formatDuration(dur) {
   if (!dur) return '未知'
@@ -309,15 +263,7 @@ async function fetchWatching() {
   finally { watchingLoading.value = false }
 }
 
-async function fetchWeek() {
-  weekLoading.value = true; weekError.value = ''
-  try { const res = await animeAPI.getCalendar(); weekData.value = res.data?.data || res.data || [] }
-  catch { weekError.value = '加载失败' }
-  finally { weekLoading.value = false }
-}
-
 onMounted(() => {
-  fetchWeek()
   if (auth.isLoggedIn) fetchWatching()
   nextTick(() => {
     gsap.fromTo('section', { opacity: 0, y: 20 }, { opacity: 1, y: 0, stagger: 0.12, duration: 0.4, ease: 'power2.out' })

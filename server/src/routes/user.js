@@ -15,7 +15,7 @@ function redirectUri(c) {
 }
 
 function oauthBase(c) {
-  return isChina(c) ? 'https://bangumi.one' : 'https://bgm.tv'
+  return isChina(c) ? 'https://bangumi.lol' : 'https://bgm.tv'
 }
 
 app.post('/auth', async (c) => {

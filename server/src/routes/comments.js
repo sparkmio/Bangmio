@@ -7,7 +7,7 @@ const cache = new Map()
 const CACHE_TTL = 5 * 60 * 1000
 
 const BGM_TV = 'https://bgm.tv'
-const BGM_PROXY = 'https://bangumi.one'
+const BGM_PROXY = 'https://bangumi.lol'
 
 function getBase(isChina) {
   return isChina ? BGM_PROXY : BGM_TV
@@ -36,7 +36,7 @@ function parseUserLink(el) {
   let avatar = ''
   if (avatarMatch) {
     avatar = avatarMatch[1].startsWith('//') ? 'https:' + avatarMatch[1] : avatarMatch[1]
-    avatar = avatar.replace('lain.bgm.tv', 'lain.bangumi.one')
+    avatar = avatar.replace('lain.bgm.tv', 'lain.bangumi.lol')
   }
   return {
     username: link ? link.textContent.trim() : '',
@@ -96,7 +96,7 @@ function parseSubjectTalkbox(html) {
     let avatar = ''
     if (avatarMatch) {
       avatar = avatarMatch[1].startsWith('//') ? 'https:' + avatarMatch[1] : avatarMatch[1]
-      avatar = avatar.replace('lain.bgm.tv', 'lain.bangumi.one')
+      avatar = avatar.replace('lain.bgm.tv', 'lain.bangumi.lol')
     }
     const starEl = el.querySelector('.starlight')
     const starClass = starEl ? (starEl.getAttribute('class') || '') : ''
