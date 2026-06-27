@@ -1,0 +1,83 @@
+{
+  "project": {
+    "name": "Bangmio UI 重构",
+    "operation": "create",
+    "deviceType": "desktop",
+    "styleDefinitionBrief": "Bangumi番剧客户端, 日系可爱风格 + 干净整洁, 粉紫色系温暖配色, M PLUS Rounded圆角字体, 柔和卡片布局, 留白充足",
+    "designRead": "anime app / otaku users / warm & cute / moderate density / avoid overcrowding",
+    "designDials": { "layoutVariance": 3, "motionIntensity": 2, "visualDensity": 3 }
+  },
+  "designSource": {
+    "operatingMode": "free-explore",
+    "brandCssPath": "colors_and_type.css",
+    "styleConstraints": {
+      "radiusMax": 16,
+      "staticShadowAlphaMax": 0.05
+    }
+  },
+  "pages": [
+    {
+      "nodeId": "page-home",
+      "title": "首页",
+      "htmlSrc": "pages/home.html",
+      "visualNorthStar": "在追番剧面板 + 热门新番网格卡片, 两侧分栏布局, 左侧迷你封面列表右侧大图详情",
+      "compositionPattern": "sidebar-content-split",
+      "continuityAnchors": {
+        "shell": "左侧边栏 + 顶部导航栏, M PLUS Rounded 标题字体, 粉色主题色",
+        "typographySystem": "M PLUS Rounded 1c for titles, Noto Sans SC for body"
+      }
+    },
+    {
+      "nodeId": "page-browse",
+      "title": "搜索浏览",
+      "htmlSrc": "pages/browse.html",
+      "visualNorthStar": "搜索框居上, 标签筛选条, 下方番剧卡片网格, 分页控件",
+      "compositionPattern": "filter-bar-grid"
+    },
+    {
+      "nodeId": "page-trending",
+      "title": "新番时间表",
+      "htmlSrc": "pages/trending.html",
+      "visualNorthStar": "星期标签横排切换, 选中标签高亮, 下方番剧卡片网格",
+      "compositionPattern": "tab-grid"
+    },
+    {
+      "nodeId": "page-detail",
+      "title": "番剧详情",
+      "htmlSrc": "pages/detail.html",
+      "visualNorthStar": "封面大图 + 标题评分, 标签页切换内容(概览/章节/角色/吐槽等), 评分分布柱状图, 角色头像横向滚动",
+      "compositionPattern": "hero-tabs-content",
+      "continuityAnchors": {
+        "shell": "左侧边栏 + 顶部导航栏, 返回按钮",
+        "typographySystem": "M PLUS Rounded 1c for titles, Noto Sans SC for body"
+      }
+    },
+    {
+      "nodeId": "page-profile",
+      "title": "个人中心",
+      "htmlSrc": "pages/profile.html",
+      "visualNorthStar": "用户头像卡片, 五色统计数据, 收藏列表带封面缩略图",
+      "compositionPattern": "profile-stats-list"
+    },
+    {
+      "nodeId": "page-login",
+      "title": "登录",
+      "htmlSrc": "pages/login.html",
+      "visualNorthStar": "居中登录卡片, Bangumi OAuth按钮 + Token手动输入, 品牌logo",
+      "compositionPattern": "centered-card"
+    }
+  ],
+  "assets": [],
+  "wiringPlan": [
+    { "from": "page-home", "to": "page-browse", "domId": "nav-browse", "hideEdge": true },
+    { "from": "page-home", "to": "page-trending", "domId": "nav-trending", "hideEdge": true },
+    { "from": "page-home", "to": "page-profile", "domId": "nav-profile", "hideEdge": true },
+    { "from": "page-home", "to": "page-login", "domId": "nav-login", "hideEdge": true },
+    { "from": "page-home", "to": "page-detail", "domId": "card-anime-detail", "hideEdge": true },
+    { "from": "page-browse", "to": "page-detail", "domId": "card-anime-detail", "hideEdge": true },
+    { "from": "page-trending", "to": "page-detail", "domId": "card-anime-detail", "hideEdge": true },
+    { "from": "page-detail", "to": "page-home", "domId": "btn-back", "hideEdge": true },
+    { "from": "page-profile", "to": "page-detail", "domId": "card-anime-detail", "hideEdge": true },
+    { "from": "page-login", "to": "page-profile", "domId": "btn-login-success", "transitionLabel": "登录成功" }
+  ]
+}

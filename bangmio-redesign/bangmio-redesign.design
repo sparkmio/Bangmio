@@ -1,0 +1,261 @@
+{
+  "data": [
+    {
+      "id": "page-home",
+      "title": "首页",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1751028000000,
+      "canvasData": {
+        "x": 0,
+        "y": 377,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/home.html",
+        "interactions": [
+          {
+            "domId": "nav-browse",
+            "targetPageId": "page-browse",
+            "hideEdge": true,
+            "transitionLabel": "浏览番剧"
+          },
+          {
+            "domId": "nav-trending",
+            "targetPageId": "page-trending",
+            "hideEdge": true,
+            "transitionLabel": "新番时间表"
+          },
+          {
+            "domId": "nav-profile",
+            "targetPageId": "page-profile",
+            "hideEdge": true,
+            "transitionLabel": "个人中心"
+          },
+          {
+            "domId": "nav-login",
+            "targetPageId": "page-login",
+            "hideEdge": true,
+            "transitionLabel": "登录"
+          },
+          {
+            "domId": "card-anime-detail",
+            "targetPageId": "page-detail",
+            "hideEdge": true,
+            "transitionLabel": "查看详情"
+          },
+          {
+            "domId": "nav-settings",
+            "targetPageId": "page-settings",
+            "hideEdge": true,
+            "transitionLabel": "设置"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-browse",
+      "title": "搜索浏览",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1751028000000,
+      "canvasData": {
+        "x": 620,
+        "y": 377,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/browse.html",
+        "interactions": [
+          {
+            "domId": "nav-home",
+            "targetPageId": "page-home",
+            "hideEdge": true,
+            "transitionLabel": "返回首页"
+          },
+          {
+            "domId": "card-anime-detail",
+            "targetPageId": "page-detail",
+            "hideEdge": true,
+            "transitionLabel": "查看详情"
+          },
+          {
+            "domId": "nav-trending",
+            "targetPageId": "page-trending",
+            "hideEdge": true,
+            "transitionLabel": "新番时间表"
+          },
+          {
+            "domId": "nav-profile",
+            "targetPageId": "page-profile",
+            "hideEdge": true,
+            "transitionLabel": "个人中心"
+          },
+          {
+            "domId": "nav-login",
+            "targetPageId": "page-login",
+            "hideEdge": true,
+            "transitionLabel": "登录"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-trending",
+      "title": "新番时间表",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1751028000000,
+      "canvasData": {
+        "x": 1240,
+        "y": 377,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/trending.html",
+        "interactions": [
+          {
+            "domId": "nav-home",
+            "targetPageId": "page-home",
+            "hideEdge": true,
+            "transitionLabel": "返回首页"
+          },
+          {
+            "domId": "card-anime-detail",
+            "targetPageId": "page-detail",
+            "hideEdge": true,
+            "transitionLabel": "查看详情"
+          },
+          {
+            "domId": "nav-browse",
+            "targetPageId": "page-browse",
+            "hideEdge": true,
+            "transitionLabel": "搜索浏览"
+          },
+          {
+            "domId": "nav-profile",
+            "targetPageId": "page-profile",
+            "hideEdge": true,
+            "transitionLabel": "个人中心"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-detail",
+      "title": "番剧详情",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1751028000000,
+      "canvasData": {
+        "x": 1860,
+        "y": 377,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/detail.html",
+        "interactions": [
+          {
+            "domId": "btn-back",
+            "targetPageId": "page-home",
+            "hideEdge": true,
+            "transitionLabel": "返回"
+          },
+          {
+            "domId": "nav-home",
+            "targetPageId": "page-home",
+            "hideEdge": true,
+            "transitionLabel": "返回首页"
+          },
+          {
+            "domId": "nav-browse",
+            "targetPageId": "page-browse",
+            "hideEdge": true,
+            "transitionLabel": "搜索浏览"
+          },
+          {
+            "domId": "nav-profile",
+            "targetPageId": "page-profile",
+            "hideEdge": true,
+            "transitionLabel": "个人中心"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-profile",
+      "title": "个人中心",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1751028000000,
+      "canvasData": {
+        "x": 620,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/profile.html",
+        "interactions": [
+          {
+            "domId": "nav-home",
+            "targetPageId": "page-home",
+            "hideEdge": true,
+            "transitionLabel": "返回首页"
+          },
+          {
+            "domId": "nav-browse",
+            "targetPageId": "page-browse",
+            "hideEdge": true,
+            "transitionLabel": "搜索浏览"
+          },
+          {
+            "domId": "nav-login",
+            "targetPageId": "page-login",
+            "hideEdge": true,
+            "transitionLabel": "登录"
+          },
+          {
+            "domId": "card-anime-detail",
+            "targetPageId": "page-detail",
+            "hideEdge": true,
+            "transitionLabel": "查看详情"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-login",
+      "title": "登录",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1751028000000,
+      "canvasData": {
+        "x": 0,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/login.html",
+        "interactions": [
+          {
+            "domId": "btn-back",
+            "targetPageId": "page-home",
+            "hideEdge": true,
+            "transitionLabel": "返回首页"
+          },
+          {
+            "domId": "btn-login-success",
+            "targetPageId": "page-profile",
+            "transitionLabel": "登录成功"
+          }
+        ]
+      }
+    }
+  ],
+  "config": {
+    "autoLayout": true,
+    "deviceType": "desktop",
+    "projectName": "Bangmio UI 重构",
+    "designLibrary": null
+  }
+}

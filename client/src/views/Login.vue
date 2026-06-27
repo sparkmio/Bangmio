@@ -11,7 +11,13 @@
           <span>{{ auth.error }}</span>
         </div>
 
+        <div v-if="oauthWaiting" class="text-center py-4">
+          <span class="loading loading-spinner loading-lg text-primary"></span>
+          <p class="text-sm text-base-content/60 mt-3">请在浏览器中完成授权...</p>
+        </div>
+
         <button
+          v-else
           @click="oauthLogin"
           :disabled="auth.loading"
           class="btn w-full mb-4 bg-[#2D89EF] text-white border-none hover:brightness-110"
@@ -37,12 +43,30 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { userAPI } from '../api/endpoints'
 
 const auth = useAuthStore()
 const token = ref('')
+const oauthWaiting = ref(false)
+
+function handleOAuthCode(code) {
+  oauthWaiting.value = false
+  auth.oauthLogin(code)
+}
+
+onMounted(() => {
+  if (window.electronAPI?.onOAuthCode) {
+    window.electronAPI.onOAuthCode(handleOAuthCode)
+  }
+})
+
+onUnmounted(() => {
+  if (window.electronAPI?.onOAuthCode) {
+    window.electronAPI.onOAuthCode(() => {})
+  }
+})
 
 async function oauthLogin() {
   try {
@@ -50,7 +74,7 @@ async function oauthLogin() {
       const { Browser } = await import('@capacitor/browser')
       const { App } = await import('@capacitor/app')
       const redirectUri = 'bangmio://callback'
-      const oauthUrl = `https://bgm.tv/oauth/authorize?client_id=bgm61416a088eff71580&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}`
+      const oauthUrl = `https://bgm.tv/oauth/authorize?client_id=bgm64516a3fcf799a59a&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}`
       await Browser.open({ url: oauthUrl })
       App.addListener('appUrlOpen', async ({ url }) => {
         if (url.startsWith('bangmio://callback')) {
@@ -62,11 +86,19 @@ async function oauthLogin() {
           }
         }
       })
+    } else if (window.electronAPI?.startOAuth) {
+      oauthWaiting.value = true
+      const result = await window.electronAPI.startOAuth()
+      if (!result.success) {
+        oauthWaiting.value = false
+        auth.error = '启动授权失败：' + (result.error || '端口 5173 被占用')
+      }
     } else {
       const res = await userAPI.getOAuthUrl()
       window.location.href = res.data.data
     }
   } catch {
+    oauthWaiting.value = false
     auth.error = '获取授权链接失败'
   }
 }

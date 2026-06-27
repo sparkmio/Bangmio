@@ -1,5 +1,7 @@
-const { contextBridge } = require('electron')
+const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  platform: process.platform
+  platform: process.platform,
+  startOAuth: () => ipcRenderer.invoke('start-oauth'),
+  onOAuthCode: (callback) => ipcRenderer.on('oauth-code', (_, code) => callback(code))
 })
