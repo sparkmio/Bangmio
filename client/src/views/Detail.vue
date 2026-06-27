@@ -266,63 +266,20 @@
 
       <!-- 豆瓣 -->
       <div v-show="activeTab === 'douban'">
-        <div v-if="doubanDetails" class="space-y-5">
-          <div class="bg-base-200/40 rounded-lg p-5">
-            <div class="flex items-center gap-6 mb-4">
-              <div class="text-center flex-shrink-0">
-                <p class="text-4xl font-black text-amber-500">{{ doubanDetails.rate }}</p>
-                <div class="flex items-center gap-0.5 mt-1 justify-center">
-                  <svg v-for="i in 5" :key="i" class="w-4 h-4" :class="i <= Math.round(parseFloat(doubanDetails.rate) / 2) ? 'text-amber-400' : 'text-base-300'" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                </div>
-                <p class="text-xs text-base-content/50 mt-1">豆瓣评分</p>
+        <div v-if="doubanDetails" class="bg-base-200/40 rounded-lg p-6">
+          <div class="flex items-start gap-6 mb-4">
+            <div class="text-center flex-shrink-0">
+              <p class="text-4xl font-black text-amber-500">{{ doubanDetails.rate }}</p>
+              <div class="flex items-center gap-0.5 mt-1 justify-center">
+                <svg v-for="i in 5" :key="i" class="w-4 h-4" :class="i <= Math.round(parseFloat(doubanDetails.rate) / 2) ? 'text-amber-400' : 'text-base-300'" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
               </div>
-              <div class="flex-1 space-y-1.5" v-if="Object.keys(doubanDetails.rating_distribution).length">
-                <div v-for="star in ['5','4','3','2','1']" :key="star" class="flex items-center gap-1.5 text-xs">
-                  <span class="w-4 text-right text-base-content/40 font-mono">{{ star }}星</span>
-                  <div class="flex-1 h-1.5 rounded-full overflow-hidden bg-base-300/50">
-                    <div class="h-full rounded-full bg-amber-400" :style="{ width: (doubanDetails.rating_distribution[star] || 0) + '%' }"></div>
-                  </div>
-                  <span class="w-10 text-right text-base-content/40 font-mono">{{ doubanDetails.rating_distribution[star] || 0 }}%</span>
-                </div>
-              </div>
+              <p class="text-xs text-base-content/50 mt-1">豆瓣评分</p>
             </div>
-            <div v-if="doubanDetails.short_comment" class="border-t border-base-300/30 pt-3">
+            <div v-if="doubanDetails.short_comment" class="flex-1 min-w-0">
               <p class="text-sm text-base-content/70 italic">"{{ doubanDetails.short_comment.content }}"</p>
-              <p class="text-xs text-base-content/40 mt-1.5">— {{ doubanDetails.short_comment.author }}</p>
+              <p class="text-xs text-base-content/40 mt-2">— {{ doubanDetails.short_comment.author }}</p>
             </div>
           </div>
-
-          <div v-if="doubanDetails.short_reviews.length">
-            <h3 class="text-sm font-semibold text-base-content/60 mb-3">短评</h3>
-            <div class="space-y-3 max-h-96 overflow-y-auto">
-              <div v-for="r in doubanDetails.short_reviews" :key="r.id" class="bg-base-200/40 rounded-lg p-3">
-                <div class="flex items-center gap-2 mb-1.5">
-                  <span class="text-xs font-medium text-base-content">{{ r.author }}</span>
-                  <span class="badge badge-xs" :class="r.rating >= 4 ? 'badge-success' : r.rating >= 2 ? 'badge-warning' : 'badge-error'">{{ '★'.repeat(r.rating) }}</span>
-                  <span class="text-xs text-base-content/30 ml-auto">{{ r.votes }} 有用</span>
-                </div>
-                <p class="text-sm text-base-content/70 leading-relaxed line-clamp-4">{{ r.content }}</p>
-                <p class="text-xs text-base-content/40 mt-1">{{ r.date }}</p>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="doubanDetails.discussions?.length">
-            <h3 class="text-sm font-semibold text-base-content/60 mb-3">小组讨论</h3>
-            <div class="space-y-2 max-h-80 overflow-y-auto">
-              <a v-for="d in doubanDetails.discussions" :key="d.title" :href="d.url" target="_blank" class="flex items-center justify-between p-3 rounded-lg bg-base-200/40 hover:bg-base-200/60 transition-colors">
-                <div class="min-w-0 flex-1">
-                  <p class="text-sm font-medium text-base-content line-clamp-1">{{ d.title }}</p>
-                  <div class="flex items-center gap-3 mt-1">
-                    <span class="text-xs text-base-content/50">{{ d.author }}</span>
-                    <span class="text-xs text-base-content/30">{{ d.lastUpdate }}</span>
-                  </div>
-                </div>
-                <span class="badge badge-sm flex-shrink-0 ml-2" :class="d.replies > 0 ? 'badge-primary' : 'badge-ghost'">{{ d.replies }} 回复</span>
-              </a>
-            </div>
-          </div>
-
           <a :href="doubanDetails.url" target="_blank" class="btn btn-sm btn-ghost w-full">在豆瓣查看详情 →</a>
         </div>
         <div v-else class="py-10 text-center text-base-content/40 text-sm">
@@ -359,13 +316,19 @@
 
       <!-- 在线观看 -->
       <div v-show="activeTab === 'streaming'">
-        <iframe
-          :src="`/api/v1/moegirl/proxy?url=${encodeURIComponent('https://girigirilove.com/index.php/vod/search.html?wd=' + encodeURIComponent(anime.name_cn || anime.name))}`"
-          class="w-full rounded-lg border border-base-300"
-          style="height:75vh"
-          sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-        ></iframe>
-        <p class="text-xs text-base-content/30 text-center mt-4">内容来自第三方网站，本站不存储任何视频内容</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <a v-for="site in streamingSites" :key="site.name" :href="site.url(anime.name_cn || anime.name)" target="_blank" class="flex items-center gap-4 p-4 rounded-lg bg-base-200/40 hover:bg-base-200/60 transition-colors">
+            <div class="avatar placeholder">
+              <div class="w-10 h-10 rounded-lg text-white font-bold" :class="site.color">{{ site.icon }}</div>
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium text-base-content">{{ site.name }}</p>
+              <p class="text-xs text-base-content/50">{{ site.desc }}</p>
+            </div>
+            <svg class="w-4 h-4 text-base-content/30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </a>
+        </div>
+        <p class="text-xs text-base-content/30 text-center mt-6">内容来自第三方网站，本站不存储任何视频内容</p>
       </div>
 
       <!-- 萌娘百科 -->
@@ -447,6 +410,17 @@ const collectionStatus = ref(0)
 const collectionRating = ref(0)
 const collectionComment = ref('')
 const heroRef = ref(null)
+
+const streamingSites = [
+  { name: 'AGE动漫', desc: '高清在线', icon: 'A', color: 'bg-blue-500', url: (q) => `https://www.agemys.org/search?query=${encodeURIComponent(q)}` },
+  { name: '樱花动漫', desc: '在线播放', icon: '樱', color: 'bg-pink-500', url: (q) => `https://www.yhdm.so/search/${encodeURIComponent(q)}` },
+  { name: '次元城', desc: '次元城动漫', icon: '次', color: 'bg-teal-500', url: (q) => `https://ciyuancheng.cc/search/${encodeURIComponent(q)}` },
+  { name: 'MX动漫', desc: 'MX动漫', icon: 'M', color: 'bg-purple-500', url: (q) => `https://mxdm.com/search/${encodeURIComponent(q)}` },
+  { name: 'omofun', desc: 'omofun', icon: 'O', color: 'bg-orange-500', url: (q) => `https://omofunz.com/search/${encodeURIComponent(q)}` },
+  { name: '小风动漫', desc: '小风动漫', icon: '小', color: 'bg-green-500', url: (q) => `https://xfdm.net/search/${encodeURIComponent(q)}` },
+  { name: '咕咕动漫', desc: '咕咕动漫', icon: '咕', color: 'bg-cyan-500', url: (q) => `https://gugu3.com/search/${encodeURIComponent(q)}` },
+  { name: '奇番动漫', desc: '奇番动漫', icon: '奇', color: 'bg-red-500', url: (q) => `https://qifun.me/search/${encodeURIComponent(q)}` },
+]
 
 const typeLabel = computed(() => ({ 1:'书籍',2:'动画',3:'音乐',4:'游戏',6:'三次元' })[anime.value.type] || '其他')
 const musicItems = computed(() => relations.value.filter(r => r.type === 3))

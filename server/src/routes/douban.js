@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import * as bangumiService from '../services/bangumi.js'
-import { searchDouban, getDoubanAbstract, scrapeDoubanSubject, scrapeDoubanDiscussions } from '../services/douban.js'
+import { searchDouban, getDoubanAbstract } from '../services/douban.js'
 
 const app = new Hono()
 
@@ -65,8 +65,6 @@ app.get('/:id/details', async (c) => {
     if (!match) return c.json({ data: null })
 
     const abstract = await getDoubanAbstract(match.id)
-    const scraped = await scrapeDoubanSubject(match.id)
-    const discussions = await scrapeDoubanDiscussions(match.id)
 
     const data = {
       id: match.id,
@@ -77,10 +75,7 @@ app.get('/:id/details', async (c) => {
       release_year: abstract?.release_year || '',
       types: abstract?.types || [],
       short_comment: abstract?.short_comment || null,
-      url: `https://movie.douban.com/subject/${match.id}`,
-      rating_distribution: scraped?.rating || {},
-      short_reviews: scraped?.short_reviews || [],
-      discussions: discussions || []
+      url: `https://movie.douban.com/subject/${match.id}`
     }
 
     setCache(cacheKey, data)
