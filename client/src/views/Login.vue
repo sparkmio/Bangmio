@@ -46,8 +46,26 @@ const token = ref('')
 
 async function oauthLogin() {
   try {
-    const res = await userAPI.getOAuthUrl()
-    window.location.href = res.data.data
+    if (window.Capacitor) {
+      const { Browser } = await import('@capacitor/browser')
+      const { App } = await import('@capacitor/app')
+      const redirectUri = 'bangmio://callback'
+      const oauthUrl = `https://bgm.tv/oauth/authorize?client_id=bgm61416a088eff71580&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}`
+      await Browser.open({ url: oauthUrl })
+      App.addListener('appUrlOpen', async ({ url }) => {
+        if (url.startsWith('bangmio://callback')) {
+          const u = new URL(url)
+          const code = u.searchParams.get('code')
+          if (code) {
+            await Browser.close()
+            auth.oauthLogin(code)
+          }
+        }
+      })
+    } else {
+      const res = await userAPI.getOAuthUrl()
+      window.location.href = res.data.data
+    }
   } catch {
     auth.error = '获取授权链接失败'
   }

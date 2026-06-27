@@ -37,9 +37,9 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchMe() {
     if (!token.value) return
     try {
-      const res = await api.get('/user/me')
-      user.value = res.data.data
-      localStorage.setItem('bangmio_user', JSON.stringify(res.data.data))
+      const res = await api.get('/v0/me')
+      user.value = res.data
+      localStorage.setItem('bangmio_user', JSON.stringify(res.data))
     } catch (err) {
       if (err.response?.status === 401) {
         if (refreshToken.value) {
@@ -53,22 +53,35 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function doRefresh() {
-    const res = await api.post('/user/refresh-token', { refreshToken: refreshToken.value })
-    const u = res.data.data.user
-    const t = res.data.data.token
-    const rt = res.data.data.refreshToken || refreshToken.value
-    saveAuth(u, t, rt)
+    const params = new URLSearchParams({
+      grant_type: 'refresh_token',
+      client_id: 'bgm61416a088eff71580',
+      client_secret: '6b8055c0159fcc5e998059536813026f',
+      refresh_token: refreshToken.value,
+      redirect_uri: window.location.origin + '/login/callback'
+    })
+    const tokenRes = await fetch('https://bgm.tv/oauth/access_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    })
+    const tokenData = await tokenRes.json()
+    const accessToken = tokenData.access_token
+    const newRefreshToken = tokenData.refresh_token || refreshToken.value
+    if (!accessToken) throw new Error('Token refresh failed')
+    const userRes = await api.get('/v0/me', { headers: { Authorization: `Bearer ${accessToken}` } })
+    saveAuth(userRes.data, accessToken, newRefreshToken)
   }
 
   async function login(accessToken) {
     loading.value = true
     error.value = ''
     try {
-      const res = await api.post('/user/auth', { token: accessToken })
-      saveAuth(res.data.data.user, accessToken, res.data.data.refreshToken)
+      const res = await api.get('/v0/me', { headers: { Authorization: `Bearer ${accessToken}` } })
+      saveAuth(res.data, accessToken, '')
       router.push('/')
     } catch (err) {
-      error.value = err.response?.data?.error || 'Token 验证失败'
+      error.value = 'Token 验证失败'
     } finally {
       loading.value = false
     }
@@ -78,11 +91,27 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     error.value = ''
     try {
-      const res = await api.post('/user/oauth-callback', { code })
-      saveAuth(res.data.data.user, res.data.data.token, res.data.data.refreshToken)
+      const params = new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: 'bgm61416a088eff71580',
+        client_secret: '6b8055c0159fcc5e998059536813026f',
+        code,
+        redirect_uri: window.location.origin + '/login/callback'
+      })
+      const tokenRes = await fetch('https://bgm.tv/oauth/access_token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+      })
+      const tokenData = await tokenRes.json()
+      const accessToken = tokenData.access_token
+      const newRefreshToken = tokenData.refresh_token
+      if (!accessToken) throw new Error('授权失败')
+      const userRes = await api.get('/v0/me', { headers: { Authorization: `Bearer ${accessToken}` } })
+      saveAuth(userRes.data, accessToken, newRefreshToken)
       router.push('/')
     } catch (err) {
-      error.value = err.response?.data?.error || '授权失败'
+      error.value = '授权失败'
     } finally {
       loading.value = false
     }

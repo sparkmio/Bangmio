@@ -1,0 +1,30 @@
+{
+  "appId": "com.bangmio.app",
+  "productName": "Bangmio",
+  "directories": {
+    "output": "release",
+    "buildResources": "build"
+  },
+  "files": [
+    "electron/**/*",
+    "client/dist/**/*"
+  ],
+  "win": {
+    "target": ["nsis"],
+    "icon": "client/public/logo.png"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "shortcutName": "Bangmio"
+  },
+  "mac": {
+    "target": ["dmg"],
+    "icon": "client/public/logo.png"
+  },
+  "linux": {
+    "target": ["AppImage"],
+    "icon": "client/public/logo.png"
+  }
+}

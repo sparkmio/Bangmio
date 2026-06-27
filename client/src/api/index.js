@@ -1,21 +1,31 @@
 import axios from 'axios'
 
-const baseURL = import.meta.env.VITE_API_BASE || '/api/v1'
+const BGM_API = 'https://api.bgm.tv'
+const BGM_PROXY = 'https://api.bangumi.lol'
+
+function getBaseURL() {
+  const mirror = localStorage.getItem('bangmio_mirror') || 'intl'
+  return mirror === 'cn' ? BGM_PROXY : BGM_API
+}
+
+function rewriteImageUrls(data) {
+  if (typeof data === 'string') return data.replace(/lain\.bgm\.tv/g, 'lain.bangumi.lol')
+  if (Array.isArray(data)) return data.map(rewriteImageUrls)
+  if (data && typeof data === 'object') {
+    const out = {}
+    for (const [k, v] of Object.entries(data)) out[k] = rewriteImageUrls(v)
+    return out
+  }
+  return data
+}
 
 const api = axios.create({
-  baseURL,
+  baseURL: getBaseURL(),
   timeout: 15000
 })
 
-let isRefreshing = false
-let pendingRequests = []
-
-function onRefreshed(token) {
-  pendingRequests.forEach(cb => cb(token))
-  pendingRequests = []
-}
-
 api.interceptors.request.use(config => {
+  config.baseURL = getBaseURL()
   const token = localStorage.getItem('bangmio_token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
@@ -30,45 +40,40 @@ api.interceptors.request.use(config => {
 })
 
 api.interceptors.response.use(
-  response => response,
+  response => {
+    if (response.data) {
+      response.data = rewriteImageUrls(response.data)
+    }
+    return response
+  },
   async error => {
     const originalRequest = error.config
     if (error.response?.status === 401 && !originalRequest._retry) {
       const refreshToken = localStorage.getItem('bangmio_refresh_token')
-      if (refreshToken && !originalRequest.url?.includes('/user/refresh-token')) {
+      if (refreshToken && !originalRequest.url?.includes('/v0/users/-/')) {
         originalRequest._retry = true
-        if (!isRefreshing) {
-          isRefreshing = true
-          try {
-            const res = await axios.post(`${baseURL}/user/refresh-token`, { refreshToken }, { timeout: 15000 })
-            const newToken = res.data.data.token
-            localStorage.setItem('bangmio_token', newToken)
-            if (res.data.data.refreshToken) {
-              localStorage.setItem('bangmio_refresh_token', res.data.data.refreshToken)
-            }
-            localStorage.setItem('bangmio_user', JSON.stringify(res.data.data.user))
-            onRefreshed(newToken)
-            originalRequest.headers.Authorization = `Bearer ${newToken}`
-            return api(originalRequest)
-          } catch {
-            onRefreshed(null)
-            localStorage.removeItem('bangmio_token')
-            localStorage.removeItem('bangmio_user')
-            localStorage.removeItem('bangmio_refresh_token')
-          } finally {
-            isRefreshing = false
-          }
-        } else {
-          return new Promise((resolve, reject) => {
-            pendingRequests.push(token => {
-              if (token) {
-                originalRequest.headers.Authorization = `Bearer ${token}`
-                resolve(api(originalRequest))
-              } else {
-                reject(error)
-              }
-            })
+        try {
+          const params = new URLSearchParams({
+            grant_type: 'refresh_token',
+            client_id: 'bgm61416a088eff71580',
+            client_secret: '6b8055c0159fcc5e998059536813026f',
+            refresh_token: refreshToken,
+            redirect_uri: window.location.origin + '/login/callback'
           })
+          const tokenRes = await axios.post('https://bgm.tv/oauth/access_token', params.toString(), {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            timeout: 15000
+          })
+          const accessToken = tokenRes.data.access_token
+          const newRefreshToken = tokenRes.data.refresh_token || refreshToken
+          localStorage.setItem('bangmio_token', accessToken)
+          localStorage.setItem('bangmio_refresh_token', newRefreshToken)
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`
+          return api(originalRequest)
+        } catch {
+          localStorage.removeItem('bangmio_token')
+          localStorage.removeItem('bangmio_user')
+          localStorage.removeItem('bangmio_refresh_token')
         }
       } else {
         localStorage.removeItem('bangmio_token')
