@@ -62,6 +62,12 @@
         恢复默认设置
       </button>
     </div>
+
+    <div class="rounded-xl bg-base-200/40 p-5 mt-4">
+      <router-link to="/about" class="w-full py-2 text-sm text-base-content/60 hover:text-primary transition-colors text-center block">
+        关于 Bangmio
+      </router-link>
+    </div>
   </div>
 </template>
 

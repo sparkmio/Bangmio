@@ -96,6 +96,18 @@
       </div>
     </section>
 
+    <!-- 热门新番 -->
+    <section class="mb-10">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold text-base-content">热门新番</h2>
+        <router-link to="/trending" class="text-sm text-primary hover-underline-wipe">查看全部 →</router-link>
+      </div>
+      <LoadingState :loading="trendingLoading" :error="trendingError" @retry="fetchTrending" />
+      <div v-if="!trendingLoading && !trendingError" class="anime-grid">
+        <AnimeCard v-for="anime in trendingList.slice(0, 8)" :key="anime.id" :anime="anime" />
+      </div>
+    </section>
+
     <!-- Episode detail popup -->
     <div v-if="episodePopup" class="fixed inset-0 z-50 flex items-center justify-center" @click.self="closeEpisode">
       <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" @click="closeEpisode"></div>
@@ -175,6 +187,10 @@ const watchingList = ref([])
 const selectedWatching = ref(null)
 const watchingLoading = ref(false)
 const watchingError = ref('')
+
+const trendingList = ref([])
+const trendingLoading = ref(false)
+const trendingError = ref('')
 
 const episodes = ref([])
 const episodePopup = ref(null)
@@ -263,7 +279,15 @@ async function fetchWatching() {
   finally { watchingLoading.value = false }
 }
 
+async function fetchTrending() {
+  trendingLoading.value = true; trendingError.value = ''
+  try { const res = await animeAPI.browse({ sort: 'heat', type: 2, limit: 12 }); trendingList.value = res.data.data || [] }
+  catch { trendingError.value = '加载失败' }
+  finally { trendingLoading.value = false }
+}
+
 onMounted(() => {
+  fetchTrending()
   if (auth.isLoggedIn) fetchWatching()
   nextTick(() => {
     gsap.fromTo('section', { opacity: 0, y: 20 }, { opacity: 1, y: 0, stagger: 0.12, duration: 0.4, ease: 'power2.out' })

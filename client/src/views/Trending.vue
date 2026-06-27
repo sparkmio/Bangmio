@@ -2,7 +2,7 @@
   <div>
     <div class="flex items-center gap-3 mb-6">
       <a @click.prevent="$router.back()" class="text-sm text-primary hover-underline-wipe cursor-pointer">← 返回</a>
-      <h1 class="text-2xl font-semibold text-base-content">热门新番</h1>
+      <h1 class="text-2xl font-semibold text-base-content">新番时间表</h1>
     </div>
 
     <LoadingState :loading="loading" :error="error" @retry="fetchCalendar" />
