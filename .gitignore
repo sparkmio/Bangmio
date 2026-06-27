@@ -10,3 +10,7 @@ client/dist/
 
 .wrangler/
 .wrangler/**
+release/
+release2/
+build-output/
+client/dist/
