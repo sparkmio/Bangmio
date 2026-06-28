@@ -6,7 +6,7 @@
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "npm run dev --prefix client",
-    "build": "npm run build --prefix client",
+    "build": "cd client && npm install --no-audit --no-fund && npm run build",
     "postinstall": "npm install --prefix client",
     "electron:dev": "npm run build --prefix client && electron .",
     "electron:build": "npm run build --prefix client && electron-builder",
