@@ -6,6 +6,7 @@ import collectionRoutes from './routes/collection.js'
 import commentsRoutes from './routes/comments.js'
 import doubanRoutes from './routes/douban.js'
 import moegirlRoutes from './routes/moegirl.js'
+import groupRoutes from './routes/groups.js'
 
 const app = new Hono()
 
@@ -24,6 +25,7 @@ app.route('/api/v1/collection', collectionRoutes)
 app.route('/api/v1/comments', commentsRoutes)
 app.route('/api/v1/douban', doubanRoutes)
 app.route('/api/v1/moegirl', moegirlRoutes)
+app.route('/api/v1/groups', groupRoutes)
 
 app.get('/api/health', (c) => c.json({ status: 'ok', country: c.env?.CF_IP_COUNTRY || 'unknown' }))
 

@@ -38,6 +38,17 @@
       <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">内容</h2>
 
       <div class="flex items-center justify-between py-3 border-b border-base-300/50">
+        <div>
+          <span class="text-sm text-base-content">API 镜像</span>
+          <p class="text-xs text-base-content/40 mt-0.5">国内用户选择国内镜像</p>
+        </div>
+        <div class="flex gap-2">
+          <button @click="setMirror('intl')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="mirror === 'intl' ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">国际</button>
+          <button @click="setMirror('cn')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="mirror === 'cn' ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">国内</button>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between py-3 border-b border-base-300/50">
         <span class="text-sm text-base-content">番名显示</span>
         <div class="flex gap-2">
           <button @click="theme.setNameLang('cn')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.nameLang === 'cn' ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">优先中文</button>
@@ -72,6 +83,14 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { useThemeStore } from '../stores/theme'
 const theme = useThemeStore()
+
+const mirror = ref(localStorage.getItem('bangmio_mirror') || 'intl')
+
+function setMirror(val) {
+  mirror.value = val
+  localStorage.setItem('bangmio_mirror', val)
+}
 </script>

@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import * as bangumiService from '../services/bangumi.js'
-import { searchDouban, getDoubanAbstract } from '../services/douban.js'
+import { searchDouban, getDoubanAbstract, getDoubanComments } from '../services/douban.js'
 
 const app = new Hono()
 
@@ -122,6 +122,17 @@ app.get('/:id/details', async (c) => {
     return c.json({ data })
   } catch {
     return c.json({ data: null })
+  }
+})
+
+app.get('/:id/comments', async (c) => {
+  try {
+    const id = c.req.param('id')
+    if (!id) return c.json({ error: '缺少ID' }, 400)
+    const comments = await getDoubanComments(id)
+    return c.json({ data: comments })
+  } catch {
+    return c.json({ data: [] })
   }
 })
 

@@ -281,6 +281,24 @@
             </div>
           </div>
           <a :href="doubanDetails.url" target="_blank" class="btn btn-sm btn-ghost w-full">在豆瓣查看详情 →</a>
+          <!-- 热门短评 -->
+          <div v-if="doubanComments.length" class="mt-6 pt-4 border-t border-base-300">
+            <h4 class="text-sm font-semibold text-base-content/70 mb-3">热门短评</h4>
+            <div class="space-y-3">
+              <div v-for="(c, i) in doubanComments.slice(0, showAllComments ? 999 : 5)" :key="i" class="text-sm">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="font-medium text-base-content/80">{{ c.user }}</span>
+                  <span v-if="c.rating" class="text-amber-500 text-xs">{{ '★'.repeat(Math.round(c.rating / 2)) }}</span>
+                  <span class="text-xs text-base-content/40">{{ c.time }}</span>
+                  <span v-if="c.useful" class="text-xs text-base-content/40 ml-auto">{{ c.useful }} 有用</span>
+                </div>
+                <p class="text-base-content/70 leading-relaxed">{{ c.content }}</p>
+              </div>
+            </div>
+            <button v-if="doubanComments.length > 5" @click="showAllComments = !showAllComments" class="btn btn-xs btn-ghost mt-3">
+              {{ showAllComments ? '收起' : `查看全部 ${doubanComments.length} 条` }}
+            </button>
+          </div>
         </div>
         <div v-else class="py-10 text-center text-base-content/40 text-sm">
           <span v-if="doubanLoading" class="loading loading-spinner loading-sm"></span>
@@ -389,6 +407,8 @@ const relations = ref([])
 const episodeList = ref([])
 const doubanDetails = ref(null)
 const doubanLoading = ref(false)
+const doubanComments = ref([])
+const showAllComments = ref(false)
 const topics = ref([])
 const topicLoading = ref(false)
 const moegirlResults = ref([])
@@ -448,6 +468,14 @@ async function fetchDoubanDetails() {
     const name = anime.value?.name_cn || anime.value?.name
     const res = await doubanAPI.getDetails(id, name)
     doubanDetails.value = res.data?.data || null
+    // 获取豆瓣热门短评
+    if (res.data?.data?.douban_id || res.data?.data?.id) {
+      const did = res.data.data.douban_id || res.data.data.id
+      try {
+        const cRes = await doubanAPI.getComments(did)
+        doubanComments.value = cRes.data?.data || []
+      } catch { doubanComments.value = [] }
+    }
   } catch { doubanDetails.value = null }
   doubanLoading.value = false
 }
@@ -614,7 +642,7 @@ watch(activeTab, (tab) => {
 watch(() => route.params.id, (newId, oldId) => {
   if (newId && newId !== oldId) {
     collectionStatus.value = 0; collectionRating.value = 0; collectionComment.value = ''
-    topics.value = []; doubanDetails.value = null; moegirlResults.value = []; moegirlPage.value = null
+    topics.value = []; doubanDetails.value = null; doubanComments.value = []; moegirlResults.value = []; moegirlPage.value = null
     activeTab.value = 'overview'
     fetchDetail()
   }

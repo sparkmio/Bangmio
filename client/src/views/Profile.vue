@@ -36,85 +36,50 @@
               <p v-if="profileUser?.bio" class="text-sm mt-2 text-base-content/60 line-clamp-3">{{ profileUser.bio }}</p>
             </div>
           </div>
-
-          <!-- 收藏统计 -->
-          <div class="grid grid-cols-5 gap-2 mt-6" v-if="stats">
-            <button
-              v-for="stat in statItems"
-              :key="stat.key"
-              @click="filterType = stat.value; fetchCollections()"
-              class="text-center p-3 rounded-xl transition-all"
-              :class="filterType === stat.value ? 'bg-base-200 ring-2 ring-primary' : 'bg-base-200/50 hover:bg-base-200'"
-            >
-              <p class="text-2xl font-bold text-base-content">{{ stats[stat.key] || 0 }}</p>
-              <p class="text-xs mt-0.5 text-base-content/60">{{ stat.label }}</p>
-              <p class="text-[10px] text-base-content/40 mt-0.5">{{ statPercent(stat.key) }}%</p>
-            </button>
-          </div>
         </div>
       </div>
 
-      <!-- 最近收藏时间线 -->
-      <div v-if="recentCollections.length" class="card bg-base-100 border border-base-300 mb-6">
-        <div class="card-body p-6">
-          <div class="flex items-center justify-between mb-3">
-            <h2 class="text-base font-semibold text-base-content flex items-center gap-1.5">
-              <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              最近收藏
-            </h2>
-            <span class="text-xs text-base-content/40">最近 {{ recentCollections.length }} 条</span>
-          </div>
-          <div class="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scroll-smooth">
-            <router-link
-              v-for="col in recentCollections"
-              :key="'recent-' + (col.subject?.id || col.anime_id)"
-              :to="`/anime/${col.subject?.id || col.anime_id}`"
-              class="shrink-0 w-24 group"
-            >
-              <div class="relative aspect-[3/4] rounded-lg overflow-hidden bg-base-200 shadow-sm">
-                <img
-                  v-if="col.subject?.images?.common || col.subject?.images?.grid"
-                  :src="col.subject?.images?.common || col.subject?.images?.grid"
-                  :alt="col.subject?.name_cn || col.subject?.name"
-                  class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  loading="lazy"
-                />
-                <div v-else class="w-full h-full flex items-center justify-center text-base-content/30 text-[10px] p-1 text-center">
-                  {{ col.subject?.name_cn || col.subject?.name || '无封面' }}
-                </div>
-                <div class="absolute top-0 left-0 right-0 px-1.5 py-0.5 bg-gradient-to-b from-black/70 to-transparent">
-                  <span class="badge badge-xs" :class="statusBadgeClass(col.type)">{{ statusLabel(col.type) }}</span>
-                </div>
-                <div v-if="col.rate" class="absolute bottom-0 left-0 right-0 px-1.5 py-0.5 bg-gradient-to-t from-black/80 to-transparent">
-                  <span class="text-[10px] font-bold text-amber-400 flex items-center gap-0.5">
-                    <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                    {{ col.rate }}
-                  </span>
-                </div>
-              </div>
-              <p class="text-xs text-center mt-1 text-base-content/60 line-clamp-1 group-hover:text-primary transition-colors">
-                {{ col.subject?.name_cn || col.subject?.name }}
-              </p>
-              <p class="text-[10px] text-center text-base-content/40">{{ formatRelativeTime(col.updated_at || col.created_at) }}</p>
-            </router-link>
-          </div>
+      <!-- 彩色统计面板 -->
+      <div v-if="stats" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+        <div class="rounded-xl border border-pink-500/30 bg-pink-500/10 p-3 text-center">
+          <p class="text-xs text-pink-600">收藏数</p>
+          <p class="text-2xl font-bold text-pink-700 mt-1">{{ stats.total || 0 }}</p>
+        </div>
+        <div class="rounded-xl border border-green-500/30 bg-green-500/10 p-3 text-center">
+          <p class="text-xs text-green-600">完成数</p>
+          <p class="text-2xl font-bold text-green-700 mt-1">{{ stats.completed || 0 }}</p>
+        </div>
+        <div class="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3 text-center">
+          <p class="text-xs text-blue-600">完成率</p>
+          <p class="text-2xl font-bold text-blue-700 mt-1">{{ completionRate }}%</p>
+        </div>
+        <div class="rounded-xl border border-orange-500/30 bg-orange-500/10 p-3 text-center">
+          <p class="text-xs text-orange-600">平均分</p>
+          <p class="text-2xl font-bold text-orange-700 mt-1">{{ rateAverage || '-' }}</p>
+        </div>
+        <div class="rounded-xl border border-purple-500/30 bg-purple-500/10 p-3 text-center">
+          <p class="text-xs text-purple-600">标准差</p>
+          <p class="text-2xl font-bold text-purple-700 mt-1">{{ rateStdDev || '-' }}</p>
+        </div>
+        <div class="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-3 text-center">
+          <p class="text-xs text-cyan-600">评分数</p>
+          <p class="text-2xl font-bold text-cyan-700 mt-1">{{ rateTotal || 0 }}</p>
         </div>
       </div>
 
       <!-- 收藏区 -->
       <div class="card bg-base-100 border border-base-300">
         <div class="card-body p-6">
-          <!-- tab 切换 -->
+          <!-- 分类 tab -->
           <div class="flex items-center gap-1 border-b border-base-300 mb-4 overflow-x-auto">
             <button
-              v-for="tab in tabs"
+              v-for="tab in subjectTabs"
               :key="tab.value"
-              @click="filterType = tab.value; fetchCollections()"
+              @click="filterSubjectType = tab.value; fetchCollections()"
               class="px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors"
-              :class="filterType === tab.value ? 'border-primary text-primary' : 'border-transparent text-base-content/50 hover:text-base-content'"
+              :class="filterSubjectType === tab.value ? 'border-primary text-primary' : 'border-transparent text-base-content/50 hover:text-base-content'"
             >
               {{ tab.label }}
-              <span v-if="tab.value === 0 && stats" class="text-xs text-base-content/40 ml-1">{{ stats.total }}</span>
             </button>
           </div>
 
@@ -205,12 +170,91 @@
               <span class="text-xs w-8 text-right text-base-content font-medium shrink-0">{{ r.count }}</span>
             </div>
           </div>
-          <div v-if="rateAverage" class="mt-4 pt-3 border-t border-base-300 flex items-center justify-between text-xs">
-            <span class="text-base-content/60">平均评分</span>
-            <span class="font-bold text-amber-500 flex items-center gap-0.5">
-              {{ rateAverage }}
-              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-            </span>
+        </div>
+      </div>
+
+      <!-- 时间胶囊 -->
+      <div v-if="timeline.length" class="card bg-base-100 border border-base-300 mt-6">
+        <div class="card-body p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-base font-semibold text-base-content flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              时间胶囊
+            </h2>
+            <span class="text-xs text-base-content/40">最近 {{ timeline.length }} 条</span>
+          </div>
+          <div class="relative">
+            <div class="absolute left-[5px] top-1 bottom-1 w-px bg-base-300"></div>
+            <div v-for="(item, i) in timeline" :key="i" class="relative pl-6 pb-3 last:pb-0">
+              <div class="absolute left-0 top-1.5 w-[11px] h-[11px] rounded-full bg-primary ring-2 ring-base-100"></div>
+              <router-link :to="`/anime/${item.subject?.id || item.anime_id}`" class="block hover:text-primary transition-colors">
+                <div class="flex items-center gap-2 text-sm flex-wrap">
+                  <span class="badge badge-xs" :class="statusBadgeClass(item.type)">{{ statusLabel(item.type) }}</span>
+                  <span class="font-medium">{{ item.subject?.name_cn || item.subject?.name }}</span>
+                </div>
+                <p class="text-xs text-base-content/40 mt-0.5">{{ formatRelativeTime(item.updated_at || item.created_at) }}</p>
+              </router-link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 我的目录 -->
+      <div v-if="indexes.length" class="card bg-base-100 border border-base-300 mt-6">
+        <div class="card-body p-6">
+          <h2 class="text-base font-semibold text-base-content mb-4 flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            我的目录
+          </h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <a
+              v-for="idx in indexes"
+              :key="idx.id"
+              :href="`https://bgm.tv/index/${idx.id}`"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="block p-3 rounded-lg border border-base-300 hover:border-primary transition-colors"
+            >
+              <p class="font-medium text-sm">{{ idx.title }}</p>
+              <p v-if="idx.desc" class="text-xs text-base-content/50 mt-1 line-clamp-2">{{ idx.desc }}</p>
+              <p class="text-xs text-base-content/40 mt-1">{{ idx.total || 0 }} 条</p>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 收藏人物 -->
+      <div v-if="characters.length || persons.length" class="card bg-base-100 border border-base-300 mt-6">
+        <div class="card-body p-6">
+          <h2 class="text-base font-semibold text-base-content mb-4 flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            收藏人物
+          </h2>
+          <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-10 gap-3">
+            <router-link
+              v-for="char in characters.slice(0, 10)"
+              :key="'c-' + char.id"
+              :to="`/character/${char.id}`"
+              class="block text-center group"
+            >
+              <div class="w-12 h-12 mx-auto rounded-full overflow-hidden bg-base-200 ring-2 ring-base-100 shadow-sm group-hover:ring-primary transition">
+                <img v-if="char.images?.medium" :src="char.images.medium" :alt="char.name" class="w-full h-full object-cover" loading="lazy" />
+                <div v-else class="w-full h-full flex items-center justify-center text-xs text-base-content/50">{{ char.name?.[0] || '?' }}</div>
+              </div>
+              <p class="text-xs mt-1 line-clamp-1 group-hover:text-primary transition-colors">{{ char.name }}</p>
+            </router-link>
+            <router-link
+              v-for="person in persons.slice(0, 10)"
+              :key="'p-' + person.id"
+              :to="`/person/${person.id}`"
+              class="block text-center group"
+            >
+              <div class="w-12 h-12 mx-auto rounded-full overflow-hidden bg-base-200 ring-2 ring-base-100 shadow-sm group-hover:ring-primary transition">
+                <img v-if="person.images?.medium" :src="person.images.medium" :alt="person.name" class="w-full h-full object-cover" loading="lazy" />
+                <div v-else class="w-full h-full flex items-center justify-center text-xs text-base-content/50">{{ person.name?.[0] || '?' }}</div>
+              </div>
+              <p class="text-xs mt-1 line-clamp-1 group-hover:text-primary transition-colors">{{ person.name }}</p>
+            </router-link>
           </div>
         </div>
       </div>
@@ -219,7 +263,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { collectionAPI, userAPI } from '../api/endpoints'
@@ -230,34 +274,31 @@ const auth = useAuthStore()
 const profileUser = ref(null)
 const stats = ref(null)
 const collections = ref([])
-const filterType = ref(0)
+const filterSubjectType = ref(0) // 0=全部, 1=书籍, 2=动画, 3=音乐, 4=游戏
 const page = ref(0)
 const hasMore = ref(true)
 const loading = ref(false)
 const limit = 30
 
-// 最近收藏时间线
-const recentCollections = ref([])
+// 时间胶囊
+const timeline = ref([])
+// 我的目录
+const indexes = ref([])
+// 收藏人物
+const characters = ref([])
+const persons = ref([])
 // 评分分布
 const rateDistribution = ref([])
 const rateTotal = ref(0)
 const rateAverage = ref(0)
+const rateStdDev = ref(0)
 
-const statItems = [
-  { key: 'want', label: '想看', value: 1 },
-  { key: 'watching', label: '在追', value: 3 },
-  { key: 'completed', label: '看过', value: 2 },
-  { key: 'on_hold', label: '搁置', value: 4 },
-  { key: 'dropped', label: '弃番', value: 5 }
-]
-
-const tabs = [
+const subjectTabs = [
   { label: '全部', value: 0 },
-  { label: '想看', value: 1 },
-  { label: '在追', value: 3 },
-  { label: '看过', value: 2 },
-  { label: '搁置', value: 4 },
-  { label: '弃番', value: 5 }
+  { label: '书籍', value: 1 },
+  { label: '动画', value: 2 },
+  { label: '音乐', value: 3 },
+  { label: '游戏', value: 4 }
 ]
 
 function statusLabel(s) {
@@ -274,17 +315,13 @@ function statusBadgeClass(s) {
   }[s] || 'badge-ghost'
 }
 
-// 统计百分比：单项占总收藏的比例
-function statPercent(key) {
-  if (!stats.value) return 0
-  const total = stats.value.total
-    || ((stats.value.want || 0) + (stats.value.watching || 0) + (stats.value.completed || 0)
-        + (stats.value.on_hold || 0) + (stats.value.dropped || 0))
-  if (!total) return 0
-  return Math.round(((stats.value[key] || 0) / total) * 100)
-}
+// 完成率：completed / total * 100
+const completionRate = computed(() => {
+  if (!stats.value || !stats.value.total) return 0
+  return Math.round(((stats.value.completed || 0) / stats.value.total) * 100)
+})
 
-// 相对时间格式化：刚刚 / x分钟前 / x小时前 / x天前 / 月日
+// 相对时间格式化
 function formatRelativeTime(t) {
   if (!t) return ''
   try {
@@ -299,7 +336,6 @@ function formatRelativeTime(t) {
   } catch { return '' }
 }
 
-// 评分条颜色：高分绿色，中分蓝色，低分红色
 function rateBarClass(rate) {
   if (rate >= 9) return 'bg-success'
   if (rate >= 7) return 'bg-primary'
@@ -329,8 +365,8 @@ async function fetchCollections(reset = true) {
     hasMore.value = true
   }
   try {
-    const params = { offset: page.value * limit, limit, subject_type: 2 }
-    if (filterType.value > 0) params.type = filterType.value
+    const params = { offset: page.value * limit, limit }
+    if (filterSubjectType.value > 0) params.subject_type = filterSubjectType.value
     if (route.params.username) params.username = route.params.username
 
     const res = await collectionAPI.getList(params)
@@ -357,33 +393,68 @@ function loadMore() {
   fetchCollections(false)
 }
 
-// 拉取最近 10 条收藏（用于时间线展示）
-async function fetchRecentCollections() {
+// 时间胶囊：拉取最近 20 条收藏（按 updated_at 倒序）
+async function fetchTimeline() {
   try {
-    const params = { limit: 10, subject_type: 2 }
+    const params = { limit: 20 }
     if (route.params.username) params.username = route.params.username
     const res = await collectionAPI.getList(params)
     const list = res.data?.data || []
-    // 按 updated_at 倒序排序（如果 API 未排序则前端兜底）
-    recentCollections.value = list.sort((a, b) => {
+    timeline.value = list.sort((a, b) => {
       const ta = new Date(a.updated_at || a.created_at || 0).getTime()
       const tb = new Date(b.updated_at || b.created_at || 0).getTime()
       return tb - ta
     })
   } catch {
-    recentCollections.value = []
+    timeline.value = []
   }
 }
 
-// 拉取全部收藏并统计评分分布（1-10 星）
+// 我的目录
+async function fetchIndexes() {
+  const username = route.params.username || auth.user?.username
+  if (!username) { indexes.value = []; return }
+  try {
+    const res = await userAPI.getIndexes(username)
+    indexes.value = res.data?.data || []
+  } catch {
+    indexes.value = []
+  }
+}
+
+// 收藏人物
+async function fetchCharacters() {
+  const username = route.params.username || auth.user?.username
+  if (!username) { characters.value = []; return }
+  try {
+    const res = await userAPI.getCharacters(username)
+    characters.value = res.data?.data || []
+  } catch {
+    characters.value = []
+  }
+}
+
+async function fetchPersons() {
+  const username = route.params.username || auth.user?.username
+  if (!username) { persons.value = []; return }
+  try {
+    const res = await userAPI.getPersons(username)
+    persons.value = res.data?.data || []
+  } catch {
+    persons.value = []
+  }
+}
+
+// 拉取全部收藏并统计评分分布（1-10 星）+ 平均分 + 标准差
 async function fetchRateDistribution() {
   try {
     const all = []
     let offset = 0
     const pageSize = 50
-    const maxPages = 20 // 最多拉取 1000 条，避免无限请求
+    const maxPages = 20 // 最多拉取 1000 条
     for (let i = 0; i < maxPages; i++) {
-      const params = { offset, limit: pageSize, subject_type: 2 }
+      const params = { offset, limit: pageSize }
+      if (filterSubjectType.value > 0) params.subject_type = filterSubjectType.value
       if (route.params.username) params.username = route.params.username
       const res = await collectionAPI.getList(params)
       const data = res.data?.data || []
@@ -395,12 +466,14 @@ async function fetchRateDistribution() {
     const counts = {}
     let totalRated = 0
     let sumRate = 0
+    const ratedArr = []
     all.forEach(c => {
       const r = Number(c.rate)
       if (r && r >= 1 && r <= 10) {
         counts[r] = (counts[r] || 0) + 1
         totalRated++
         sumRate += r
+        ratedArr.push(r)
       }
     })
 
@@ -416,25 +489,40 @@ async function fetchRateDistribution() {
     rateDistribution.value = dist.filter(d => d.count > 0).sort((a, b) => a.rate - b.rate)
     rateTotal.value = totalRated
     rateAverage.value = totalRated > 0 ? (sumRate / totalRated).toFixed(1) : 0
+    // 标准差
+    if (totalRated > 0) {
+      const mean = sumRate / totalRated
+      const variance = ratedArr.reduce((s, r) => s + (r - mean) ** 2, 0) / totalRated
+      rateStdDev.value = Math.sqrt(variance).toFixed(2)
+    } else {
+      rateStdDev.value = 0
+    }
   } catch {
     rateDistribution.value = []
     rateTotal.value = 0
     rateAverage.value = 0
+    rateStdDev.value = 0
   }
 }
 
 onMounted(async () => {
   await loadProfile()
   fetchCollections()
-  fetchRecentCollections()
+  fetchTimeline()
+  fetchIndexes()
+  fetchCharacters()
+  fetchPersons()
   fetchRateDistribution()
 })
 
 watch(() => route.params.username, async () => {
   await loadProfile()
-  filterType.value = 0
+  filterSubjectType.value = 0
   fetchCollections()
-  fetchRecentCollections()
+  fetchTimeline()
+  fetchIndexes()
+  fetchCharacters()
+  fetchPersons()
   fetchRateDistribution()
 })
 </script>

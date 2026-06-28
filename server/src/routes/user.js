@@ -104,6 +104,46 @@ app.get('/me', async (c) => {
   }
 })
 
+app.get('/:username/characters', async (c) => {
+  try {
+    const username = c.req.param('username')
+    if (!username) return c.json({ error: '缺少用户名' }, 400)
+    const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
+    const client = token ? getClient(token, isChina(c)) : getClient('', isChina(c))
+    const data = await client.get(`/v0/users/${username}/characters`, { limit: 10 })
+    return c.json({ data: data.data || [] })
+  } catch {
+    return c.json({ data: [] })
+  }
+})
+
+app.get('/:username/persons', async (c) => {
+  try {
+    const username = c.req.param('username')
+    if (!username) return c.json({ error: '缺少用户名' }, 400)
+    const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
+    const client = token ? getClient(token, isChina(c)) : getClient('', isChina(c))
+    const data = await client.get(`/v0/users/${username}/persons`, { limit: 10 })
+    return c.json({ data: data.data || [] })
+  } catch {
+    return c.json({ data: [] })
+  }
+})
+
+app.get('/:username/indexes', async (c) => {
+  try {
+    const username = c.req.param('username')
+    if (!username) return c.json({ error: '缺少用户名' }, 400)
+    const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
+    const client = token ? getClient(token, isChina(c)) : getClient('', isChina(c))
+    // Bangumi v0 API 可能没有 /indexes，尝试调用，失败返回空数组
+    const data = await client.get(`/v0/users/${username}/indexes`)
+    return c.json({ data: data.data || [] })
+  } catch {
+    return c.json({ data: [] })
+  }
+})
+
 app.get('/:username', async (c) => {
   try {
     const username = c.req.param('username')

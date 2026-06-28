@@ -5,7 +5,16 @@ export const userAPI = {
   getMe() { return api.get('/user/me') },
   getOAuthUrl() { return api.get('/user/oauth-url') },
   oauthCallback(code) { return api.post('/user/oauth-callback', { code }) },
-  getUser(username) { return api.get(`/user/${username}`) }
+  getUser(username) { return api.get(`/user/${username}`) },
+  getCharacters(username) {
+    return api.get(`/user/${username}/characters`)
+  },
+  getPersons(username) {
+    return api.get(`/user/${username}/persons`)
+  },
+  getIndexes(username) {
+    return api.get(`/user/${username}/indexes`)
+  }
 }
 
 export const animeAPI = {
@@ -53,8 +62,20 @@ export const doubanAPI = {
     }
     return api.get(`/douban/${id}/details`)
   },
+  getComments(id) {
+    return api.get(`/douban/${id}/comments`)
+  }
 }
 
 export const moegirlAPI = {
   search(q) { return api.get('/moegirl/search', { params: { q } }) },
+}
+
+export const groupAPI = {
+  getList() {
+    return api.get('/groups/')
+  },
+  getDetail(id) {
+    return api.get(`/groups/${id}`)
+  }
 }
