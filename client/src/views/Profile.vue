@@ -1,5 +1,5 @@
 <template>
-  <div class="max-w-6xl mx-auto">
+  <div class="max-w-5xl mx-auto">
     <!-- 未登录且未指定用户名时提示 -->
     <div v-if="!auth.isLoggedIn && !route.params.username" class="py-20 text-center">
       <p class="text-base-content/50 mb-3">请先登录</p>
@@ -8,21 +8,21 @@
 
     <div v-else>
       <!-- 用户卡 -->
-      <div class="card bg-base-100 border border-base-300 mb-6 overflow-hidden">
-        <div class="h-24 bg-gradient-to-r from-primary/30 via-secondary/20 to-accent/30"></div>
-        <div class="card-body p-6 pt-0">
-          <div class="flex flex-col sm:flex-row sm:items-end gap-4 -mt-12">
+      <div class="card bg-base-100 border border-base-300 mb-4 overflow-hidden">
+        <div class="h-16 bg-gradient-to-r from-primary/30 via-secondary/20 to-accent/30"></div>
+        <div class="card-body p-4 pt-0">
+          <div class="flex flex-col sm:flex-row sm:items-end gap-3 -mt-8">
             <div class="avatar shrink-0">
-              <div class="w-24 h-24 rounded-2xl ring-4 ring-base-100 shadow-lg">
+              <div class="w-16 h-16 rounded-xl ring-4 ring-base-100 shadow-lg">
                 <img v-if="profileUser?.avatar?.large" :src="profileUser.avatar.large" />
-                <div v-else class="w-24 h-24 rounded-2xl bg-primary text-primary-content flex items-center justify-center text-3xl font-bold">
+                <div v-else class="w-16 h-16 rounded-xl bg-primary text-primary-content flex items-center justify-center text-2xl font-bold">
                   {{ profileUser?.nickname?.[0] || profileUser?.username?.[0]?.toUpperCase() || '?' }}
                 </div>
               </div>
             </div>
             <div class="flex-1 min-w-0 pb-1">
               <div class="flex items-center gap-2 flex-wrap">
-                <h1 class="text-2xl font-bold text-base-content">{{ profileUser?.nickname || profileUser?.username }}</h1>
+                <h1 class="text-xl font-bold text-base-content">{{ profileUser?.nickname || profileUser?.username }}</h1>
                 <span v-if="profileUser?.user_group" class="badge badge-sm badge-outline">{{ profileUser.user_group }}</span>
               </div>
               <p class="text-sm text-base-content/50 mt-0.5">@{{ profileUser?.username }} · UID: {{ profileUser?.id }}</p>
@@ -41,7 +41,7 @@
       </div>
 
       <!-- 顶部二级导航 -->
-      <div class="card bg-base-100 border border-base-300 mb-6">
+      <div class="card bg-base-100 border border-base-300 mb-4">
         <nav class="flex items-center px-2 py-1 overflow-x-auto">
           <button
             v-for="tab in navTabs"
@@ -56,16 +56,16 @@
       </div>
 
       <!-- 整体两栏布局 -->
-      <div class="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
         <!-- 左侧主栏 -->
-        <div id="collections" class="main-col space-y-6">
+        <div id="collections" class="main-col space-y-4">
           <!-- 各媒介类型：动画 / 游戏 / 书籍 / 音乐 -->
           <div
             v-for="(config, subjectType) in TYPE_CONFIG"
             :key="subjectType"
             class="card bg-base-100 border border-base-300"
           >
-            <div class="card-body p-6">
+            <div class="card-body p-4">
               <!-- 标题 + 各状态计数 -->
               <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <h2 class="text-base font-bold text-base-content">我的{{ config.label }}</h2>
@@ -92,7 +92,7 @@
                     class="shrink-0 group"
                     :title="col.subject?.name_cn || col.subject?.name"
                   >
-                    <div class="w-[100px] h-[140px] rounded-lg overflow-hidden bg-base-200 shadow-sm relative">
+                    <div class="w-[72px] h-[100px] rounded-md overflow-hidden bg-base-200 shadow-sm relative">
                       <img
                         v-if="col.subject?.images?.common || col.subject?.images?.grid || col.subject?.images?.medium"
                         :src="col.subject?.images?.common || col.subject?.images?.grid || col.subject?.images?.medium"
@@ -109,7 +109,7 @@
                         {{ col.rate }}
                       </div>
                     </div>
-                    <p class="text-xs text-center mt-1 text-base-content/60 line-clamp-1 w-[100px] group-hover:text-primary transition-colors">
+                    <p class="text-[10px] text-center mt-1 text-base-content/60 line-clamp-1 w-[72px] group-hover:text-primary transition-colors">
                       {{ col.subject?.name_cn || col.subject?.name }}
                     </p>
                   </router-link>
@@ -121,10 +121,10 @@
         </div>
 
         <!-- 右侧边栏 -->
-        <div class="sidebar-col space-y-6">
+        <div class="sidebar-col space-y-4">
           <!-- 我的时间胶囊 -->
           <div id="timeline" class="card bg-base-100 border border-base-300">
-            <div class="card-body p-5">
+            <div class="card-body p-4">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-bold text-base-content/70">/ 我的时间胶囊</h3>
                 <a
@@ -153,7 +153,7 @@
 
           <!-- 统计面板 -->
           <div id="stats" class="card bg-base-100 border border-base-300">
-            <div class="card-body p-5">
+            <div class="card-body p-4">
               <!-- 统计 tab -->
               <div class="flex items-center gap-1 border-b border-base-300 mb-4 overflow-x-auto">
                 <button
@@ -168,21 +168,21 @@
               </div>
 
               <!-- 6 彩色统计卡片 -->
-              <div class="grid grid-cols-2 gap-3 mb-5">
+              <div class="grid grid-cols-2 gap-2 mb-4">
                 <div class="rounded-2xl border border-pink-500/30 bg-pink-500/10 p-3">
-                  <p class="text-2xl font-bold text-pink-700">{{ computedStats.total }}</p>
+                  <p class="text-xl font-bold text-pink-700">{{ computedStats.total }}</p>
                   <p class="text-xs text-pink-600 mt-1">收藏数</p>
                 </div>
                 <div class="rounded-2xl border border-green-500/30 bg-green-500/10 p-3">
-                  <p class="text-2xl font-bold text-green-700">{{ computedStats.completed }}</p>
+                  <p class="text-xl font-bold text-green-700">{{ computedStats.completed }}</p>
                   <p class="text-xs text-green-600 mt-1">完成数</p>
                 </div>
                 <div class="rounded-2xl border border-blue-500/30 bg-blue-500/10 p-3">
-                  <p class="text-2xl font-bold text-blue-700">{{ computedStats.completionRate }}%</p>
+                  <p class="text-xl font-bold text-blue-700">{{ computedStats.completionRate }}%</p>
                   <p class="text-xs text-blue-600 mt-1">完成率</p>
                 </div>
                 <div class="rounded-2xl border border-orange-500/30 bg-orange-500/10 p-3">
-                  <p class="text-2xl font-bold text-orange-700">{{ computedStats.avg }}</p>
+                  <p class="text-xl font-bold text-orange-700">{{ computedStats.avg }}</p>
                   <p class="text-xs text-orange-600 mt-1">平均分</p>
                 </div>
                 <div class="rounded-2xl border border-purple-500/30 bg-purple-500/10 p-3">
@@ -190,7 +190,7 @@
                   <p class="text-xs text-purple-600 mt-1">标准差</p>
                 </div>
                 <div class="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-3">
-                  <p class="text-2xl font-bold text-cyan-700">{{ computedStats.rateTotal }}</p>
+                  <p class="text-xl font-bold text-cyan-700">{{ computedStats.rateTotal }}</p>
                   <p class="text-xs text-cyan-600 mt-1">评分数</p>
                 </div>
               </div>
@@ -223,7 +223,7 @@
 
           <!-- 我的朋友 -->
           <div id="friends" v-if="friends.length" class="card bg-base-100 border border-base-300">
-            <div class="card-body p-5">
+            <div class="card-body p-4">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-bold text-base-content/70">/ 我的朋友</h3>
                 <a
@@ -233,14 +233,14 @@
                   class="text-xs text-base-content/40 hover:text-primary"
                 >...more</a>
               </div>
-              <div class="grid grid-cols-4 gap-3">
+              <div class="grid grid-cols-6 gap-2">
                 <router-link
                   v-for="f in friends.slice(0, 12)"
                   :key="f.username"
                   :to="`/profile/${f.username}`"
                   class="block text-center group"
                 >
-                  <div class="w-14 h-14 mx-auto rounded-full overflow-hidden bg-base-200 ring-2 ring-base-100 shadow-sm group-hover:ring-primary transition">
+                  <div class="w-10 h-10 mx-auto rounded-full overflow-hidden bg-base-200 ring-2 ring-base-100 shadow-sm group-hover:ring-primary transition">
                     <img v-if="f.avatar" :src="f.avatar" :alt="f.nickname" class="w-full h-full object-cover" loading="lazy" />
                     <div v-else class="w-full h-full flex items-center justify-center text-lg font-bold text-base-content/50">
                       {{ f.nickname?.[0] || f.username?.[0]?.toUpperCase() || '?' }}
@@ -254,7 +254,7 @@
 
           <!-- 我参加的小组 -->
           <div id="groups" v-if="groups.length" class="card bg-base-100 border border-base-300">
-            <div class="card-body p-5">
+            <div class="card-body p-4">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-bold text-base-content/70">/ 我参加的小组</h3>
                 <a
@@ -271,7 +271,7 @@
                   :to="`/group/${g.id}`"
                   class="flex items-center gap-3 group"
                 >
-                  <div class="w-10 h-10 rounded-full overflow-hidden bg-base-200 shrink-0 ring-2 ring-base-100 group-hover:ring-primary transition">
+                  <div class="w-8 h-8 rounded-full overflow-hidden bg-base-200 shrink-0 ring-2 ring-base-100 group-hover:ring-primary transition">
                     <img v-if="g.avatar" :src="g.avatar" :alt="g.name" class="w-full h-full object-cover" loading="lazy" />
                     <div v-else class="w-full h-full flex items-center justify-center text-xs text-base-content/40">{{ g.name?.[0] || '?' }}</div>
                   </div>
@@ -286,7 +286,7 @@
 
           <!-- 我的目录 -->
           <div id="indexes" v-if="indexes.length" class="card bg-base-100 border border-base-300">
-            <div class="card-body p-5">
+            <div class="card-body p-4">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-bold text-base-content/70">/ 我的目录</h3>
                 <a
@@ -313,7 +313,7 @@
 
           <!-- 我收藏的人物 -->
           <div id="characters" v-if="characters.length || persons.length" class="card bg-base-100 border border-base-300">
-            <div class="card-body p-5">
+            <div class="card-body p-4">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-bold text-base-content/70">/ 我收藏的人物</h3>
                 <a
@@ -323,14 +323,14 @@
                   class="text-xs text-base-content/40 hover:text-primary"
                 >...more</a>
               </div>
-              <div class="grid grid-cols-5 gap-3">
+              <div class="grid grid-cols-6 gap-2">
                 <router-link
                   v-for="char in characters.slice(0, 10)"
                   :key="'c-' + char.id"
                   :to="`/character/${char.id}`"
                   class="block text-center group"
                 >
-                  <div class="w-20 h-20 mx-auto rounded overflow-hidden bg-base-200 shadow-sm group-hover:ring-2 group-hover:ring-primary transition">
+                  <div class="w-14 h-14 mx-auto rounded overflow-hidden bg-base-200 shadow-sm group-hover:ring-2 group-hover:ring-primary transition">
                     <img v-if="char.images?.medium" :src="char.images.medium" :alt="char.name" class="w-full h-full object-cover" loading="lazy" />
                     <div v-else class="w-full h-full flex items-center justify-center text-xs text-base-content/50">{{ char.name?.[0] || '?' }}</div>
                   </div>
@@ -342,7 +342,7 @@
                   :to="`/person/${person.id}`"
                   class="block text-center group"
                 >
-                  <div class="w-20 h-20 mx-auto rounded overflow-hidden bg-base-200 shadow-sm group-hover:ring-2 group-hover:ring-primary transition">
+                  <div class="w-14 h-14 mx-auto rounded overflow-hidden bg-base-200 shadow-sm group-hover:ring-2 group-hover:ring-primary transition">
                     <img v-if="person.images?.medium" :src="person.images.medium" :alt="person.name" class="w-full h-full object-cover" loading="lazy" />
                     <div v-else class="w-full h-full flex items-center justify-center text-xs text-base-content/50">{{ person.name?.[0] || '?' }}</div>
                   </div>
@@ -354,7 +354,7 @@
 
           <!-- RSS2.0 / 我的维基编辑 -->
           <div class="card bg-base-100 border border-base-300">
-            <div class="card-body p-5">
+            <div class="card-body p-4">
               <div class="flex items-center gap-4 text-sm">
                 <a
                   :href="`https://bgm.tv/feed/user/${currentUsername}`"

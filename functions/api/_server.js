@@ -15148,10 +15148,21 @@ var FALLBACK_GROUPS = [
   { id: "photography", name: "\u6444\u5F71", description: "\u6444\u5F71\u4F5C\u54C1\u4E0E\u6280\u672F\u4EA4\u6D41", member_count: 650, avatar: "" }
 ];
 function parseGroupFromContext(context, base) {
-  const memberMatch = context.match(/<span class="group_member">([0-9]+).*?<\/span>/i) || context.match(/<span class="l">([0-9]+).*?<\/span>/i) || context.match(/<strong>([0-9]+)<\/strong>/i);
+  const memberMatch = context.match(/([0-9]+)\s*(?:位成员|成员|members?)/i) || context.match(/<span class="group_member">([0-9]+).*?<\/span>/i) || context.match(/<span class="l">([0-9]+).*?<\/span>/i) || context.match(/<strong>([0-9]+)<\/strong>/i);
   const member_count = memberMatch ? parseNumber2(memberMatch[1]) : 0;
-  const descMatch = context.match(/<small[^>]*>(.*?)<\/small>/i);
-  const description = descMatch ? unescapeHtml2(stripTags3(descMatch[1])) : "";
+  let description = "";
+  const smallMatches = context.match(/<small[^>]*>(.*?)<\/small>/gi) || [];
+  for (const sm of smallMatches) {
+    const text = unescapeHtml2(stripTags3(sm));
+    if (/^\d+\s*(?:位成员|成员|members?)$/.test(text)) continue;
+    if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(text)) continue;
+    if (/^\d+\s*(?:分钟?|小时?|天|周|月|年)前/.test(text)) continue;
+    if (/^\+\d+$/.test(text)) continue;
+    if (text) {
+      description = text;
+      break;
+    }
+  }
   const avatarMatch = context.match(/<img[^>]*src="([^"]+)"[^>]*>/i);
   const avatar = avatarMatch ? fixUrl2(avatarMatch[1], base) : "";
   return { member_count, description, avatar };
