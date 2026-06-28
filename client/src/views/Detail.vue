@@ -403,6 +403,7 @@ const error = ref('')
 const collectionStatus = ref(0)
 const collectionRating = ref(0)
 const collectionComment = ref('')
+let collectionLoaded = false
 const heroRef = ref(null)
 
 const typeLabel = computed(() => ({ 1:'书籍',2:'动画',3:'音乐',4:'游戏',6:'三次元' })[anime.value.type] || '其他')
@@ -561,6 +562,7 @@ async function loadCollection() {
     } else {
       collectionStatus.value = 0; collectionRating.value = 0; collectionComment.value = ''
     }
+    collectionLoaded = true
   } catch (err) {
     const msg = err.response?.data?.error
     if (msg) toast.error(msg)
@@ -591,7 +593,7 @@ async function updateComment() {
 }
 
 watch(collectionRating, async (val) => {
-  if (!auth.isLoggedIn) return
+  if (!auth.isLoggedIn || !collectionLoaded) return
   await saveCollectionBody({ rating: val })
 })
 

@@ -53,28 +53,42 @@ function parseSearchResults(json) {
 }
 
 async function fetchPageExtract(apiBase, title) {
-  // 用 action=parse 获取完整渲染 HTML，排版正常（extracts 返回纯文本/不完整）
-  const params = `action=parse&page=${encodeURIComponent(title)}&prop=text&format=json&disablelimitreport=1&disabletoc=1`
-  const json = await fetchMoegirlJSON(apiBase, params)
-  const html = json?.parse?.text?.['*']
-  if (!html) return null
-  // 清理无关内容：脚本/样式/编辑链接/目录/分类（保留 .mw-collapsible 折叠遮挡）
-  let clean = html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<span class="mw-editsection">[\s\S]*?<\/span>/gi, '')
-    .replace(/<div id="toc"[\s\S]*?<\/div>\s*<\/div>/gi, '')
-    .replace(/<div class="toc[\s\S]*?<\/div>\s*<\/div>/gi, '')
-    .replace(/<div id="catlinks"[\s\S]*?<\/div>/gi, '')
-    .replace(/<table class="navbox[\s\S]*?<\/table>/gi, '')
-  // 把相对链接转成绝对路径，保证点击可跳转（先 /wiki/ 再其他 /）
+  // apiBase 是 https://zh.moegirl.org.cn/api.php 或 https://zh.moegirl.uk/api.php
   const base = apiBase.replace('/api.php', '')
-  clean = clean.replace(/href="\/wiki\//g, `href="${base}/wiki/`)
-  clean = clean.replace(/href="\//g, `href="${base}/`)
-  return {
-    title: json.parse.title || title,
-    html: clean
+  const pageUrl = `${base}/${encodeURIComponent(title)}`
+
+  try {
+    const res = await fetch(pageUrl, {
+      headers: {
+        'User-Agent': 'Bangmio/1.0 (Mozilla/5.0; compatible)',
+        'Accept': 'text/html',
+        'Accept-Language': 'zh-CN,zh;q=0.9'
+      }
+    })
+    if (!res.ok) return null
+    const html = await res.text()
+
+    // 提取 #mw-content-text 的内容
+    const contentMatch = html.match(/<div id="mw-content-text"[^>]*>([\s\S]*?)<\/div>\s*(?:<div class="printfooter|<div id="catlinks|<\/body>)/i)
+    if (!contentMatch) return null
+
+    let clean = contentMatch[1]
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<span class="mw-editsection">[\s\S]*?<\/span>/gi, '')
+
+    // 链接绝对化
+    clean = clean.replace(/href="\/wiki\//g, `href="${base}/wiki/`)
+    clean = clean.replace(/href="\//g, `href="${base}/`)
+    clean = clean.replace(/src="\//g, `src="${base}/`)
+
+    return {
+      title,
+      html: clean
+    }
+  } catch {
+    return null
   }
 }
 
