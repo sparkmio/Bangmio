@@ -260,30 +260,38 @@ app.get('/:username/groups', async (c) => {
     const html = await fetchHTML(`${base}/user/${username}/group`)
     if (!html) return c.json({ data: [] })
 
+    // 优先从 #group 或 .groups 区块提取，避免全页导航链接受污染
+    let scope = html
+    const blockMatch =
+      html.match(/id="group"[\s\S]*?<ul[\s\S]*?<\/ul>/i) ||
+      html.match(/class="[^"]*groups[^"]*"[\s\S]*?<ul[\s\S]*?<\/ul>/i) ||
+      html.match(/<h2[^>]*>小组[\s\S]*?<ul[\s\S]*?<\/ul>/i)
+    if (blockMatch) scope = blockMatch[0]
+
     const groups = []
     const seen = new Set()
-    const chunks = html.split(/<li\b/i)
-    for (const chunk of chunks) {
-      const linkMatch = chunk.match(/href="\/group\/(?!topic\/)([^"\/?#]+)"/i)
-      if (!linkMatch) continue
-      const id = linkMatch[1]
+    const linkRegex = /<a href="\/group\/([^"\/]+)"[^>]*>([\s\S]*?)<\/a>/gi
+    let m
+    while ((m = linkRegex.exec(scope)) !== null) {
+      const id = m[1]
       if (seen.has(id)) continue
+      const name = unescapeHtml(stripTags(m[2])).trim()
+      if (!name || /^\d+$/.test(name)) continue
       seen.add(id)
 
-      const nameRe = new RegExp(`href="/group/${escapeRegex(id)}"[^>]*>([\\s\\S]*?)<\\/a>`, 'i')
-      const nameMatch = chunk.match(nameRe)
-      const name = nameMatch ? unescapeHtml(stripTags(nameMatch[1])) : id
+      const idx = m.index
+      const context = scope.slice(Math.max(0, idx - 250), Math.min(scope.length, idx + 500))
 
-      const descMatch = chunk.match(/<small[^>]*>([\s\S]*?)<\/small>/i)
-      const description = descMatch ? unescapeHtml(stripTags(descMatch[1])) : ''
-
-      const memberMatch = chunk.match(/group_member[^>]*>([\s\S]*?)<\//i)
+      const memberMatch = context.match(/([0-9]+)\s*成员/i)
+        || context.match(/<span class="group_member">([0-9]+).*?<\/span>/i)
+        || context.match(/<span class="l">([0-9]+).*?<\/span>/i)
+        || context.match(/<strong>([0-9]+)<\/strong>/i)
       const member_count = memberMatch ? parseNumber(memberMatch[1]) : 0
 
-      const avatarMatch = chunk.match(/<img[^>]*src="([^"]+)"/i)
+      const avatarMatch = context.match(/<img[^>]*src="([^"]+)"[^>]*>/i)
       const avatar = avatarMatch ? fixUrl(avatarMatch[1], base) : ''
 
-      groups.push({ id, name, description, member_count, avatar })
+      groups.push({ id, name, avatar, member_count })
       if (groups.length >= 30) break
     }
 

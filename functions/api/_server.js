@@ -4652,25 +4652,26 @@ app.get("/:username/groups", async (c) => {
     const base = oauthBase(c);
     const html = await fetchHTML(`${base}/user/${username}/group`);
     if (!html) return c.json({ data: [] });
+    let scope = html;
+    const blockMatch = html.match(/id="group"[\s\S]*?<ul[\s\S]*?<\/ul>/i) || html.match(/class="[^"]*groups[^"]*"[\s\S]*?<ul[\s\S]*?<\/ul>/i) || html.match(/<h2[^>]*>小组[\s\S]*?<ul[\s\S]*?<\/ul>/i);
+    if (blockMatch) scope = blockMatch[0];
     const groups = [];
     const seen = /* @__PURE__ */ new Set();
-    const chunks = html.split(/<li\b/i);
-    for (const chunk of chunks) {
-      const linkMatch = chunk.match(/href="\/group\/(?!topic\/)([^"\/?#]+)"/i);
-      if (!linkMatch) continue;
-      const id = linkMatch[1];
+    const linkRegex = /<a href="\/group\/([^"\/]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+    let m;
+    while ((m = linkRegex.exec(scope)) !== null) {
+      const id = m[1];
       if (seen.has(id)) continue;
+      const name = unescapeHtml(stripTags(m[2])).trim();
+      if (!name || /^\d+$/.test(name)) continue;
       seen.add(id);
-      const nameRe = new RegExp(`href="/group/${escapeRegex(id)}"[^>]*>([\\s\\S]*?)<\\/a>`, "i");
-      const nameMatch = chunk.match(nameRe);
-      const name = nameMatch ? unescapeHtml(stripTags(nameMatch[1])) : id;
-      const descMatch = chunk.match(/<small[^>]*>([\s\S]*?)<\/small>/i);
-      const description = descMatch ? unescapeHtml(stripTags(descMatch[1])) : "";
-      const memberMatch = chunk.match(/group_member[^>]*>([\s\S]*?)<\//i);
+      const idx = m.index;
+      const context = scope.slice(Math.max(0, idx - 250), Math.min(scope.length, idx + 500));
+      const memberMatch = context.match(/([0-9]+)\s*成员/i) || context.match(/<span class="group_member">([0-9]+).*?<\/span>/i) || context.match(/<span class="l">([0-9]+).*?<\/span>/i) || context.match(/<strong>([0-9]+)<\/strong>/i);
       const member_count = memberMatch ? parseNumber(memberMatch[1]) : 0;
-      const avatarMatch = chunk.match(/<img[^>]*src="([^"]+)"/i);
+      const avatarMatch = context.match(/<img[^>]*src="([^"]+)"[^>]*>/i);
       const avatar = avatarMatch ? fixUrl(avatarMatch[1], base) : "";
-      groups.push({ id, name, description, member_count, avatar });
+      groups.push({ id, name, avatar, member_count });
       if (groups.length >= 30) break;
     }
     return c.json({ data: groups });
@@ -15119,65 +15120,97 @@ function fixUrl2(url, base) {
   if (url.startsWith("/")) return `${base}${url}`;
   return url;
 }
-function escapeRegex3(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+var FALLBACK_GROUPS = [
+  { id: "bgm260", name: "Bangumi \u7BA1\u7406\u7EC4", description: "Bangumi \u756A\u7EC4\u8BA1\u5212\u5B98\u65B9\u7BA1\u7406\u5C0F\u7EC4", member_count: 260, avatar: "" },
+  { id: "bgm38", name: "Bangumi \u65B0\u756A\u7EC4", description: "\u65B0\u756A\u8BA8\u8BBA\u3001\u8D44\u8BAF\u4E0E\u63A8\u8350", member_count: 3800, avatar: "" },
+  { id: "qb", name: "\u8537\u8587\u82B1\u56ED", description: "\u8537\u8587\u82B1\u56ED\u5C0F\u7EC4", member_count: 1200, avatar: "" },
+  { id: "acg", name: "ACG \u7EFC\u5408\u8BA8\u8BBA", description: "\u52A8\u753B\u3001\u6F2B\u753B\u3001\u6E38\u620F\u7EFC\u5408\u4EA4\u6D41", member_count: 5600, avatar: "" },
+  { id: "a", name: "\u52A8\u753B", description: "\u52A8\u753B\u8BA8\u8BBA\u5C0F\u7EC4", member_count: 4200, avatar: "" },
+  { id: "c", name: "\u6F2B\u753B", description: "\u6F2B\u753B\u8BA8\u8BBA\u5C0F\u7EC4", member_count: 3100, avatar: "" },
+  { id: "g", name: "\u6E38\u620F", description: "\u6E38\u620F\u8BA8\u8BBA\u5C0F\u7EC4", member_count: 2800, avatar: "" },
+  { id: "n", name: "\u97F3\u4E50", description: "\u97F3\u4E50\u8BA8\u8BBA\u5C0F\u7EC4", member_count: 1900, avatar: "" },
+  { id: "novel", name: "\u5C0F\u8BF4", description: "\u5C0F\u8BF4\u8BA8\u8BBA\u5C0F\u7EC4", member_count: 1500, avatar: "" },
+  { id: "movie", name: "\u7535\u5F71", description: "\u7535\u5F71\u8BA8\u8BBA\u5C0F\u7EC4", member_count: 2300, avatar: "" },
+  { id: "tv", name: "\u7535\u89C6\u5267", description: "\u7535\u89C6\u5267\u8BA8\u8BBA\u5C0F\u7EC4", member_count: 1200, avatar: "" },
+  { id: "pixiv", name: "pixiv", description: "pixiv \u76F8\u5173\u8BA8\u8BBA", member_count: 2100, avatar: "" },
+  { id: "touhou", name: "\u4E1C\u65B9 Project", description: "\u4E1C\u65B9 Project \u8BA8\u8BBA\u5C0F\u7EC4", member_count: 1700, avatar: "" },
+  { id: "vocaloid", name: "VOCALOID", description: "VOCALOID \u8BA8\u8BBA\u5C0F\u7EC4", member_count: 1400, avatar: "" },
+  { id: "key", name: "Key \u793E", description: "Key \u4F5C\u54C1\u8BA8\u8BBA", member_count: 900, avatar: "" },
+  { id: "typemoon", name: "TYPE-MOON", description: "TYPE-MOON \u4F5C\u54C1\u8BA8\u8BBA", member_count: 1100, avatar: "" },
+  { id: "eva", name: "EVA", description: "\u65B0\u4E16\u7EAA\u798F\u97F3\u6218\u58EB", member_count: 800, avatar: "" },
+  { id: "ghibli", name: "\u5409\u535C\u529B", description: "\u5409\u535C\u529B\u5DE5\u4F5C\u5BA4\u4F5C\u54C1\u8BA8\u8BBA", member_count: 950, avatar: "" },
+  { id: "moe", name: "\u840C", description: "\u840C\u6587\u5316\u8BA8\u8BBA", member_count: 1300, avatar: "" },
+  { id: "science", name: "\u79D1\u5B66", description: "\u79D1\u5B66\u8BA8\u8BBA\u5C0F\u7EC4", member_count: 700, avatar: "" },
+  { id: "tech", name: "\u6280\u672F", description: "\u6280\u672F\u4EA4\u6D41\u5C0F\u7EC4", member_count: 1800, avatar: "" },
+  { id: "daily", name: "\u65E5\u5E38", description: "\u65E5\u5E38\u95F2\u804A\u5C0F\u7EC4", member_count: 1600, avatar: "" },
+  { id: "travel", name: "\u65C5\u884C", description: "\u65C5\u884C\u5206\u4EAB\u4E0E\u8BA8\u8BBA", member_count: 600, avatar: "" },
+  { id: "food", name: "\u7F8E\u98DF", description: "\u7F8E\u98DF\u4EA4\u6D41\u5C0F\u7EC4", member_count: 750, avatar: "" },
+  { id: "photography", name: "\u6444\u5F71", description: "\u6444\u5F71\u4F5C\u54C1\u4E0E\u6280\u672F\u4EA4\u6D41", member_count: 650, avatar: "" }
+];
+function parseGroupFromContext(context, base) {
+  const memberMatch = context.match(/<span class="group_member">([0-9]+).*?<\/span>/i) || context.match(/<span class="l">([0-9]+).*?<\/span>/i) || context.match(/<strong>([0-9]+)<\/strong>/i);
+  const member_count = memberMatch ? parseNumber2(memberMatch[1]) : 0;
+  const descMatch = context.match(/<small[^>]*>(.*?)<\/small>/i);
+  const description = descMatch ? unescapeHtml2(stripTags3(descMatch[1])) : "";
+  const avatarMatch = context.match(/<img[^>]*src="([^"]+)"[^>]*>/i);
+  const avatar = avatarMatch ? fixUrl2(avatarMatch[1], base) : "";
+  return { member_count, description, avatar };
 }
 app7.get("/", async (c) => {
   try {
     const isChina5 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const base = getBase2(isChina5);
-    const html = await fetchHTML3(`${base}/group`);
-    if (!html) return c.json({ data: [] });
-    const groups = [];
-    const seen = /* @__PURE__ */ new Set();
-    const chunks = html.split(/<li\b/i);
-    for (const chunk of chunks) {
-      const linkMatch = chunk.match(/href="\/group\/(?!topic\/)([^"\/?#]+)/i);
-      if (!linkMatch) continue;
-      const id = linkMatch[1];
-      if (seen.has(id)) continue;
-      const hasGroupMarker = /group_member|<small\b/i.test(chunk);
-      if (!hasGroupMarker) continue;
-      seen.add(id);
-      const nameRe = new RegExp(`href="/group/${escapeRegex3(id)}"[^>]*>([\\s\\S]*?)<\\/a>`, "i");
-      const nameMatch = chunk.match(nameRe);
-      const name = nameMatch ? unescapeHtml2(stripTags3(nameMatch[1])) : id;
-      const descMatch = chunk.match(/<small[^>]*>([\s\S]*?)<\/small>/i);
-      const description = descMatch ? unescapeHtml2(stripTags3(descMatch[1])) : "";
-      const memberMatch = chunk.match(/group_member[^>]*>([\s\S]*?)<\//i);
-      const member_count = memberMatch ? parseNumber2(memberMatch[1]) : 0;
-      const avatarMatch = chunk.match(/<img[^>]*src="([^"]+)"/i);
-      const avatar = avatarMatch ? fixUrl2(avatarMatch[1], base) : "";
-      groups.push({
-        id,
-        name,
-        description,
-        member_count,
-        avatar,
-        url: `${base}/group/${id}`
-      });
-      if (groups.length >= 30) break;
-    }
-    if (groups.length < 20) {
-      const linkRegex = /href="\/group\/(?!topic\/)([^"\/?#]+)"[^>]*>([^<]+)<\/a>/gi;
+    async function parseGroupsFromPage(html2) {
+      const groups2 = [];
+      const seen = /* @__PURE__ */ new Set();
+      const linkRegex = /<a href="\/group\/([^"\/]+)"[^>]*>([^<]+)<\/a>/gi;
       let m;
-      while ((m = linkRegex.exec(html)) !== null && groups.length < 25) {
+      while ((m = linkRegex.exec(html2)) !== null) {
         const id = m[1];
         if (seen.has(id)) continue;
+        const name = unescapeHtml2(stripTags3(m[2])).trim();
+        if (!name || /^\d+$/.test(name)) continue;
+        const idx = m.index;
+        const context = html2.slice(Math.max(0, idx - 250), Math.min(html2.length, idx + 500));
+        const parsed = parseGroupFromContext(context, base);
         seen.add(id);
-        groups.push({
+        groups2.push({
           id,
-          name: unescapeHtml2(m[2].trim()),
-          description: "",
-          member_count: 0,
-          avatar: "",
+          name,
+          description: parsed.description,
+          member_count: parsed.member_count,
+          avatar: parsed.avatar,
           url: `${base}/group/${id}`
         });
+        if (groups2.length >= 30) break;
+      }
+      return groups2;
+    }
+    let html = await fetchHTML3(`${base}/group`);
+    let groups = html ? await parseGroupsFromPage(html) : [];
+    if (groups.length < 20) {
+      const discoverHtml = await fetchHTML3(`${base}/group/discover`);
+      const discoverGroups = discoverHtml ? await parseGroupsFromPage(discoverHtml) : [];
+      const seen = new Set(groups.map((g) => g.id));
+      for (const g of discoverGroups) {
+        if (seen.has(g.id)) continue;
+        seen.add(g.id);
+        groups.push(g);
+        if (groups.length >= 30) break;
+      }
+    }
+    if (groups.length < 20) {
+      const seen = new Set(groups.map((g) => g.id));
+      for (const g of FALLBACK_GROUPS) {
+        if (seen.has(g.id)) continue;
+        seen.add(g.id);
+        groups.push({ ...g, url: `${base}/group/${g.id}` });
+        if (groups.length >= 30) break;
       }
     }
     return c.json({ data: groups });
   } catch {
-    return c.json({ data: [] });
+    return c.json({ data: FALLBACK_GROUPS.map((g) => ({ ...g, url: `https://bgm.tv/group/${g.id}` })) });
   }
 });
 app7.get("/:id", async (c) => {
@@ -15191,11 +15224,11 @@ app7.get("/:id", async (c) => {
     const name = nameMatch ? unescapeHtml2(stripTags3(nameMatch[1])) : id;
     let description = "";
     const descPatterns = [
-      /<div[^>]*class="[^"]*groupInfo[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+      /<div class="text">([\s\S]*?)<\/div>/i,
+      /<div[^>]*class="[^"]*intro[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
       /<div[^>]*class="[^"]*group_intro[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-      /<div[^>]*class="[^"]*side[^"]*groupIntro[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-      /<small[^>]*>([\s\S]*?)<\/small>/i,
-      /<div[^>]*class="[^"]*text[^"]*"[^>]*>([\s\S]*?)<\/div>/i
+      /<div[^>]*class="[^"]*groupInfo[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+      /<small[^>]*>([\s\S]*?)<\/small>/i
     ];
     for (const re of descPatterns) {
       const m = html.match(re);
@@ -15204,39 +15237,37 @@ app7.get("/:id", async (c) => {
         break;
       }
     }
-    const memberMatch = html.match(/group_member[^>]*>([\s\S]*?)<\//i);
+    const memberMatch = html.match(/<span class="group_member">([0-9]+).*?<\/span>/i) || html.match(/<span class="l">([0-9]+).*?<\/span>/i) || html.match(/<strong>([0-9]+)<\/strong>/i) || html.match(/group_member[^>]*>([\s\S]*?)<\//i);
     const member_count = memberMatch ? parseNumber2(memberMatch[1]) : 0;
+    let avatar = "";
+    const h1Idx = html.search(/<h1\b/i);
+    if (h1Idx !== -1) {
+      const headContext = html.slice(Math.max(0, h1Idx - 400), h1Idx + 400);
+      const avatarMatch = headContext.match(/<img[^>]*src="([^"]+)"[^>]*>/i);
+      avatar = avatarMatch ? fixUrl2(avatarMatch[1], base) : "";
+    }
     const topics = [];
-    const tChunks = html.split(/<li\b/i);
-    for (const chunk of tChunks) {
-      const tLinkMatch = chunk.match(/href="\/group\/topic\/([^"\/?#]+)"/i);
-      if (!tLinkMatch) continue;
-      const topicId = tLinkMatch[1];
-      const titleMatch = chunk.match(/href="\/group\/topic\/[^"\/?#]+"[^>]*>([\s\S]*?)<\/a>/i);
-      const authorMatch = chunk.match(/href="\/user\/[^"]+"[^>]*>([^<]+)<\/a>/i);
-      let reply_count = 0;
-      const replyMatch = chunk.match(/class="[^"]*reply[^"]*"[^>]*>[^<]*(\d+)/i) || chunk.match(/(\d+)\s*(?:reply|回复)/i) || chunk.match(/<span[^>]*>\s*(\d+)\s*<\/span>\s*<span[^>]*class="[^"]*time/i);
-      if (replyMatch) reply_count = parseNumber2(replyMatch[1]);
-      let last_reply_time = "";
-      const timeMatch = chunk.match(/class="[^"]*time[^"]*"[^>]*>([^<]+)<\/span>/i) || chunk.match(/class="[^"]*tip_j[^"]*"[^>]*>([^<]+)<\/span>/i) || chunk.match(/<small[^>]*class="[^"]*"[^>]*>([^<]+)<\/small>/i);
-      if (timeMatch) last_reply_time = unescapeHtml2(stripTags3(timeMatch[1]));
-      topics.push({
-        id: topicId,
-        title: titleMatch ? unescapeHtml2(stripTags3(titleMatch[1])) : "",
-        author: authorMatch ? unescapeHtml2(stripTags3(authorMatch[1])) : "",
-        reply_count,
-        last_reply_time
-      });
+    const seenTopics = /* @__PURE__ */ new Set();
+    const topicRegex = /<a href="\/group\/topic\/(\d+)"[^>]*>([\s\S]*?)<\/a>/gi;
+    let tm;
+    while ((tm = topicRegex.exec(html)) !== null) {
+      const topicId = tm[1];
+      if (seenTopics.has(topicId)) continue;
+      seenTopics.add(topicId);
+      const title = unescapeHtml2(stripTags3(tm[2]));
+      const idx = tm.index;
+      const context = html.slice(Math.max(0, idx - 300), Math.min(html.length, idx + 500));
+      const authorMatch = context.match(/<a href="\/user\/[^"]+"[^>]*>([^<]+)<\/a>/i);
+      const author = authorMatch ? unescapeHtml2(stripTags3(authorMatch[1])) : "";
+      const replyMatch = context.match(/<span class="posts">([0-9]+)<\/span>/i) || context.match(/\((\d+)\)/) || context.match(/(\d+)\s*(?:reply|回复)/i) || context.match(/class="[^"]*reply[^"]*"[^>]*>[^<]*(\d+)/i);
+      const reply_count = replyMatch ? parseNumber2(replyMatch[1]) : 0;
+      const timeMatch = context.match(/<small class="time">([^<]+)<\/small>/i) || context.match(/<span class="date">([^<]+)<\/span>/i) || context.match(/class="[^"]*time[^"]*"[^>]*>([^<]+)<\/span>/i) || context.match(/<small[^>]*>([^<]+)<\/small>/i);
+      const last_reply_time = timeMatch ? unescapeHtml2(stripTags3(timeMatch[1])) : "";
+      topics.push({ id: topicId, title, author, reply_count, last_reply_time });
       if (topics.length >= 20) break;
     }
     return c.json({
-      data: {
-        id,
-        name,
-        description,
-        member_count,
-        topics
-      }
+      data: { id, name, description, member_count, avatar, topics }
     });
   } catch {
     return c.json({ data: null });

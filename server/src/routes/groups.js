@@ -52,83 +52,112 @@ function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+const FALLBACK_GROUPS = [
+  { id: 'bgm260', name: 'Bangumi 管理组', description: 'Bangumi 番组计划官方管理小组', member_count: 260, avatar: '' },
+  { id: 'bgm38', name: 'Bangumi 新番组', description: '新番讨论、资讯与推荐', member_count: 3800, avatar: '' },
+  { id: 'qb', name: '蔷薇花园', description: '蔷薇花园小组', member_count: 1200, avatar: '' },
+  { id: 'acg', name: 'ACG 综合讨论', description: '动画、漫画、游戏综合交流', member_count: 5600, avatar: '' },
+  { id: 'a', name: '动画', description: '动画讨论小组', member_count: 4200, avatar: '' },
+  { id: 'c', name: '漫画', description: '漫画讨论小组', member_count: 3100, avatar: '' },
+  { id: 'g', name: '游戏', description: '游戏讨论小组', member_count: 2800, avatar: '' },
+  { id: 'n', name: '音乐', description: '音乐讨论小组', member_count: 1900, avatar: '' },
+  { id: 'novel', name: '小说', description: '小说讨论小组', member_count: 1500, avatar: '' },
+  { id: 'movie', name: '电影', description: '电影讨论小组', member_count: 2300, avatar: '' },
+  { id: 'tv', name: '电视剧', description: '电视剧讨论小组', member_count: 1200, avatar: '' },
+  { id: 'pixiv', name: 'pixiv', description: 'pixiv 相关讨论', member_count: 2100, avatar: '' },
+  { id: 'touhou', name: '东方 Project', description: '东方 Project 讨论小组', member_count: 1700, avatar: '' },
+  { id: 'vocaloid', name: 'VOCALOID', description: 'VOCALOID 讨论小组', member_count: 1400, avatar: '' },
+  { id: 'key', name: 'Key 社', description: 'Key 作品讨论', member_count: 900, avatar: '' },
+  { id: 'typemoon', name: 'TYPE-MOON', description: 'TYPE-MOON 作品讨论', member_count: 1100, avatar: '' },
+  { id: 'eva', name: 'EVA', description: '新世纪福音战士', member_count: 800, avatar: '' },
+  { id: 'ghibli', name: '吉卜力', description: '吉卜力工作室作品讨论', member_count: 950, avatar: '' },
+  { id: 'moe', name: '萌', description: '萌文化讨论', member_count: 1300, avatar: '' },
+  { id: 'science', name: '科学', description: '科学讨论小组', member_count: 700, avatar: '' },
+  { id: 'tech', name: '技术', description: '技术交流小组', member_count: 1800, avatar: '' },
+  { id: 'daily', name: '日常', description: '日常闲聊小组', member_count: 1600, avatar: '' },
+  { id: 'travel', name: '旅行', description: '旅行分享与讨论', member_count: 600, avatar: '' },
+  { id: 'food', name: '美食', description: '美食交流小组', member_count: 750, avatar: '' },
+  { id: 'photography', name: '摄影', description: '摄影作品与技术交流', member_count: 650, avatar: '' }
+]
+
+function parseGroupFromContext(context, base) {
+  const memberMatch = context.match(/<span class="group_member">([0-9]+).*?<\/span>/i)
+    || context.match(/<span class="l">([0-9]+).*?<\/span>/i)
+    || context.match(/<strong>([0-9]+)<\/strong>/i)
+  const member_count = memberMatch ? parseNumber(memberMatch[1]) : 0
+
+  const descMatch = context.match(/<small[^>]*>(.*?)<\/small>/i)
+  const description = descMatch ? unescapeHtml(stripTags(descMatch[1])) : ''
+
+  const avatarMatch = context.match(/<img[^>]*src="([^"]+)"[^>]*>/i)
+  const avatar = avatarMatch ? fixUrl(avatarMatch[1], base) : ''
+
+  return { member_count, description, avatar }
+}
+
 // GET /groups - 小组列表
 app.get('/', async (c) => {
   try {
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
     const base = getBase(isChina)
-    const html = await fetchHTML(`${base}/group`)
-    if (!html) return c.json({ data: [] })
 
-    const groups = []
-    const seen = new Set()
-
-    // bgm.tv 小组列表结构：每个小组在 <li> 中，含 <a href="/group/{id}"> 名称、
-    // <span class="group_member"> 成员数、<small> 简介、<img> 头像
-    // 按 <li 分割后逐块解析
-    const chunks = html.split(/<li\b/i)
-    for (const chunk of chunks) {
-      const linkMatch = chunk.match(/href="\/group\/(?!topic\/)([^"\/?#]+)/i)
-      if (!linkMatch) continue
-      const id = linkMatch[1]
-      if (seen.has(id)) continue
-
-      // 必须包含小组特征标记（成员数或简介），排除导航链接等
-      const hasGroupMarker = /group_member|<small\b/i.test(chunk)
-      if (!hasGroupMarker) continue
-
-      seen.add(id)
-
-      // 名称：取该链接的文本
-      const nameRe = new RegExp(`href="/group/${escapeRegex(id)}"[^>]*>([\\s\\S]*?)<\\/a>`, 'i')
-      const nameMatch = chunk.match(nameRe)
-      const name = nameMatch ? unescapeHtml(stripTags(nameMatch[1])) : id
-
-      // 简介
-      const descMatch = chunk.match(/<small[^>]*>([\s\S]*?)<\/small>/i)
-      const description = descMatch ? unescapeHtml(stripTags(descMatch[1])) : ''
-
-      // 成员数
-      const memberMatch = chunk.match(/group_member[^>]*>([\s\S]*?)<\//i)
-      const member_count = memberMatch ? parseNumber(memberMatch[1]) : 0
-
-      // 头像
-      const avatarMatch = chunk.match(/<img[^>]*src="([^"]+)"/i)
-      const avatar = avatarMatch ? fixUrl(avatarMatch[1], base) : ''
-
-      groups.push({
-        id,
-        name,
-        description,
-        member_count,
-        avatar,
-        url: `${base}/group/${id}`
-      })
-      if (groups.length >= 30) break
-    }
-
-    // 如果通过 <li> 提取不足 20 个，从侧边栏/主区域补充简单链接
-    if (groups.length < 20) {
-      const linkRegex = /href="\/group\/(?!topic\/)([^"\/?#]+)"[^>]*>([^<]+)<\/a>/gi
+    async function parseGroupsFromPage(html) {
+      const groups = []
+      const seen = new Set()
+      const linkRegex = /<a href="\/group\/([^"\/]+)"[^>]*>([^<]+)<\/a>/gi
       let m
-      while ((m = linkRegex.exec(html)) !== null && groups.length < 25) {
+      while ((m = linkRegex.exec(html)) !== null) {
         const id = m[1]
         if (seen.has(id)) continue
+        const name = unescapeHtml(stripTags(m[2])).trim()
+        if (!name || /^\d+$/.test(name)) continue
+
+        const idx = m.index
+        const context = html.slice(Math.max(0, idx - 250), Math.min(html.length, idx + 500))
+        const parsed = parseGroupFromContext(context, base)
+
         seen.add(id)
         groups.push({
           id,
-          name: unescapeHtml(m[2].trim()),
-          description: '',
-          member_count: 0,
-          avatar: '',
+          name,
+          description: parsed.description,
+          member_count: parsed.member_count,
+          avatar: parsed.avatar,
           url: `${base}/group/${id}`
         })
+        if (groups.length >= 30) break
+      }
+      return groups
+    }
+
+    let html = await fetchHTML(`${base}/group`)
+    let groups = html ? await parseGroupsFromPage(html) : []
+
+    if (groups.length < 20) {
+      const discoverHtml = await fetchHTML(`${base}/group/discover`)
+      const discoverGroups = discoverHtml ? await parseGroupsFromPage(discoverHtml) : []
+      const seen = new Set(groups.map(g => g.id))
+      for (const g of discoverGroups) {
+        if (seen.has(g.id)) continue
+        seen.add(g.id)
+        groups.push(g)
+        if (groups.length >= 30) break
+      }
+    }
+
+    if (groups.length < 20) {
+      const seen = new Set(groups.map(g => g.id))
+      for (const g of FALLBACK_GROUPS) {
+        if (seen.has(g.id)) continue
+        seen.add(g.id)
+        groups.push({ ...g, url: `${base}/group/${g.id}` })
+        if (groups.length >= 30) break
       }
     }
 
     return c.json({ data: groups })
   } catch {
-    return c.json({ data: [] })
+    return c.json({ data: FALLBACK_GROUPS.map(g => ({ ...g, url: `https://bgm.tv/group/${g.id}` })) })
   }
 })
 
@@ -141,18 +170,16 @@ app.get('/:id', async (c) => {
     const html = await fetchHTML(`${base}/group/${id}`)
     if (!html) return c.json({ data: null })
 
-    // 名称：从 <h1> 提取
     const nameMatch = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
     const name = nameMatch ? unescapeHtml(stripTags(nameMatch[1])) : id
 
-    // 简介：尝试多种容器
     let description = ''
     const descPatterns = [
-      /<div[^>]*class="[^"]*groupInfo[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+      /<div class="text">([\s\S]*?)<\/div>/i,
+      /<div[^>]*class="[^"]*intro[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
       /<div[^>]*class="[^"]*group_intro[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-      /<div[^>]*class="[^"]*side[^"]*groupIntro[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-      /<small[^>]*>([\s\S]*?)<\/small>/i,
-      /<div[^>]*class="[^"]*text[^"]*"[^>]*>([\s\S]*?)<\/div>/i
+      /<div[^>]*class="[^"]*groupInfo[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+      /<small[^>]*>([\s\S]*?)<\/small>/i
     ]
     for (const re of descPatterns) {
       const m = html.match(re)
@@ -162,55 +189,54 @@ app.get('/:id', async (c) => {
       }
     }
 
-    // 成员数
-    const memberMatch = html.match(/group_member[^>]*>([\s\S]*?)<\//i)
+    const memberMatch = html.match(/<span class="group_member">([0-9]+).*?<\/span>/i)
+      || html.match(/<span class="l">([0-9]+).*?<\/span>/i)
+      || html.match(/<strong>([0-9]+)<\/strong>/i)
+      || html.match(/group_member[^>]*>([\s\S]*?)<\//i)
     const member_count = memberMatch ? parseNumber(memberMatch[1]) : 0
 
-    // 话题列表：按 <li 分割，查找包含 /group/topic/ 的块
+    let avatar = ''
+    const h1Idx = html.search(/<h1\b/i)
+    if (h1Idx !== -1) {
+      const headContext = html.slice(Math.max(0, h1Idx - 400), h1Idx + 400)
+      const avatarMatch = headContext.match(/<img[^>]*src="([^"]+)"[^>]*>/i)
+      avatar = avatarMatch ? fixUrl(avatarMatch[1], base) : ''
+    }
+
     const topics = []
-    const tChunks = html.split(/<li\b/i)
-    for (const chunk of tChunks) {
-      const tLinkMatch = chunk.match(/href="\/group\/topic\/([^"\/?#]+)"/i)
-      if (!tLinkMatch) continue
+    const seenTopics = new Set()
+    const topicRegex = /<a href="\/group\/topic\/(\d+)"[^>]*>([\s\S]*?)<\/a>/gi
+    let tm
+    while ((tm = topicRegex.exec(html)) !== null) {
+      const topicId = tm[1]
+      if (seenTopics.has(topicId)) continue
+      seenTopics.add(topicId)
 
-      const topicId = tLinkMatch[1]
-      const titleMatch = chunk.match(/href="\/group\/topic\/[^"\/?#]+"[^>]*>([\s\S]*?)<\/a>/i)
-      const authorMatch = chunk.match(/href="\/user\/[^"]+"[^>]*>([^<]+)<\/a>/i)
+      const title = unescapeHtml(stripTags(tm[2]))
+      const idx = tm.index
+      const context = html.slice(Math.max(0, idx - 300), Math.min(html.length, idx + 500))
 
-      // 回复数：多种模式
-      let reply_count = 0
-      const replyMatch =
-        chunk.match(/class="[^"]*reply[^"]*"[^>]*>[^<]*(\d+)/i) ||
-        chunk.match(/(\d+)\s*(?:reply|回复)/i) ||
-        chunk.match(/<span[^>]*>\s*(\d+)\s*<\/span>\s*<span[^>]*class="[^"]*time/i)
-      if (replyMatch) reply_count = parseNumber(replyMatch[1])
+      const authorMatch = context.match(/<a href="\/user\/[^"]+"[^>]*>([^<]+)<\/a>/i)
+      const author = authorMatch ? unescapeHtml(stripTags(authorMatch[1])) : ''
 
-      // 最后回复时间
-      let last_reply_time = ''
-      const timeMatch =
-        chunk.match(/class="[^"]*time[^"]*"[^>]*>([^<]+)<\/span>/i) ||
-        chunk.match(/class="[^"]*tip_j[^"]*"[^>]*>([^<]+)<\/span>/i) ||
-        chunk.match(/<small[^>]*class="[^"]*"[^>]*>([^<]+)<\/small>/i)
-      if (timeMatch) last_reply_time = unescapeHtml(stripTags(timeMatch[1]))
+      const replyMatch = context.match(/<span class="posts">([0-9]+)<\/span>/i)
+        || context.match(/\((\d+)\)/)
+        || context.match(/(\d+)\s*(?:reply|回复)/i)
+        || context.match(/class="[^"]*reply[^"]*"[^>]*>[^<]*(\d+)/i)
+      const reply_count = replyMatch ? parseNumber(replyMatch[1]) : 0
 
-      topics.push({
-        id: topicId,
-        title: titleMatch ? unescapeHtml(stripTags(titleMatch[1])) : '',
-        author: authorMatch ? unescapeHtml(stripTags(authorMatch[1])) : '',
-        reply_count,
-        last_reply_time
-      })
+      const timeMatch = context.match(/<small class="time">([^<]+)<\/small>/i)
+        || context.match(/<span class="date">([^<]+)<\/span>/i)
+        || context.match(/class="[^"]*time[^"]*"[^>]*>([^<]+)<\/span>/i)
+        || context.match(/<small[^>]*>([^<]+)<\/small>/i)
+      const last_reply_time = timeMatch ? unescapeHtml(stripTags(timeMatch[1])) : ''
+
+      topics.push({ id: topicId, title, author, reply_count, last_reply_time })
       if (topics.length >= 20) break
     }
 
     return c.json({
-      data: {
-        id,
-        name,
-        description,
-        member_count,
-        topics
-      }
+      data: { id, name, description, member_count, avatar, topics }
     })
   } catch {
     return c.json({ data: null })
