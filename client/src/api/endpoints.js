@@ -14,7 +14,11 @@ export const userAPI = {
   },
   getIndexes(username) {
     return api.get(`/user/${username}/indexes`)
-  }
+  },
+  getFriends(username) { return api.get(`/user/${username}/friends`) },
+  getGroups(username) { return api.get(`/user/${username}/groups`) },
+  getTimeline(username) { return api.get(`/user/${username}/timeline`) },
+  getYearlyStats(username) { return api.get(`/user/${username}/stats-yearly`) }
 }
 
 export const animeAPI = {
@@ -64,7 +68,8 @@ export const doubanAPI = {
   },
   getComments(id) {
     return api.get(`/douban/${id}/comments`)
-  }
+  },
+  getReviews(id) { return api.get(`/douban/${id}/reviews`) }
 }
 
 export const moegirlAPI = {

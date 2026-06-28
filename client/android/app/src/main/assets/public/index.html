@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light" class="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bangmio</title>
+    <link rel="icon" href="/logo.png" />
+    <script type="module" crossorigin src="/assets/index-_Xg4z3tC.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-FYSZ7fsp.css">
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      (function() {
+        var r = sessionStorage.redirect
+        delete sessionStorage.redirect
+        if (r && r !== location.href) {
+          history.replaceState(null, null, r)
+        }
+      })()
+    </script>
+  </body>
+</html>

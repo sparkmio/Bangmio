@@ -67,6 +67,62 @@
         </div>
       </div>
 
+      <!-- 年度统计柱状图 -->
+      <div v-if="yearlyStats.length" class="card bg-base-100 border border-base-300 mb-6">
+        <div class="card-body p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-base font-semibold text-base-content flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              年度统计
+            </h2>
+            <span class="text-xs text-base-content/40">最近 {{ yearlyStats.length }} 年</span>
+          </div>
+
+          <!-- 堆叠柱状图：纯 div + flex 实现 -->
+          <div class="flex items-end gap-2 h-48 px-1">
+            <div
+              v-for="y in yearlyStats"
+              :key="y.year"
+              class="flex-1 flex flex-col justify-end items-center relative group min-w-0"
+            >
+              <div
+                class="w-full max-w-[40px] mx-auto rounded-t overflow-hidden flex flex-col-reverse transition-all duration-300 group-hover:opacity-80"
+                :style="{ height: (yearlyMaxTotal > 0 ? (y.total / yearlyMaxTotal) * 100 : 0) + '%' }"
+              >
+                <div class="bg-blue-500" :style="{ height: y.total > 0 ? (y.want / y.total) * 100 + '%' : '0%' }"></div>
+                <div class="bg-green-500" :style="{ height: y.total > 0 ? (y.collect / y.total) * 100 + '%' : '0%' }"></div>
+                <div class="bg-orange-500" :style="{ height: y.total > 0 ? (y.doing / y.total) * 100 + '%' : '0%' }"></div>
+                <div class="bg-yellow-400" :style="{ height: y.total > 0 ? (y.on_hold / y.total) * 100 + '%' : '0%' }"></div>
+                <div class="bg-red-500" :style="{ height: y.total > 0 ? (y.dropped / y.total) * 100 + '%' : '0%' }"></div>
+              </div>
+              <p class="text-[10px] text-center mt-1 text-base-content/60">{{ y.year }}</p>
+
+              <!-- hover tooltip -->
+              <div class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 hidden group-hover:block z-20 bg-base-100 border border-base-300 rounded-lg shadow-lg p-2 text-xs whitespace-nowrap min-w-[140px]">
+                <p class="font-semibold mb-1 text-center text-base-content">{{ y.year }} 年</p>
+                <div class="space-y-0.5">
+                  <div class="flex justify-between gap-3"><span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-blue-500"></span>想看</span><span class="text-base-content/70">{{ y.want || 0 }}</span></div>
+                  <div class="flex justify-between gap-3"><span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-green-500"></span>看过</span><span class="text-base-content/70">{{ y.collect || 0 }}</span></div>
+                  <div class="flex justify-between gap-3"><span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-orange-500"></span>在看</span><span class="text-base-content/70">{{ y.doing || 0 }}</span></div>
+                  <div class="flex justify-between gap-3"><span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-yellow-400"></span>搁置</span><span class="text-base-content/70">{{ y.on_hold || 0 }}</span></div>
+                  <div class="flex justify-between gap-3"><span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-red-500"></span>弃番</span><span class="text-base-content/70">{{ y.dropped || 0 }}</span></div>
+                  <div class="flex justify-between gap-3 border-t border-base-300 pt-0.5 mt-0.5"><span class="text-base-content">合计</span><span class="font-semibold text-base-content">{{ y.total }}</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 图例 -->
+          <div class="flex flex-wrap gap-3 mt-4 justify-center text-xs text-base-content/60">
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-blue-500"></span>想看</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-green-500"></span>看过</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-orange-500"></span>在看</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-yellow-400"></span>搁置</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-red-500"></span>弃番</span>
+          </div>
+        </div>
+      </div>
+
       <!-- 收藏区 -->
       <div class="card bg-base-100 border border-base-300">
         <div class="card-body p-6">
@@ -187,12 +243,13 @@
             <div class="absolute left-[5px] top-1 bottom-1 w-px bg-base-300"></div>
             <div v-for="(item, i) in timeline" :key="i" class="relative pl-6 pb-3 last:pb-0">
               <div class="absolute left-0 top-1.5 w-[11px] h-[11px] rounded-full bg-primary ring-2 ring-base-100"></div>
-              <router-link :to="`/anime/${item.subject?.id || item.anime_id}`" class="block hover:text-primary transition-colors">
+              <router-link :to="`/anime/${item.subject_id || item.subject?.id || item.anime_id}`" class="block hover:text-primary transition-colors">
                 <div class="flex items-center gap-2 text-sm flex-wrap">
-                  <span class="badge badge-xs" :class="statusBadgeClass(item.type)">{{ statusLabel(item.type) }}</span>
-                  <span class="font-medium">{{ item.subject?.name_cn || item.subject?.name }}</span>
+                  <span class="badge badge-xs" :class="timelineBadgeClass(item)">{{ timelineTypeLabel(item) }}</span>
+                  <span class="font-medium">{{ item.subject_name || item.subject?.name_cn || item.subject?.name }}</span>
+                  <span v-if="item.action" class="text-xs text-base-content/50">{{ item.action }}</span>
                 </div>
-                <p class="text-xs text-base-content/40 mt-0.5">{{ formatRelativeTime(item.updated_at || item.created_at) }}</p>
+                <p class="text-xs text-base-content/40 mt-0.5">{{ formatRelativeTime(item.time || item.updated_at || item.created_at) }}</p>
               </router-link>
             </div>
           </div>
@@ -258,6 +315,64 @@
           </div>
         </div>
       </div>
+
+      <!-- 好友 -->
+      <div v-if="friends.length" class="card bg-base-100 border border-base-300 mt-6">
+        <div class="card-body p-6">
+          <h2 class="text-base font-semibold text-base-content mb-4 flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            好友
+          </h2>
+          <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-3">
+            <router-link
+              v-for="f in friends.slice(0, 12)"
+              :key="f.username"
+              :to="`/user/${f.username}`"
+              class="block text-center group"
+            >
+              <div class="w-14 h-14 mx-auto rounded-full overflow-hidden bg-base-200 ring-2 ring-base-100 shadow-sm group-hover:ring-primary transition">
+                <img v-if="f.avatar" :src="f.avatar" :alt="f.nickname" class="w-full h-full object-cover" loading="lazy" />
+                <div v-else class="w-full h-full flex items-center justify-center text-lg font-bold text-base-content/50">
+                  {{ f.nickname?.[0] || f.username?.[0]?.toUpperCase() || '?' }}
+                </div>
+              </div>
+              <p class="text-xs mt-1 line-clamp-1 group-hover:text-primary transition-colors">{{ f.nickname || f.username }}</p>
+            </router-link>
+          </div>
+        </div>
+      </div>
+
+      <!-- 加入的小组 -->
+      <div v-if="groups.length" class="card bg-base-100 border border-base-300 mt-6">
+        <div class="card-body p-6">
+          <h2 class="text-base font-semibold text-base-content mb-4 flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            加入的小组
+          </h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <router-link
+              v-for="g in groups.slice(0, 6)"
+              :key="g.id"
+              :to="`/group/${g.id}`"
+              class="block p-3 rounded-lg border border-base-300 hover:border-primary transition-colors group"
+            >
+              <div class="flex gap-3">
+                <div class="w-12 h-12 rounded-lg overflow-hidden bg-base-200 shrink-0">
+                  <img v-if="g.avatar" :src="g.avatar" :alt="g.name" class="w-full h-full object-cover" loading="lazy" />
+                  <div v-else class="w-full h-full flex items-center justify-center text-base-content/40 text-xs">
+                    {{ g.name?.[0] || '?' }}
+                  </div>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="font-medium text-sm truncate group-hover:text-primary transition-colors">{{ g.name }}</p>
+                  <p v-if="g.description" class="text-xs text-base-content/50 mt-0.5 line-clamp-2">{{ g.description }}</p>
+                  <p class="text-xs text-base-content/40 mt-1">{{ g.member_count || 0 }} 成员</p>
+                </div>
+              </div>
+            </router-link>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -292,6 +407,12 @@ const rateDistribution = ref([])
 const rateTotal = ref(0)
 const rateAverage = ref(0)
 const rateStdDev = ref(0)
+// 年度统计
+const yearlyStats = ref([])
+// 好友
+const friends = ref([])
+// 加入的小组
+const groups = ref([])
 
 const subjectTabs = [
   { label: '全部', value: 0 },
@@ -315,10 +436,28 @@ function statusBadgeClass(s) {
   }[s] || 'badge-ghost'
 }
 
+// timeline 项的类型标签：兼容新 timeline API（type 为字符串）和旧 collection 数据（type 为数字）
+function timelineTypeLabel(item) {
+  if (typeof item.type === 'string' && item.type) return item.type
+  return statusLabel(item.type)
+}
+
+// timeline 项的 badge 样式：字符串类型给一个默认配色
+function timelineBadgeClass(item) {
+  if (typeof item.type === 'number') return statusBadgeClass(item.type)
+  const map = { '收藏': 'badge-info', '评论': 'badge-secondary', '进度': 'badge-success' }
+  return map[item.type] || 'badge-ghost'
+}
+
 // 完成率：completed / total * 100
 const completionRate = computed(() => {
   if (!stats.value || !stats.value.total) return 0
   return Math.round(((stats.value.completed || 0) / stats.value.total) * 100)
+})
+
+// 年度统计中最大年度合计，用于柱子高度归一化
+const yearlyMaxTotal = computed(() => {
+  return Math.max(...yearlyStats.value.map(y => y.total || 0), 1)
 })
 
 // 相对时间格式化
@@ -393,8 +532,21 @@ function loadMore() {
   fetchCollections(false)
 }
 
-// 时间胶囊：拉取最近 20 条收藏（按 updated_at 倒序）
+// 时间胶囊：优先使用新 timeline API，失败或空时回退到 collectionAPI 排序模拟
 async function fetchTimeline() {
+  const username = route.params.username || auth.user?.username
+  // 先尝试新 timeline API
+  if (username) {
+    try {
+      const res = await userAPI.getTimeline(username)
+      const data = res.data?.data || []
+      if (data.length) {
+        timeline.value = data.slice(0, 20)
+        return
+      }
+    } catch { /* 回退到老逻辑 */ }
+  }
+  // 兜底：用 collectionAPI 排序模拟
   try {
     const params = { limit: 20 }
     if (route.params.username) params.username = route.params.username
@@ -505,24 +657,72 @@ async function fetchRateDistribution() {
   }
 }
 
-onMounted(async () => {
-  await loadProfile()
-  fetchCollections()
-  fetchTimeline()
-  fetchIndexes()
-  fetchCharacters()
-  fetchPersons()
-  fetchRateDistribution()
+// 年度统计：调用 timeline stats API，计算 total 并按年份排序取最近 10 年
+async function fetchYearlyStats() {
+  const username = route.params.username || auth.user?.username
+  if (!username) { yearlyStats.value = []; return }
+  try {
+    const res = await userAPI.getYearlyStats(username)
+    const data = res.data?.data || []
+    yearlyStats.value = data
+      .map(y => ({
+        ...y,
+        total: (y.want || 0) + (y.collect || 0) + (y.doing || 0) + (y.on_hold || 0) + (y.dropped || 0)
+      }))
+      .filter(y => y.total > 0)
+      .sort((a, b) => Number(a.year) - Number(b.year))
+      .slice(-10)
+  } catch {
+    yearlyStats.value = []
+  }
+}
+
+// 好友
+async function fetchFriends() {
+  const username = route.params.username || auth.user?.username
+  if (!username) { friends.value = []; return }
+  try {
+    const res = await userAPI.getFriends(username)
+    friends.value = res.data?.data || []
+  } catch {
+    friends.value = []
+  }
+}
+
+// 加入的小组
+async function fetchGroups() {
+  const username = route.params.username || auth.user?.username
+  if (!username) { groups.value = []; return }
+  try {
+    const res = await userAPI.getGroups(username)
+    groups.value = res.data?.data || []
+  } catch {
+    groups.value = []
+  }
+}
+
+// 并行拉取所有数据
+function fetchAll() {
+  return Promise.allSettled([
+    loadProfile(),
+    fetchCollections(),
+    fetchTimeline(),
+    fetchIndexes(),
+    fetchCharacters(),
+    fetchPersons(),
+    fetchRateDistribution(),
+    fetchYearlyStats(),
+    fetchFriends(),
+    fetchGroups()
+  ])
+}
+
+onMounted(() => {
+  fetchAll()
 })
 
-watch(() => route.params.username, async () => {
-  await loadProfile()
+watch(() => route.params.username, () => {
   filterSubjectType.value = 0
-  fetchCollections()
-  fetchTimeline()
-  fetchIndexes()
-  fetchCharacters()
-  fetchPersons()
-  fetchRateDistribution()
+  fetchAll()
 })
 </script>

@@ -4447,6 +4447,56 @@ function redirectUri(c) {
 function oauthBase(c) {
   return isChina(c) ? "https://bangumi.lol" : "https://bgm.tv";
 }
+var SCRAPE_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+async function fetchHTML(url) {
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": SCRAPE_UA,
+      "Accept": "text/html,application/xhtml+xml",
+      "Accept-Language": "zh-CN,zh;q=0.9"
+    }
+  });
+  if (!res.ok) return "";
+  return res.text();
+}
+function stripTags(s) {
+  return (s || "").replace(/<[^>]+>/g, "").trim();
+}
+function unescapeHtml(s) {
+  return (s || "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").trim();
+}
+function parseNumber(s) {
+  if (!s) return 0;
+  const m = String(s).replace(/[^0-9]/g, "");
+  const n = parseInt(m);
+  return isNaN(n) ? 0 : n;
+}
+function fixUrl(url, base) {
+  if (!url) return "";
+  if (url.startsWith("//")) return `https:${url}`;
+  if (url.startsWith("/")) return `${base}${url}`;
+  return url;
+}
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+var TIMELINE_TYPE_MAP = {
+  collection: "\u6536\u85CF",
+  wish: "\u60F3\u770B",
+  do: "\u5728\u770B",
+  doing: "\u5728\u770B",
+  on_hold: "\u6401\u7F6E",
+  dropped: "\u629B\u5F03",
+  progress: "\u8FDB\u5EA6",
+  comment: "\u8BC4\u8BBA",
+  create: "\u521B\u5EFA",
+  blog: "\u65E5\u5FD7",
+  group_topic: "\u5C0F\u7EC4\u8BDD\u9898",
+  status: "\u7B7E\u540D",
+  mono: "\u4EBA\u7269",
+  subject: "\u6761\u76EE",
+  index: "\u76EE\u5F55"
+};
 app.post("/auth", async (c) => {
   try {
     const { token } = await c.req.json();
@@ -4560,6 +4610,211 @@ app.get("/:username/indexes", async (c) => {
     const client = token ? getClient(token, isChina(c)) : getClient("", isChina(c));
     const data = await client.get(`/v0/users/${username}/indexes`);
     return c.json({ data: data.data || [] });
+  } catch {
+    return c.json({ data: [] });
+  }
+});
+app.get("/:username/friends", async (c) => {
+  try {
+    const username = c.req.param("username");
+    if (!username) return c.json({ data: [] });
+    const base = oauthBase(c);
+    const html = await fetchHTML(`${base}/user/${username}/friends`);
+    if (!html) return c.json({ data: [] });
+    const friends = [];
+    const seen = /* @__PURE__ */ new Set();
+    const chunks = html.split(/<li\b/i);
+    for (const chunk of chunks) {
+      const linkMatch = chunk.match(/href="\/user\/([^"\/?#]+)"/i);
+      if (!linkMatch) continue;
+      const uname = linkMatch[1];
+      if (uname === username || seen.has(uname)) continue;
+      seen.add(uname);
+      const nameRe = new RegExp(`href="/user/${escapeRegex(uname)}"[^>]*>([\\s\\S]*?)<\\/a>`, "i");
+      const nameMatch = chunk.match(nameRe);
+      const nickname = nameMatch ? unescapeHtml(stripTags(nameMatch[1])) : uname;
+      const avatarMatch = chunk.match(/<img[^>]*src="([^"]+)"/i);
+      const avatar = avatarMatch ? fixUrl(avatarMatch[1], base) : "";
+      const signMatch = chunk.match(/<p[^>]*class="[^"]*sign[^"]*"[^>]*>([\s\S]*?)<\/p>/i) || chunk.match(/class="sign"[^>]*>([\s\S]*?)<\//i);
+      const sign = signMatch ? unescapeHtml(stripTags(signMatch[1])) : "";
+      friends.push({ username: uname, nickname, avatar, sign });
+      if (friends.length >= 30) break;
+    }
+    return c.json({ data: friends });
+  } catch {
+    return c.json({ data: [] });
+  }
+});
+app.get("/:username/groups", async (c) => {
+  try {
+    const username = c.req.param("username");
+    if (!username) return c.json({ data: [] });
+    const base = oauthBase(c);
+    const html = await fetchHTML(`${base}/user/${username}/group`);
+    if (!html) return c.json({ data: [] });
+    const groups = [];
+    const seen = /* @__PURE__ */ new Set();
+    const chunks = html.split(/<li\b/i);
+    for (const chunk of chunks) {
+      const linkMatch = chunk.match(/href="\/group\/(?!topic\/)([^"\/?#]+)"/i);
+      if (!linkMatch) continue;
+      const id = linkMatch[1];
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const nameRe = new RegExp(`href="/group/${escapeRegex(id)}"[^>]*>([\\s\\S]*?)<\\/a>`, "i");
+      const nameMatch = chunk.match(nameRe);
+      const name = nameMatch ? unescapeHtml(stripTags(nameMatch[1])) : id;
+      const descMatch = chunk.match(/<small[^>]*>([\s\S]*?)<\/small>/i);
+      const description = descMatch ? unescapeHtml(stripTags(descMatch[1])) : "";
+      const memberMatch = chunk.match(/group_member[^>]*>([\s\S]*?)<\//i);
+      const member_count = memberMatch ? parseNumber(memberMatch[1]) : 0;
+      const avatarMatch = chunk.match(/<img[^>]*src="([^"]+)"/i);
+      const avatar = avatarMatch ? fixUrl(avatarMatch[1], base) : "";
+      groups.push({ id, name, description, member_count, avatar });
+      if (groups.length >= 30) break;
+    }
+    return c.json({ data: groups });
+  } catch {
+    return c.json({ data: [] });
+  }
+});
+app.get("/:username/timeline", async (c) => {
+  try {
+    const username = c.req.param("username");
+    if (!username) return c.json({ data: [] });
+    const base = oauthBase(c);
+    const html = await fetchHTML(`${base}/user/${username}/timeline`);
+    if (!html) return c.json({ data: [] });
+    const items = [];
+    const chunks = html.split(/(?=<li[^>]*class="[^"]*tml-item)|(?=<div[^>]*class="[^"]*tml-item)/i);
+    for (const chunk of chunks) {
+      if (!/tml-item/i.test(chunk)) continue;
+      const typeMatch = chunk.match(/class="[^"]*tml-item\s+tml-(\w+)/i) || chunk.match(/class="[^"]*tml-(\w+)/i);
+      const rawType = typeMatch ? typeMatch[1] : "unknown";
+      const type = TIMELINE_TYPE_MAP[rawType] || rawType;
+      const subMatch = chunk.match(/href="\/subject\/(\d+)"[^>]*>([^<]+)<\/a>/i);
+      const subject_id = subMatch ? subMatch[1] : "";
+      const subject_name = subMatch ? unescapeHtml(subMatch[2].trim()) : "";
+      const contentMatch = chunk.match(/<div[^>]*class="[^"]*tml-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i) || chunk.match(/<p[^>]*class="[^"]*tml-content[^"]*"[^>]*>([\s\S]*?)<\/p>/i) || chunk.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+      let action = "";
+      if (contentMatch) {
+        action = contentMatch[1].replace(/<a[^>]*>[\s\S]*?<\/a>/gi, "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+      }
+      const timeMatch = chunk.match(/class="[^"]*tml-time[^"]*"[^>]*>([^<]+)<\//i) || chunk.match(/class="[^"]*time[^"]*"[^>]*>([^<]+)<\//i);
+      const time = timeMatch ? unescapeHtml(stripTags(timeMatch[1])) : "";
+      items.push({ type, subject_id, subject_name, action, time });
+      if (items.length >= 20) break;
+    }
+    return c.json({ data: items });
+  } catch {
+    return c.json({ data: [] });
+  }
+});
+app.get("/:username/stats-yearly", async (c) => {
+  try {
+    const username = c.req.param("username");
+    if (!username) return c.json({ data: [] });
+    const base = oauthBase(c);
+    const html = await fetchHTML(`${base}/user/${username}`);
+    if (!html) return c.json({ data: [] });
+    const stats = [];
+    const seenYears = /* @__PURE__ */ new Set();
+    const scriptChartMatch = html.match(/(?:yearlyChart|charts|chartData)\s*=\s*(\[[\s\S]*?\]);/i);
+    if (scriptChartMatch) {
+      try {
+        const data = JSON.parse(scriptChartMatch[1]);
+        for (const item of data) {
+          if (item && item.year && !seenYears.has(item.year)) {
+            seenYears.add(item.year);
+            stats.push({
+              year: parseInt(item.year),
+              want: item.want || item.wish || 0,
+              collect: item.collect || 0,
+              doing: item.do || item.doing || 0,
+              on_hold: item.on_hold || item.onhold || 0,
+              dropped: item.dropped || item.drop || 0
+            });
+          }
+        }
+      } catch {
+      }
+    }
+    if (!stats.length) {
+      const dataYearRegex = /data-year="(\d{4})"[^>]*\sdata-(?:want|wish)="(\d*)"[^>]*\sdata-collect="(\d*)"[^>]*\sdata-doing="(\d*)"[^>]*\sdata-on_hold="(\d*)"[^>]*\sdata-dropped="(\d*)"/gi;
+      let dym;
+      while ((dym = dataYearRegex.exec(html)) !== null) {
+        const year = parseInt(dym[1]);
+        if (!seenYears.has(year)) {
+          seenYears.add(year);
+          stats.push({
+            year,
+            want: parseNumber(dym[2]),
+            collect: parseNumber(dym[3]),
+            doing: parseNumber(dym[4]),
+            on_hold: parseNumber(dym[5]),
+            dropped: parseNumber(dym[6])
+          });
+        }
+      }
+    }
+    if (!stats.length) {
+      const yearRegex = /href="\/user\/[^"]+\/(?:list|anime-list)\/(\d{4})[^"]*"[^>]*>([\s\S]{0,300}?)<\/a>/gi;
+      let ym;
+      while ((ym = yearRegex.exec(html)) !== null) {
+        const year = parseInt(ym[1]);
+        if (seenYears.has(year)) continue;
+        const content = ym[2];
+        const nums = content.match(/(\d+)/g) || [];
+        if (nums.length > 0) {
+          seenYears.add(year);
+          stats.push({
+            year,
+            want: parseInt(nums[0]) || 0,
+            collect: parseInt(nums[1]) || 0,
+            doing: parseInt(nums[2]) || 0,
+            on_hold: parseInt(nums[3]) || 0,
+            dropped: parseInt(nums[4]) || 0
+          });
+        }
+      }
+    }
+    if (!stats.length) {
+      const chartRegex = /class="[^"]*year[^"]*"[^>]*>\s*(\d{4})\s*<[\s\S]{0,200}?class="[^"]*(?:num|count|rate)[^"]*"[^>]*>\s*(\d+)/gi;
+      let cm;
+      while ((cm = chartRegex.exec(html)) !== null) {
+        const year = parseInt(cm[1]);
+        if (year >= 2e3 && year <= 2030 && !seenYears.has(year)) {
+          seenYears.add(year);
+          stats.push({
+            year,
+            want: 0,
+            collect: parseInt(cm[2]) || 0,
+            doing: 0,
+            on_hold: 0,
+            dropped: 0
+          });
+        }
+      }
+    }
+    if (!stats.length) {
+      const yearStatRegex = /(\d{4})\s*年[\s\S]{0,80}?(\d+)\s*(?:部|个|条)/gi;
+      let ysm;
+      while ((ysm = yearStatRegex.exec(html)) !== null) {
+        const year = parseInt(ysm[1]);
+        if (year >= 2e3 && year <= 2030 && !seenYears.has(year)) {
+          seenYears.add(year);
+          stats.push({
+            year,
+            want: 0,
+            collect: parseInt(ysm[2]) || 0,
+            doing: 0,
+            on_hold: 0,
+            dropped: 0
+          });
+        }
+      }
+    }
+    return c.json({ data: stats });
   } catch {
     return c.json({ data: [] });
   }
@@ -9596,7 +9851,7 @@ function getProcedure(token) {
 // node_modules/css-select/lib/esm/attributes.js
 var import_boolbase = __toESM(require_boolbase(), 1);
 var reChars = /[-[\]{}()*+?.,\\^$|#\s]/g;
-function escapeRegex(value) {
+function escapeRegex2(value) {
   return value.replace(reChars, "\\$&");
 }
 var caseInsensitiveAttributes = /* @__PURE__ */ new Set([
@@ -9687,7 +9942,7 @@ var attributeRules = {
     if (/\s/.test(value)) {
       return import_boolbase.default.falseFunc;
     }
-    const regex = new RegExp(`(?:^|\\s)${escapeRegex(value)}(?:$|\\s)`, shouldIgnoreCase(data, options) ? "i" : "");
+    const regex = new RegExp(`(?:^|\\s)${escapeRegex2(value)}(?:$|\\s)`, shouldIgnoreCase(data, options) ? "i" : "");
     return function element(elem) {
       const attr = adapter2.getAttributeValue(elem, name);
       return attr != null && attr.length >= value.length && regex.test(attr) && next(elem);
@@ -9743,7 +9998,7 @@ var attributeRules = {
       return import_boolbase.default.falseFunc;
     }
     if (shouldIgnoreCase(data, options)) {
-      const regex = new RegExp(escapeRegex(value), "i");
+      const regex = new RegExp(escapeRegex2(value), "i");
       return function anyIC(elem) {
         const attr = adapter2.getAttributeValue(elem, name);
         return attr != null && attr.length >= value.length && regex.test(attr) && next(elem);
@@ -14098,7 +14353,7 @@ var BGM_PROXY2 = "https://bangumi.lol";
 function getBase(isChina5) {
   return isChina5 ? BGM_PROXY2 : BGM_TV;
 }
-async function fetchHTML(url, token) {
+async function fetchHTML2(url, token) {
   const headers2 = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml",
@@ -14270,7 +14525,7 @@ app4.get("/character/:id", async (c) => {
     const key2 = `char_${c.req.param("id")}_${isChina5}`;
     const cached = getCached(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina5)}/character/${c.req.param("id")}`);
+    const html = await fetchHTML2(`${getBase(isChina5)}/character/${c.req.param("id")}`);
     const comments = parseTalkbox(html);
     setCache(key2, comments);
     return c.json({ data: comments });
@@ -14284,7 +14539,7 @@ app4.get("/subject/:id", async (c) => {
     const key2 = `subj_${c.req.param("id")}_${isChina5}`;
     const cached = getCached(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina5)}/subject/${c.req.param("id")}`);
+    const html = await fetchHTML2(`${getBase(isChina5)}/subject/${c.req.param("id")}`);
     const comments = parseSubjectTalkbox(html);
     setCache(key2, comments);
     return c.json({ data: comments });
@@ -14298,7 +14553,7 @@ app4.get("/subject/:id/topics", async (c) => {
     const key2 = `topics_${c.req.param("id")}_${isChina5}`;
     const cached = getCached(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina5)}/subject/${c.req.param("id")}/board`);
+    const html = await fetchHTML2(`${getBase(isChina5)}/subject/${c.req.param("id")}/board`);
     const topics = parseTopics(html);
     setCache(key2, topics);
     return c.json({ data: topics });
@@ -14312,7 +14567,7 @@ app4.get("/topic/:topicId", async (c) => {
     const key2 = `topic_${c.req.param("topicId")}_${isChina5}`;
     const cached = getCached(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina5)}/subject/topic/${c.req.param("topicId")}`);
+    const html = await fetchHTML2(`${getBase(isChina5)}/subject/topic/${c.req.param("topicId")}`);
     const topic = parseTopicPage(html);
     setCache(key2, topic);
     return c.json({ data: topic });
@@ -14326,7 +14581,7 @@ app4.get("/person/:id", async (c) => {
     const key2 = `person_${c.req.param("id")}_${isChina5}`;
     const cached = getCached(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina5)}/person/${c.req.param("id")}`);
+    const html = await fetchHTML2(`${getBase(isChina5)}/person/${c.req.param("id")}`);
     const comments = parseTalkbox(html);
     setCache(key2, comments);
     return c.json({ data: comments });
@@ -14350,7 +14605,7 @@ app4.post("/subject/:id/comment", async (c) => {
     const { content } = await c.req.json();
     if (!content) return c.json({ error: "\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A" }, 400);
     const subjectId = c.req.param("id");
-    const pageHtml = await fetchHTML(`${base}/subject/${subjectId}/comments`, token);
+    const pageHtml = await fetchHTML2(`${base}/subject/${subjectId}/comments`, token);
     const formhash = extractFormhash(pageHtml);
     if (!formhash) return c.json({ error: "\u65E0\u6CD5\u83B7\u53D6\u8868\u5355 token\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55" }, 400);
     const cookie = extractChiiAuth(token);
@@ -14386,7 +14641,7 @@ app4.post("/topic/:topicId/reply", async (c) => {
     const { content } = await c.req.json();
     if (!content) return c.json({ error: "\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A" }, 400);
     const topicId = c.req.param("topicId");
-    const pageHtml = await fetchHTML(`${base}/subject/topic/${topicId}`, token);
+    const pageHtml = await fetchHTML2(`${base}/subject/topic/${topicId}`, token);
     const formhash = extractFormhash(pageHtml);
     if (!formhash) return c.json({ error: "\u65E0\u6CD5\u83B7\u53D6\u8868\u5355 token\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55" }, 400);
     const cookie = extractChiiAuth(token);
@@ -14422,7 +14677,7 @@ app4.post("/subject/:id/talkbox", async (c) => {
     const { content } = await c.req.json();
     if (!content) return c.json({ error: "\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A" }, 400);
     const subjectId = c.req.param("id");
-    const pageHtml = await fetchHTML(`${base}/subject/${subjectId}/talkbox`, token);
+    const pageHtml = await fetchHTML2(`${base}/subject/${subjectId}/talkbox`, token);
     const formhash = extractFormhash(pageHtml);
     if (!formhash) return c.json({ error: "\u65E0\u6CD5\u83B7\u53D6\u8868\u5355 token\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55" }, 400);
     const cookie = extractChiiAuth(token);
@@ -14459,7 +14714,7 @@ app4.post("/subject/:id/topic", async (c) => {
     if (!title) return c.json({ error: "\u6807\u9898\u4E0D\u80FD\u4E3A\u7A7A" }, 400);
     if (!content) return c.json({ error: "\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A" }, 400);
     const subjectId = c.req.param("id");
-    const pageHtml = await fetchHTML(`${base}/subject/${subjectId}/board`, token);
+    const pageHtml = await fetchHTML2(`${base}/subject/${subjectId}/board`, token);
     const formhash = extractFormhash(pageHtml);
     if (!formhash) return c.json({ error: "\u65E0\u6CD5\u83B7\u53D6\u8868\u5355 token\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55" }, 400);
     const cookie = extractChiiAuth(token);
@@ -14492,6 +14747,9 @@ var comments_default = app4;
 // server/src/services/douban.js
 var DOUBAN_API = "https://movie.douban.com";
 var UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+function stripTags2(s) {
+  return (s || "").replace(/<[^>]+>/g, "").trim();
+}
 async function searchDouban(name) {
   const url = `${DOUBAN_API}/j/subject_suggest?q=${encodeURIComponent(name)}`;
   const res = await fetch(url, {
@@ -14509,36 +14767,79 @@ async function getDoubanAbstract(subjectId) {
   return data?.subject || data || null;
 }
 async function getDoubanComments(subjectId) {
-  const url = `https://movie.douban.com/subject/${subjectId}/comments?status=P&limit=20`;
+  const allComments = [];
+  const starts = [0, 20];
+  for (const start of starts) {
+    try {
+      const url = `${DOUBAN_API}/subject/${subjectId}/comments?start=${start}&limit=20&status=P`;
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent": UA,
+          "Referer": `${DOUBAN_API}/subject/${subjectId}/`,
+          "Accept": "text/html",
+          "Accept-Language": "zh-CN,zh;q=0.9"
+        }
+      });
+      if (!res.ok) continue;
+      const html = await res.text();
+      const parts = html.split(/(?=<div class="comment-item)/i);
+      for (const part of parts) {
+        if (!/comment-item/i.test(part)) continue;
+        const userMatch = part.match(/<a[^>]*href="[^"]*\/people\/[^"]+"[^>]*>([^<]+)<\/a>/i);
+        const user = userMatch ? userMatch[1].trim() : "\u533F\u540D";
+        const ratingMatch = part.match(/allstar(\d{2})/i) || part.match(/rating["\s]*([\d-]+)/i);
+        let rating = 0;
+        if (ratingMatch) rating = parseInt(ratingMatch[1]) || 0;
+        const timeMatch = part.match(/<span class="comment-time[^"]*"[^>]*>([^<]+)<\/span>/i);
+        const time = timeMatch ? timeMatch[1].trim() : "";
+        const contentMatch = part.match(/<p class="[^"]*"[^>]*>([\s\S]*?)<\/p>/i);
+        let content = contentMatch ? contentMatch[1].replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").trim() : "";
+        const usefulMatch = part.match(/<span class="votes vote-count">(\d+)<\/span>/i) || part.match(/<span class="vote-count"[^>]*>(\d+)<\/span>/i) || part.match(/class="[^"]*vote-count[^"]*"[^>]*>(\d+)/i);
+        const useful = usefulMatch ? parseInt(usefulMatch[1]) : 0;
+        if (content) {
+          allComments.push({ user, rating, time, content, useful });
+        }
+        if (allComments.length >= 40) break;
+      }
+    } catch {
+    }
+    if (allComments.length >= 40) break;
+  }
+  return allComments;
+}
+async function getDoubanReviews(subjectId) {
+  const url = `${DOUBAN_API}/subject/${subjectId}/reviews`;
   const res = await fetch(url, {
     headers: {
       "User-Agent": UA,
-      "Referer": `https://movie.douban.com/subject/${subjectId}/`,
+      "Referer": `${DOUBAN_API}/subject/${subjectId}/`,
       "Accept": "text/html",
       "Accept-Language": "zh-CN,zh;q=0.9"
     }
   });
   if (!res.ok) return [];
   const html = await res.text();
-  const comments = [];
-  const itemRegex = /<div class="comment-item"[^>]*>[\s\S]*?<\/div>\s*<\/div>/gi;
-  const items = html.match(itemRegex) || [];
-  for (const item of items.slice(0, 10)) {
-    const userMatch = item.match(/<span class="comment-info">[\s\S]*?<a[^>]*>([^<]+)<\/a>/);
+  const reviews = [];
+  const parts = html.split(/(?=<div class="review-item)/i);
+  for (const part of parts.slice(0, 25)) {
+    if (!/review-item/i.test(part)) continue;
+    const userMatch = part.match(/<a[^>]*href="[^"]*\/people\/[^"]+"[^>]*>([^<]+)<\/a>/i);
     const user = userMatch ? userMatch[1].trim() : "\u533F\u540D";
-    const ratingMatch = item.match(/rating["\s]*([\d-]+)/);
+    const ratingMatch = part.match(/allstar(\d{2})/i);
     const rating = ratingMatch ? parseInt(ratingMatch[1]) : 0;
-    const timeMatch = item.match(/<span class="comment-time "[^>]*>([^<]+)<\/span>/);
+    const timeMatch = part.match(/<span class="date"[^>]*>([^<]+)<\/span>/i);
     const time = timeMatch ? timeMatch[1].trim() : "";
-    const contentMatch = item.match(/<p class=""[^>]*>([\s\S]*?)<\/p>/);
-    let content = contentMatch ? contentMatch[1].replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").trim() : "";
-    const usefulMatch = item.match(/<span class="votes vote-count">(\d+)<\/span>/);
+    const titleMatch = part.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
+    const title = titleMatch ? stripTags2(titleMatch[1]) : "";
+    const contentMatch = part.match(/<div class="review-content"[^>]*>([\s\S]*?)<\/div>/i);
+    let content = contentMatch ? contentMatch[1].replace(/<a[^>]*>\(展开\)<\/a>/gi, "").replace(/<a[^>]*>展开<\/a>/gi, "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").trim() : "";
+    if (content.length > 500) content = content.slice(0, 500) + "...";
+    const usefulMatch = part.match(/<span class="num"[^>]*>(\d+)<\/span>/i) || part.match(/class="[^"]*action-btn[^"]*up[^"]*"[^>]*>[\s\S]*?(\d+)/i) || part.match(/class="[^"]*vote-count[^"]*"[^>]*>(\d+)/i);
     const useful = usefulMatch ? parseInt(usefulMatch[1]) : 0;
-    if (content) {
-      comments.push({ user, rating, time, content, useful });
-    }
+    reviews.push({ user, rating, time, title, content, useful });
+    if (reviews.length >= 20) break;
   }
-  return comments;
+  return reviews;
 }
 
 // server/src/routes/douban.js
@@ -14661,6 +14962,16 @@ app5.get("/:id/comments", async (c) => {
     return c.json({ data: [] });
   }
 });
+app5.get("/:id/reviews", async (c) => {
+  try {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "\u7F3A\u5C11ID" }, 400);
+    const reviews = await getDoubanReviews(id);
+    return c.json({ data: reviews });
+  } catch {
+    return c.json({ data: [] });
+  }
+});
 var douban_default = app5;
 
 // server/src/routes/moegirl.js
@@ -14775,35 +15086,92 @@ var moegirl_default = app6;
 
 // server/src/routes/groups.js
 var app7 = new Hono2();
-var UA2 = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.0.36";
+var UA2 = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 function getBase2(isChina5) {
   return isChina5 ? "https://bangumi.lol" : "https://bgm.tv";
 }
-async function fetchHTML2(url) {
+async function fetchHTML3(url) {
   const res = await fetch(url, {
-    headers: { "User-Agent": UA2, "Accept": "text/html", "Accept-Language": "zh-CN" }
+    headers: {
+      "User-Agent": UA2,
+      "Accept": "text/html,application/xhtml+xml",
+      "Accept-Language": "zh-CN,zh;q=0.9"
+    }
   });
   if (!res.ok) return "";
   return res.text();
+}
+function stripTags3(s) {
+  return (s || "").replace(/<[^>]+>/g, "").trim();
+}
+function unescapeHtml2(s) {
+  return (s || "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").trim();
+}
+function parseNumber2(s) {
+  if (!s) return 0;
+  const m = String(s).replace(/[^0-9]/g, "");
+  const n = parseInt(m);
+  return isNaN(n) ? 0 : n;
+}
+function fixUrl2(url, base) {
+  if (!url) return "";
+  if (url.startsWith("//")) return `https:${url}`;
+  if (url.startsWith("/")) return `${base}${url}`;
+  return url;
+}
+function escapeRegex3(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 app7.get("/", async (c) => {
   try {
     const isChina5 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const base = getBase2(isChina5);
-    const html = await fetchHTML2(`${base}/group`);
+    const html = await fetchHTML3(`${base}/group`);
+    if (!html) return c.json({ data: [] });
     const groups = [];
-    const itemRegex = /<li[^>]*>[\s\S]*?<a href="\/group\/([^"]+)"[^>]*>[\s\S]*?<\/a>[\s\S]*?<\/li>/gi;
-    const items = html.match(itemRegex) || [];
-    for (const item of items.slice(0, 20)) {
-      const idMatch = item.match(/href="\/group\/([^"]+)"/);
-      const nameMatch = item.match(/>([^<]+)<\/a>/);
-      const descMatch = item.match(/<small[^>]*>([^<]+)<\/small>/);
-      if (idMatch && nameMatch) {
+    const seen = /* @__PURE__ */ new Set();
+    const chunks = html.split(/<li\b/i);
+    for (const chunk of chunks) {
+      const linkMatch = chunk.match(/href="\/group\/(?!topic\/)([^"\/?#]+)/i);
+      if (!linkMatch) continue;
+      const id = linkMatch[1];
+      if (seen.has(id)) continue;
+      const hasGroupMarker = /group_member|<small\b/i.test(chunk);
+      if (!hasGroupMarker) continue;
+      seen.add(id);
+      const nameRe = new RegExp(`href="/group/${escapeRegex3(id)}"[^>]*>([\\s\\S]*?)<\\/a>`, "i");
+      const nameMatch = chunk.match(nameRe);
+      const name = nameMatch ? unescapeHtml2(stripTags3(nameMatch[1])) : id;
+      const descMatch = chunk.match(/<small[^>]*>([\s\S]*?)<\/small>/i);
+      const description = descMatch ? unescapeHtml2(stripTags3(descMatch[1])) : "";
+      const memberMatch = chunk.match(/group_member[^>]*>([\s\S]*?)<\//i);
+      const member_count = memberMatch ? parseNumber2(memberMatch[1]) : 0;
+      const avatarMatch = chunk.match(/<img[^>]*src="([^"]+)"/i);
+      const avatar = avatarMatch ? fixUrl2(avatarMatch[1], base) : "";
+      groups.push({
+        id,
+        name,
+        description,
+        member_count,
+        avatar,
+        url: `${base}/group/${id}`
+      });
+      if (groups.length >= 30) break;
+    }
+    if (groups.length < 20) {
+      const linkRegex = /href="\/group\/(?!topic\/)([^"\/?#]+)"[^>]*>([^<]+)<\/a>/gi;
+      let m;
+      while ((m = linkRegex.exec(html)) !== null && groups.length < 25) {
+        const id = m[1];
+        if (seen.has(id)) continue;
+        seen.add(id);
         groups.push({
-          id: idMatch[1],
-          name: nameMatch[1].trim(),
-          description: descMatch ? descMatch[1].trim() : "",
-          url: `${base}/group/${idMatch[1]}`
+          id,
+          name: unescapeHtml2(m[2].trim()),
+          description: "",
+          member_count: 0,
+          avatar: "",
+          url: `${base}/group/${id}`
         });
       }
     }
@@ -14817,21 +15185,56 @@ app7.get("/:id", async (c) => {
     const id = c.req.param("id");
     const isChina5 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const base = getBase2(isChina5);
-    const html = await fetchHTML2(`${base}/group/${id}`);
-    const nameMatch = html.match(/<h1[^>]*>([^<]+)<\/h1>/);
-    const descMatch = html.match(/<div class="text">([\s\S]*?)<\/div>/);
+    const html = await fetchHTML3(`${base}/group/${id}`);
+    if (!html) return c.json({ data: null });
+    const nameMatch = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+    const name = nameMatch ? unescapeHtml2(stripTags3(nameMatch[1])) : id;
+    let description = "";
+    const descPatterns = [
+      /<div[^>]*class="[^"]*groupInfo[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+      /<div[^>]*class="[^"]*group_intro[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+      /<div[^>]*class="[^"]*side[^"]*groupIntro[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+      /<small[^>]*>([\s\S]*?)<\/small>/i,
+      /<div[^>]*class="[^"]*text[^"]*"[^>]*>([\s\S]*?)<\/div>/i
+    ];
+    for (const re of descPatterns) {
+      const m = html.match(re);
+      if (m && stripTags3(m[1])) {
+        description = unescapeHtml2(stripTags3(m[1]));
+        break;
+      }
+    }
+    const memberMatch = html.match(/group_member[^>]*>([\s\S]*?)<\//i);
+    const member_count = memberMatch ? parseNumber2(memberMatch[1]) : 0;
     const topics = [];
-    const topicRegex = /<a href="\/group\/topic\/([^"]+)"[^>]*>([^<]+)<\/a>/gi;
-    const topicMatches = html.match(topicRegex) || [];
-    for (const t of topicMatches.slice(0, 10)) {
-      const m = t.match(/href="\/group\/topic\/([^"]+)"[^>]*>([^<]+)<\/a>/);
-      if (m) topics.push({ id: m[1], title: m[2].trim() });
+    const tChunks = html.split(/<li\b/i);
+    for (const chunk of tChunks) {
+      const tLinkMatch = chunk.match(/href="\/group\/topic\/([^"\/?#]+)"/i);
+      if (!tLinkMatch) continue;
+      const topicId = tLinkMatch[1];
+      const titleMatch = chunk.match(/href="\/group\/topic\/[^"\/?#]+"[^>]*>([\s\S]*?)<\/a>/i);
+      const authorMatch = chunk.match(/href="\/user\/[^"]+"[^>]*>([^<]+)<\/a>/i);
+      let reply_count = 0;
+      const replyMatch = chunk.match(/class="[^"]*reply[^"]*"[^>]*>[^<]*(\d+)/i) || chunk.match(/(\d+)\s*(?:reply|回复)/i) || chunk.match(/<span[^>]*>\s*(\d+)\s*<\/span>\s*<span[^>]*class="[^"]*time/i);
+      if (replyMatch) reply_count = parseNumber2(replyMatch[1]);
+      let last_reply_time = "";
+      const timeMatch = chunk.match(/class="[^"]*time[^"]*"[^>]*>([^<]+)<\/span>/i) || chunk.match(/class="[^"]*tip_j[^"]*"[^>]*>([^<]+)<\/span>/i) || chunk.match(/<small[^>]*class="[^"]*"[^>]*>([^<]+)<\/small>/i);
+      if (timeMatch) last_reply_time = unescapeHtml2(stripTags3(timeMatch[1]));
+      topics.push({
+        id: topicId,
+        title: titleMatch ? unescapeHtml2(stripTags3(titleMatch[1])) : "",
+        author: authorMatch ? unescapeHtml2(stripTags3(authorMatch[1])) : "",
+        reply_count,
+        last_reply_time
+      });
+      if (topics.length >= 20) break;
     }
     return c.json({
       data: {
         id,
-        name: nameMatch ? nameMatch[1].trim() : id,
-        description: descMatch ? descMatch[1].replace(/<[^>]+>/g, "").trim() : "",
+        name,
+        description,
+        member_count,
         topics
       }
     });
