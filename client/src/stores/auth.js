@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import router from '../router'
-import api, { backend, isProdWeb, getOAuthConfig, doRefreshToken } from '../api/index'
+import api from '../api/index'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(JSON.parse(localStorage.getItem('bangmio_user') || 'null'))
@@ -37,9 +37,9 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchMe() {
     if (!token.value) return
     try {
-      const res = await api.get('/v0/me')
-      user.value = res.data
-      localStorage.setItem('bangmio_user', JSON.stringify(res.data))
+      const res = await api.get('/user/me')
+      user.value = res.data.data
+      localStorage.setItem('bangmio_user', JSON.stringify(res.data.data))
     } catch (err) {
       if (err.response?.status === 401) {
         if (refreshToken.value) {
@@ -53,19 +53,22 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function doRefresh() {
-    const { accessToken, refreshToken: newRefresh, user: u } = await doRefreshToken()
-    saveAuth(u, accessToken, newRefresh)
+    const res = await api.post('/user/refresh-token', { refreshToken: refreshToken.value })
+    const u = res.data.data.user
+    const t = res.data.data.token
+    const rt = res.data.data.refreshToken || refreshToken.value
+    saveAuth(u, t, rt)
   }
 
   async function login(accessToken) {
     loading.value = true
     error.value = ''
     try {
-      const res = await api.get('/v0/me', { headers: { Authorization: `Bearer ${accessToken}` } })
-      saveAuth(res.data, accessToken, '')
+      const res = await api.post('/user/auth', { token: accessToken })
+      saveAuth(res.data.data.user, accessToken, res.data.data.refreshToken)
       router.push('/')
     } catch (err) {
-      error.value = 'Token 验证失败'
+      error.value = err.response?.data?.error || 'Token 验证失败'
     } finally {
       loading.value = false
     }
@@ -75,40 +78,11 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     error.value = ''
     try {
-      let user, accessToken, newRefreshToken
-      if (isProdWeb()) {
-        // 生产 web：走后端换码，secret 留服务端，回调 = bangmio.pages.dev
-        const res = await backend.post('/user/oauth-callback', { code })
-        const d = res.data.data
-        user = d.user
-        accessToken = d.token
-        newRefreshToken = d.refreshToken
-      } else {
-        // 本地（dev / Electron）：本地 app + localhost 回调
-        const cfg = getOAuthConfig()
-        const params = new URLSearchParams({
-          grant_type: 'authorization_code',
-          client_id: cfg.clientId,
-          client_secret: cfg.clientSecret,
-          code,
-          redirect_uri: cfg.redirectUri
-        })
-        const tokenRes = await fetch('https://bgm.tv/oauth/access_token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: params.toString()
-        })
-        const tokenData = await tokenRes.json()
-        accessToken = tokenData.access_token
-        newRefreshToken = tokenData.refresh_token
-        if (!accessToken) throw new Error('授权失败')
-        const userRes = await api.get('/v0/me', { headers: { Authorization: `Bearer ${accessToken}` } })
-        user = userRes.data
-      }
-      saveAuth(user, accessToken, newRefreshToken)
+      const res = await api.post('/user/oauth-callback', { code })
+      saveAuth(res.data.data.user, res.data.data.token, res.data.data.refreshToken)
       router.push('/')
     } catch (err) {
-      error.value = '授权失败'
+      error.value = err.response?.data?.error || '授权失败'
     } finally {
       loading.value = false
     }

@@ -444,8 +444,7 @@ async function fetchDoubanDetails() {
   doubanLoading.value = true
   try {
     const id = route.params.id
-    const name = anime.value?.name_cn || anime.value?.name
-    const res = await doubanAPI.getDetails(id, name)
+    const res = await doubanAPI.getDetails(id)
     doubanDetails.value = res.data?.data || null
   } catch { doubanDetails.value = null }
   doubanLoading.value = false
