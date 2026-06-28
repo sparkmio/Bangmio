@@ -1,5 +1,5 @@
 <template>
-  <div class="max-w-5xl mx-auto">
+  <div class="max-w-[900px] mx-auto lg:ml-[240px] lg:mr-auto">
     <!-- 未登录且未指定用户名时提示 -->
     <div v-if="!auth.isLoggedIn && !route.params.username" class="py-20 text-center">
       <p class="text-base-content/50 mb-3">请先登录</p>

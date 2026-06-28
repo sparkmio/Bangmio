@@ -15171,53 +15171,40 @@ app7.get("/", async (c) => {
   try {
     const isChina5 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const base = getBase2(isChina5);
-    async function parseGroupsFromPage(html2) {
-      const groups2 = [];
-      const seen = /* @__PURE__ */ new Set();
-      const linkRegex = /<a href="\/group\/([^"\/]+)"[^>]*>([^<]+)<\/a>/gi;
-      let m;
-      while ((m = linkRegex.exec(html2)) !== null) {
-        const id = m[1];
-        if (seen.has(id)) continue;
-        const name = unescapeHtml2(stripTags3(m[2])).trim();
-        if (!name || /^\d+$/.test(name)) continue;
-        const idx = m.index;
-        const context = html2.slice(Math.max(0, idx - 250), Math.min(html2.length, idx + 500));
-        const parsed = parseGroupFromContext(context, base);
-        seen.add(id);
-        groups2.push({
-          id,
-          name,
-          description: parsed.description,
-          member_count: parsed.member_count,
-          avatar: parsed.avatar,
-          url: `${base}/group/${id}`
-        });
-        if (groups2.length >= 30) break;
+    const groups = FALLBACK_GROUPS.map((g) => ({
+      ...g,
+      url: `${base}/group/${g.id}`,
+      avatar: g.avatar || ""
+    }));
+    try {
+      const html = await fetchHTML3(`${base}/group`);
+      if (html) {
+        const seen = new Set(groups.map((g) => g.id));
+        const linkRegex = /<a href="\/group\/([^"\/]+)"[^>]*>([^<]+)<\/a>/gi;
+        let m;
+        while ((m = linkRegex.exec(html)) !== null) {
+          const id = m[1];
+          if (seen.has(id)) continue;
+          const name = unescapeHtml2(stripTags3(m[2])).trim();
+          if (!name || /^\d+$/.test(name)) continue;
+          const idx = m.index;
+          const context = html.slice(Math.max(0, idx - 250), Math.min(html.length, idx + 500));
+          const parsed = parseGroupFromContext(context, base);
+          if (parsed.member_count > 0 || parsed.description) {
+            seen.add(id);
+            groups.push({
+              id,
+              name,
+              description: parsed.description || "",
+              member_count: parsed.member_count || 0,
+              avatar: parsed.avatar || "",
+              url: `${base}/group/${id}`
+            });
+          }
+          if (groups.length >= 50) break;
+        }
       }
-      return groups2;
-    }
-    let html = await fetchHTML3(`${base}/group`);
-    let groups = html ? await parseGroupsFromPage(html) : [];
-    if (groups.length < 20) {
-      const discoverHtml = await fetchHTML3(`${base}/group/discover`);
-      const discoverGroups = discoverHtml ? await parseGroupsFromPage(discoverHtml) : [];
-      const seen = new Set(groups.map((g) => g.id));
-      for (const g of discoverGroups) {
-        if (seen.has(g.id)) continue;
-        seen.add(g.id);
-        groups.push(g);
-        if (groups.length >= 30) break;
-      }
-    }
-    if (groups.length < 20) {
-      const seen = new Set(groups.map((g) => g.id));
-      for (const g of FALLBACK_GROUPS) {
-        if (seen.has(g.id)) continue;
-        seen.add(g.id);
-        groups.push({ ...g, url: `${base}/group/${g.id}` });
-        if (groups.length >= 30) break;
-      }
+    } catch {
     }
     return c.json({ data: groups });
   } catch {

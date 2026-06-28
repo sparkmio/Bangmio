@@ -116,59 +116,46 @@ app.get('/', async (c) => {
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
     const base = getBase(isChina)
 
-    async function parseGroupsFromPage(html) {
-      const groups = []
-      const seen = new Set()
-      const linkRegex = /<a href="\/group\/([^"\/]+)"[^>]*>([^<]+)<\/a>/gi
-      let m
-      while ((m = linkRegex.exec(html)) !== null) {
-        const id = m[1]
-        if (seen.has(id)) continue
-        const name = unescapeHtml(stripTags(m[2])).trim()
-        if (!name || /^\d+$/.test(name)) continue
+    // 以硬编码兜底列表为基础（确保 member_count 和 description 正确）
+    const groups = FALLBACK_GROUPS.map(g => ({
+      ...g,
+      url: `${base}/group/${g.id}`,
+      avatar: g.avatar || ''
+    }))
 
-        const idx = m.index
-        const context = html.slice(Math.max(0, idx - 250), Math.min(html.length, idx + 500))
-        const parsed = parseGroupFromContext(context, base)
+    // 尝试从真实页面补充更多小组（解析成功的才加入）
+    try {
+      const html = await fetchHTML(`${base}/group`)
+      if (html) {
+        const seen = new Set(groups.map(g => g.id))
+        const linkRegex = /<a href="\/group\/([^"\/]+)"[^>]*>([^<]+)<\/a>/gi
+        let m
+        while ((m = linkRegex.exec(html)) !== null) {
+          const id = m[1]
+          if (seen.has(id)) continue
+          const name = unescapeHtml(stripTags(m[2])).trim()
+          if (!name || /^\d+$/.test(name)) continue
 
-        seen.add(id)
-        groups.push({
-          id,
-          name,
-          description: parsed.description,
-          member_count: parsed.member_count,
-          avatar: parsed.avatar,
-          url: `${base}/group/${id}`
-        })
-        if (groups.length >= 30) break
+          const idx = m.index
+          const context = html.slice(Math.max(0, idx - 250), Math.min(html.length, idx + 500))
+          const parsed = parseGroupFromContext(context, base)
+
+          // 只加入解析到有效 member_count 的小组
+          if (parsed.member_count > 0 || parsed.description) {
+            seen.add(id)
+            groups.push({
+              id,
+              name,
+              description: parsed.description || '',
+              member_count: parsed.member_count || 0,
+              avatar: parsed.avatar || '',
+              url: `${base}/group/${id}`
+            })
+          }
+          if (groups.length >= 50) break
+        }
       }
-      return groups
-    }
-
-    let html = await fetchHTML(`${base}/group`)
-    let groups = html ? await parseGroupsFromPage(html) : []
-
-    if (groups.length < 20) {
-      const discoverHtml = await fetchHTML(`${base}/group/discover`)
-      const discoverGroups = discoverHtml ? await parseGroupsFromPage(discoverHtml) : []
-      const seen = new Set(groups.map(g => g.id))
-      for (const g of discoverGroups) {
-        if (seen.has(g.id)) continue
-        seen.add(g.id)
-        groups.push(g)
-        if (groups.length >= 30) break
-      }
-    }
-
-    if (groups.length < 20) {
-      const seen = new Set(groups.map(g => g.id))
-      for (const g of FALLBACK_GROUPS) {
-        if (seen.has(g.id)) continue
-        seen.add(g.id)
-        groups.push({ ...g, url: `${base}/group/${g.id}` })
-        if (groups.length >= 30) break
-      }
-    }
+    } catch { /* 解析失败不影响兜底数据 */ }
 
     return c.json({ data: groups })
   } catch {
