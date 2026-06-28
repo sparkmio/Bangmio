@@ -261,7 +261,7 @@ async function fetchWatching() {
     const params = { type: 3, limit: 30 }
     if (watchingType.value) params.subject_type = watchingType.value
     const res = await collectionAPI.getList(params)
-    const data = res.data?.data || []
+    const data = (res.data?.data || []).filter(c => Number(c.subject_type) !== 4 && Number(c.subject?.type) !== 4)
     watchingList.value = data
       .map(c => ({
         ...(c.subject || {}),
