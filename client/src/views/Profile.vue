@@ -40,10 +40,9 @@
               :key="stat.key"
               @click="filterType = stat.value; fetchCollections()"
               class="text-center p-3 rounded-xl transition-all"
-              :class="filterType === stat.value ? 'bg-base-200 ring-2' : 'bg-base-200/50 hover:bg-base-200'"
-              :style="filterType === stat.value ? { '--tw-ring-color': stat.color } : {}"
+              :class="filterType === stat.value ? 'bg-base-200 ring-2 ring-primary' : 'bg-base-200/50 hover:bg-base-200'"
             >
-              <p class="text-2xl font-bold" :style="{ color: stat.color }">{{ stats[stat.key] || 0 }}</p>
+              <p class="text-2xl font-bold text-base-content">{{ stats[stat.key] || 0 }}</p>
               <p class="text-xs mt-0.5 text-base-content/60">{{ stat.label }}</p>
             </button>
           </div>
@@ -149,11 +148,11 @@ const loading = ref(false)
 const limit = 30
 
 const statItems = [
-  { key: 'want', label: '想看', value: 1, color: '#60a5fa' },
-  { key: 'watching', label: '在追', value: 3, color: '#34d399' },
-  { key: 'completed', label: '看过', value: 2, color: '#f472b6' },
-  { key: 'on_hold', label: '搁置', value: 4, color: '#fbbf24' },
-  { key: 'dropped', label: '弃番', value: 5, color: '#f87171' }
+  { key: 'want', label: '想看', value: 1 },
+  { key: 'watching', label: '在追', value: 3 },
+  { key: 'completed', label: '看过', value: 2 },
+  { key: 'on_hold', label: '搁置', value: 4 },
+  { key: 'dropped', label: '弃番', value: 5 }
 ]
 
 const tabs = [

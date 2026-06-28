@@ -47,7 +47,12 @@ export const commentsAPI = {
 
 export const doubanAPI = {
   getRating(id) { return api.get(`/douban/${id}`) },
-  getDetails(id) { return api.get(`/douban/${id}/details`) },
+  getDetails(id, name) {
+    if (name) {
+      return api.get('/douban/by-name', { params: { name } })
+    }
+    return api.get(`/douban/${id}/details`)
+  },
 }
 
 export const moegirlAPI = {

@@ -57,16 +57,8 @@ async function fetchPageExtract(apiBase, title) {
   const params = `action=parse&page=${encodeURIComponent(title)}&prop=text&format=json&disablelimitreport=1&disabletoc=1`
   const json = await fetchMoegirlJSON(apiBase, params)
   const html = json?.parse?.text?.['*']
-  if (!html) {
-    // fallback：旧 extracts 方式
-    const params2 = `action=query&titles=${encodeURIComponent(title)}&prop=extracts&format=json`
-    const json2 = await fetchMoegirlJSON(apiBase, params2)
-    if (!json2?.query?.pages) return null
-    const pages = Object.values(json2.query.pages)
-    if (!pages[0]?.extract) return null
-    return { title: pages[0].title, html: pages[0].extract }
-  }
-  // 清理无关内容：脚本/样式/编辑链接/目录/分类
+  if (!html) return null
+  // 清理无关内容：脚本/样式/编辑链接/目录/分类（保留 .mw-collapsible 折叠遮挡）
   let clean = html
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
@@ -76,6 +68,10 @@ async function fetchPageExtract(apiBase, title) {
     .replace(/<div class="toc[\s\S]*?<\/div>\s*<\/div>/gi, '')
     .replace(/<div id="catlinks"[\s\S]*?<\/div>/gi, '')
     .replace(/<table class="navbox[\s\S]*?<\/table>/gi, '')
+  // 把相对链接转成绝对路径，保证点击可跳转（先 /wiki/ 再其他 /）
+  const base = apiBase.replace('/api.php', '')
+  clean = clean.replace(/href="\/wiki\//g, `href="${base}/wiki/`)
+  clean = clean.replace(/href="\//g, `href="${base}/`)
   return {
     title: json.parse.title || title,
     html: clean

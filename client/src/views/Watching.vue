@@ -266,7 +266,7 @@ async function fetchCollections() {
     const params = { offset: page.value * limit, limit, type: 3 }
     if (activeType.value) params.subject_type = activeType.value
     const res = await collectionAPI.getList(params)
-    const data = (res.data?.data || []).filter(c => c.subject_type !== 4)
+    const data = (res.data?.data || []).filter(c => Number(c.subject_type) !== 4 && Number(c.subject?.type) !== 4)
     if (page.value === 0) {
       collections.value = data
       if (data.length && !selected.value) {

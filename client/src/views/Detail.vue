@@ -460,6 +460,14 @@ async function fetchTopics() {
   topicLoading.value = false
 }
 
+function handleMoegirlClick(e) {
+  const link = e.target.closest('a')
+  if (link && link.href && link.href.startsWith('http')) {
+    e.preventDefault()
+    window.open(link.href, '_blank', 'noopener')
+  }
+}
+
 async function fetchMoegirlSearch() {
   moegirlLoading.value = true
   try {
