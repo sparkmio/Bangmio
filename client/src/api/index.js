@@ -1,23 +1,19 @@
 import axios from 'axios'
 
-const BGM_API = 'https://api.bgm.tv'
-const BGM_PROXY = 'https://api.bangumi.lol'
+// 原版设计：所有 Bangumi API 请求走后端 /api/v1 代理（同源无 CORS，后端 China 感知切镜像）
+// 不要改成直连 api.bgm.tv —— 浏览器 CORS 会拦截
+const baseURL = import.meta.env.VITE_API_BASE || '/api/v1'
 
-function getBaseURL() {
-  const mirror = localStorage.getItem('bangmio_mirror') || 'intl'
-  return mirror === 'cn' ? BGM_PROXY : BGM_API
-}
+const api = axios.create({
+  baseURL,
+  timeout: 15000
+})
 
-function rewriteImageUrls(data) {
-  if (typeof data === 'string') return data.replace(/lain\.bgm\.tv/g, 'lain.bangumi.lol')
-  if (Array.isArray(data)) return data.map(rewriteImageUrls)
-  if (data && typeof data === 'object') {
-    const out = {}
-    for (const [k, v] of Object.entries(data)) out[k] = rewriteImageUrls(v)
-    return out
-  }
-  return data
-}
+// 后端代理实例（与 api 同源 /api/v1，语义上区分用于 comments/douban/moegirl/user OAuth）
+const backend = axios.create({
+  baseURL,
+  timeout: 15000
+})
 
 // ===== 环境判断 =====
 // 生产 web（Cloudflare Pages）：https 域名，走后端 Pages Functions，OAuth 回调 = 当前域名
@@ -29,16 +25,6 @@ export function isProdWeb() {
   return origin.startsWith('https://') && !origin.includes('localhost')
 }
 
-// 后端 baseURL：web 用相对路径（CF Pages 同源 / vite 代理）；非 http(s) origin（Electron file:// / Capacitor）用部署后的后端
-function getBackendBase() {
-  if (typeof window === 'undefined') return '/api/v1'
-  const origin = window.location.origin
-  if (!origin.startsWith('http://') && !origin.startsWith('https://')) {
-    return 'https://bangmio.pages.dev/api/v1'
-  }
-  return '/api/v1'
-}
-
 // 本地 OAuth 应用配置（dev / Electron 用，回调 localhost:5173）
 export function getOAuthConfig() {
   return {
@@ -48,45 +34,19 @@ export function getOAuthConfig() {
   }
 }
 
-// OAuth 端点域名（按镜像分流）
+// OAuth 端点域名（按镜像分流，本地环境直连用）
 function getOauthBase() {
   const mirror = localStorage.getItem('bangmio_mirror') || 'intl'
   return mirror === 'cn' ? 'https://bangumi.lol' : 'https://bgm.tv'
 }
 
-const api = axios.create({
-  baseURL: getBaseURL(),
-  timeout: 15000
-})
+let isRefreshing = false
+let pendingRequests = []
 
-// 后端代理实例：吐槽箱 / 讨论版 / 豆瓣 / 萌娘百科 / OAuth 换码刷新都走这里（避开 CORS，服务端 China 感知）
-const backend = axios.create({
-  baseURL: getBackendBase(),
-  timeout: 15000
-})
-
-api.interceptors.request.use(config => {
-  config.baseURL = getBaseURL()
-  const token = localStorage.getItem('bangmio_token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  try {
-    const user = JSON.parse(localStorage.getItem('bangmio_user') || '{}')
-    if (user.username) {
-      config.headers['X-Bangumi-Username'] = user.username
-    }
-  } catch {}
-  return config
-})
-
-backend.interceptors.request.use(config => {
-  const token = localStorage.getItem('bangmio_token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
-})
+function onRefreshed(token) {
+  pendingRequests.forEach(cb => cb(token))
+  pendingRequests = []
+}
 
 // 统一的 token 刷新（web 走后端 /user/refresh-token，本地走 local app 直接换）
 export async function doRefreshToken() {
@@ -115,35 +75,75 @@ export async function doRefreshToken() {
     accessToken = tokenRes.data.access_token
     newRefresh = tokenRes.data.refresh_token || refreshToken
     if (!accessToken) throw new Error('refresh failed')
-    const userRes = await api.get('/v0/me', { headers: { Authorization: `Bearer ${accessToken}` } })
+    // 本地直连 Bangumi 获取用户信息（不走 /api/v1 代理，本地可能没起后端）
+    const userRes = await axios.get(`${getOauthBase()}/v0/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      timeout: 15000
+    })
     user = userRes.data
   }
   localStorage.setItem('bangmio_token', accessToken)
   localStorage.setItem('bangmio_refresh_token', newRefresh)
+  localStorage.setItem('bangmio_user', JSON.stringify(user))
   return { accessToken, refreshToken: newRefresh, user }
 }
 
-api.interceptors.response.use(
-  response => {
-    if (response.data) {
-      response.data = rewriteImageUrls(response.data)
+api.interceptors.request.use(config => {
+  const token = localStorage.getItem('bangmio_token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  try {
+    const user = JSON.parse(localStorage.getItem('bangmio_user') || '{}')
+    if (user.username) {
+      config.headers['X-Bangumi-Username'] = user.username
     }
-    return response
-  },
+  } catch {}
+  return config
+})
+
+backend.interceptors.request.use(config => {
+  const token = localStorage.getItem('bangmio_token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+api.interceptors.response.use(
+  response => response,
   async error => {
     const originalRequest = error.config
     if (error.response?.status === 401 && !originalRequest._retry) {
       const refreshToken = localStorage.getItem('bangmio_refresh_token')
-      if (refreshToken && !originalRequest.url?.includes('/v0/users/-/')) {
+      if (refreshToken && !originalRequest.url?.includes('/user/refresh-token')) {
         originalRequest._retry = true
-        try {
-          const { accessToken } = await doRefreshToken()
-          originalRequest.headers.Authorization = `Bearer ${accessToken}`
-          return api(originalRequest)
-        } catch {
-          localStorage.removeItem('bangmio_token')
-          localStorage.removeItem('bangmio_user')
-          localStorage.removeItem('bangmio_refresh_token')
+        if (!isRefreshing) {
+          isRefreshing = true
+          try {
+            const { accessToken } = await doRefreshToken()
+            onRefreshed(accessToken)
+            originalRequest.headers.Authorization = `Bearer ${accessToken}`
+            return api(originalRequest)
+          } catch {
+            onRefreshed(null)
+            localStorage.removeItem('bangmio_token')
+            localStorage.removeItem('bangmio_user')
+            localStorage.removeItem('bangmio_refresh_token')
+          } finally {
+            isRefreshing = false
+          }
+        } else {
+          return new Promise((resolve, reject) => {
+            pendingRequests.push(token => {
+              if (token) {
+                originalRequest.headers.Authorization = `Bearer ${token}`
+                resolve(api(originalRequest))
+              } else {
+                reject(error)
+              }
+            })
+          })
         }
       } else {
         localStorage.removeItem('bangmio_token')
