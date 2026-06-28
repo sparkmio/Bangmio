@@ -3,5 +3,8 @@ compatibility_date = "2025-05-31"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "client/dist"
 
+[build]
+command = "cd client && npm install && npm run build"
+
 [vars]
 OAUTH_REDIRECT_URI = "https://bangmio.pages.dev/login/callback"
