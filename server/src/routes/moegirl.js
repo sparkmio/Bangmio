@@ -53,14 +53,32 @@ function parseSearchResults(json) {
 }
 
 async function fetchPageExtract(apiBase, title) {
-  const params = `action=query&titles=${encodeURIComponent(title)}&prop=extracts&format=json`
+  // 用 action=parse 获取完整渲染 HTML，排版正常（extracts 返回纯文本/不完整）
+  const params = `action=parse&page=${encodeURIComponent(title)}&prop=text&format=json&disablelimitreport=1&disabletoc=1`
   const json = await fetchMoegirlJSON(apiBase, params)
-  if (!json?.query?.pages) return null
-  const pages = Object.values(json.query.pages)
-  if (!pages[0]?.extract) return null
+  const html = json?.parse?.text?.['*']
+  if (!html) {
+    // fallback：旧 extracts 方式
+    const params2 = `action=query&titles=${encodeURIComponent(title)}&prop=extracts&format=json`
+    const json2 = await fetchMoegirlJSON(apiBase, params2)
+    if (!json2?.query?.pages) return null
+    const pages = Object.values(json2.query.pages)
+    if (!pages[0]?.extract) return null
+    return { title: pages[0].title, html: pages[0].extract }
+  }
+  // 清理无关内容：脚本/样式/编辑链接/目录/分类
+  let clean = html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<span class="mw-editsection">[\s\S]*?<\/span>/gi, '')
+    .replace(/<div id="toc"[\s\S]*?<\/div>\s*<\/div>/gi, '')
+    .replace(/<div class="toc[\s\S]*?<\/div>\s*<\/div>/gi, '')
+    .replace(/<div id="catlinks"[\s\S]*?<\/div>/gi, '')
+    .replace(/<table class="navbox[\s\S]*?<\/table>/gi, '')
   return {
-    title: pages[0].title,
-    html: pages[0].extract
+    title: json.parse.title || title,
+    html: clean
   }
 }
 

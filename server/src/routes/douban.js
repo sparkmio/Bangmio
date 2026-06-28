@@ -13,6 +13,10 @@ function setCache(key, data) {
   cache.set(key, { data, time: Date.now() })
 }
 
+function isChina(c) {
+  return (c.env?.CF_IP_COUNTRY || '') === 'CN'
+}
+
 async function findDoubanMatch(detail) {
   const names = [...new Set([detail.name, detail.name_cn].filter(Boolean))]
   if (!names.length) return null
@@ -26,10 +30,45 @@ async function findDoubanMatch(detail) {
   return null
 }
 
+app.get('/by-name', async (c) => {
+  try {
+    const name = c.req.query('name')
+    if (!name) return c.json({ data: null })
+    const cacheKey = `douban_name_${name}`
+    const cached = getCached(cacheKey)
+    if (cached) return c.json({ data: cached })
+
+    // 直接用番名搜豆瓣，不依赖 Bangumi API（避免镜像/被墙影响）
+    const suggestions = await searchDouban(name)
+    const match = suggestions?.[0]
+    if (!match) {
+      setCache(cacheKey, null)
+      return c.json({ data: null })
+    }
+    const abstract = await getDoubanAbstract(match.id)
+    const data = {
+      id: match.id,
+      title: abstract?.title || match.title,
+      rate: abstract?.rate || '0',
+      star: abstract?.star || 0,
+      episodes_count: abstract?.episodes_count || 0,
+      release_year: abstract?.release_year || '',
+      types: abstract?.types || [],
+      short_comment: abstract?.short_comment || null,
+      url: `https://movie.douban.com/subject/${match.id}`
+    }
+    setCache(cacheKey, data)
+    return c.json({ data })
+  } catch {
+    return c.json({ data: null })
+  }
+})
+
 app.get('/:id', async (c) => {
   try {
     const subjectId = c.req.param('id')
-    const detail = await bangumiService.getAnimeDetail(subjectId)
+    const cn = isChina(c)
+    const detail = await bangumiService.getAnimeDetail(subjectId, { isChina: cn })
     if (!detail) return c.json({ data: null })
     const match = await findDoubanMatch(detail)
     if (!match) return c.json({ data: null })
@@ -55,11 +94,12 @@ app.get('/:id', async (c) => {
 app.get('/:id/details', async (c) => {
   try {
     const subjectId = c.req.param('id')
-    const cacheKey = `douban_details_${subjectId}`
+    const cn = isChina(c)
+    const cacheKey = `douban_details_${subjectId}_${cn}`
     const cached = getCached(cacheKey)
     if (cached) return c.json({ data: cached })
 
-    const detail = await bangumiService.getAnimeDetail(subjectId)
+    const detail = await bangumiService.getAnimeDetail(subjectId, { isChina: cn })
     if (!detail) return c.json({ data: null })
     const match = await findDoubanMatch(detail)
     if (!match) return c.json({ data: null })

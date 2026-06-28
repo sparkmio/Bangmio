@@ -233,8 +233,8 @@
         <router-link :to="`/anime/${anime.id}/topics`" class="btn btn-sm btn-outline mt-4 w-full">查看全部讨论</router-link>
         <a :href="`https://bangumi.lol/subject/${anime.id}/board`" target="_blank" class="btn btn-sm btn-ghost mt-2 w-full">在 Bangumi 发表讨论 →</a>
 
-        <dialog v-if="showNewTopicModal" class="modal modal-open">
-          <div class="modal-box">
+        <dialog v-if="showNewTopicModal" class="modal modal-open modal-bottom sm:modal-middle">
+          <div class="modal-box max-h-[90vh] sm:max-w-lg">
             <h3 class="text-lg font-bold mb-4">发表新讨论</h3>
             <input v-model="newTopicTitle" placeholder="标题" class="input input-bordered w-full mb-3" />
             <textarea v-model="newTopicContent" placeholder="内容..." rows="5" class="textarea textarea-bordered w-full mb-4"></textarea>
@@ -444,7 +444,8 @@ async function fetchDoubanDetails() {
   doubanLoading.value = true
   try {
     const id = route.params.id
-    const res = await doubanAPI.getDetails(id)
+    const name = anime.value?.name_cn || anime.value?.name
+    const res = await doubanAPI.getDetails(id, name)
     doubanDetails.value = res.data?.data || null
   } catch { doubanDetails.value = null }
   doubanLoading.value = false
@@ -656,5 +657,22 @@ onMounted(fetchDetail)
 }
 .moegirl-content :deep(li) {
   margin: 0.2rem 0;
+}
+.moegirl-content :deep(p) {
+  margin: 0.6rem 0;
+  line-height: 1.7;
+}
+.moegirl-content :deep(b), .moegirl-content :deep(strong) {
+  font-weight: 600;
+}
+.moegirl-content :deep(.infobox) {
+  float: right;
+  max-width: 280px;
+  margin: 0 0 0.5rem 0.5rem;
+  font-size: 0.75rem;
+}
+.moegirl-content :deep(.thumb) {
+  max-width: 200px;
+  margin: 0.25rem;
 }
 </style>
