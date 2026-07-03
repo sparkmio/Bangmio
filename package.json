@@ -1,24 +1,15 @@
 {
-  "name": "bangmio-local",
+  "name": "bangmio",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "main": "electron/main.cjs",
   "scripts": {
     "dev": "npm run dev --prefix client",
     "build": "npm run server:build && cd client && npm install --no-audit --no-fund && npm run build",
     "server:build": "npx esbuild server/src/app.js --bundle --platform=node --format=esm --outfile=functions/api/_server.js",
-    "postinstall": "npm install --prefix client",
-    "electron:dev": "npm run build --prefix client && electron .",
-    "electron:build": "npm run build --prefix client && electron-builder",
-    "cap:init": "npx cap init Bangmio com.bangmio.app --web-dir dist",
-    "cap:add:android": "npx cap add android",
-    "cap:sync": "npx cap sync",
-    "cap:open:android": "npx cap open android"
+    "postinstall": "npm install --prefix client"
   },
   "devDependencies": {
-    "electron": "^28.0.0",
-    "electron-builder": "^24.9.1",
     "esbuild": "^0.28.1"
   },
   "dependencies": {
