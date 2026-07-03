@@ -11,25 +11,25 @@
       <div class="flex items-center justify-between py-3 border-b border-base-300/50">
         <span class="text-sm text-base-content">主题</span>
         <div class="flex gap-2">
-          <button @click="theme.setTheme('light')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.theme === 'light' ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">浅色</button>
-          <button @click="theme.setTheme('dark')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.theme === 'dark' ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">暗色</button>
+          <button @click="theme.setTheme('light')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.theme === 'light' ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/60'">浅色</button>
+          <button @click="theme.setTheme('dark')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.theme === 'dark' ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/60'">暗色</button>
         </div>
       </div>
 
       <div class="flex items-center justify-between py-3 border-b border-base-300/50">
         <span class="text-sm text-base-content">字号</span>
         <div class="flex gap-2">
-          <button @click="theme.setFontSize(12)" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.fontSize === 12 ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">小</button>
-          <button @click="theme.setFontSize(14)" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.fontSize === 14 ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">中</button>
-          <button @click="theme.setFontSize(16)" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.fontSize === 16 ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">大</button>
+          <button @click="theme.setFontSize(12)" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.fontSize === 12 ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/60'">小</button>
+          <button @click="theme.setFontSize(14)" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.fontSize === 14 ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/60'">中</button>
+          <button @click="theme.setFontSize(16)" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.fontSize === 16 ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/60'">大</button>
         </div>
       </div>
 
       <div class="flex items-center justify-between py-3">
         <span class="text-sm text-base-content">间距</span>
         <div class="flex gap-2">
-          <button @click="theme.setDensity('compact')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.density === 'compact' ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">紧凑</button>
-          <button @click="theme.setDensity('comfortable')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.density === 'comfortable' ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">舒适</button>
+          <button @click="theme.setDensity('compact')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.density === 'compact' ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/60'">紧凑</button>
+          <button @click="theme.setDensity('comfortable')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.density === 'comfortable' ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/60'">舒适</button>
         </div>
       </div>
     </div>
@@ -43,16 +43,16 @@
           <p class="text-xs text-base-content/40 mt-0.5">国内用户选择国内镜像</p>
         </div>
         <div class="flex gap-2">
-          <button @click="setMirror('intl')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="mirror === 'intl' ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">国际</button>
-          <button @click="setMirror('cn')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="mirror === 'cn' ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">国内</button>
+          <button @click="setMirror('intl')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="mirror === 'intl' ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/60'">国际</button>
+          <button @click="setMirror('cn')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="mirror === 'cn' ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/60'">国内</button>
         </div>
       </div>
 
       <div class="flex items-center justify-between py-3 border-b border-base-300/50">
         <span class="text-sm text-base-content">番名显示</span>
         <div class="flex gap-2">
-          <button @click="theme.setNameLang('cn')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.nameLang === 'cn' ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">优先中文</button>
-          <button @click="theme.setNameLang('original')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.nameLang === 'original' ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">优先原名</button>
+          <button @click="theme.setNameLang('cn')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.nameLang === 'cn' ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/60'">优先中文</button>
+          <button @click="theme.setNameLang('original')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.nameLang === 'original' ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/60'">优先原名</button>
         </div>
       </div>
 
@@ -62,8 +62,8 @@
           <p class="text-xs text-base-content/40 mt-0.5">隐藏成人向内容</p>
         </div>
         <div class="flex gap-2">
-          <button @click="theme.setNsfw('hide')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.nsfw === 'hide' ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">隐藏</button>
-          <button @click="theme.setNsfw('show')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.nsfw === 'show' ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60'">显示</button>
+          <button @click="theme.setNsfw('hide')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.nsfw === 'hide' ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/60'">隐藏</button>
+          <button @click="theme.setNsfw('show')" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all" :class="theme.nsfw === 'show' ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/60'">显示</button>
         </div>
       </div>
     </div>

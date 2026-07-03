@@ -18,7 +18,7 @@
           :key="t.value"
           @click="filterType = t.value; page = 1; browse()"
           class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-all"
-          :class="filterType === t.value ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60 hover:bg-base-300'"
+          :class="filterType === t.value ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/60 hover:bg-base-300'"
         >
           {{ t.label }}
         </button>

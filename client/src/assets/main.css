@@ -18,9 +18,9 @@
   --ink: #1a1a1a;
   --ink-soft: #525252;
   --ink-muted: #a3a3a3;
-  --brand: #ff8fa3;
-  --brand-soft: #ffb3c1;
-  --brand-deep: #ff6b81;
+  --brand: #fda4af;
+  --brand-soft: #fecdd3;
+  --brand-deep: #fb7185;
 }
 
 .dark {
@@ -31,8 +31,8 @@
   --ink-soft: #d4d4d4;
   --ink-muted: #737373;
   --brand: #ffb3c1;
-  --brand-soft: #ffd1d9;
-  --brand-deep: #ff8fa3;
+  --brand-soft: #ffe4e8;
+  --brand-deep: #fda4af;
 }
 
 html, body {
@@ -128,7 +128,7 @@ h1, h2, h3, h4, h5, h6 {
   transition: box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1), transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .paper-shadow:hover {
-  box-shadow: 0 4px 8px rgba(255, 143, 163, 0.08), 0 12px 32px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 8px rgba(253, 164, 175, 0.08), 0 12px 32px rgba(0, 0, 0, 0.08);
 }
 .dark .paper-shadow {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.4);

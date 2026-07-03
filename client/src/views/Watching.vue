@@ -12,7 +12,7 @@
         :key="t.value"
         @click="switchType(t.value)"
         class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-all"
-        :class="activeType === t.value ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60 hover:bg-base-300'"
+        :class="activeType === t.value ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/60 hover:bg-base-300'"
       >
         {{ t.label }}
       </button>
@@ -86,7 +86,7 @@
                   :key="ep"
                   @click="openEpisode(ep)"
                   class="w-8 h-7 rounded text-xs font-bold flex items-center justify-center transition-all hover:scale-110 cursor-pointer"
-                  :class="ep <= (selected.ep_status || 0) ? 'bg-primary text-white' : 'bg-base-300 text-base-content/40 hover:bg-base-300/80'"
+                  :class="ep <= (selected.ep_status || 0) ? 'bg-primary text-primary-content' : 'bg-base-300 text-base-content/40 hover:bg-base-300/80'"
                 >
                   {{ String(ep).padStart(2, '0') }}
                 </button>
@@ -125,7 +125,7 @@
             :key="s.value"
             @click="updateEpStatus(s.value)"
             class="px-3 py-1.5 rounded-md text-sm font-medium transition-all"
-            :class="selected?.type === s.value ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60 hover:bg-base-300'"
+            :class="selected?.type === s.value ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/60 hover:bg-base-300'"
           >
             {{ s.label }}
           </button>
