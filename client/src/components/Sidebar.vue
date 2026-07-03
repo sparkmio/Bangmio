@@ -1,18 +1,18 @@
 <template>
-  <aside class="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-56 z-40 bg-washi-50/60 backdrop-blur-xl border-r border-ink-600/10">
+  <aside class="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-56 z-40 bg-base-100/80 backdrop-blur-xl border-r border-base-300">
     <!-- 刊头 -->
     <div class="px-5 pt-5 pb-3 shrink-0">
       <router-link to="/" class="flex items-baseline gap-2 mb-1">
-        <span class="font-display font-black text-2xl tracking-tighter text-ink-600">Bangmio</span>
-        <span class="text-[9px] font-mono tracking-widest text-ink-300 uppercase">vol.04</span>
+        <span class="font-display font-black text-2xl tracking-tighter text-base-content">Bangmio</span>
+        <span class="text-[9px] font-mono tracking-widest text-base-content/40 uppercase">vol.04</span>
       </router-link>
       <hr class="masthead-rule" />
-      <p class="text-[10px] text-ink-300 mt-1.5 tracking-wider serif-cn">番组追番 · 编辑手记</p>
+      <p class="text-[10px] text-base-content/40 mt-1.5 tracking-wider serif-cn">番组追番 · 编辑手记</p>
     </div>
 
     <!-- 目录 -->
     <div class="px-5 pt-2 pb-1">
-      <p class="text-[9px] font-mono tracking-[0.25em] text-ink-300 uppercase mb-2">Contents</p>
+      <p class="text-[9px] font-mono tracking-[0.25em] text-base-content/40 uppercase mb-2">Contents</p>
     </div>
 
     <ul class="flex-1 px-3 gap-0.5 overflow-y-auto scrollbar-hide">
@@ -22,11 +22,11 @@
           :class="$route.path === item.path ? 'is-active' : ''"
           class="group flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-300"
         >
-          <span class="editorial-number text-xs text-ink-200 group-hover:text-sakura transition-colors w-5 tabular-nums">
+          <span class="editorial-number text-xs text-base-content/30 group-hover:text-pink-500 transition-colors w-5 tabular-nums">
             {{ String(idx + 1).padStart(2, '0') }}
           </span>
-          <component :is="item.icon" class="w-4 h-4 text-ink-300 group-hover:text-ink-600 transition-colors" :class="$route.path === item.path ? '!text-sakura' : ''" />
-          <span class="text-[13px] font-medium serif-cn group-hover:text-ink-600 transition-colors">{{ item.label }}</span>
+          <component :is="item.icon" class="w-4 h-4 text-base-content/40 group-hover:text-base-content transition-colors" :class="$route.path === item.path ? '!text-pink-500' : ''" />
+          <span class="text-[13px] font-medium serif-cn group-hover:text-base-content transition-colors">{{ item.label }}</span>
         </router-link>
       </li>
     </ul>
@@ -36,31 +36,31 @@
     <!-- 用户区 -->
     <div class="px-3 py-3 shrink-0">
       <template v-if="auth.isLoggedIn">
-        <router-link to="/profile" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-sakura/5 transition-colors">
+        <router-link to="/profile" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-pink-50 dark:hover:bg-pink-500/10 transition-colors">
           <div class="avatar">
-            <div class="w-8 h-8 rounded-full ring-1 ring-sakura/20">
+            <div class="w-8 h-8 rounded-full ring-1 ring-pink-500/20">
               <img v-if="auth.user?.avatar?.medium || auth.user?.avatar?.large" :src="auth.user.avatar.medium || auth.user.avatar.large" class="rounded-full" />
-              <div v-else class="w-8 h-8 rounded-full bg-sakura text-white flex items-center justify-center text-xs font-bold serif-cn">
+              <div v-else class="w-8 h-8 rounded-full bg-pink-500 text-white flex items-center justify-center text-xs font-bold serif-cn">
                 {{ auth.user?.nickname?.[0] || auth.user?.username?.[0]?.toUpperCase() }}
               </div>
             </div>
           </div>
           <div class="min-w-0 flex-1">
-            <p class="text-[13px] font-medium truncate text-ink-600 serif-cn">{{ auth.user?.nickname || auth.user?.username }}</p>
-            <p class="text-[10px] truncate text-ink-300 tracking-wider">查看主页</p>
+            <p class="text-[13px] font-medium truncate text-base-content serif-cn">{{ auth.user?.nickname || auth.user?.username }}</p>
+            <p class="text-[10px] truncate text-base-content/40 tracking-wider">查看主页</p>
           </div>
         </router-link>
-        <button @click="auth.logout()" class="btn btn-ghost btn-xs w-full mt-1.5 text-ink-200 hover:text-vermilion rounded-full text-[11px] tracking-wider">
+        <button @click="auth.logout()" class="btn btn-ghost btn-xs w-full mt-1.5 text-base-content/50 hover:text-pink-600 rounded-full text-[11px] tracking-wider">
           退出登录
         </button>
       </template>
       <template v-else>
-        <router-link to="/login" class="btn btn-primary btn-sm w-full rounded-full shadow-md shadow-sakura/20 text-xs tracking-wider">
+        <router-link to="/login" class="btn btn-primary btn-sm w-full rounded-full shadow-md shadow-pink-500/20 text-xs tracking-wider">
           登录 Bangmio
         </router-link>
       </template>
 
-      <button @click="theme.toggle()" class="btn btn-ghost btn-xs w-full mt-2 gap-2 rounded-full text-[11px] text-ink-200 tracking-wider">
+      <button @click="theme.toggle()" class="btn btn-ghost btn-xs w-full mt-2 gap-2 rounded-full text-[11px] text-base-content/50 tracking-wider">
         <svg v-if="theme.theme === 'dark'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
         <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
         {{ theme.theme === 'dark' ? '浅色' : '深色' }}
@@ -94,7 +94,7 @@ const navItems = [
 
 <style scoped>
 .is-active {
-  background: color-mix(in srgb, var(--sakura) 8%, transparent);
+  background: color-mix(in srgb, var(--pink) 8%, transparent);
   position: relative;
 }
 .is-active::before {
@@ -105,9 +105,9 @@ const navItems = [
   transform: translateY(-50%);
   width: 2px;
   height: 60%;
-  background: var(--sakura);
+  background: var(--pink);
 }
 .is-active span {
-  color: var(--sakura) !important;
+  color: var(--pink) !important;
 }
 </style>

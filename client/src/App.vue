@@ -1,8 +1,5 @@
 <template>
   <div class="min-h-screen relative">
-    <!-- 樱花飘落装饰 -->
-    <div class="petal" v-for="i in 6" :key="i" :style="petalStyle(i)"></div>
-
     <Sidebar />
     <Navbar />
 
@@ -36,20 +33,6 @@ import Toast from './components/Toast.vue'
 import { useAuthStore } from './stores/auth'
 
 const auth = useAuthStore()
-
-function petalStyle(i) {
-  const left = (i * 17 + 5) % 100
-  const delay = (i * 2.3) % 12
-  const duration = 12 + (i % 3) * 4
-  const size = 6 + (i % 2) * 3
-  return {
-    left: left + '%',
-    animationDelay: -delay + 's',
-    animationDuration: duration + 's',
-    width: size + 'px',
-    height: size + 'px',
-  }
-}
 
 function onBeforeEnter(el) { gsap.set(el, { opacity: 0, y: 12 }) }
 function onEnter(el, done) { gsap.to(el, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out', onComplete: done }) }
