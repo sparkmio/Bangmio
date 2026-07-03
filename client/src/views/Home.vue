@@ -4,10 +4,10 @@
     <section class="mb-10" v-if="auth.isLoggedIn">
       <div class="flex items-end justify-between mb-5">
         <div class="flex items-baseline gap-3">
-          <span class="editorial-number text-3xl text-pink-500">01</span>
+          <span class="editorial-number text-3xl text-violet-500">01</span>
           <h2 class="text-xl font-bold text-base-content serif-cn">在追</h2>
         </div>
-        <router-link to="/watching" class="text-xs text-base-content/40 hover:text-pink-500 transition-colors font-mono tracking-wider">查看全部 →</router-link>
+        <router-link to="/watching" class="text-xs text-base-content/40 hover:text-violet-500 transition-colors font-mono tracking-wider">查看全部 →</router-link>
       </div>
       <hr class="masthead-rule-thin mb-5" />
 
@@ -18,7 +18,7 @@
           :key="t.value"
           @click="switchType(t.value)"
           class="px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all serif-cn tracking-wider"
-          :class="watchingType === t.value ? 'bg-pink-500 text-white shadow-sm shadow-pink-500/20' : 'bg-base-200 text-base-content/40 hover:bg-base-300'"
+          :class="watchingType === t.value ? 'bg-violet-500 text-white shadow-sm shadow-violet-500/20' : 'bg-base-200 text-base-content/40 hover:bg-base-300'"
         >
           {{ t.label }}
         </button>
@@ -36,7 +36,7 @@
               @click="selectWatching(item)"
               class="w-full flex items-center gap-3 p-2 rounded-md text-left transition-all duration-300"
               :class="selectedWatching?.id === item.id
-                ? 'bg-pink-500/8 border-l-2 border-pink-500'
+                ? 'bg-violet-500/8 border-l-2 border-violet-500'
                 : 'hover:bg-base-200 border-l-2 border-transparent'"
             >
               <img
@@ -45,8 +45,8 @@
                 class="w-10 h-14 rounded object-cover flex-shrink-0"
               />
               <div class="min-w-0 flex-1">
-                <p class="text-[13px] font-medium text-base-content line-clamp-1 hover:text-pink-500 transition-colors cursor-pointer serif-cn">{{ item.name_cn || item.name }}</p>
-                <p class="text-xs text-pink-500 font-semibold mt-0.5 numeric">[{{ item.ep_status || 0 }}/{{ item.total_episodes || '?' }}]</p>
+                <p class="text-[13px] font-medium text-base-content line-clamp-1 hover:text-violet-500 transition-colors cursor-pointer serif-cn">{{ item.name_cn || item.name }}</p>
+                <p class="text-xs text-violet-500 font-semibold mt-0.5 numeric">[{{ item.ep_status || 0 }}/{{ item.total_episodes || '?' }}]</p>
               </div>
             </button>
           </div>
@@ -65,9 +65,9 @@
                 <h3 class="text-lg font-bold text-base-content mb-1 serif-cn">{{ selectedWatching.name_cn || selectedWatching.name }}</h3>
                 <p class="text-xs text-base-content/40 mb-3 font-mono tracking-tight">{{ selectedWatching.name }}</p>
                 <div class="flex gap-3 text-xs">
-                  <router-link :to="`/anime/${selectedWatching.id}/topics`" class="text-pink-500 hover-underline-wipe">参与讨论</router-link>
-                  <router-link :to="`/anime/${selectedWatching.id}/talkbox`" class="text-pink-500 hover-underline-wipe">观吐槽</router-link>
-                  <router-link :to="`/anime/${selectedWatching.id}`" class="text-pink-500 hover-underline-wipe">详情页</router-link>
+                  <router-link :to="`/anime/${selectedWatching.id}/topics`" class="text-violet-500 hover-underline-wipe">参与讨论</router-link>
+                  <router-link :to="`/anime/${selectedWatching.id}/talkbox`" class="text-violet-500 hover-underline-wipe">观吐槽</router-link>
+                  <router-link :to="`/anime/${selectedWatching.id}`" class="text-violet-500 hover-underline-wipe">详情页</router-link>
                 </div>
               </div>
             </div>
@@ -81,7 +81,7 @@
                   :key="ep"
                   @click="openEpisode(ep)"
                   class="w-8 h-7 rounded text-xs font-bold flex items-center justify-center transition-all hover:scale-110 cursor-pointer numeric"
-                  :class="ep <= (selectedWatching.ep_status || 0) ? 'bg-pink-500 text-white' : 'bg-base-300 text-base-content/30 hover:bg-washi-300'"
+                  :class="ep <= (selectedWatching.ep_status || 0) ? 'bg-violet-500 text-white' : 'bg-base-300 text-base-content/30 hover:bg-washi-300'"
                 >
                   {{ String(ep).padStart(2, '0') }}
                 </button>
@@ -96,7 +96,7 @@
 
       <div v-else-if="!watchingLoading && watchingList.length === 0" class="text-center py-10 rounded-md bg-base-200/40">
         <p class="text-xs text-base-content/40 serif-cn tracking-wider">还没有在追的内容</p>
-        <router-link to="/anime" class="text-xs text-pink-500 mt-1 inline-block hover-underline-wipe font-mono tracking-wider">去探索 →</router-link>
+        <router-link to="/anime" class="text-xs text-violet-500 mt-1 inline-block hover-underline-wipe font-mono tracking-wider">去探索 →</router-link>
       </div>
     </section>
 
@@ -104,10 +104,10 @@
     <section class="mb-10">
       <div class="flex items-end justify-between mb-5">
         <div class="flex items-baseline gap-3">
-          <span class="editorial-number text-3xl text-pink-500">02</span>
+          <span class="editorial-number text-3xl text-violet-500">02</span>
           <h2 class="text-xl font-bold text-base-content serif-cn">热门新番</h2>
         </div>
-        <router-link to="/trending" class="text-xs text-base-content/40 hover:text-pink-500 transition-colors font-mono tracking-wider">查看全部 →</router-link>
+        <router-link to="/trending" class="text-xs text-base-content/40 hover:text-violet-500 transition-colors font-mono tracking-wider">查看全部 →</router-link>
       </div>
       <hr class="masthead-rule-thin mb-5" />
       <LoadingState :loading="trendingLoading" :error="trendingError" @retry="fetchTrending" />
@@ -126,7 +126,7 @@
 
         <p class="text-[10px] font-mono tracking-widest text-base-content/40 uppercase mb-1">Episode</p>
         <h3 class="text-base font-bold text-base-content mb-4 pr-8 serif-cn">
-          <span class="text-pink-500 numeric">ep.{{ episodePopup.episode }}</span> {{ episodePopup.name }}
+          <span class="text-violet-500 numeric">ep.{{ episodePopup.episode }}</span> {{ episodePopup.name }}
         </h3>
 
         <div class="flex flex-wrap gap-2 mb-4">
@@ -135,7 +135,7 @@
             :key="s.value"
             @click="updateWatchingStatus(s.value)"
             class="px-3 py-1.5 rounded-md text-xs font-medium transition-all serif-cn"
-            :class="selectedWatching?.type === s.value ? 'bg-pink-500 text-white shadow-sm shadow-pink-500/20' : 'bg-base-200 text-base-content/40 hover:bg-base-300'"
+            :class="selectedWatching?.type === s.value ? 'bg-violet-500 text-white shadow-sm shadow-violet-500/20' : 'bg-base-200 text-base-content/40 hover:bg-base-300'"
           >
             {{ s.label }}
           </button>
@@ -157,7 +157,7 @@
             <router-link
               v-if="selectedWatching?.id"
               :to="`/anime/${selectedWatching.id}/topics`"
-              class="text-pink-500 hover-underline-wipe"
+              class="text-violet-500 hover-underline-wipe"
               @click="closeEpisode"
             >
               参与讨论 →

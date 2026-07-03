@@ -18,9 +18,9 @@
   --ink: #1a1a1a;
   --ink-soft: #525252;
   --ink-muted: #a3a3a3;
-  --pink: #ec4899;
-  --pink-soft: #f9a8d4;
-  --pink-deep: #db2777;
+  --violet: #8b5cf6;
+  --violet-soft: #a78bfa;
+  --violet-deep: #7c3aed;
 }
 
 .dark {
@@ -30,9 +30,9 @@
   --ink: #f5f5f5;
   --ink-soft: #d4d4d4;
   --ink-muted: #737373;
-  --pink: #f472b6;
-  --pink-soft: #f9a8d4;
-  --pink-deep: #ec4899;
+  --violet: #a78bfa;
+  --violet-soft: #c4b5fd;
+  --violet-deep: #8b5cf6;
 }
 
 html, body {
@@ -69,8 +69,8 @@ h1, h2, h3, h4, h5, h6 {
 
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--pink); opacity: 0.3; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--pink); opacity: 0.5; }
+::-webkit-scrollbar-thumb { background: var(--violet); opacity: 0.3; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--violet); opacity: 0.5; }
 
 .anime-grid {
   display: grid;
@@ -100,7 +100,7 @@ h1, h2, h3, h4, h5, h6 {
   left: 0;
   width: 0;
   height: 1px;
-  background: var(--pink);
+  background: var(--violet);
   transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .hover-underline-wipe:hover::after { width: 100%; }
@@ -128,13 +128,13 @@ h1, h2, h3, h4, h5, h6 {
   transition: box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1), transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .paper-shadow:hover {
-  box-shadow: 0 4px 8px rgba(236, 72, 153, 0.08), 0 12px 32px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 8px rgba(139, 92, 246, 0.08), 0 12px 32px rgba(0, 0, 0, 0.08);
 }
 .dark .paper-shadow {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 .dark .paper-shadow:hover {
-  box-shadow: 0 4px 8px rgba(244, 114, 182, 0.1), 0 12px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 8px rgba(167, 139, 250, 0.1), 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
 @media (prefers-reduced-motion: reduce) {

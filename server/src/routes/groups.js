@@ -140,19 +140,17 @@ app.get('/', async (c) => {
           const context = html.slice(Math.max(0, idx - 250), Math.min(html.length, idx + 500))
           const parsed = parseGroupFromContext(context, base)
 
-          // 只加入解析到有效 member_count 的小组
-          if (parsed.member_count > 0 || parsed.description) {
-            seen.add(id)
-            groups.push({
-              id,
-              name,
-              description: parsed.description || '',
-              member_count: parsed.member_count || 0,
-              avatar: parsed.avatar || '',
-              url: `${base}/group/${id}`
-            })
-          }
-          if (groups.length >= 50) break
+          // 放宽条件：只要名字有效就加入，member_count/description 可选
+          seen.add(id)
+          groups.push({
+            id,
+            name,
+            description: parsed.description || '',
+            member_count: parsed.member_count || 0,
+            avatar: parsed.avatar || '',
+            url: `${base}/group/${id}`
+          })
+          if (groups.length >= 60) break
         }
       }
     } catch { /* 解析失败不影响兜底数据 */ }
@@ -169,7 +167,15 @@ app.get('/:id', async (c) => {
     const id = c.req.param('id')
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
     const base = getBase(isChina)
-    const html = await fetchHTML(`${base}/group/${id}`)
+
+    // 某些小组详情页 Bangumi 会 302 到小组主页，先跟随重定向
+    let html = await fetchHTML(`${base}/group/${id}`)
+    if (!html && !isChina) {
+      html = await fetchHTML(`https://bgm.tv/group/${id}`)
+    }
+    if (!html && isChina) {
+      html = await fetchHTML(`https://bangumi.lol/group/${id}`)
+    }
     if (!html) return c.json({ data: null })
 
     const nameMatch = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
@@ -238,7 +244,7 @@ app.get('/:id', async (c) => {
     }
 
     return c.json({
-      data: { id, name, description, member_count, avatar, topics }
+      data: { id, name, description, member_count, avatar, topics, url: `${base}/group/${id}` }
     })
   } catch {
     return c.json({ data: null })

@@ -169,9 +169,9 @@
 
               <!-- 6 彩色统计卡片 -->
               <div class="grid grid-cols-2 gap-2 mb-4">
-                <div class="rounded-2xl border border-pink-500/30 bg-pink-500/10 p-3">
-                  <p class="text-xl font-bold text-pink-700">{{ computedStats.total }}</p>
-                  <p class="text-xs text-pink-600 mt-1">收藏数</p>
+                <div class="rounded-2xl border border-violet-500/30 bg-violet-500/10 p-3">
+                  <p class="text-xl font-bold text-violet-700">{{ computedStats.total }}</p>
+                  <p class="text-xs text-violet-600 mt-1">收藏数</p>
                 </div>
                 <div class="rounded-2xl border border-green-500/30 bg-green-500/10 p-3">
                   <p class="text-xl font-bold text-green-700">{{ computedStats.completed }}</p>

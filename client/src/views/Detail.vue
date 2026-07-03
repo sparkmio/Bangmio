@@ -233,21 +233,27 @@
         <router-link :to="`/anime/${anime.id}/topics`" class="btn btn-sm btn-outline mt-4 w-full">查看全部讨论</router-link>
         <a :href="`https://bangumi.lol/subject/${anime.id}/board`" target="_blank" class="btn btn-sm btn-ghost mt-2 w-full">在 Bangumi 发表讨论 →</a>
 
-        <dialog v-if="showNewTopicModal" class="modal modal-open modal-bottom sm:modal-middle">
-          <div class="modal-box max-h-[90vh] sm:max-w-lg">
-            <h3 class="text-lg font-bold mb-4">发表新讨论</h3>
-            <input v-model="newTopicTitle" placeholder="标题" class="input input-bordered w-full mb-3" />
-            <textarea v-model="newTopicContent" placeholder="内容..." rows="5" class="textarea textarea-bordered w-full mb-4"></textarea>
+        <!-- 发表新讨论弹窗 -->
+        <div v-if="showNewTopicModal" class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center" @click.self="showNewTopicModal = false">
+          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="showNewTopicModal = false"></div>
+          <div class="relative bg-base-100 rounded-t-xl sm:rounded-xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto p-5 z-10 shadow-2xl">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-bold text-base-content serif-cn">发表新讨论</h3>
+              <button @click="showNewTopicModal = false" class="btn btn-ghost btn-circle btn-xs text-base-content/40 hover:text-base-content">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <input v-model="newTopicTitle" placeholder="标题" class="input input-bordered w-full mb-3 bg-base-100" />
+            <textarea v-model="newTopicContent" placeholder="内容..." rows="5" class="textarea textarea-bordered w-full mb-4 bg-base-100"></textarea>
             <div class="flex gap-2 justify-end">
               <button @click="showNewTopicModal = false" class="btn btn-ghost btn-sm">取消</button>
-              <button @click="postNewTopic" :disabled="newTopicPosting" class="btn btn-primary btn-sm">
+              <button @click="postNewTopic" :disabled="newTopicPosting || !newTopicTitle.trim() || !newTopicContent.trim()" class="btn btn-primary btn-sm">
                 <span v-if="newTopicPosting" class="loading loading-spinner loading-xs"></span>
                 发布
               </button>
             </div>
           </div>
-          <div class="modal-backdrop" @click="showNewTopicModal = false"></div>
-        </dialog>
+        </div>
       </div>
 
       <!-- wiki -->
