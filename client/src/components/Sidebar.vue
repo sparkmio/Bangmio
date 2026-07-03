@@ -22,10 +22,10 @@
           :class="$route.path === item.path ? 'is-active' : ''"
           class="group flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-300"
         >
-          <span class="editorial-number text-xs text-base-content/30 group-hover:text-violet-500 transition-colors w-5 tabular-nums">
+          <span class="editorial-number text-xs text-base-content/30 group-hover:text-brand-400 transition-colors w-5 tabular-nums">
             {{ String(idx + 1).padStart(2, '0') }}
           </span>
-          <component :is="item.icon" class="w-4 h-4 text-base-content/40 group-hover:text-base-content transition-colors" :class="$route.path === item.path ? '!text-violet-500' : ''" />
+          <component :is="item.icon" class="w-4 h-4 text-base-content/40 group-hover:text-base-content transition-colors" :class="$route.path === item.path ? '!text-brand-400' : ''" />
           <span class="text-[13px] font-medium serif-cn group-hover:text-base-content transition-colors">{{ item.label }}</span>
         </router-link>
       </li>
@@ -36,11 +36,11 @@
     <!-- 用户区 -->
     <div class="px-3 py-3 shrink-0">
       <template v-if="auth.isLoggedIn">
-        <router-link to="/profile" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-violet-50 dark:hover:bg-violet-500/10 transition-colors">
+        <router-link to="/profile" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-brand-50 dark:hover:bg-brand-400/10 transition-colors">
           <div class="avatar">
-            <div class="w-8 h-8 rounded-full ring-1 ring-violet-500/20">
+            <div class="w-8 h-8 rounded-full ring-1 ring-brand-400/20">
               <img v-if="auth.user?.avatar?.medium || auth.user?.avatar?.large" :src="auth.user.avatar.medium || auth.user.avatar.large" class="rounded-full" />
-              <div v-else class="w-8 h-8 rounded-full bg-violet-500 text-white flex items-center justify-center text-xs font-bold serif-cn">
+              <div v-else class="w-8 h-8 rounded-full bg-brand-400 text-white flex items-center justify-center text-xs font-bold serif-cn">
                 {{ auth.user?.nickname?.[0] || auth.user?.username?.[0]?.toUpperCase() }}
               </div>
             </div>
@@ -50,12 +50,12 @@
             <p class="text-[10px] truncate text-base-content/40 tracking-wider">查看主页</p>
           </div>
         </router-link>
-        <button @click="auth.logout()" class="btn btn-ghost btn-xs w-full mt-1.5 text-base-content/50 hover:text-violet-600 rounded-full text-[11px] tracking-wider">
+        <button @click="auth.logout()" class="btn btn-ghost btn-xs w-full mt-1.5 text-base-content/50 hover:text-brand-500 rounded-full text-[11px] tracking-wider">
           退出登录
         </button>
       </template>
       <template v-else>
-        <router-link to="/login" class="btn btn-primary btn-sm w-full rounded-full shadow-md shadow-violet-500/20 text-xs tracking-wider">
+        <router-link to="/login" class="btn btn-primary btn-sm w-full rounded-full shadow-md shadow-brand-400/20 text-xs tracking-wider">
           登录 Bangmio
         </router-link>
       </template>
@@ -94,7 +94,7 @@ const navItems = [
 
 <style scoped>
 .is-active {
-  background: color-mix(in srgb, var(--violet) 8%, transparent);
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
   position: relative;
 }
 .is-active::before {
@@ -105,9 +105,9 @@ const navItems = [
   transform: translateY(-50%);
   width: 2px;
   height: 60%;
-  background: var(--violet);
+  background: var(--brand);
 }
 .is-active span {
-  color: var(--violet) !important;
+  color: var(--brand) !important;
 }
 </style>

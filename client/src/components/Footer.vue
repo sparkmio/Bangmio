@@ -6,7 +6,7 @@
         Bangmio &copy; 2026
       </p>
       <p class="text-[10px] text-base-content/30 mt-1 serif-cn tracking-wider">
-        番剧数据来自 <a href="https://bgm.tv" target="_blank" class="text-violet-500 hover-underline-wipe">Bangumi</a>
+        番剧数据来自 <a href="https://bgm.tv" target="_blank" class="text-brand-400 hover-underline-wipe">Bangumi</a>
       </p>
     </aside>
   </footer>
