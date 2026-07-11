@@ -1,39 +1,10 @@
-/* ============================================================
-   Bangmio · 编辑杂志风 · 白×粉
-   Editorial Magazine · White & Pink Aesthetic
-   ============================================================ */
-
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700;9..144,900&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;600;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
-
-:root {
-  --bg: #ffffff;
-  --bg-soft: #fafafa;
-  --bg-card: #f5f5f5;
-  --ink: #1a1a1a;
-  --ink-soft: #525252;
-  --ink-muted: #a3a3a3;
-  --brand: #fda4af;
-  --brand-soft: #fecdd3;
-  --brand-deep: #fb7185;
-}
-
-.dark {
-  --bg: #0a0a0a;
-  --bg-soft: #141414;
-  --bg-card: #1c1c1c;
-  --ink: #f5f5f5;
-  --ink-soft: #d4d4d4;
-  --ink-muted: #737373;
-  --brand: #ffb3c1;
-  --brand-soft: #ffe4e8;
-  --brand-deep: #fda4af;
-}
 
 html, body {
   font-family: 'DM Sans', 'Noto Sans SC', sans-serif;
@@ -42,53 +13,40 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.4s ease, color 0.4s ease;
-  background-color: var(--bg);
-  color: var(--ink);
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Fraunces', 'Noto Serif SC', serif;
-  line-height: 1.2;
-  letter-spacing: -0.025em;
-  font-weight: 700;
+  font-family: 'Overpass', 'Noto Sans SC', sans-serif;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
 }
 
-/* 杂志风序号 */
-.editorial-number {
-  font-family: 'Fraunces', serif;
-  font-weight: 900;
-  font-style: italic;
-  font-variation-settings: 'opsz' 144;
-}
-
-/* 数字用等宽字体 */
-.numeric { font-family: 'JetBrains Mono', monospace; font-feature-settings: 'tnum'; }
-
-/* 中文衬线 */
-.serif-cn { font-family: 'Noto Serif SC', 'Fraunces', serif; }
-
-::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--brand); opacity: 0.3; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--brand); opacity: 0.5; }
+::-webkit-scrollbar-thumb { background: oklch(var(--p) / 0.25); border-radius: 3px; }
 
 .anime-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
+
 @media (max-width: 640px) {
-  .anime-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.875rem; }
+  .anime-grid {
+    grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+    gap: 0.85rem;
+  }
 }
 
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-.fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
+
 .break-words { overflow-wrap: break-word; word-break: break-word; }
 
-/* 下划线擦拭效果 */
+/* Underline wipe on hover */
 .hover-underline-wipe {
   position: relative;
   text-decoration: none;
@@ -96,61 +54,13 @@ h1, h2, h3, h4, h5, h6 {
 .hover-underline-wipe::after {
   content: '';
   position: absolute;
-  bottom: -2px;
+  bottom: -1px;
   left: 0;
   width: 0;
-  height: 1px;
-  background: var(--brand);
-  transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  height: 1.5px;
+  background: oklch(var(--p));
+  transition: width 0.3s ease;
 }
-.hover-underline-wipe:hover::after { width: 100%; }
-
-/* 杂志分隔符 */
-.editorial-divider {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--ink-muted);
-  font-size: 10px;
-  letter-spacing: 0.3em;
-}
-.editorial-divider::before,
-.editorial-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: currentColor;
-}
-
-/* 卡片质感阴影 */
-.paper-shadow {
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.05);
-  transition: box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1), transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.paper-shadow:hover {
-  box-shadow: 0 4px 8px rgba(253, 164, 175, 0.08), 0 12px 32px rgba(0, 0, 0, 0.08);
-}
-.dark .paper-shadow {
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-.dark .paper-shadow:hover {
-  box-shadow: 0 4px 8px rgba(255, 179, 193, 0.1), 0 12px 32px rgba(0, 0, 0, 0.5);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
-}
-
-/* 刊头装饰线 */
-.masthead-rule {
-  border: none;
-  border-top: 2px solid var(--ink);
-  margin: 0;
-  opacity: 0.8;
-}
-.masthead-rule-thin {
-  border: none;
-  border-top: 1px solid var(--ink);
-  margin: 0;
-  opacity: 0.1;
+.hover-underline-wipe:hover::after {
+  width: 100%;
 }

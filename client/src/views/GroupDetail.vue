@@ -36,7 +36,7 @@
           <a
             v-for="t in group.topics"
             :key="t.id"
-            :href="`${group.url}/topic/${t.id}`"
+            :href="`https://bangumi.lol/group/topic/${t.id}`"
             target="_blank"
             rel="noopener noreferrer"
             class="block p-3 hover:bg-base-200 rounded-lg transition-colors group"

@@ -72,6 +72,15 @@ export const doubanAPI = {
   getReviews(id) { return api.get(`/douban/${id}/reviews`) }
 }
 
+export const bilibiliAPI = {
+  getDetails(id, name) {
+    if (name) {
+      return api.get('/bilibili/by-name', { params: { name } })
+    }
+    return api.get(`/bilibili/${id}`)
+  }
+}
+
 export const moegirlAPI = {
   search(q) { return api.get('/moegirl/search', { params: { q } }) },
 }

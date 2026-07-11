@@ -169,9 +169,9 @@
 
               <!-- 6 彩色统计卡片 -->
               <div class="grid grid-cols-2 gap-2 mb-4">
-                <div class="rounded-2xl border border-primary/30 bg-primary/10 p-3">
-                  <p class="text-xl font-bold text-primary">{{ computedStats.total }}</p>
-                  <p class="text-xs text-primary mt-1">收藏数</p>
+                <div class="rounded-2xl border border-pink-500/30 bg-pink-500/10 p-3">
+                  <p class="text-xl font-bold text-pink-700">{{ computedStats.total }}</p>
+                  <p class="text-xs text-pink-600 mt-1">收藏数</p>
                 </div>
                 <div class="rounded-2xl border border-green-500/30 bg-green-500/10 p-3">
                   <p class="text-xl font-bold text-green-700">{{ computedStats.completed }}</p>
@@ -185,9 +185,9 @@
                   <p class="text-xl font-bold text-orange-700">{{ computedStats.avg }}</p>
                   <p class="text-xs text-orange-600 mt-1">平均分</p>
                 </div>
-                <div class="rounded-2xl border border-secondary/30 bg-secondary/10 p-3">
-                  <p class="text-2xl font-bold text-secondary">{{ computedStats.stdDev }}</p>
-                  <p class="text-xs text-secondary mt-1">标准差</p>
+                <div class="rounded-2xl border border-purple-500/30 bg-purple-500/10 p-3">
+                  <p class="text-2xl font-bold text-purple-700">{{ computedStats.stdDev }}</p>
+                  <p class="text-xs text-purple-600 mt-1">标准差</p>
                 </div>
                 <div class="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-3">
                   <p class="text-xl font-bold text-cyan-700">{{ computedStats.rateTotal }}</p>

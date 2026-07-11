@@ -233,27 +233,21 @@
         <router-link :to="`/anime/${anime.id}/topics`" class="btn btn-sm btn-outline mt-4 w-full">查看全部讨论</router-link>
         <a :href="`https://bangumi.lol/subject/${anime.id}/board`" target="_blank" class="btn btn-sm btn-ghost mt-2 w-full">在 Bangumi 发表讨论 →</a>
 
-        <!-- 发表新讨论弹窗 -->
-        <div v-if="showNewTopicModal" class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center" @click.self="showNewTopicModal = false">
-          <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="showNewTopicModal = false"></div>
-          <div class="relative bg-base-100 rounded-t-xl sm:rounded-xl w-full sm:max-w-lg max-h-[90vh] overflow-y-auto p-5 z-10 shadow-2xl">
-            <div class="flex items-center justify-between mb-4">
-              <h3 class="text-lg font-bold text-base-content serif-cn">发表新讨论</h3>
-              <button @click="showNewTopicModal = false" class="btn btn-ghost btn-circle btn-xs text-base-content/40 hover:text-base-content">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
-            </div>
-            <input v-model="newTopicTitle" placeholder="标题" class="input input-bordered w-full mb-3 bg-base-100" />
-            <textarea v-model="newTopicContent" placeholder="内容..." rows="5" class="textarea textarea-bordered w-full mb-4 bg-base-100"></textarea>
+        <dialog v-if="showNewTopicModal" class="modal modal-open modal-bottom sm:modal-middle">
+          <div class="modal-box max-h-[90vh] sm:max-w-lg">
+            <h3 class="text-lg font-bold mb-4">发表新讨论</h3>
+            <input v-model="newTopicTitle" placeholder="标题" class="input input-bordered w-full mb-3" />
+            <textarea v-model="newTopicContent" placeholder="内容..." rows="5" class="textarea textarea-bordered w-full mb-4"></textarea>
             <div class="flex gap-2 justify-end">
               <button @click="showNewTopicModal = false" class="btn btn-ghost btn-sm">取消</button>
-              <button @click="postNewTopic" :disabled="newTopicPosting || !newTopicTitle.trim() || !newTopicContent.trim()" class="btn btn-primary btn-sm">
+              <button @click="postNewTopic" :disabled="newTopicPosting" class="btn btn-primary btn-sm">
                 <span v-if="newTopicPosting" class="loading loading-spinner loading-xs"></span>
                 发布
               </button>
             </div>
           </div>
-        </div>
+          <div class="modal-backdrop" @click="showNewTopicModal = false"></div>
+        </dialog>
       </div>
 
       <!-- wiki -->
@@ -270,45 +264,75 @@
       </div>
       <div v-show="activeTab === 'wiki'" v-else class="py-10 text-center text-base-content/40 text-sm">暂无制作信息</div>
 
-      <!-- 豆瓣 -->
-      <div v-show="activeTab === 'douban'">
-        <div v-if="doubanDetails" class="bg-base-200/40 rounded-lg p-6">
-          <div class="flex items-start gap-6 mb-4">
-            <div class="text-center flex-shrink-0">
+      <!-- 评分（Bangumi + 豆瓣 + B站） -->
+      <div v-show="activeTab === 'rating'">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <!-- Bangumi -->
+          <div class="bg-base-200/40 rounded-lg p-5 text-center">
+            <p class="text-4xl font-black" :class="anime.rating?.score >= 8 ? 'text-success' : anime.rating?.score >= 5 ? 'text-warning' : 'text-base-content/50'">
+              {{ anime.rating?.score?.toFixed(1) || '-' }}
+            </p>
+            <div class="flex items-center gap-0.5 mt-1 justify-center">
+              <svg v-for="i in 5" :key="i" class="w-4 h-4" :class="i <= Math.round((anime.rating?.score || 0) / 2) ? 'text-amber-400' : 'text-base-300'" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+            </div>
+            <p class="text-xs text-base-content/50 mt-1">Bangumi {{ anime.rating?.total }}人评</p>
+            <a :href="`https://bangumi.lol/subject/${anime.id}`" target="_blank" class="btn btn-xs btn-ghost mt-3 w-full">查看详情 →</a>
+          </div>
+
+          <!-- 豆瓣 -->
+          <div class="bg-base-200/40 rounded-lg p-5 text-center">
+            <template v-if="doubanDetails">
               <p class="text-4xl font-black text-amber-500">{{ doubanDetails.rate }}</p>
               <div class="flex items-center gap-0.5 mt-1 justify-center">
                 <svg v-for="i in 5" :key="i" class="w-4 h-4" :class="i <= Math.round(parseFloat(doubanDetails.rate) / 2) ? 'text-amber-400' : 'text-base-300'" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
               </div>
               <p class="text-xs text-base-content/50 mt-1">豆瓣评分</p>
-            </div>
-            <div v-if="doubanDetails.short_comment" class="flex-1 min-w-0">
-              <p class="text-sm text-base-content/70 italic">"{{ doubanDetails.short_comment.content }}"</p>
-              <p class="text-xs text-base-content/40 mt-2">— {{ doubanDetails.short_comment.author }}</p>
-            </div>
+              <a :href="doubanDetails.url" target="_blank" class="btn btn-xs btn-ghost mt-3 w-full">查看详情 →</a>
+            </template>
+            <template v-else>
+              <p class="text-sm text-base-content/40 py-6">
+                <span v-if="doubanLoading" class="loading loading-spinner loading-sm"></span>
+                <span v-else>暂无豆瓣评分</span>
+              </p>
+            </template>
           </div>
-          <a :href="doubanDetails.url" target="_blank" class="btn btn-sm btn-ghost w-full">在豆瓣查看详情 →</a>
-          <!-- 热门短评 -->
-          <div v-if="doubanComments.length" class="mt-6 pt-4 border-t border-base-300">
-            <h4 class="text-sm font-semibold text-base-content/70 mb-3">热门短评</h4>
-            <div class="space-y-3">
-              <div v-for="(c, i) in doubanComments.slice(0, showAllComments ? 999 : 5)" :key="i" class="text-sm">
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="font-medium text-base-content/80">{{ c.user }}</span>
-                  <span v-if="c.rating" class="text-amber-500 text-xs">{{ '★'.repeat(Math.round(c.rating / 2)) }}</span>
-                  <span class="text-xs text-base-content/40">{{ c.time }}</span>
-                  <span v-if="c.useful" class="text-xs text-base-content/40 ml-auto">{{ c.useful }} 有用</span>
-                </div>
-                <p class="text-base-content/70 leading-relaxed">{{ c.content }}</p>
+
+          <!-- B站 -->
+          <div class="bg-base-200/40 rounded-lg p-5 text-center">
+            <template v-if="bilibiliDetails">
+              <p class="text-4xl font-black text-pink-500">{{ bilibiliDetails.score }}</p>
+              <div class="flex items-center gap-0.5 mt-1 justify-center">
+                <svg v-for="i in 5" :key="i" class="w-4 h-4" :class="i <= Math.round((bilibiliDetails.score || 0) / 2) ? 'text-pink-400' : 'text-base-300'" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
               </div>
-            </div>
-            <button v-if="doubanComments.length > 5" @click="showAllComments = !showAllComments" class="btn btn-xs btn-ghost mt-3">
-              {{ showAllComments ? '收起' : `查看全部 ${doubanComments.length} 条` }}
-            </button>
+              <p class="text-xs text-base-content/50 mt-1">B站评分 {{ bilibiliDetails.score_count ? `(${bilibiliDetails.score_count}人)` : '' }}</p>
+              <a :href="bilibiliDetails.url" target="_blank" class="btn btn-xs btn-ghost mt-3 w-full">查看详情 →</a>
+            </template>
+            <template v-else>
+              <p class="text-sm text-base-content/40 py-6">
+                <span v-if="bilibiliLoading" class="loading loading-spinner loading-sm"></span>
+                <span v-else>暂无 B 站评分</span>
+              </p>
+            </template>
           </div>
         </div>
-        <div v-else class="py-10 text-center text-base-content/40 text-sm">
-          <span v-if="doubanLoading" class="loading loading-spinner loading-sm"></span>
-          <span v-else>暂无豆瓣评分信息</span>
+
+        <!-- 豆瓣热门短评 -->
+        <div v-if="doubanComments.length" class="mt-6 bg-base-200/40 rounded-lg p-5">
+          <h4 class="text-sm font-semibold text-base-content/70 mb-3">豆瓣热门短评</h4>
+          <div class="space-y-3">
+            <div v-for="(c, i) in doubanComments.slice(0, showAllComments ? 999 : 5)" :key="i" class="text-sm">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="font-medium text-base-content/80">{{ c.user }}</span>
+                <span v-if="c.rating" class="text-amber-500 text-xs">{{ '★'.repeat(Math.round(c.rating / 2)) }}</span>
+                <span class="text-xs text-base-content/40">{{ c.time }}</span>
+                <span v-if="c.useful" class="text-xs text-base-content/40 ml-auto">{{ c.useful }} 有用</span>
+              </div>
+              <p class="text-base-content/70 leading-relaxed">{{ c.content }}</p>
+            </div>
+          </div>
+          <button v-if="doubanComments.length > 5" @click="showAllComments = !showAllComments" class="btn btn-xs btn-ghost mt-3">
+            {{ showAllComments ? '收起' : `查看全部 ${doubanComments.length} 条` }}
+          </button>
         </div>
       </div>
 
@@ -340,13 +364,31 @@
 
       <!-- 在线观看 -->
       <div v-show="activeTab === 'streaming'">
-        <a
-          :href="`https://ani.girigirilove.com/search/-------------.html?wd=${encodeURIComponent(anime.name_cn || anime.name)}`"
-          target="_blank"
-          class="btn btn-primary w-full"
-        >
-          前往 girigirilove 搜索观看 →
-        </a>
+        <div class="space-y-3">
+          <a
+            v-if="bilibiliDetails?.url"
+            :href="bilibiliDetails.url"
+            target="_blank"
+            class="btn btn-primary w-full"
+          >
+            前往 B 站观看《{{ bilibiliDetails.title || anime.name_cn || anime.name }}》 →
+          </a>
+          <a
+            v-else
+            :href="`https://search.bilibili.com/bangumi?keyword=${encodeURIComponent(anime.name_cn || anime.name)}`"
+            target="_blank"
+            class="btn btn-primary w-full"
+          >
+            在 B 站搜索《{{ anime.name_cn || anime.name }}》 →
+          </a>
+          <a
+            :href="`https://ani.girigirilove.com/search/-------------.html?wd=${encodeURIComponent(anime.name_cn || anime.name)}`"
+            target="_blank"
+            class="btn btn-outline w-full"
+          >
+            前往 girigirilove 搜索观看 →
+          </a>
+        </div>
         <p class="text-xs text-base-content/30 text-center mt-4">点击跳转至第三方网站，本站不存储任何视频内容</p>
       </div>
 
@@ -378,7 +420,7 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { gsap } from 'gsap'
-import { animeAPI, collectionAPI, doubanAPI, commentsAPI, moegirlAPI } from '../api/endpoints'
+import { animeAPI, collectionAPI, doubanAPI, bilibiliAPI, commentsAPI, moegirlAPI } from '../api/endpoints'
 import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toast'
 import CollectionButton from '../components/CollectionButton.vue'
@@ -399,7 +441,7 @@ const tabs = [
   { key: 'talkbox', label: '吐槽' },
   { key: 'topics', label: '讨论版' },
   { key: 'wiki', label: 'wiki' },
-  { key: 'douban', label: '豆瓣' },
+  { key: 'rating', label: '评分' },
   { key: 'music', label: '音乐' },
   { key: 'streaming', label: '在线观看' },
   { key: 'moegirl', label: '萌娘百科' },
@@ -414,6 +456,8 @@ const episodeList = ref([])
 const doubanDetails = ref(null)
 const doubanLoading = ref(false)
 const doubanComments = ref([])
+const bilibiliDetails = ref(null)
+const bilibiliLoading = ref(false)
 const showAllComments = ref(false)
 const topics = ref([])
 const topicLoading = ref(false)
@@ -484,6 +528,22 @@ async function fetchDoubanDetails() {
     }
   } catch { doubanDetails.value = null }
   doubanLoading.value = false
+}
+
+async function fetchBilibiliDetails() {
+  if (bilibiliDetails.value || bilibiliLoading.value) return
+  bilibiliLoading.value = true
+  try {
+    const id = route.params.id
+    const name = anime.value?.name_cn || anime.value?.name
+    const res = await bilibiliAPI.getDetails(id, name)
+    bilibiliDetails.value = res.data?.data || null
+  } catch { bilibiliDetails.value = null }
+  bilibiliLoading.value = false
+}
+
+async function fetchRatingDetails() {
+  await Promise.all([fetchDoubanDetails(), fetchBilibiliDetails()])
 }
 
 async function fetchTopics() {
@@ -641,14 +701,14 @@ async function removeCollection() {
 
 watch(activeTab, (tab) => {
   if (tab === 'topics' && topics.value.length === 0 && !topicLoading.value) fetchTopics()
-  if (tab === 'douban' && !doubanDetails.value && !doubanLoading.value) fetchDoubanDetails()
+  if (tab === 'rating' && !doubanDetails.value && !doubanLoading.value && !bilibiliDetails.value && !bilibiliLoading.value) fetchRatingDetails()
   if (tab === 'moegirl' && moegirlResults.value.length === 0 && !moegirlPage.value && !moegirlLoading.value) fetchMoegirlSearch()
 })
 
 watch(() => route.params.id, (newId, oldId) => {
   if (newId && newId !== oldId) {
     collectionStatus.value = 0; collectionRating.value = 0; collectionComment.value = ''
-    topics.value = []; doubanDetails.value = null; doubanComments.value = []; moegirlResults.value = []; moegirlPage.value = null
+    topics.value = []; doubanDetails.value = null; doubanComments.value = []; bilibiliDetails.value = null; moegirlResults.value = []; moegirlPage.value = null
     activeTab.value = 'overview'
     fetchDetail()
   }
