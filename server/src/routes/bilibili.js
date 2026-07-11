@@ -5,6 +5,20 @@ const app = new Hono()
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
+function generateBuvid3() {
+  const seg = () => Math.floor(Math.random() * 0x10000).toString(16).padStart(4, '0')
+  return `${seg()}${seg()}-${seg()}-${seg()}-${seg()}-${seg()}${seg()}${seg()}infoc`
+}
+
+const BILIBILI_HEADERS = {
+  'User-Agent': UA,
+  'Referer': 'https://search.bilibili.com/',
+  'Origin': 'https://search.bilibili.com',
+  'Accept': 'application/json, text/plain, */*',
+  'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+  'Cookie': `buvid3=${generateBuvid3()}; b_nut=${Date.now()}`
+}
+
 const cache = new Map()
 function getCached(key) {
   const c = cache.get(key)
@@ -25,13 +39,7 @@ function stripTags(s) {
 async function searchBilibiliBangumi(name) {
   if (!name) return null
   const url = `https://api.bilibili.com/x/web-interface/search/type?search_type=media_bangumi&keyword=${encodeURIComponent(name)}`
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': UA,
-      'Referer': 'https://search.bilibili.com/',
-      'Accept': 'application/json, text/plain, */*'
-    }
-  })
+  const res = await fetch(url, { headers: BILIBILI_HEADERS })
   if (!res.ok) return null
   const json = await res.json()
   if (json.code !== 0) return null
