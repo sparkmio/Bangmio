@@ -105,7 +105,8 @@ export async function sendVerificationCode(db, env, { email, purpose = 'register
  *
  * 流程：
  * 1. 检查邮箱是否已注册，已存在则抛 `httpError(409, '邮箱已注册')`
- * 2. 校验邮箱验证码（必须为 'register' 用途且未消费未过期），失败抛 `httpError(400, '验证码错误或已过期')`
+ * 2. 若已配置 `RESEND_API_KEY`：校验邮箱验证码（必须为 'register' 用途且未消费未过期），
+ *    失败抛 `httpError(400, '验证码错误或已过期')`；未配置时跳过验证码（仅靠 Turnstile 防滥用）
  * 3. 生成 salt 并计算 PBKDF2 密码哈希
  * 4. 生成 userId（`crypto.randomUUID()`），写入 D1
  * 5. 签发 JWT（含 userId、email）
@@ -122,12 +123,15 @@ export async function registerUser(db, env, { email, password, code }) {
   if (exists) {
     throw httpError(409, '邮箱已注册')
   }
-  if (!code) {
-    throw httpError(400, '请输入邮箱验证码')
-  }
-  const codeOk = await verifyCode(db, email, String(code), 'register')
-  if (!codeOk) {
-    throw httpError(400, '验证码错误或已过期')
+  // 仅在配置了邮件服务时强制校验验证码；未配置时降级跳过（仅靠 Turnstile 防滥用）
+  if (env.RESEND_API_KEY) {
+    if (!code) {
+      throw httpError(400, '请输入邮箱验证码')
+    }
+    const codeOk = await verifyCode(db, email, String(code), 'register')
+    if (!codeOk) {
+      throw httpError(400, '验证码错误或已过期')
+    }
   }
   const salt = generateSalt()
   const passwordHash = await hashPassword(password, salt)

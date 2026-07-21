@@ -56,8 +56,8 @@
             <p v-if="turnstileError" class="text-xs text-error ml-1">{{ turnstileError }}</p>
           </div>
 
-          <!-- 邮箱验证码 -->
-          <div class="flex flex-col gap-1.5">
+          <!-- 邮箱验证码（仅当后端启用邮件服务时显示，由 VITE_REQUIRE_EMAIL_CODE 构建变量控制） -->
+          <div v-if="requireEmailCode" class="flex flex-col gap-1.5">
             <div class="flex gap-2">
               <input
                 v-model="code"
@@ -114,6 +114,8 @@ let cooldownTimer = null
 
 // Turnstile 配置：未配置 site key 时跳过人机验证（后端也兼容跳过）
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
+// 是否要求邮箱验证码：由构建变量 VITE_REQUIRE_EMAIL_CODE 控制（后端 RESEND_API_KEY 未配置时跳过校验）
+const requireEmailCode = import.meta.env.VITE_REQUIRE_EMAIL_CODE === 'true'
 const turnstileContainer = ref(null)
 const captchaToken = ref('')
 const turnstileError = ref('')
@@ -157,7 +159,7 @@ const canSubmit = computed(
     EMAIL_REGEX.test(email.value) &&
     password.value.length >= 8 &&
     confirmPassword.value === password.value &&
-    /^\d{6}$/.test(code.value) &&
+    (!requireEmailCode || /^\d{6}$/.test(code.value)) &&
     (!turnstileSiteKey || captchaToken.value)
 )
 

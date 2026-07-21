@@ -149,6 +149,35 @@ describe('registerUser', () => {
     expect(input.salt).toMatch(/^[0-9a-f]{32}$/)
     expect(input.passwordHash).toMatch(/^[0-9a-f]{64}$/)
   })
+
+  it('未配置 RESEND_API_KEY 时跳过验证码校验（降级模式）', async () => {
+    userExistsByEmail.mockResolvedValue(false)
+    const createdUser = {
+      id: 'no-code-user',
+      email: 'nocode@test.com',
+      bgmUid: null,
+      createdAt: 1,
+      updatedAt: 1
+    }
+    createUser.mockResolvedValue(createdUser)
+
+    // 不传 code，且 ENV 不含 RESEND_API_KEY
+    const { token, user } = await registerUser(
+      DB,
+      { ...ENV, RESEND_API_KEY: '' },
+      {
+        email: 'nocode@test.com',
+        password: 'pwd123'
+      }
+    )
+
+    // 验证码未校验
+    expect(verifyCode).not.toHaveBeenCalled()
+    // 注册成功
+    expect(user).toEqual({ id: 'no-code-user', email: 'nocode@test.com', bgmUid: null })
+    const verified = await verifyJwt(token, ENV.JWT_SECRET)
+    expect(verified.valid).toBe(true)
+  })
 })
 
 describe('sendVerificationCode', () => {
