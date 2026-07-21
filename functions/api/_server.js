@@ -3974,13 +3974,9 @@ function generateSalt() {
 }
 async function hashPassword(password, saltHex) {
   const enc = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"]
-  );
+  const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, [
+    "deriveBits"
+  ]);
   const bits = await crypto.subtle.deriveBits(
     {
       name: "PBKDF2",
@@ -4007,13 +4003,9 @@ async function verifyPassword(password, saltHex, hashHex) {
 }
 async function deriveKey(secret, saltHex) {
   const enc = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(secret),
-    "HKDF",
-    false,
-    ["deriveKey"]
-  );
+  const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(secret), "HKDF", false, [
+    "deriveKey"
+  ]);
   return crypto.subtle.deriveKey(
     {
       name: "HKDF",
@@ -4037,11 +4029,7 @@ async function encryptToken(token, secret) {
   const key2 = await deriveKey(secret, saltHex);
   const iv = crypto.getRandomValues(new Uint8Array(AES_GCM_IV_BYTES));
   const enc = new TextEncoder();
-  const ciphertext = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
-    key2,
-    enc.encode(token)
-  );
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key2, enc.encode(token));
   return { encrypted: bufferToHex(ciphertext), iv: bufferToHex(iv.buffer) };
 }
 
@@ -4308,6 +4296,19 @@ async function getCurrentUser(db, env, userId) {
 
 // server/src/routes/auth.js
 var app = new Hono2();
+app.use("*", async (c, next) => {
+  if (!c.env?.DB && c.req.method === "POST") {
+    return c.json(
+      {
+        data: null,
+        error: "\u8D26\u53F7\u7CFB\u7EDF\u6682\u672A\u5F00\u653E\uFF08D1 \u6570\u636E\u5E93\u672A\u914D\u7F6E\uFF09\uFF0C\u8BF7\u4F7F\u7528 Bangumi \u76F4\u767B",
+        code: 503
+      },
+      503
+    );
+  }
+  await next();
+});
 var EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function isHttpError(err) {
   return err instanceof Error && typeof err.status === "number";
@@ -4319,10 +4320,7 @@ function errorResponse(err) {
       { status: err.status }
     );
   }
-  return Response.json(
-    { data: null, error: "\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF", code: 500 },
-    { status: 500 }
-  );
+  return Response.json({ data: null, error: "\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF", code: 500 }, { status: 500 });
 }
 app.post("/register", async (c) => {
   try {

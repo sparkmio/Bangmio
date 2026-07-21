@@ -356,8 +356,8 @@
       ],
       "format": "esm"
     },
-    "server/src/utils/crypto.js": { "bytes": 6908, "imports": [], "format": "esm" },
-    "server/src/db/users.js": { "bytes": 7850, "imports": [], "format": "esm" },
+    "server/src/utils/crypto.js": { "bytes": 6860, "imports": [], "format": "esm" },
+    "server/src/db/users.js": { "bytes": 7829, "imports": [], "format": "esm" },
     "server/src/utils/http.js": {
       "bytes": 4625,
       "imports": [
@@ -370,7 +370,7 @@
       "format": "esm"
     },
     "server/src/services/auth.js": {
-      "bytes": 9389,
+      "bytes": 9365,
       "imports": [
         {
           "path": "server/src/utils/crypto.js",
@@ -401,7 +401,7 @@
       "format": "esm"
     },
     "server/src/routes/auth.js": {
-      "bytes": 4919,
+      "bytes": 5336,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -4935,7 +4935,7 @@
       "format": "esm"
     },
     "server/src/app.js": {
-      "bytes": 3052,
+      "bytes": 3040,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -5068,11 +5068,11 @@
         "server/src/config.js": { "bytesInOutput": 383 },
         "server/src/utils/jwt.js": { "bytesInOutput": 2942 },
         "server/src/middleware/jwtAuth.js": { "bytesInOutput": 671 },
-        "server/src/utils/crypto.js": { "bytesInOutput": 2601 },
+        "server/src/utils/crypto.js": { "bytesInOutput": 2553 },
         "server/src/db/users.js": { "bytesInOutput": 2874 },
         "server/src/utils/http.js": { "bytesInOutput": 1749 },
         "server/src/services/auth.js": { "bytesInOutput": 3724 },
-        "server/src/routes/auth.js": { "bytesInOutput": 3323 },
+        "server/src/routes/auth.js": { "bytesInOutput": 3670 },
         "server/src/services/bangumi.js": { "bytesInOutput": 5574 },
         "server/src/routes/user.js": { "bytesInOutput": 15377 },
         "server/src/controllers/animeController.js": { "bytesInOutput": 4411 },
@@ -5310,7 +5310,7 @@
         "server/src/routes/groups.js": { "bytesInOutput": 10447 },
         "server/src/app.js": { "bytesInOutput": 1919 }
       },
-      "bytes": 646458
+      "bytes": 646757
     }
   }
 }

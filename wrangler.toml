@@ -6,7 +6,10 @@ pages_build_output_dir = "client/dist"
 [vars]
 OAUTH_REDIRECT_URI = "https://bangmio.pages.dev/login/callback"
 
-[[d1_databases]]
-binding = "DB"
-database_name = "bangmio-users"
-database_id = "PLACEHOLDER_REPLACE_WITH_ACTUAL_ID"
+# D1 binding 暂时注释，需先创建数据库后填入真实 database_id
+# 创建命令：npx wrangler d1 create bangmio-users
+# 然后取消注释并替换 database_id
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "bangmio-users"
+# database_id = "PLACEHOLDER_REPLACE_WITH_ACTUAL_ID"

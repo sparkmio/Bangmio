@@ -24,6 +24,24 @@ import {
 
 const app = new Hono()
 
+/**
+ * D1 可用性检查中间件
+ * 当 D1 binding 未配置时，所有写操作路由返回 503 引导用户使用 Bangumi 直登
+ */
+app.use('*', async (c, next) => {
+  if (!c.env?.DB && c.req.method === 'POST') {
+    return c.json(
+      {
+        data: null,
+        error: '账号系统暂未开放（D1 数据库未配置），请使用 Bangumi 直登',
+        code: 503
+      },
+      503
+    )
+  }
+  await next()
+})
+
 /** 简单邮箱正则：包含 @ 与域名点 */
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
