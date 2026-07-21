@@ -177,41 +177,98 @@ app.get('/search', async c => {
 })
 
 /**
+ * 判断返回的 HTML 是否为萌娘百科的反爬/JS 检测页（非真实内容）。
+ * 特征：包含 "JavaScript enabled" 提示、长度过短、或主要是 noscript 标签。
+ * @param {string} html - 抓取返回的 HTML。
+ * @returns {boolean} 若为反爬页返回 true。
+ */
+function isMoegirlBlockPage(html) {
+  if (!html) return true
+  if (html.length < 2000) {
+    if (/JavaScript enabled|requires JavaScript|check your browser settings/i.test(html)) {
+      return true
+    }
+    // 短页面且不含萌娘百科核心标识
+    if (html.length < 500 && !/mw-parser-output|mw-content-text|moegirl/i.test(html)) {
+      return true
+    }
+  }
+  return false
+}
+
+/**
+ * 生成萌娘百科降级 HTML：当上游抓取失败或返回反爬页时使用，包含直达链接与提示。
+ * @param {string} name - 萌娘百科页面名（已解码）。
+ * @returns {string} HTML 片段。
+ */
+function buildMoegirlFallbackHTML(name) {
+  const encoded = encodeURIComponent(name)
+  const url = `https://zh.moegirl.org.cn/${encoded}`
+  const ukUrl = `https://zh.moegirl.uk/${encoded}`
+  return `<div style="text-align:center;padding:2.5rem 1rem;font-family:system-ui,-apple-system,'Segoe UI',sans-serif">
+  <div style="display:inline-block;padding:1.5rem 2rem;background:#fff5f6;border:1px solid #ffd6dd;border-radius:12px;max-width:420px">
+    <p style="margin:0 0 0.5rem;font-size:1rem;color:#666">萌娘百科页面暂无法嵌入</p>
+    <p style="margin:0 0 1rem;font-size:0.85rem;color:#999">萌娘百科对第三方服务器有访问限制，请直接访问查看完整内容</p>
+    <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap">
+      <a href="${url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:0.5rem 1.25rem;background:#ff6b81;color:#fff;text-decoration:none;border-radius:999px;font-size:0.9rem;font-weight:500">萌娘百科（国内）→</a>
+      <a href="${ukUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:0.5rem 1.25rem;background:#fff;color:#ff6b81;border:1px solid #ff6b81;text-decoration:none;border-radius:999px;font-size:0.9rem;font-weight:500">萌娘百科（海外）→</a>
+    </div>
+  </div>
+</div>`
+}
+
+/**
  * 萌娘百科页面代理。
  * 抓取指定页面名的萌娘百科页面，仅保留 .mw-parser-output 内容（不存在则保留整个 body），
  * 移除导航/页脚/侧栏/编辑按钮/脚本/样式/广告后返回清洗的 HTML 片段。
- * 使用 30 分钟内存缓存，抓取失败返回 502。
+ * 使用 30 分钟内存缓存。
+ * 优先抓取国内源（zh.moegirl.org.cn），失败或检测到反爬页时尝试海外源（zh.moegirl.uk），
+ * 全部失败时返回 200 + 降级 HTML（直达链接），而非 502，保证前端 iframe 正常展示。
  *
  * @route GET /page/:name
  * @param {string} name - 萌娘百科页面名（URL 编码，会自动解码）。
- * @returns {Response} Content-Type 为 text/html; charset=utf-8 的 HTML 片段；失败返回 502 JSON。
+ * @returns {Response} Content-Type 为 text/html; charset=utf-8 的 HTML 片段。
  */
 app.get('/page/:name', async c => {
+  const rawName = c.req.param('name')
+  let name
   try {
-    const rawName = c.req.param('name')
-    let name
-    try {
-      name = decodeURIComponent(rawName)
-    } catch {
-      name = rawName
-    }
-    if (!name) return c.json({ data: null, error: '缺少页面名', code: 400 }, 400)
-
-    const cacheKey = `moegirl_page_${name}`
-    const cached = cache.get(cacheKey)
-    if (cached) {
-      return c.html(cached, 200, { 'Content-Type': 'text/html; charset=utf-8' })
-    }
-
-    const url = `https://zh.moegirl.org.cn/${encodeURIComponent(name)}`
-    const html = await fetchHTML(url)
-    const fragment = cleanMoegirlPage(html)
-
-    cache.set(cacheKey, fragment)
-    return c.html(fragment, 200, { 'Content-Type': 'text/html; charset=utf-8' })
+    name = decodeURIComponent(rawName)
   } catch {
-    return c.json({ data: null, error: '上游服务暂不可用', code: 502 }, 502)
+    name = rawName
   }
+  if (!name) return c.json({ data: null, error: '缺少页面名', code: 400 }, 400)
+
+  const cacheKey = `moegirl_page_${name}`
+  const cached = cache.get(cacheKey)
+  if (cached) {
+    return c.html(cached, 200, { 'Content-Type': 'text/html; charset=utf-8' })
+  }
+
+  const encoded = encodeURIComponent(name)
+  const candidates = [`https://zh.moegirl.org.cn/${encoded}`, `https://zh.moegirl.uk/${encoded}`]
+
+  for (const url of candidates) {
+    try {
+      const html = await fetchHTML(url, {
+        headers: {
+          Referer: 'https://zh.moegirl.org.cn/',
+          'Cache-Control': 'no-cache'
+        }
+      })
+      if (isMoegirlBlockPage(html)) continue
+      const fragment = cleanMoegirlPage(html)
+      if (!fragment || fragment.trim().length < 100) continue
+      cache.set(cacheKey, fragment)
+      return c.html(fragment, 200, { 'Content-Type': 'text/html; charset=utf-8' })
+    } catch {
+      // 当前源失败，尝试下一个
+    }
+  }
+
+  // 所有源均失败，返回降级 HTML
+  const fallback = buildMoegirlFallbackHTML(name)
+  return c.html(fallback, 200, { 'Content-Type': 'text/html; charset=utf-8' })
 })
 
 export default app

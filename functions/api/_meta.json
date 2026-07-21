@@ -4822,7 +4822,7 @@
     },
     "server/src/services/douban.js": { "bytes": 6739, "imports": [], "format": "esm" },
     "server/src/routes/douban.js": {
-      "bytes": 7318,
+      "bytes": 9080,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -4886,7 +4886,7 @@
       "format": "esm"
     },
     "server/src/routes/moegirl.js": {
-      "bytes": 6621,
+      "bytes": 9524,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -4913,7 +4913,7 @@
       "format": "esm"
     },
     "server/src/routes/groups.js": {
-      "bytes": 11631,
+      "bytes": 12027,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -5304,13 +5304,13 @@
         "server/src/utils/cache.js": { "bytesInOutput": 906 },
         "server/src/routes/comments.js": { "bytesInOutput": 17997 },
         "server/src/services/douban.js": { "bytesInOutput": 4613 },
-        "server/src/routes/douban.js": { "bytesInOutput": 5743 },
+        "server/src/routes/douban.js": { "bytesInOutput": 7280 },
         "server/src/routes/bilibili.js": { "bytesInOutput": 3024 },
-        "server/src/routes/moegirl.js": { "bytesInOutput": 5179 },
-        "server/src/routes/groups.js": { "bytesInOutput": 10447 },
+        "server/src/routes/moegirl.js": { "bytesInOutput": 7394 },
+        "server/src/routes/groups.js": { "bytesInOutput": 10737 },
         "server/src/app.js": { "bytesInOutput": 1919 }
       },
-      "bytes": 646944
+      "bytes": 650986
     }
   }
 }

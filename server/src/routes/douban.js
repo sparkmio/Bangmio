@@ -201,34 +201,65 @@ app.get('/:id/reviews', async c => {
 })
 
 /**
+ * 生成豆瓣降级 HTML：当上游抓取失败时返回，包含直达链接与提示。
+ * @param {string} id - 豆瓣条目 ID。
+ * @returns {string} HTML 片段。
+ */
+function buildDoubanFallbackHTML(id) {
+  const url = `https://movie.douban.com/subject/${id}/`
+  return `<div style="text-align:center;padding:2.5rem 1rem;font-family:system-ui,-apple-system,'Segoe UI',sans-serif">
+  <div style="display:inline-block;padding:1.5rem 2rem;background:#fff5f6;border:1px solid #ffd6dd;border-radius:12px;max-width:400px">
+    <p style="margin:0 0 0.5rem;font-size:1rem;color:#666">豆瓣页面暂无法嵌入</p>
+    <p style="margin:0 0 1rem;font-size:0.85rem;color:#999">豆瓣对第三方服务器有访问限制，请直接访问豆瓣查看完整内容</p>
+    <a href="${url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:0.5rem 1.25rem;background:#ff6b81;color:#fff;text-decoration:none;border-radius:999px;font-size:0.9rem;font-weight:500">前往豆瓣查看 →</a>
+  </div>
+</div>`
+}
+
+/**
  * 豆瓣条目页面代理。
  * 抓取豆瓣条目页面，移除导航/侧栏/推荐/广告等噪声后返回清洗的 HTML 片段。
  * 保留评分区（#interest_sectl）、短评区（.comment-item）、长评区（.review-item）等核心内容。
- * 使用 5 分钟内存缓存，抓取失败返回 502。
+ * 使用 5 分钟内存缓存。
+ * 抓取失败时返回 200 + 降级 HTML（直达链接），而非 502，保证前端 iframe 正常展示。
  *
  * @route GET /page/:id
  * @param {string} id - 豆瓣条目 ID。
- * @returns {Response} Content-Type 为 text/html; charset=utf-8 的 HTML 片段；失败返回 502 JSON。
+ * @returns {Response} Content-Type 为 text/html; charset=utf-8 的 HTML 片段。
  */
 app.get('/page/:id', async c => {
+  const id = c.req.param('id')
+  if (!id) return c.json({ data: null, error: '缺少ID', code: 400 }, 400)
+
+  const cacheKey = `douban_page_${id}`
+  const cached = pageCache.get(cacheKey)
+  if (cached) {
+    return c.html(cached, 200, { 'Content-Type': 'text/html; charset=utf-8' })
+  }
+
+  const url = `https://movie.douban.com/subject/${id}/`
   try {
-    const id = c.req.param('id')
-    if (!id) return c.json({ data: null, error: '缺少ID', code: 400 }, 400)
-
-    const cacheKey = `douban_page_${id}`
-    const cached = pageCache.get(cacheKey)
-    if (cached) {
-      return c.html(cached, 200, { 'Content-Type': 'text/html; charset=utf-8' })
+    const html = await fetchHTML(url, {
+      headers: {
+        Referer: 'https://movie.douban.com/',
+        Cookie: 'bid='
+      }
+    })
+    // 检测是否被反爬拦截（登录页/验证页通常很短或包含特定关键词）
+    if (!html || html.length < 1000 || /login|验证|请输入|forbidden|访问受限/i.test(html)) {
+      const fallback = buildDoubanFallbackHTML(id)
+      return c.html(fallback, 200, { 'Content-Type': 'text/html; charset=utf-8' })
     }
-
-    const url = `https://movie.douban.com/subject/${id}/`
-    const html = await fetchHTML(url)
     const fragment = cleanDoubanPage(html)
-
+    if (!fragment || fragment.trim().length < 100) {
+      const fallback = buildDoubanFallbackHTML(id)
+      return c.html(fallback, 200, { 'Content-Type': 'text/html; charset=utf-8' })
+    }
     pageCache.set(cacheKey, fragment)
     return c.html(fragment, 200, { 'Content-Type': 'text/html; charset=utf-8' })
   } catch {
-    return c.json({ data: null, error: '上游服务暂不可用', code: 502 }, 502)
+    const fallback = buildDoubanFallbackHTML(id)
+    return c.html(fallback, 200, { 'Content-Type': 'text/html; charset=utf-8' })
   }
 })
 

@@ -162,55 +162,62 @@ function parseGroupDetailHTML(html, id, base) {
     avatar = avatarMatch ? fixUrl(avatarMatch[1], base) : ''
   }
 
-  // 话题
+  // 话题：仅在 .topic_list 表格内解析，避免导航栏的 Mobile 链接被误匹配
   const topics = []
   const seenTopics = new Set()
-  const topicRegex = /<a[^>]+href="\/group\/topic\/(\d+)"[^>]*>([\s\S]*?)<\/a>/gi
-  let tm
-  while ((tm = topicRegex.exec(html)) !== null) {
-    const topicId = tm[1]
-    if (seenTopics.has(topicId)) continue
-    seenTopics.add(topicId)
+  const tableMatch = html.match(/<table[^>]*class="[^"]*topic_list[^"]*"[^>]*>([\s\S]*?)<\/table>/i)
+  const topicContext = tableMatch ? tableMatch[1] : ''
+  if (topicContext) {
+    const topicRegex = /<a[^>]+href="\/group\/topic\/(\d+)"[^>]*>([\s\S]*?)<\/a>/gi
+    let tm
+    while ((tm = topicRegex.exec(topicContext)) !== null) {
+      const topicId = tm[1]
+      if (seenTopics.has(topicId)) continue
+      seenTopics.add(topicId)
 
-    const title = unescapeHtml(stripTags(tm[2]).replace(/\s+/g, ' '))
-    if (!title) continue
+      const title = unescapeHtml(stripTags(tm[2]).replace(/\s+/g, ' '))
+      if (!title) continue
 
-    const idx = tm.index
-    const context = html.slice(Math.max(0, idx - 400), Math.min(html.length, idx + 600))
+      const idx = tm.index
+      const context = topicContext.slice(
+        Math.max(0, idx - 400),
+        Math.min(topicContext.length, idx + 600)
+      )
 
-    // 作者
-    let author = ''
-    const authorMatch = context.match(/<a[^>]+href="\/user\/[^"]+"[^>]*>([\s\S]*?)<\/a>/i)
-    if (authorMatch) {
-      author = unescapeHtml(stripTags(authorMatch[1]))
-    }
-
-    // 回复数
-    let reply_count = 0
-    const replyMatch =
-      context.match(/<span[^>]*class="[^"]*(?:posts|reply|count)[^"]*"[^>]*>([\s\S]*?)<\/span>/i) ||
-      context.match(/\((\d+)\s*(?:回复|reply|条)/i) ||
-      context.match(/(\d+)\s*(?:回复|reply)/i)
-    if (replyMatch) {
-      reply_count = parseNumber(replyMatch[1])
-    }
-
-    // 最后回复时间
-    let last_reply_time = ''
-    const timeMatch =
-      context.match(/<small[^>]*class="[^"]*time[^"]*"[^>]*>([\s\S]*?)<\/small>/i) ||
-      context.match(/<span[^>]*class="[^"]*date[^"]*"[^>]*>([\s\S]*?)<\/span>/i) ||
-      context.match(/<span[^>]*class="[^"]*time[^"]*"[^>]*>([\s\S]*?)<\/span>/i) ||
-      context.match(/<small[^>]*>([\s\S]*?)<\/small>/i)
-    if (timeMatch) {
-      const timeText = unescapeHtml(stripTags(timeMatch[1]))
-      if (!/^\d+\s*(?:位成员|成员|members?)$/.test(timeText)) {
-        last_reply_time = timeText
+      // 作者
+      let author = ''
+      const authorMatch = context.match(/<a[^>]+href="\/user\/[^"]+"[^>]*>([\s\S]*?)<\/a>/i)
+      if (authorMatch) {
+        author = unescapeHtml(stripTags(authorMatch[1]))
       }
-    }
 
-    topics.push({ id: topicId, title, author, reply_count, last_reply_time })
-    if (topics.length >= 20) break
+      // 回复数
+      let reply_count = 0
+      const replyMatch =
+        context.match(/<td[^>]*class="[^"]*posts[^"]*"[^>]*>([\s\S]*?)<\/td>/i) ||
+        context.match(/\((\d+)\s*(?:回复|reply|条)/i) ||
+        context.match(/(\d+)\s*(?:回复|reply)/i)
+      if (replyMatch) {
+        reply_count = parseNumber(replyMatch[1])
+      }
+
+      // 最后回复时间
+      let last_reply_time = ''
+      const timeMatch =
+        context.match(/<small[^>]*class="[^"]*time[^"]*"[^>]*>([\s\S]*?)<\/small>/i) ||
+        context.match(/<span[^>]*class="[^"]*date[^"]*"[^>]*>([\s\S]*?)<\/span>/i) ||
+        context.match(/<span[^>]*class="[^"]*time[^"]*"[^>]*>([\s\S]*?)<\/span>/i) ||
+        context.match(/<small[^>]*>([\s\S]*?)<\/small>/i)
+      if (timeMatch) {
+        const timeText = unescapeHtml(stripTags(timeMatch[1]))
+        if (!/^\d+\s*(?:位成员|成员|members?)$/.test(timeText)) {
+          last_reply_time = timeText
+        }
+      }
+
+      topics.push({ id: topicId, title, author, reply_count, last_reply_time })
+      if (topics.length >= 20) break
+    }
   }
 
   return { id, name, description, member_count, avatar, topics, url: `${base}/group/${id}` }

@@ -151,21 +151,29 @@ describe('GET /page/:id', () => {
     expect(html).not.toContain('ad-banner')
 
     expect(fetchHTML).toHaveBeenCalledTimes(1)
-    expect(fetchHTML).toHaveBeenCalledWith('https://movie.douban.com/subject/12345/')
+    expect(fetchHTML).toHaveBeenCalledWith(
+      'https://movie.douban.com/subject/12345/',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Referer: 'https://movie.douban.com/',
+          Cookie: 'bid='
+        })
+      })
+    )
   })
 
-  it('上游抓取失败返回 502 与错误 JSON', async () => {
+  it('上游抓取失败返回 200 与降级 HTML（直达链接）', async () => {
     fetchHTML.mockRejectedValue(new Error('upstream unavailable'))
 
     const res = await app.request('/page/999999', { method: 'GET' })
 
-    expect(res.status).toBe(502)
-    expect(res.headers.get('content-type')).toMatch(/application\/json/)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toMatch(/text\/html/)
 
-    const json = await res.json()
-    expect(json.code).toBe(502)
-    expect(json.error).toBeTruthy()
-    expect(json.data).toBeNull()
+    const html = await res.text()
+    expect(html).toContain('豆瓣页面暂无法嵌入')
+    expect(html).toContain('前往豆瓣查看')
+    expect(html).toContain('https://movie.douban.com/subject/999999/')
 
     expect(fetchHTML).toHaveBeenCalledTimes(1)
   })

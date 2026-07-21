@@ -12,6 +12,8 @@ import { fetchHTML } from '../utils/http.js'
  * 模拟萌娘百科页面 HTML 片段。
  * 包含应被移除的导航/页脚/侧栏/编辑按钮/脚本/样式/广告元素，
  * 以及应保留的 .mw-parser-output 内容。
+ * 注意：mw-parser-output 内的正文需足够长（清洗后 > 100 字符），
+ * 否则路由会判定为内容过短并返回降级 HTML。
  */
 const sampleMoegirlHTML = `
 <!DOCTYPE html>
@@ -34,10 +36,17 @@ const sampleMoegirlHTML = `
 
   <div class="mw-body-content">
     <div class="mw-parser-output">
-      <p>词条正文段落 1。</p>
-      <p>词条正文段落 2。</p>
+      <p>词条正文段落 1。这里是一段较长的概述文字，用于介绍该词条的基本信息与背景设定。</p>
+      <p>词条正文段落 2。这里是第二段正文，继续展开词条主题的相关内容与详细描述。</p>
       <h2>二级标题<span class="mw-editsection">[<a href="/edit">编辑</a>]</span></h2>
-      <p>二级标题下正文。</p>
+      <p>二级标题下正文。这里是对应二级标题下的详细说明，包含若干细节描述与补充信息。</p>
+      <h2>另一个二级标题<span class="mw-editsection">[<a href="/edit">编辑</a>]</span></h2>
+      <p>另一个二级标题下正文。这里继续展开新的章节内容，提供更多相关说明与背景介绍。</p>
+      <ul>
+        <li>列表项 1：相关条目一</li>
+        <li>列表项 2：相关条目二</li>
+        <li>列表项 3：相关条目三</li>
+      </ul>
       <div class="ad-box">广告内容</div>
       <div class="promo">促销</div>
     </div>
@@ -145,23 +154,43 @@ describe('GET /page/:name', () => {
     expect(html).not.toMatch(/class="mw-editsection"/)
 
     expect(fetchHTML).toHaveBeenCalledTimes(1)
-    expect(fetchHTML).toHaveBeenCalledWith('https://zh.moegirl.org.cn/TestPage')
+    expect(fetchHTML).toHaveBeenCalledWith(
+      'https://zh.moegirl.org.cn/TestPage',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Referer: 'https://zh.moegirl.org.cn/',
+          'Cache-Control': 'no-cache'
+        })
+      })
+    )
   })
 
-  it('上游抓取失败返回 502 与错误 JSON', async () => {
+  it('上游抓取失败返回 200 与降级 HTML（直达链接，双源尝试）', async () => {
     fetchHTML.mockRejectedValue(new Error('upstream unavailable'))
 
     const res = await app.request('/page/FailPage', { method: 'GET' })
 
-    expect(res.status).toBe(502)
-    expect(res.headers.get('content-type')).toMatch(/application\/json/)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toMatch(/text\/html/)
 
-    const json = await res.json()
-    expect(json.code).toBe(502)
-    expect(json.error).toBeTruthy()
-    expect(json.data).toBeNull()
+    const html = await res.text()
+    expect(html).toContain('萌娘百科页面暂无法嵌入')
+    // 降级 HTML 应包含国内 + 海外两个直达链接
+    expect(html).toContain('https://zh.moegirl.org.cn/FailPage')
+    expect(html).toContain('https://zh.moegirl.uk/FailPage')
 
-    expect(fetchHTML).toHaveBeenCalledTimes(1)
+    // 双源尝试：fetchHTML 应被调用 2 次
+    expect(fetchHTML).toHaveBeenCalledTimes(2)
+    expect(fetchHTML).toHaveBeenNthCalledWith(
+      1,
+      'https://zh.moegirl.org.cn/FailPage',
+      expect.objectContaining({ headers: expect.any(Object) })
+    )
+    expect(fetchHTML).toHaveBeenNthCalledWith(
+      2,
+      'https://zh.moegirl.uk/FailPage',
+      expect.objectContaining({ headers: expect.any(Object) })
+    )
   })
 
   it('name 参数 URL decode 正确（中文名）', async () => {
@@ -174,7 +203,10 @@ describe('GET /page/:name', () => {
     expect(fetchHTML).toHaveBeenCalledTimes(1)
     // 路由内部应解码 name 后再调用 fetchHTML，URL 应包含解码后的中文名（再次 encodeURIComponent）
     expect(fetchHTML).toHaveBeenCalledWith(
-      `https://zh.moegirl.org.cn/${encodeURIComponent('中文词条名')}`
+      `https://zh.moegirl.org.cn/${encodeURIComponent('中文词条名')}`,
+      expect.objectContaining({
+        headers: expect.any(Object)
+      })
     )
   })
 

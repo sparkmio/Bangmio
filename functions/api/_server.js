@@ -16502,22 +16502,46 @@ app6.get("/:id/reviews", async (c) => {
     return c.json({ data: [] });
   }
 });
+function buildDoubanFallbackHTML(id) {
+  const url = `https://movie.douban.com/subject/${id}/`;
+  return `<div style="text-align:center;padding:2.5rem 1rem;font-family:system-ui,-apple-system,'Segoe UI',sans-serif">
+  <div style="display:inline-block;padding:1.5rem 2rem;background:#fff5f6;border:1px solid #ffd6dd;border-radius:12px;max-width:400px">
+    <p style="margin:0 0 0.5rem;font-size:1rem;color:#666">\u8C46\u74E3\u9875\u9762\u6682\u65E0\u6CD5\u5D4C\u5165</p>
+    <p style="margin:0 0 1rem;font-size:0.85rem;color:#999">\u8C46\u74E3\u5BF9\u7B2C\u4E09\u65B9\u670D\u52A1\u5668\u6709\u8BBF\u95EE\u9650\u5236\uFF0C\u8BF7\u76F4\u63A5\u8BBF\u95EE\u8C46\u74E3\u67E5\u770B\u5B8C\u6574\u5185\u5BB9</p>
+    <a href="${url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:0.5rem 1.25rem;background:#ff6b81;color:#fff;text-decoration:none;border-radius:999px;font-size:0.9rem;font-weight:500">\u524D\u5F80\u8C46\u74E3\u67E5\u770B \u2192</a>
+  </div>
+</div>`;
+}
 app6.get("/page/:id", async (c) => {
+  const id = c.req.param("id");
+  if (!id) return c.json({ data: null, error: "\u7F3A\u5C11ID", code: 400 }, 400);
+  const cacheKey = `douban_page_${id}`;
+  const cached = pageCache.get(cacheKey);
+  if (cached) {
+    return c.html(cached, 200, { "Content-Type": "text/html; charset=utf-8" });
+  }
+  const url = `https://movie.douban.com/subject/${id}/`;
   try {
-    const id = c.req.param("id");
-    if (!id) return c.json({ data: null, error: "\u7F3A\u5C11ID", code: 400 }, 400);
-    const cacheKey = `douban_page_${id}`;
-    const cached = pageCache.get(cacheKey);
-    if (cached) {
-      return c.html(cached, 200, { "Content-Type": "text/html; charset=utf-8" });
+    const html = await fetchHTML(url, {
+      headers: {
+        Referer: "https://movie.douban.com/",
+        Cookie: "bid="
+      }
+    });
+    if (!html || html.length < 1e3 || /login|验证|请输入|forbidden|访问受限/i.test(html)) {
+      const fallback = buildDoubanFallbackHTML(id);
+      return c.html(fallback, 200, { "Content-Type": "text/html; charset=utf-8" });
     }
-    const url = `https://movie.douban.com/subject/${id}/`;
-    const html = await fetchHTML(url);
     const fragment = cleanDoubanPage(html);
+    if (!fragment || fragment.trim().length < 100) {
+      const fallback = buildDoubanFallbackHTML(id);
+      return c.html(fallback, 200, { "Content-Type": "text/html; charset=utf-8" });
+    }
     pageCache.set(cacheKey, fragment);
     return c.html(fragment, 200, { "Content-Type": "text/html; charset=utf-8" });
   } catch {
-    return c.json({ data: null, error: "\u4E0A\u6E38\u670D\u52A1\u6682\u4E0D\u53EF\u7528", code: 502 }, 502);
+    const fallback = buildDoubanFallbackHTML(id);
+    return c.html(fallback, 200, { "Content-Type": "text/html; charset=utf-8" });
   }
 });
 var douban_default = app6;
@@ -16738,29 +16762,70 @@ app8.get("/search", async (c) => {
     return c.json({ data: { results: [] } });
   }
 });
-app8.get("/page/:name", async (c) => {
-  try {
-    const rawName = c.req.param("name");
-    let name;
-    try {
-      name = decodeURIComponent(rawName);
-    } catch {
-      name = rawName;
+function isMoegirlBlockPage(html) {
+  if (!html) return true;
+  if (html.length < 2e3) {
+    if (/JavaScript enabled|requires JavaScript|check your browser settings/i.test(html)) {
+      return true;
     }
-    if (!name) return c.json({ data: null, error: "\u7F3A\u5C11\u9875\u9762\u540D", code: 400 }, 400);
-    const cacheKey = `moegirl_page_${name}`;
-    const cached = cache4.get(cacheKey);
-    if (cached) {
-      return c.html(cached, 200, { "Content-Type": "text/html; charset=utf-8" });
+    if (html.length < 500 && !/mw-parser-output|mw-content-text|moegirl/i.test(html)) {
+      return true;
     }
-    const url = `https://zh.moegirl.org.cn/${encodeURIComponent(name)}`;
-    const html = await fetchHTML(url);
-    const fragment = cleanMoegirlPage(html);
-    cache4.set(cacheKey, fragment);
-    return c.html(fragment, 200, { "Content-Type": "text/html; charset=utf-8" });
-  } catch {
-    return c.json({ data: null, error: "\u4E0A\u6E38\u670D\u52A1\u6682\u4E0D\u53EF\u7528", code: 502 }, 502);
   }
+  return false;
+}
+function buildMoegirlFallbackHTML(name) {
+  const encoded = encodeURIComponent(name);
+  const url = `https://zh.moegirl.org.cn/${encoded}`;
+  const ukUrl = `https://zh.moegirl.uk/${encoded}`;
+  return `<div style="text-align:center;padding:2.5rem 1rem;font-family:system-ui,-apple-system,'Segoe UI',sans-serif">
+  <div style="display:inline-block;padding:1.5rem 2rem;background:#fff5f6;border:1px solid #ffd6dd;border-radius:12px;max-width:420px">
+    <p style="margin:0 0 0.5rem;font-size:1rem;color:#666">\u840C\u5A18\u767E\u79D1\u9875\u9762\u6682\u65E0\u6CD5\u5D4C\u5165</p>
+    <p style="margin:0 0 1rem;font-size:0.85rem;color:#999">\u840C\u5A18\u767E\u79D1\u5BF9\u7B2C\u4E09\u65B9\u670D\u52A1\u5668\u6709\u8BBF\u95EE\u9650\u5236\uFF0C\u8BF7\u76F4\u63A5\u8BBF\u95EE\u67E5\u770B\u5B8C\u6574\u5185\u5BB9</p>
+    <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap">
+      <a href="${url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:0.5rem 1.25rem;background:#ff6b81;color:#fff;text-decoration:none;border-radius:999px;font-size:0.9rem;font-weight:500">\u840C\u5A18\u767E\u79D1\uFF08\u56FD\u5185\uFF09\u2192</a>
+      <a href="${ukUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:0.5rem 1.25rem;background:#fff;color:#ff6b81;border:1px solid #ff6b81;text-decoration:none;border-radius:999px;font-size:0.9rem;font-weight:500">\u840C\u5A18\u767E\u79D1\uFF08\u6D77\u5916\uFF09\u2192</a>
+    </div>
+  </div>
+</div>`;
+}
+app8.get("/page/:name", async (c) => {
+  const rawName = c.req.param("name");
+  let name;
+  try {
+    name = decodeURIComponent(rawName);
+  } catch {
+    name = rawName;
+  }
+  if (!name) return c.json({ data: null, error: "\u7F3A\u5C11\u9875\u9762\u540D", code: 400 }, 400);
+  const cacheKey = `moegirl_page_${name}`;
+  const cached = cache4.get(cacheKey);
+  if (cached) {
+    return c.html(cached, 200, { "Content-Type": "text/html; charset=utf-8" });
+  }
+  const encoded = encodeURIComponent(name);
+  const candidates = [
+    `https://zh.moegirl.org.cn/${encoded}`,
+    `https://zh.moegirl.uk/${encoded}`
+  ];
+  for (const url of candidates) {
+    try {
+      const html = await fetchHTML(url, {
+        headers: {
+          Referer: "https://zh.moegirl.org.cn/",
+          "Cache-Control": "no-cache"
+        }
+      });
+      if (isMoegirlBlockPage(html)) continue;
+      const fragment = cleanMoegirlPage(html);
+      if (!fragment || fragment.trim().length < 100) continue;
+      cache4.set(cacheKey, fragment);
+      return c.html(fragment, 200, { "Content-Type": "text/html; charset=utf-8" });
+    } catch {
+    }
+  }
+  const fallback = buildMoegirlFallbackHTML(name);
+  return c.html(fallback, 200, { "Content-Type": "text/html; charset=utf-8" });
 });
 var moegirl_default = app8;
 
@@ -16887,36 +16952,45 @@ function parseGroupDetailHTML(html, id, base) {
   }
   const topics = [];
   const seenTopics = /* @__PURE__ */ new Set();
-  const topicRegex = /<a[^>]+href="\/group\/topic\/(\d+)"[^>]*>([\s\S]*?)<\/a>/gi;
-  let tm;
-  while ((tm = topicRegex.exec(html)) !== null) {
-    const topicId = tm[1];
-    if (seenTopics.has(topicId)) continue;
-    seenTopics.add(topicId);
-    const title = unescapeHtml(stripTags(tm[2]).replace(/\s+/g, " "));
-    if (!title) continue;
-    const idx = tm.index;
-    const context = html.slice(Math.max(0, idx - 400), Math.min(html.length, idx + 600));
-    let author = "";
-    const authorMatch = context.match(/<a[^>]+href="\/user\/[^"]+"[^>]*>([\s\S]*?)<\/a>/i);
-    if (authorMatch) {
-      author = unescapeHtml(stripTags(authorMatch[1]));
-    }
-    let reply_count = 0;
-    const replyMatch = context.match(/<span[^>]*class="[^"]*(?:posts|reply|count)[^"]*"[^>]*>([\s\S]*?)<\/span>/i) || context.match(/\((\d+)\s*(?:回复|reply|条)/i) || context.match(/(\d+)\s*(?:回复|reply)/i);
-    if (replyMatch) {
-      reply_count = parseNumber(replyMatch[1]);
-    }
-    let last_reply_time = "";
-    const timeMatch = context.match(/<small[^>]*class="[^"]*time[^"]*"[^>]*>([\s\S]*?)<\/small>/i) || context.match(/<span[^>]*class="[^"]*date[^"]*"[^>]*>([\s\S]*?)<\/span>/i) || context.match(/<span[^>]*class="[^"]*time[^"]*"[^>]*>([\s\S]*?)<\/span>/i) || context.match(/<small[^>]*>([\s\S]*?)<\/small>/i);
-    if (timeMatch) {
-      const timeText = unescapeHtml(stripTags(timeMatch[1]));
-      if (!/^\d+\s*(?:位成员|成员|members?)$/.test(timeText)) {
-        last_reply_time = timeText;
+  const tableMatch = html.match(/<table[^>]*class="[^"]*topic_list[^"]*"[^>]*>([\s\S]*?)<\/table>/i);
+  const topicContext = tableMatch ? tableMatch[1] : "";
+  if (topicContext) {
+    const topicRegex = /<a[^>]+href="\/group\/topic\/(\d+)"[^>]*>([\s\S]*?)<\/a>/gi;
+    let tm;
+    while ((tm = topicRegex.exec(topicContext)) !== null) {
+      const topicId = tm[1];
+      if (seenTopics.has(topicId)) continue;
+      seenTopics.add(topicId);
+      const title = unescapeHtml(stripTags(tm[2]).replace(/\s+/g, " "));
+      if (!title) continue;
+      const idx = tm.index;
+      const context = topicContext.slice(
+        Math.max(0, idx - 400),
+        Math.min(topicContext.length, idx + 600)
+      );
+      let author = "";
+      const authorMatch = context.match(/<a[^>]+href="\/user\/[^"]+"[^>]*>([\s\S]*?)<\/a>/i);
+      if (authorMatch) {
+        author = unescapeHtml(stripTags(authorMatch[1]));
       }
+      let reply_count = 0;
+      const replyMatch = context.match(
+        /<td[^>]*class="[^"]*posts[^"]*"[^>]*>([\s\S]*?)<\/td>/i
+      ) || context.match(/\((\d+)\s*(?:回复|reply|条)/i) || context.match(/(\d+)\s*(?:回复|reply)/i);
+      if (replyMatch) {
+        reply_count = parseNumber(replyMatch[1]);
+      }
+      let last_reply_time = "";
+      const timeMatch = context.match(/<small[^>]*class="[^"]*time[^"]*"[^>]*>([\s\S]*?)<\/small>/i) || context.match(/<span[^>]*class="[^"]*date[^"]*"[^>]*>([\s\S]*?)<\/span>/i) || context.match(/<span[^>]*class="[^"]*time[^"]*"[^>]*>([\s\S]*?)<\/span>/i) || context.match(/<small[^>]*>([\s\S]*?)<\/small>/i);
+      if (timeMatch) {
+        const timeText = unescapeHtml(stripTags(timeMatch[1]));
+        if (!/^\d+\s*(?:位成员|成员|members?)$/.test(timeText)) {
+          last_reply_time = timeText;
+        }
+      }
+      topics.push({ id: topicId, title, author, reply_count, last_reply_time });
+      if (topics.length >= 20) break;
     }
-    topics.push({ id: topicId, title, author, reply_count, last_reply_time });
-    if (topics.length >= 20) break;
   }
   return { id, name, description, member_count, avatar, topics, url: `${base}/group/${id}` };
 }
