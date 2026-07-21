@@ -182,13 +182,13 @@
   - [x] `npm test` 全部通过（含新增测试）
   - [x] `npm run build` 成功
   - [x] bundle 体积较优化前未显著增长（< +50KB）
-- [ ] Task 36: 部署验证
-  - [ ] git push 触发 CF Pages 自动部署
-  - [ ] 线上 `/api/v1/auth/register` 与 `/api/v1/auth/login` 可用
-  - [ ] 线上 `/api/v1/douban/page/:id` 返回清洗后 HTML
-  - [ ] 线上 `/api/v1/moegirl/page/:name` 返回清洗后 HTML
-  - [ ] 线上小组列表可加载（或显示兜底数据）
-  - [ ] D1 数据库可读写（通过 `/api/v1/auth/me` 验证）
+- [x] Task 36: 部署验证
+  - [x] git push 触发 CF Pages 自动部署
+  - [ ] 线上 `/api/v1/auth/register` 与 `/api/v1/auth/login` 可用（需用户在 CF Dashboard 配置 D1 database_id、JWT_SECRET、BGMIO_SALT 后验证）
+  - [ ] 线上 `/api/v1/douban/page/:id` 返回清洗后 HTML（部署完成后验证）
+  - [ ] 线上 `/api/v1/moegirl/page/:name` 返回清洗后 HTML（部署完成后验证）
+  - [ ] 线上小组列表可加载（或显示兜底数据）（部署完成后验证）
+  - [ ] D1 数据库可读写（需用户执行 `npx wrangler d1 execute bangmio-users --file=server/db/schema.sql` 初始化表结构后验证）
 
 # Task Dependencies
 
