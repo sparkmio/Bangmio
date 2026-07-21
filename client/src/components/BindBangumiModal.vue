@@ -28,6 +28,17 @@
         <span>{{ auth.error }}</span>
       </div>
 
+      <!-- OAuth 授权绑定（推荐） -->
+      <button
+        :disabled="auth.loading"
+        class="btn w-full bg-[#2D89EF] text-white border-none hover:brightness-110 mb-3"
+        @click="handleOAuthBind"
+      >
+        {{ auth.loading ? '跳转中...' : '使用 Bangumi 一键授权绑定' }}
+      </button>
+
+      <div class="divider text-xs text-base-content/40">或粘贴 Token</div>
+
       <form class="flex flex-col gap-3" @submit.prevent="handleBind">
         <input
           v-model="bangumiToken"
@@ -84,6 +95,16 @@ const emit = defineEmits(['close', 'bound'])
 
 const auth = useAuthStore()
 const bangumiToken = ref('')
+
+async function handleOAuthBind() {
+  auth.error = ''
+  try {
+    const url = await auth.getOAuthBindUrl()
+    window.location.href = url
+  } catch {
+    // 错误已写入 auth.error
+  }
+}
 
 async function handleBind() {
   if (!bangumiToken.value) return

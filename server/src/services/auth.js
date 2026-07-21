@@ -31,11 +31,23 @@ import {
   getUserBgmBinding,
   userExistsByEmail
 } from '../db/users.js'
+import {
+  generateNumericCode,
+  createCode,
+  getLatestCode,
+  verifyCode,
+  canResend,
+  resendCooldownSeconds
+} from '../db/emailCodes.js'
+import { sendEmail, buildVerificationEmailHTML } from '../utils/email.js'
 import { fetchHTML } from '../utils/http.js'
 import { logError, logInfo } from '../utils/logger.js'
 
 /** Bangumi `/v0/me` 接口地址，用于验证 Access Token 有效性 */
 const BGM_ME_API = 'https://api.bgm.tv/v0/me'
+
+/** OAuth 绑定流程 state JWT 有效期：5 分钟 */
+const OAUTH_BIND_STATE_TTL = 5 * 60
 
 /**
  * 构造一个带 `status` 属性的 Error，供路由层根据 status 决定响应码。
@@ -50,25 +62,72 @@ function httpError(status, message) {
 }
 
 /**
+ * 发送邮箱验证码（用于注册等场景）。
+ *
+ * 流程：
+ * 1. 检查 1 分钟内是否已发送过（防滥用），未到冷却时间返回剩余秒数
+ * 2. 生成 6 位数字验证码并写入 D1（10 分钟过期）
+ * 3. 通过 Resend 发送验证码邮件
+ *
+ * @param {D1Database} db - D1 binding。
+ * @param {object} env - 环境变量（需含 `RESEND_API_KEY`，可选 `RESEND_FROM`）。
+ * @param {{ email: string, purpose?: string }} input - 邮箱与用途（默认 'register'）。
+ * @returns {Promise<{ sent: true, cooldownSeconds: 0 }|{ sent: false, cooldownSeconds: number }>}
+ *   发送结果，失败时返回剩余冷却秒数。
+ * @throws {Error} 当邮件服务未配置或发送失败时抛出 httpError。
+ */
+export async function sendVerificationCode(db, env, { email, purpose = 'register' }) {
+  const latest = await getLatestCode(db, email, purpose)
+  if (!canResend(latest)) {
+    return { sent: false, cooldownSeconds: resendCooldownSeconds(latest) }
+  }
+  if (!env.RESEND_API_KEY) {
+    throw httpError(500, '邮件服务未配置（缺少 RESEND_API_KEY）')
+  }
+  const code = generateNumericCode()
+  await createCode(db, { email, code, purpose })
+  try {
+    await sendEmail(
+      { to: email, subject: '【Bangmio】注册验证码', html: buildVerificationEmailHTML(code) },
+      env.RESEND_API_KEY,
+      env.RESEND_FROM
+    )
+  } catch (err) {
+    logError('验证码邮件发送失败', { email, error: String(err) })
+    throw httpError(500, '验证码发送失败，请稍后重试')
+  }
+  logInfo('验证码已发送', { email, purpose })
+  return { sent: true, cooldownSeconds: 0 }
+}
+
+/**
  * 注册新用户。
  *
  * 流程：
  * 1. 检查邮箱是否已注册，已存在则抛 `httpError(409, '邮箱已注册')`
- * 2. 生成 salt 并计算 PBKDF2 密码哈希
- * 3. 生成 userId（`crypto.randomUUID()`），写入 D1
- * 4. 签发 JWT（含 userId、email）
+ * 2. 校验邮箱验证码（必须为 'register' 用途且未消费未过期），失败抛 `httpError(400, '验证码错误或已过期')`
+ * 3. 生成 salt 并计算 PBKDF2 密码哈希
+ * 4. 生成 userId（`crypto.randomUUID()`），写入 D1
+ * 5. 签发 JWT（含 userId、email）
  *
  * @param {D1Database} db - D1 binding（`c.env.DB`）。
  * @param {object} env - 环境变量（需含 `JWT_SECRET`）。
- * @param {{ email: string, password: string }} input - 注册信息。
+ * @param {{ email: string, password: string, code: string }} input - 注册信息（含验证码）。
  * @returns {Promise<{ token: string, user: { id: string, email: string, bgmUid: null } }>}
  *   JWT 与公开用户信息。
- * @throws {Error} 当邮箱已存在或入库失败时抛出 httpError。
+ * @throws {Error} 当邮箱已存在、验证码错误或入库失败时抛出 httpError。
  */
-export async function registerUser(db, env, { email, password }) {
+export async function registerUser(db, env, { email, password, code }) {
   const exists = await userExistsByEmail(db, email)
   if (exists) {
     throw httpError(409, '邮箱已注册')
+  }
+  if (!code) {
+    throw httpError(400, '请输入邮箱验证码')
+  }
+  const codeOk = await verifyCode(db, email, String(code), 'register')
+  if (!codeOk) {
+    throw httpError(400, '验证码错误或已过期')
   }
   const salt = generateSalt()
   const passwordHash = await hashPassword(password, salt)
@@ -261,5 +320,122 @@ export async function getUserBgmToken(db, env, userId) {
   } catch (err) {
     logError('Bangumi token 解密失败', { userId, error: String(err) })
     return null
+  }
+}
+
+/**
+ * 生成 OAuth 绑定流程的 state JWT。
+ *
+ * state 中包含当前 Bangmio 用户 ID 与 action='bind' 标记，
+ * 用于在 OAuth 回调时识别这是绑定流程而非登录流程，并定位到具体用户。
+ * 有效期 5 分钟。
+ *
+ * @param {object} env - 环境变量（需含 `JWT_SECRET`）。
+ * @param {string} userId - 当前 Bangmio 用户 ID。
+ * @returns {Promise<string>} state JWT 字符串。
+ */
+export async function createOAuthBindState(env, userId) {
+  return signJwt({ userId, action: 'bind' }, env.JWT_SECRET, OAUTH_BIND_STATE_TTL)
+}
+
+/**
+ * 验证 OAuth 绑定流程的 state JWT 并返回 userId。
+ *
+ * @param {object} env - 环境变量（需含 `JWT_SECRET`）。
+ * @param {string} state - 待验证的 state JWT。
+ * @returns {Promise<{ valid: boolean, userId?: string }>}
+ */
+export async function verifyOAuthBindState(env, state) {
+  const { valid, payload } = await verifyJwt(state, env.JWT_SECRET)
+  if (!valid || !payload || payload.action !== 'bind' || !payload.userId) {
+    return { valid: false }
+  }
+  return { valid: true, userId: payload.userId }
+}
+
+/**
+ * 通过 Bangumi OAuth 授权码绑定账号。
+ *
+ * 流程：
+ * 1. 验证 state JWT，提取 userId（必须是绑定流程）
+ * 2. 用授权码向 Bangumi 换取 access_token
+ * 3. 调用 /v0/me 获取 Bangumi 用户信息
+ * 4. 加密 access_token 并写入 D1
+ * 5. 签发新的 Bangmio JWT（含 bgmUid）
+ *
+ * @param {D1Database} db - D1 binding。
+ * @param {object} env - 环境变量。
+ * @param {{ code: string, state: string, oauthBase: string, appId: string, appSecret: string, redirectUri: string }} input
+ *   OAuth 参数。
+ * @returns {Promise<{ token: string, user: object }>}
+ *   新 JWT 与用户信息。
+ * @throws {Error} 当 state 无效、授权码换取失败或写入失败时抛出 httpError。
+ */
+export async function bindBangumiByOAuth(
+  db,
+  env,
+  { code, state, oauthBase, appId, appSecret, redirectUri }
+) {
+  const stateResult = await verifyOAuthBindState(env, state)
+  if (!stateResult.valid || !stateResult.userId) {
+    throw httpError(400, '授权状态无效或已过期，请重新发起绑定')
+  }
+  const userId = stateResult.userId
+
+  // 用授权码换取 access_token
+  let accessToken
+  try {
+    const params = new URLSearchParams({
+      grant_type: 'authorization_code',
+      client_id: appId,
+      client_secret: appSecret,
+      code,
+      redirect_uri: redirectUri
+    })
+    const tokenRes = await fetch(`${oauthBase}/oauth/access_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    })
+    const tokenData = await tokenRes.json()
+    accessToken = tokenData.access_token
+  } catch (err) {
+    logError('OAuth 授权码换取失败', { userId, error: String(err) })
+    throw httpError(400, '授权码无效或已过期')
+  }
+  if (!accessToken) {
+    throw httpError(400, '获取 Bangumi Access Token 失败')
+  }
+
+  // 验证 token 并获取 Bangumi 用户信息
+  let me
+  try {
+    const text = await fetchHTML(BGM_ME_API, {
+      headers: { Authorization: 'Bearer ' + accessToken, Accept: 'application/json' }
+    })
+    me = JSON.parse(text)
+  } catch (err) {
+    logError('OAuth 绑定时验证 token 失败', { userId, error: String(err) })
+    throw httpError(500, 'Bangumi Token 验证失败')
+  }
+  const bgmUid = me?.id
+  if (!bgmUid) {
+    throw httpError(500, '获取 Bangumi 用户信息失败')
+  }
+
+  const { encrypted, iv } = await encryptToken(accessToken, env.JWT_SECRET)
+  const updated = await updateUserBgmBinding(db, userId, String(bgmUid), encrypted, iv)
+  if (!updated) {
+    throw httpError(404, '用户不存在')
+  }
+  const token = await signJwt(
+    { userId: updated.id, email: updated.email, bgmUid: updated.bgmUid },
+    env.JWT_SECRET
+  )
+  logInfo('OAuth 绑定成功', { userId, bgmUid: String(bgmUid) })
+  return {
+    token,
+    user: { id: updated.id, email: updated.email, bgmUid: updated.bgmUid },
+    bgmToken: accessToken
   }
 }

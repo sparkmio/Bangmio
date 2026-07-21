@@ -22,9 +22,26 @@ vi.mock('../utils/http.js', () => ({
   SCRAPE_UA: 'mock-ua'
 }))
 
+// Mock emailCodes.js（验证码逻辑由单元测试覆盖；集成测试中 verifyCode 固定返回 true）
+vi.mock('../db/emailCodes.js', () => ({
+  generateNumericCode: vi.fn(() => '123456'),
+  createCode: vi.fn(),
+  getLatestCode: vi.fn(),
+  verifyCode: vi.fn(),
+  canResend: vi.fn(() => true),
+  resendCooldownSeconds: vi.fn(() => 0)
+}))
+
+// Mock email.js（不实际发信）
+vi.mock('../utils/email.js', () => ({
+  sendEmail: vi.fn(),
+  buildVerificationEmailHTML: vi.fn(() => '<html>mock</html>')
+}))
+
 // 不 mock users.js / crypto.js / jwt.js：使用真实实现，配合内存 D1 完成端到端验证
 import { registerUser, bindBangumi, refreshJwt, getCurrentUser, getUserBgmToken } from './auth.js'
 import { fetchHTML } from '../utils/http.js'
+import { verifyCode } from '../db/emailCodes.js'
 import { verifyJwt } from '../utils/jwt.js'
 
 /** 测试环境变量（JWT_SECRET ≥ 32 字符；BGMIO_SALT 用于 HKDF 派生） */
@@ -222,9 +239,12 @@ describe('场景 1：Bangmio 完整流程（注册 → 登录 → 绑定 → 调
   })
 
   it('1.1 注册新用户返回 JWT，payload 含 userId/email，无 bgmUid', async () => {
+    // verifyCode 默认返回 undefined → registerUser 会因验证码失败，需 mock 为 true
+    verifyCode.mockResolvedValue(true)
     const { token, user } = await registerUser(db, ENV, {
       email: 'flow@test.com',
-      password: 'password123'
+      password: 'password123',
+      code: '123456'
     })
 
     // JWT 验证：payload 含 userId/email，无 bgmUid
@@ -400,11 +420,13 @@ describe('场景 3：未绑定 Bangmio 用户调用番剧功能 → 403 引导',
   beforeEach(async () => {
     db = createMockD1()
     fetchHTML.mockResolvedValue(JSON.stringify({ id: 12345, username: 'test' }))
+    verifyCode.mockResolvedValue(true)
 
     // 注册 Bangmio 账号但不绑定 Bangumi（场景前置）
     const { user } = await registerUser(db, ENV, {
       email: 'unbound@test.com',
-      password: 'password123'
+      password: 'password123',
+      code: '123456'
     })
     userId = user.id
   })

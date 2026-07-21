@@ -11,6 +11,22 @@ vi.mock('../db/users.js', () => ({
   userExistsByEmail: vi.fn()
 }))
 
+// Mock emailCodes.js（验证码相关）
+vi.mock('../db/emailCodes.js', () => ({
+  generateNumericCode: vi.fn(() => '123456'),
+  createCode: vi.fn(),
+  getLatestCode: vi.fn(),
+  verifyCode: vi.fn(),
+  canResend: vi.fn(() => true),
+  resendCooldownSeconds: vi.fn(() => 0)
+}))
+
+// Mock email.js（邮件发送）
+vi.mock('../utils/email.js', () => ({
+  sendEmail: vi.fn(),
+  buildVerificationEmailHTML: vi.fn(() => '<html>mock</html>')
+}))
+
 // Mock http.js 的 fetchHTML（bindBangumi 用它验证 Bangumi Token）
 vi.mock('../utils/http.js', () => ({
   fetchHTML: vi.fn(),
@@ -24,7 +40,8 @@ import {
   bindBangumi,
   refreshJwt,
   getCurrentUser,
-  getUserBgmToken
+  getUserBgmToken,
+  sendVerificationCode
 } from './auth.js'
 import {
   createUser,
@@ -34,13 +51,16 @@ import {
   getUserBgmBinding,
   userExistsByEmail
 } from '../db/users.js'
+import { verifyCode, createCode, getLatestCode } from '../db/emailCodes.js'
+import { sendEmail } from '../utils/email.js'
 import { fetchHTML } from '../utils/http.js'
 import { hashPassword, generateSalt, encryptToken } from '../utils/crypto.js'
 import { signJwt, verifyJwt } from '../utils/jwt.js'
 
 const ENV = {
   JWT_SECRET: 'test-secret-at-least-32-chars-long',
-  BGMIO_SALT: 'test-salt'
+  BGMIO_SALT: 'test-salt',
+  RESEND_API_KEY: 're_test_key'
 }
 
 // db 对象（因 users.js 全部被 mock，db 不会被实际使用）
@@ -55,14 +75,45 @@ describe('registerUser', () => {
     userExistsByEmail.mockResolvedValue(true)
 
     await expect(
-      registerUser(DB, ENV, { email: 'existing@test.com', password: 'pwd' })
+      registerUser(DB, ENV, {
+        email: 'existing@test.com',
+        password: 'pwd',
+        code: '123456'
+      })
     ).rejects.toMatchObject({ status: 409 })
 
     expect(createUser).not.toHaveBeenCalled()
   })
 
-  it('新邮箱成功注册并返回有效 JWT 与 user', async () => {
+  it('未提供验证码时抛 400 错误', async () => {
     userExistsByEmail.mockResolvedValue(false)
+
+    await expect(
+      registerUser(DB, ENV, { email: 'new@test.com', password: 'pwd123' })
+    ).rejects.toMatchObject({ status: 400, message: '请输入邮箱验证码' })
+
+    expect(verifyCode).not.toHaveBeenCalled()
+    expect(createUser).not.toHaveBeenCalled()
+  })
+
+  it('验证码错误时抛 400 错误', async () => {
+    userExistsByEmail.mockResolvedValue(false)
+    verifyCode.mockResolvedValue(false)
+
+    await expect(
+      registerUser(DB, ENV, {
+        email: 'new@test.com',
+        password: 'pwd123',
+        code: 'wrong'
+      })
+    ).rejects.toMatchObject({ status: 400, message: '验证码错误或已过期' })
+
+    expect(createUser).not.toHaveBeenCalled()
+  })
+
+  it('新邮箱 + 有效验证码 → 成功注册并返回有效 JWT 与 user', async () => {
+    userExistsByEmail.mockResolvedValue(false)
+    verifyCode.mockResolvedValue(true)
     const createdUser = {
       id: 'new-user-id',
       email: 'new@test.com',
@@ -74,8 +125,12 @@ describe('registerUser', () => {
 
     const { token, user } = await registerUser(DB, ENV, {
       email: 'new@test.com',
-      password: 'pwd123'
+      password: 'pwd123',
+      code: '123456'
     })
+
+    // 验证码被校验
+    expect(verifyCode).toHaveBeenCalledWith(DB, 'new@test.com', '123456', 'register')
 
     // token 是有效 JWT
     const verified = await verifyJwt(token, ENV.JWT_SECRET)
@@ -93,6 +148,49 @@ describe('registerUser', () => {
     expect(input.id).toBeTruthy()
     expect(input.salt).toMatch(/^[0-9a-f]{32}$/)
     expect(input.passwordHash).toMatch(/^[0-9a-f]{64}$/)
+  })
+})
+
+describe('sendVerificationCode', () => {
+  it('冷却时间内返回 sent: false 与剩余秒数', async () => {
+    getLatestCode.mockResolvedValue({ createdAt: Date.now() })
+    // canResend 默认返回 true，需覆盖
+    const { canResend } = await import('../db/emailCodes.js')
+    canResend.mockReturnValue(false)
+    const { resendCooldownSeconds } = await import('../db/emailCodes.js')
+    resendCooldownSeconds.mockReturnValue(45)
+
+    const result = await sendVerificationCode(DB, ENV, { email: 'a@b.c', purpose: 'register' })
+
+    expect(result).toEqual({ sent: false, cooldownSeconds: 45 })
+    expect(createCode).not.toHaveBeenCalled()
+    expect(sendEmail).not.toHaveBeenCalled()
+  })
+
+  it('未配置 RESEND_API_KEY 时抛 500 错误', async () => {
+    getLatestCode.mockResolvedValue(null)
+    const { canResend } = await import('../db/emailCodes.js')
+    canResend.mockReturnValue(true)
+
+    await expect(
+      sendVerificationCode(DB, { ...ENV, RESEND_API_KEY: '' }, { email: 'a@b.c' })
+    ).rejects.toMatchObject({ status: 500, message: '邮件服务未配置（缺少 RESEND_API_KEY）' })
+  })
+
+  it('正常发送验证码 → 生成 6 位码、写入 D1、调用 Resend', async () => {
+    getLatestCode.mockResolvedValue(null)
+    const { canResend } = await import('../db/emailCodes.js')
+    canResend.mockReturnValue(true)
+    sendEmail.mockResolvedValue({ id: 'email-id' })
+
+    const result = await sendVerificationCode(DB, ENV, { email: 'a@b.c', purpose: 'register' })
+
+    expect(result).toEqual({ sent: true, cooldownSeconds: 0 })
+    expect(createCode).toHaveBeenCalledTimes(1)
+    expect(sendEmail).toHaveBeenCalledTimes(1)
+    const [emailArg] = sendEmail.mock.calls[0]
+    expect(emailArg.to).toBe('a@b.c')
+    expect(emailArg.subject).toContain('注册验证码')
   })
 })
 

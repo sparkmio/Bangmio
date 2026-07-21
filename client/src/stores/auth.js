@@ -124,6 +124,10 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const res = await api.post('/auth/login', { email, password })
       saveBangmioAuth(res.data.data.token, res.data.data.user)
+      // 已绑定用户登录后拉取 bgm token 到本地缓存
+      if (res.data.data.user?.bgmUid) {
+        await fetchBgmToken()
+      }
       redirectAfterAuth()
     } catch (err) {
       error.value = err.response?.data?.error || '登录失败'
@@ -133,16 +137,76 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // Bangmio 邮箱密码注册
-  async function registerWithBangmio(email, password) {
+  // 发送邮箱验证码（注册流程）
+  async function sendVerificationCode(email, captchaToken) {
     loading.value = true
     error.value = ''
     try {
-      const res = await api.post('/auth/register', { email, password })
+      const res = await api.post('/auth/send-code', { email, captchaToken, purpose: 'register' })
+      return res.data.data
+    } catch (err) {
+      error.value = err.response?.data?.error || '验证码发送失败'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Bangmio 邮箱密码注册（带验证码）
+  async function registerWithBangmio(email, password, code, captchaToken) {
+    loading.value = true
+    error.value = ''
+    try {
+      const res = await api.post('/auth/register', { email, password, code, captchaToken })
       saveBangmioAuth(res.data.data.token, res.data.data.user)
-      redirectAfterAuth()
+      // 注册成功后跳转绑定页（强制绑定 Bangumi）
+      router.push({ name: 'BindBangumi' })
     } catch (err) {
       error.value = err.response?.data?.error || '注册失败'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 获取当前用户解密后的 Bangumi Access Token（绑定后调用）
+  // 修复绑定后功能异常：Bangmio 用户登录后需拉取 bgm token 缓存到本地
+  async function fetchBgmToken() {
+    if (!bangmioToken.value) return null
+    try {
+      const res = await api.get('/auth/bgm-token')
+      if (res.data?.data?.bgmToken) {
+        saveBgmTokenCached(res.data.data.bgmToken)
+        return res.data.data.bgmToken
+      }
+    } catch (err) {
+      // 404 表示未绑定，静默处理
+      if (err.response?.status !== 404) {
+        // 其他错误静默记录
+      }
+    }
+    return null
+  }
+
+  // OAuth 绑定 Bangumi：获取授权 URL（带 state JWT）
+  async function getOAuthBindUrl() {
+    const res = await api.get('/auth/oauth-bind-url')
+    return res.data.data.url
+  }
+
+  // OAuth 绑定回调：用 code + state 完成绑定
+  async function oauthBindBangumi(code, state) {
+    loading.value = true
+    error.value = ''
+    try {
+      const res = await api.post('/auth/oauth-bind-callback', { code, state })
+      saveBangmioAuth(res.data.data.token, res.data.data.user)
+      if (res.data.data.bgmToken) {
+        saveBgmTokenCached(res.data.data.bgmToken)
+      }
+      return res.data.data
+    } catch (err) {
+      error.value = err.response?.data?.error || 'OAuth 绑定失败'
       throw err
     } finally {
       loading.value = false
@@ -257,9 +321,13 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // 应用启动时检查认证状态
-  function checkAuth() {
+  async function checkAuth() {
     if (bangmioToken.value) {
-      fetchCurrentUser()
+      await fetchCurrentUser()
+      // 已绑定但本地无 bgm token 缓存（如换设备登录）时，从服务器拉取解密后的 token
+      if (bangmioUser.value?.bgmUid && !bgmToken.value) {
+        await fetchBgmToken()
+      }
     } else if (token.value) {
       fetchMe()
     }
@@ -298,6 +366,10 @@ export const useAuthStore = defineStore('auth', () => {
     checkAuth,
     loginWithBangmio,
     registerWithBangmio,
+    sendVerificationCode,
+    fetchBgmToken,
+    getOAuthBindUrl,
+    oauthBindBangumi,
     loginWithBangumi,
     oauthLogin,
     bindBangumi,

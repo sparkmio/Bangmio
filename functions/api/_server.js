@@ -4032,6 +4032,17 @@ async function encryptToken(token, secret) {
   const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key2, enc.encode(token));
   return { encrypted: bufferToHex(ciphertext), iv: bufferToHex(iv.buffer) };
 }
+async function decryptToken(encryptedHex, ivHex, secret) {
+  const saltHex = await deriveSaltFromSecret(secret);
+  const key2 = await deriveKey(secret, saltHex);
+  const dec = new TextDecoder();
+  const plaintext = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: hexToBuffer(ivHex) },
+    key2,
+    hexToBuffer(encryptedHex)
+  );
+  return dec.decode(plaintext);
+}
 
 // server/src/db/users.js
 var USER_COLUMNS_FULL = `
@@ -4119,6 +4130,25 @@ async function clearUserBgmBinding(db, id) {
     throw new Error(`clearUserBgmBinding: \u66F4\u65B0\u5931\u8D25 (id=${id})`, { cause: err });
   }
 }
+async function getUserBgmBinding(db, id) {
+  try {
+    const row = await db.prepare(
+      `SELECT bgm_uid AS bgmUid,
+                bgm_token_encrypted AS bgmTokenEncrypted,
+                bgm_token_iv AS bgmTokenIv
+           FROM users
+          WHERE id = ?`
+    ).bind(id).first();
+    if (!row) return null;
+    return {
+      bgmUid: row.bgmUid,
+      bgmTokenEncrypted: row.bgmTokenEncrypted,
+      bgmTokenIv: row.bgmTokenIv
+    };
+  } catch {
+    return null;
+  }
+}
 async function userExistsByEmail(db, email) {
   try {
     const row = await db.prepare("SELECT 1 FROM users WHERE email = ? LIMIT 1").bind(email).first();
@@ -4126,6 +4156,126 @@ async function userExistsByEmail(db, email) {
   } catch {
     return false;
   }
+}
+
+// server/src/db/emailCodes.js
+var CODE_TTL_MS = 10 * 60 * 1e3;
+var CODE_RESEND_INTERVAL_MS = 60 * 1e3;
+function generateNumericCode() {
+  const bytes = crypto.getRandomValues(new Uint8Array(6));
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += String(bytes[i] % 10);
+  }
+  return code;
+}
+async function getLatestCode(db, email, purpose) {
+  try {
+    const row = await db.prepare(
+      `SELECT id, code, expires_at AS expiresAt, consumed, created_at AS createdAt
+           FROM email_codes
+          WHERE email = ? AND purpose = ?
+          ORDER BY created_at DESC
+          LIMIT 1`
+    ).bind(email, purpose).first();
+    return row || null;
+  } catch {
+    return null;
+  }
+}
+async function createCode(db, { email, code, purpose }) {
+  const id = crypto.randomUUID();
+  const now = Date.now();
+  const expiresAt = now + CODE_TTL_MS;
+  try {
+    const result = await db.prepare(
+      `INSERT INTO email_codes (id, email, code, purpose, expires_at, consumed, created_at)
+         VALUES (?, ?, ?, ?, ?, 0, ?)`
+    ).bind(id, email, code, purpose, expiresAt, now).run();
+    if (!result.success) throw new Error("D1 run() \u8FD4\u56DE success=false");
+  } catch (err) {
+    throw new Error(`createCode: \u5199\u5165\u5931\u8D25 (email=${email}, purpose=${purpose})`, { cause: err });
+  }
+  return { id, expiresAt };
+}
+async function verifyCode(db, email, code, purpose) {
+  const record = await getLatestCode(db, email, purpose);
+  if (!record) return false;
+  if (record.consumed) return false;
+  if (Date.now() > record.expiresAt) return false;
+  if (record.code.length !== code.length) return false;
+  let diff = 0;
+  for (let i = 0; i < code.length; i++) {
+    diff |= record.code.charCodeAt(i) ^ code.charCodeAt(i);
+  }
+  if (diff !== 0) return false;
+  try {
+    await db.prepare("UPDATE email_codes SET consumed = 1 WHERE id = ?").bind(record.id).run();
+  } catch {
+  }
+  return true;
+}
+function canResend(latest) {
+  if (!latest) return true;
+  return Date.now() - latest.createdAt >= CODE_RESEND_INTERVAL_MS;
+}
+function resendCooldownSeconds(latest) {
+  if (!latest) return 0;
+  const elapsed = Date.now() - latest.createdAt;
+  if (elapsed >= CODE_RESEND_INTERVAL_MS) return 0;
+  return Math.ceil((CODE_RESEND_INTERVAL_MS - elapsed) / 1e3);
+}
+
+// server/src/utils/email.js
+var RESEND_API = "https://api.resend.com/emails";
+var DEFAULT_FROM = "Bangmio <onboarding@resend.dev>";
+async function sendEmail({ to, subject, html }, apiKey, from) {
+  if (!apiKey) throw new Error("RESEND_API_KEY \u672A\u914D\u7F6E");
+  if (!to) throw new Error("\u6536\u4EF6\u4EBA\u4E0D\u80FD\u4E3A\u7A7A");
+  const res = await fetch(RESEND_API, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      from: from || DEFAULT_FROM,
+      to,
+      subject,
+      html
+    })
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Resend API ${res.status}: ${text}`);
+  }
+  return res.json();
+}
+function buildVerificationEmailHTML(code) {
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f6f6f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f6f6f9;padding:24px 0">
+    <tr><td align="center">
+      <table role="presentation" cellpadding="0" cellspacing="0" width="420" style="max-width:420px;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04)">
+        <tr><td style="padding:24px 32px 8px;text-align:center">
+          <h1 style="margin:0;font-size:18px;font-weight:600;color:#1f2937">Bangmio \u8D26\u53F7\u6CE8\u518C</h1>
+          <p style="margin:8px 0 0;font-size:13px;color:#6b7280">\u4F7F\u7528\u4EE5\u4E0B\u9A8C\u8BC1\u7801\u5B8C\u6210\u6CE8\u518C</p>
+        </td></tr>
+        <tr><td style="padding:16px 32px 8px;text-align:center">
+          <div style="display:inline-block;padding:14px 28px;background:#fff5f6;border:1px solid #ffd6dd;border-radius:10px;letter-spacing:8px;font-size:30px;font-weight:600;color:#ff6b81;font-family:'SF Mono','Menlo','Consolas',monospace">${code}</div>
+        </td></tr>
+        <tr><td style="padding:8px 32px 24px;text-align:center">
+          <p style="margin:0;font-size:12px;color:#9ca3af">\u9A8C\u8BC1\u7801 10 \u5206\u949F\u5185\u6709\u6548\uFF0C\u8BF7\u52FF\u5411\u4ED6\u4EBA\u6CC4\u9732</p>
+          <p style="margin:8px 0 0;font-size:12px;color:#9ca3af">\u5982\u975E\u672C\u4EBA\u64CD\u4F5C\uFF0C\u8BF7\u5FFD\u7565\u6B64\u90AE\u4EF6</p>
+        </td></tr>
+      </table>
+      <p style="margin:16px 0 0;font-size:11px;color:#9ca3af">\xA9 Bangmio \xB7 \u6B64\u90AE\u4EF6\u7531\u7CFB\u7EDF\u81EA\u52A8\u53D1\u9001\uFF0C\u8BF7\u52FF\u56DE\u590D</p>
+    </td></tr>
+  </table>
+</body>
+</html>`;
 }
 
 // server/src/utils/http.js
@@ -4185,15 +4335,46 @@ function fixUrl(url, base = "") {
 
 // server/src/services/auth.js
 var BGM_ME_API = "https://api.bgm.tv/v0/me";
+var OAUTH_BIND_STATE_TTL = 5 * 60;
 function httpError(status, message) {
   const err = new Error(message);
   err.status = status;
   return err;
 }
-async function registerUser(db, env, { email, password }) {
+async function sendVerificationCode(db, env, { email, purpose = "register" }) {
+  const latest = await getLatestCode(db, email, purpose);
+  if (!canResend(latest)) {
+    return { sent: false, cooldownSeconds: resendCooldownSeconds(latest) };
+  }
+  if (!env.RESEND_API_KEY) {
+    throw httpError(500, "\u90AE\u4EF6\u670D\u52A1\u672A\u914D\u7F6E\uFF08\u7F3A\u5C11 RESEND_API_KEY\uFF09");
+  }
+  const code = generateNumericCode();
+  await createCode(db, { email, code, purpose });
+  try {
+    await sendEmail(
+      { to: email, subject: "\u3010Bangmio\u3011\u6CE8\u518C\u9A8C\u8BC1\u7801", html: buildVerificationEmailHTML(code) },
+      env.RESEND_API_KEY,
+      env.RESEND_FROM
+    );
+  } catch (err) {
+    logError("\u9A8C\u8BC1\u7801\u90AE\u4EF6\u53D1\u9001\u5931\u8D25", { email, error: String(err) });
+    throw httpError(500, "\u9A8C\u8BC1\u7801\u53D1\u9001\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+  }
+  logInfo("\u9A8C\u8BC1\u7801\u5DF2\u53D1\u9001", { email, purpose });
+  return { sent: true, cooldownSeconds: 0 };
+}
+async function registerUser(db, env, { email, password, code }) {
   const exists = await userExistsByEmail(db, email);
   if (exists) {
     throw httpError(409, "\u90AE\u7BB1\u5DF2\u6CE8\u518C");
+  }
+  if (!code) {
+    throw httpError(400, "\u8BF7\u8F93\u5165\u90AE\u7BB1\u9A8C\u8BC1\u7801");
+  }
+  const codeOk = await verifyCode(db, email, String(code), "register");
+  if (!codeOk) {
+    throw httpError(400, "\u9A8C\u8BC1\u7801\u9519\u8BEF\u6216\u5DF2\u8FC7\u671F");
   }
   const salt = generateSalt();
   const passwordHash = await hashPassword(password, salt);
@@ -4293,9 +4474,130 @@ async function getCurrentUser(db, env, userId) {
     }
   };
 }
+async function getUserBgmToken(db, env, userId) {
+  const binding = await getUserBgmBinding(db, userId);
+  if (!binding || !binding.bgmTokenEncrypted || !binding.bgmTokenIv) {
+    return null;
+  }
+  try {
+    return await decryptToken(binding.bgmTokenEncrypted, binding.bgmTokenIv, env.JWT_SECRET);
+  } catch (err) {
+    logError("Bangumi token \u89E3\u5BC6\u5931\u8D25", { userId, error: String(err) });
+    return null;
+  }
+}
+async function createOAuthBindState(env, userId) {
+  return signJwt({ userId, action: "bind" }, env.JWT_SECRET, OAUTH_BIND_STATE_TTL);
+}
+async function verifyOAuthBindState(env, state) {
+  const { valid, payload } = await verifyJwt(state, env.JWT_SECRET);
+  if (!valid || !payload || payload.action !== "bind" || !payload.userId) {
+    return { valid: false };
+  }
+  return { valid: true, userId: payload.userId };
+}
+async function bindBangumiByOAuth(db, env, { code, state, oauthBase: oauthBase3, appId, appSecret, redirectUri: redirectUri3 }) {
+  const stateResult = await verifyOAuthBindState(env, state);
+  if (!stateResult.valid || !stateResult.userId) {
+    throw httpError(400, "\u6388\u6743\u72B6\u6001\u65E0\u6548\u6216\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u53D1\u8D77\u7ED1\u5B9A");
+  }
+  const userId = stateResult.userId;
+  let accessToken;
+  try {
+    const params = new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: appId,
+      client_secret: appSecret,
+      code,
+      redirect_uri: redirectUri3
+    });
+    const tokenRes = await fetch(`${oauthBase3}/oauth/access_token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString()
+    });
+    const tokenData = await tokenRes.json();
+    accessToken = tokenData.access_token;
+  } catch (err) {
+    logError("OAuth \u6388\u6743\u7801\u6362\u53D6\u5931\u8D25", { userId, error: String(err) });
+    throw httpError(400, "\u6388\u6743\u7801\u65E0\u6548\u6216\u5DF2\u8FC7\u671F");
+  }
+  if (!accessToken) {
+    throw httpError(400, "\u83B7\u53D6 Bangumi Access Token \u5931\u8D25");
+  }
+  let me;
+  try {
+    const text = await fetchHTML(BGM_ME_API, {
+      headers: { Authorization: "Bearer " + accessToken, Accept: "application/json" }
+    });
+    me = JSON.parse(text);
+  } catch (err) {
+    logError("OAuth \u7ED1\u5B9A\u65F6\u9A8C\u8BC1 token \u5931\u8D25", { userId, error: String(err) });
+    throw httpError(500, "Bangumi Token \u9A8C\u8BC1\u5931\u8D25");
+  }
+  const bgmUid = me?.id;
+  if (!bgmUid) {
+    throw httpError(500, "\u83B7\u53D6 Bangumi \u7528\u6237\u4FE1\u606F\u5931\u8D25");
+  }
+  const { encrypted, iv } = await encryptToken(accessToken, env.JWT_SECRET);
+  const updated = await updateUserBgmBinding(db, userId, String(bgmUid), encrypted, iv);
+  if (!updated) {
+    throw httpError(404, "\u7528\u6237\u4E0D\u5B58\u5728");
+  }
+  const token = await signJwt(
+    { userId: updated.id, email: updated.email, bgmUid: updated.bgmUid },
+    env.JWT_SECRET
+  );
+  logInfo("OAuth \u7ED1\u5B9A\u6210\u529F", { userId, bgmUid: String(bgmUid) });
+  return {
+    token,
+    user: { id: updated.id, email: updated.email, bgmUid: updated.bgmUid },
+    bgmToken: accessToken
+  };
+}
+
+// server/src/utils/turnstile.js
+var TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+async function verifyTurnstile(token, secret, remoteip) {
+  if (!secret) {
+    return { success: true, skipped: true };
+  }
+  if (!token) {
+    return { success: false, errorCodes: ["missing-input-response"] };
+  }
+  const body = new URLSearchParams({
+    secret,
+    response: token
+  });
+  if (remoteip) body.append("remoteip", remoteip);
+  try {
+    const res = await fetch(TURNSTILE_VERIFY_URL, {
+      method: "POST",
+      body
+    });
+    const data = await res.json();
+    return {
+      success: !!data.success,
+      errorCodes: data["error-codes"] || []
+    };
+  } catch (err) {
+    return { success: false, errorCodes: ["verify-error"], message: String(err) };
+  }
+}
 
 // server/src/routes/auth.js
 var app = new Hono2();
+var DEFAULT_BGM_APP_ID = "bgm61416a088eff71580";
+var DEFAULT_BGM_APP_SECRET = "6b8055c0159fcc5e998059536813026f";
+function isChina(c) {
+  return (c.env?.CF_IP_COUNTRY || "") === "CN";
+}
+function oauthBase(c) {
+  return isChina(c) ? "https://bangumi.lol" : "https://bgm.tv";
+}
+function redirectUri(c) {
+  return c.env?.OAUTH_REDIRECT_URI || "http://localhost:5173/login/callback";
+}
 app.use("*", async (c, next) => {
   if (c.req.method === "POST" && (!c.env?.DB || !c.env?.JWT_SECRET)) {
     const missing = [];
@@ -4325,17 +4627,48 @@ function errorResponse(err) {
   }
   return Response.json({ data: null, error: "\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF", code: 500 }, { status: 500 });
 }
+app.post("/send-code", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { email, captchaToken, purpose = "register" } = body || {};
+    if (!email || !EMAIL_REGEX.test(String(email))) {
+      return c.json({ data: null, error: "\u90AE\u7BB1\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
+    }
+    const turnstile = await verifyTurnstile(
+      captchaToken,
+      c.env?.TURNSTILE_SECRET_KEY,
+      c.req.header("CF-Connecting-IP")
+    );
+    if (!turnstile.success) {
+      return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
+    }
+    const result = await sendVerificationCode(c.env.DB, c.env, { email, purpose });
+    return c.json({ data: result, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
 app.post("/register", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
-    const { email, password } = body || {};
+    const { email, password, code, captchaToken } = body || {};
     if (!email || !EMAIL_REGEX.test(String(email))) {
       return c.json({ data: null, error: "\u90AE\u7BB1\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
     }
     if (!password || String(password).length < 8) {
       return c.json({ data: null, error: "\u5BC6\u7801\u81F3\u5C11 8 \u4F4D", code: 400 }, 400);
     }
-    const result = await registerUser(c.env.DB, c.env, { email, password });
+    if (c.env?.TURNSTILE_SECRET_KEY) {
+      const turnstile = await verifyTurnstile(
+        captchaToken,
+        c.env.TURNSTILE_SECRET_KEY,
+        c.req.header("CF-Connecting-IP")
+      );
+      if (!turnstile.success) {
+        return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
+      }
+    }
+    const result = await registerUser(c.env.DB, c.env, { email, password, code });
     return c.json({ data: { token: result.token, user: result.user }, code: 200 });
   } catch (err) {
     return errorResponse(err);
@@ -4399,6 +4732,56 @@ app.get("/me", jwtAuth(), async (c) => {
     return errorResponse(err);
   }
 });
+app.get("/bgm-token", jwtAuth(), async (c) => {
+  try {
+    const currentUser = c.get("user");
+    const bgmToken = await getUserBgmToken(c.env.DB, c.env, currentUser.userId);
+    if (!bgmToken) {
+      return c.json(
+        { data: null, error: "\u672A\u7ED1\u5B9A Bangumi \u8D26\u53F7", code: 404 },
+        404
+      );
+    }
+    return c.json({ data: { bgmToken }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.get("/oauth-bind-url", jwtAuth(), async (c) => {
+  try {
+    const currentUser = c.get("user");
+    const state = await createOAuthBindState(c.env, currentUser.userId);
+    const appId = c.env?.BGM_APP_ID || DEFAULT_BGM_APP_ID;
+    const url = `${oauthBase(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}&state=${encodeURIComponent(state)}`;
+    return c.json({ data: { url }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.post("/oauth-bind-callback", jwtAuth(), async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { code, state } = body || {};
+    if (!code || !state) {
+      return c.json({ data: null, error: "\u7F3A\u5C11\u6388\u6743\u7801\u6216 state", code: 400 }, 400);
+    }
+    const appId = c.env?.BGM_APP_ID || DEFAULT_BGM_APP_ID;
+    const appSecret = c.env?.BGM_APP_SECRET || DEFAULT_BGM_APP_SECRET;
+    const result = await bindBangumiByOAuth(c.env.DB, c.env, {
+      code,
+      state,
+      oauthBase: oauthBase(c),
+      appId,
+      appSecret,
+      redirectUri: redirectUri(c)
+    });
+    return c.json(
+      { data: { token: result.token, user: result.user, bgmToken: result.bgmToken }, code: 200 }
+    );
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
 var auth_default = app;
 
 // server/src/services/bangumi.js
@@ -4417,8 +4800,8 @@ function rewriteImageUrls(data) {
 function headers(token) {
   return token ? { "User-Agent": "Bangmio/anime-manager", Authorization: `Bearer ${token}` } : { "User-Agent": "Bangmio/anime-manager" };
 }
-async function bgmGet(path, token, params, isChina6 = false) {
-  const base = isChina6 ? BGM_PROXY : BGM_API;
+async function bgmGet(path, token, params, isChina7 = false) {
+  const base = isChina7 ? BGM_PROXY : BGM_API;
   const url = new URL(`${base}${path}`);
   if (params) Object.entries(params).forEach(([k, v]) => v != null && url.searchParams.set(k, v));
   const res = await fetch(url.toString(), { headers: headers(token) });
@@ -4431,8 +4814,8 @@ async function bgmGet(path, token, params, isChina6 = false) {
   }
   return rewriteImageUrls(data);
 }
-async function bgmPost(path, body, token, params, isChina6 = false) {
-  const base = isChina6 ? BGM_PROXY : BGM_API;
+async function bgmPost(path, body, token, params, isChina7 = false) {
+  const base = isChina7 ? BGM_PROXY : BGM_API;
   const url = new URL(`${base}${path}`);
   if (params) Object.entries(params).forEach(([k, v]) => v != null && url.searchParams.set(k, v));
   const res = await fetch(url.toString(), {
@@ -4473,12 +4856,12 @@ async function browseAnime(params = {}) {
   const d = await bgmPost("/v0/search/subjects", body, null, { limit, offset }, params.isChina);
   return { data: d.data || [], total: d.total || 0 };
 }
-function getClient(token, isChina6 = false) {
+function getClient(token, isChina7 = false) {
   return {
-    get: (path, params) => bgmGet(path, token, params, isChina6),
-    post: (path, body, params) => bgmPost(path, body, token, params, isChina6),
+    get: (path, params) => bgmGet(path, token, params, isChina7),
+    post: (path, body, params) => bgmPost(path, body, token, params, isChina7),
     delete: async (path) => {
-      const base = isChina6 ? BGM_PROXY : BGM_API;
+      const base = isChina7 ? BGM_PROXY : BGM_API;
       const r = await fetch(`${base}${path}`, { method: "DELETE", headers: headers(token) });
       const t = await r.text();
       return t ? JSON.parse(t) : {};
@@ -4488,8 +4871,8 @@ function getClient(token, isChina6 = false) {
 async function getAnimeDetail(id, opts) {
   return bgmGet(`/v0/subjects/${id}`, null, null, opts?.isChina);
 }
-async function getAnimeEpisodes(id, { offset = 0, limit = 100, isChina: isChina6 } = {}) {
-  const d = await bgmGet("/v0/episodes", null, { subject_id: id, offset, limit }, isChina6);
+async function getAnimeEpisodes(id, { offset = 0, limit = 100, isChina: isChina7 } = {}) {
+  const d = await bgmGet("/v0/episodes", null, { subject_id: id, offset, limit }, isChina7);
   return { data: d.data || [], total: d.total || 0 };
 }
 async function getAnimeCharacters(id, opts) {
@@ -4548,14 +4931,14 @@ async function getPersonSubjects(id, opts) {
 var app2 = new Hono2();
 var DEFAULT_APP_ID = "bgm61416a088eff71580";
 var DEFAULT_APP_SECRET = "6b8055c0159fcc5e998059536813026f";
-function isChina(c) {
+function isChina2(c) {
   return (c.env?.CF_IP_COUNTRY || "") === "CN";
 }
-function redirectUri(c) {
+function redirectUri2(c) {
   return c.env?.OAUTH_REDIRECT_URI || "http://localhost:5173/login/callback";
 }
-function oauthBase(c) {
-  return isChina(c) ? "https://bangumi.lol" : "https://bgm.tv";
+function oauthBase2(c) {
+  return isChina2(c) ? "https://bangumi.lol" : "https://bgm.tv";
 }
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -4581,7 +4964,7 @@ app2.post("/auth", async (c) => {
   try {
     const { token } = await c.req.json();
     if (!token) return c.json({ error: "\u8BF7\u8F93\u5165 Access Token" }, 400);
-    const client = getClient(token, isChina(c));
+    const client = getClient(token, isChina2(c));
     const user = await client.get("/v0/me");
     return c.json({ data: { user, token } });
   } catch (err) {
@@ -4591,7 +4974,7 @@ app2.post("/auth", async (c) => {
 });
 app2.get("/oauth-url", (c) => {
   const appId = c.env?.BGM_APP_ID || DEFAULT_APP_ID;
-  const url = `${oauthBase(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}`;
+  const url = `${oauthBase2(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri2(c))}`;
   return c.json({ data: url });
 });
 app2.post("/oauth-callback", async (c) => {
@@ -4605,9 +4988,9 @@ app2.post("/oauth-callback", async (c) => {
       client_id: appId,
       client_secret: appSecret,
       code,
-      redirect_uri: redirectUri(c)
+      redirect_uri: redirectUri2(c)
     });
-    const tokenRes = await fetch(`${oauthBase(c)}/oauth/access_token`, {
+    const tokenRes = await fetch(`${oauthBase2(c)}/oauth/access_token`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: params.toString()
@@ -4616,7 +4999,7 @@ app2.post("/oauth-callback", async (c) => {
     const accessToken = tokenData.access_token;
     const refreshToken = tokenData.refresh_token;
     if (!accessToken) return c.json({ error: "\u83B7\u53D6 Token \u5931\u8D25", detail: tokenData }, 400);
-    const client = getClient(accessToken, isChina(c));
+    const client = getClient(accessToken, isChina2(c));
     const user = await client.get("/v0/me");
     return c.json({ data: { user, token: accessToken, refreshToken: refreshToken || "" } });
   } catch (err) {
@@ -4634,9 +5017,9 @@ app2.post("/refresh-token", async (c) => {
       client_id: appId,
       client_secret: appSecret,
       refresh_token: refreshToken,
-      redirect_uri: redirectUri(c)
+      redirect_uri: redirectUri2(c)
     });
-    const tokenRes = await fetch(`${oauthBase(c)}/oauth/access_token`, {
+    const tokenRes = await fetch(`${oauthBase2(c)}/oauth/access_token`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: params.toString()
@@ -4645,7 +5028,7 @@ app2.post("/refresh-token", async (c) => {
     const accessToken = tokenData.access_token;
     const newRefreshToken = tokenData.refresh_token || refreshToken;
     if (!accessToken) return c.json({ error: "\u5237\u65B0 Token \u5931\u8D25" }, 400);
-    const client = getClient(accessToken, isChina(c));
+    const client = getClient(accessToken, isChina2(c));
     const user = await client.get("/v0/me");
     return c.json({ data: { user, token: accessToken, refreshToken: newRefreshToken } });
   } catch (err) {
@@ -4656,7 +5039,7 @@ app2.get("/me", async (c) => {
   try {
     const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
-    const client = getClient(token, isChina(c));
+    const client = getClient(token, isChina2(c));
     const user = await client.get("/v0/me");
     return c.json({ data: user });
   } catch (err) {
@@ -4668,7 +5051,7 @@ app2.get("/:username/characters", async (c) => {
     const username = c.req.param("username");
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
     const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
-    const client = token ? getClient(token, isChina(c)) : getClient("", isChina(c));
+    const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
     const data = await client.get(`/v0/users/${username}/characters`, { limit: 10 });
     return c.json({ data: data.data || [] });
   } catch {
@@ -4680,7 +5063,7 @@ app2.get("/:username/persons", async (c) => {
     const username = c.req.param("username");
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
     const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
-    const client = token ? getClient(token, isChina(c)) : getClient("", isChina(c));
+    const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
     const data = await client.get(`/v0/users/${username}/persons`, { limit: 10 });
     return c.json({ data: data.data || [] });
   } catch {
@@ -4692,7 +5075,7 @@ app2.get("/:username/indexes", async (c) => {
     const username = c.req.param("username");
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
     const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
-    const client = token ? getClient(token, isChina(c)) : getClient("", isChina(c));
+    const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
     const data = await client.get(`/v0/users/${username}/indexes`);
     return c.json({ data: data.data || [] });
   } catch {
@@ -4703,7 +5086,7 @@ app2.get("/:username/friends", async (c) => {
   try {
     const username = c.req.param("username");
     if (!username) return c.json({ data: [] });
-    const base = oauthBase(c);
+    const base = oauthBase2(c);
     const html = await fetchHTML(`${base}/user/${username}/friends`);
     if (!html) return c.json({ data: [] });
     const friends = [];
@@ -4734,7 +5117,7 @@ app2.get("/:username/groups", async (c) => {
   try {
     const username = c.req.param("username");
     if (!username) return c.json({ data: [] });
-    const base = oauthBase(c);
+    const base = oauthBase2(c);
     const html = await fetchHTML(`${base}/user/${username}/group`);
     if (!html) return c.json({ data: [] });
     let scope = html;
@@ -4768,7 +5151,7 @@ app2.get("/:username/timeline", async (c) => {
   try {
     const username = c.req.param("username");
     if (!username) return c.json({ data: [] });
-    const base = oauthBase(c);
+    const base = oauthBase2(c);
     const html = await fetchHTML(`${base}/user/${username}/timeline`);
     if (!html) return c.json({ data: [] });
     const items = [];
@@ -4800,7 +5183,7 @@ app2.get("/:username/stats-yearly", async (c) => {
   try {
     const username = c.req.param("username");
     if (!username) return c.json({ data: [] });
-    const base = oauthBase(c);
+    const base = oauthBase2(c);
     const html = await fetchHTML(`${base}/user/${username}`);
     if (!html) return c.json({ data: [] });
     const stats = [];
@@ -4910,7 +5293,7 @@ app2.get("/:username", async (c) => {
     const username = c.req.param("username");
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
     const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
-    const client = token ? getClient(token, isChina(c)) : getClient("", isChina(c));
+    const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
     const user = await client.get(`/v0/users/${username}`);
     return c.json({ data: user });
   } catch {
@@ -4920,7 +5303,7 @@ app2.get("/:username", async (c) => {
 var user_default = app2;
 
 // server/src/controllers/animeController.js
-function isChina2(c) {
+function isChina3(c) {
   return (c.env?.CF_IP_COUNTRY || "") === "CN";
 }
 async function searchAnime2(c) {
@@ -4931,7 +5314,7 @@ async function searchAnime2(c) {
     const opts = {
       page: Number(c.req.query("page")) || 1,
       limit: Number(c.req.query("limit") || "20"),
-      isChina: isChina2(c)
+      isChina: isChina3(c)
     };
     if (typeNum > 0) opts.type = typeNum;
     const result = await searchAnime(keyword, opts);
@@ -4943,7 +5326,7 @@ async function searchAnime2(c) {
 async function browseAnime2(c) {
   try {
     const q = c.req.query();
-    const params = { isChina: isChina2(c) };
+    const params = { isChina: isChina3(c) };
     if (q.sort) params.sort = q.sort;
     if (q.type && Number(q.type) > 0) params.type = q.type;
     if (q.page) params.page = q.page;
@@ -4957,7 +5340,7 @@ async function browseAnime2(c) {
 }
 async function getAnimeDetail2(c) {
   try {
-    const detail = await getAnimeDetail(c.req.param("id"), { isChina: isChina2(c) });
+    const detail = await getAnimeDetail(c.req.param("id"), { isChina: isChina3(c) });
     return c.json({ data: detail });
   } catch {
     return c.json({ error: "\u83B7\u53D6\u8BE6\u60C5\u5931\u8D25" }, 500);
@@ -4967,7 +5350,7 @@ async function getAnimeEpisodes2(c) {
   try {
     const data = await getAnimeEpisodes(c.req.param("id"), {
       ...c.req.query(),
-      isChina: isChina2(c)
+      isChina: isChina3(c)
     });
     return c.json({ data: data.data, total: data.total });
   } catch {
@@ -4976,7 +5359,7 @@ async function getAnimeEpisodes2(c) {
 }
 async function getAnimeCharacters2(c) {
   try {
-    const data = await getAnimeCharacters(c.req.param("id"), { isChina: isChina2(c) });
+    const data = await getAnimeCharacters(c.req.param("id"), { isChina: isChina3(c) });
     return c.json({ data });
   } catch {
     return c.json({ error: "\u83B7\u53D6\u89D2\u8272\u5931\u8D25" }, 500);
@@ -4984,7 +5367,7 @@ async function getAnimeCharacters2(c) {
 }
 async function getAnimePersons2(c) {
   try {
-    const data = await getAnimePersons(c.req.param("id"), { isChina: isChina2(c) });
+    const data = await getAnimePersons(c.req.param("id"), { isChina: isChina3(c) });
     return c.json({ data });
   } catch {
     return c.json({ error: "\u83B7\u53D6\u5236\u4F5C\u4EBA\u5458\u5931\u8D25" }, 500);
@@ -4992,7 +5375,7 @@ async function getAnimePersons2(c) {
 }
 async function getAnimeRelations2(c) {
   try {
-    const data = await getAnimeRelations(c.req.param("id"), { isChina: isChina2(c) });
+    const data = await getAnimeRelations(c.req.param("id"), { isChina: isChina3(c) });
     return c.json({ data });
   } catch {
     return c.json({ error: "\u83B7\u53D6\u5173\u8054\u6761\u76EE\u5931\u8D25" }, 500);
@@ -5000,7 +5383,7 @@ async function getAnimeRelations2(c) {
 }
 async function getAnimeCalendar2(c) {
   try {
-    const data = await getAnimeCalendar({ isChina: isChina2(c) });
+    const data = await getAnimeCalendar({ isChina: isChina3(c) });
     return c.json({ data });
   } catch {
     return c.json({ error: "\u83B7\u53D6\u65F6\u95F4\u8868\u5931\u8D25" }, 500);
@@ -5016,7 +5399,7 @@ async function getAnimeTags2(c) {
 }
 async function getCharacterDetail2(c) {
   try {
-    const data = await getCharacterDetail(c.req.param("id"), { isChina: isChina2(c) });
+    const data = await getCharacterDetail(c.req.param("id"), { isChina: isChina3(c) });
     return c.json({ data });
   } catch {
     return c.json({ error: "\u83B7\u53D6\u89D2\u8272\u8BE6\u60C5\u5931\u8D25" }, 500);
@@ -5025,7 +5408,7 @@ async function getCharacterDetail2(c) {
 async function getCharacterSubjects2(c) {
   try {
     const data = await getCharacterSubjects(c.req.param("id"), {
-      isChina: isChina2(c)
+      isChina: isChina3(c)
     });
     return c.json({ data });
   } catch {
@@ -5035,7 +5418,7 @@ async function getCharacterSubjects2(c) {
 async function getCharacterPersons2(c) {
   try {
     const data = await getCharacterPersons(c.req.param("id"), {
-      isChina: isChina2(c)
+      isChina: isChina3(c)
     });
     return c.json({ data });
   } catch {
@@ -5044,7 +5427,7 @@ async function getCharacterPersons2(c) {
 }
 async function getPersonDetail2(c) {
   try {
-    const data = await getPersonDetail(c.req.param("id"), { isChina: isChina2(c) });
+    const data = await getPersonDetail(c.req.param("id"), { isChina: isChina3(c) });
     return c.json({ data });
   } catch {
     return c.json({ error: "\u83B7\u53D6\u4EBA\u7269\u8BE6\u60C5\u5931\u8D25" }, 500);
@@ -5052,7 +5435,7 @@ async function getPersonDetail2(c) {
 }
 async function getPersonSubjects2(c) {
   try {
-    const data = await getPersonSubjects(c.req.param("id"), { isChina: isChina2(c) });
+    const data = await getPersonSubjects(c.req.param("id"), { isChina: isChina3(c) });
     return c.json({ data });
   } catch {
     return c.json({ error: "\u83B7\u53D6\u4EBA\u7269\u4F5C\u54C1\u5931\u8D25" }, 500);
@@ -5079,7 +5462,7 @@ var anime_default = app3;
 
 // server/src/routes/collection.js
 var app4 = new Hono2();
-function isChina3(c) {
+function isChina4(c) {
   return (c.env?.CF_IP_COUNTRY || "") === "CN";
 }
 function extractToken(c) {
@@ -5100,7 +5483,7 @@ app4.get("/list", async (c) => {
     const username = extractUsername(c);
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
-    const client = getClient(token, isChina3(c));
+    const client = getClient(token, isChina4(c));
     const params = {
       offset: Number(c.req.query("offset")) || 0,
       limit: Number(c.req.query("limit")) || 30
@@ -5122,7 +5505,7 @@ app4.get("/stats", async (c) => {
     const username = extractUsername(c);
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
-    const client = getClient(token, isChina3(c));
+    const client = getClient(token, isChina4(c));
     const fetchTotal = (type) => client.get(`/v0/users/${username}/collections`, { type, limit: 1 }).then((r) => r.total).catch(() => 0);
     const [wish, collect, doing, on_hold, dropped] = await Promise.all([
       fetchTotal(1),
@@ -5152,7 +5535,7 @@ app4.get("/:animeId", async (c) => {
     const username = extractUsername(c);
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
-    const client = getClient(token, isChina3(c));
+    const client = getClient(token, isChina4(c));
     const collection = await client.get(
       `/v0/users/${username}/collections/${c.req.param("animeId")}`
     );
@@ -5178,7 +5561,7 @@ app4.post("/:animeId", async (c) => {
     const token = extractToken(c);
     const username = extractUsername(c);
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
-    const client = getClient(token, isChina3(c));
+    const client = getClient(token, isChina4(c));
     const body = await c.req.json();
     const payload = {};
     if (body.status !== void 0 && body.status >= 1) payload.type = Number(body.status);
@@ -5242,7 +5625,7 @@ app4.delete("/:animeId", async (c) => {
   try {
     const token = extractToken(c);
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
-    const client = getClient(token, isChina3(c));
+    const client = getClient(token, isChina4(c));
     await client.delete(`/v0/users/-/collections/${c.req.param("animeId")}`);
     return c.json({ message: "\u5DF2\u5220\u9664" });
   } catch (err) {
@@ -15844,8 +16227,8 @@ var app5 = new Hono2();
 var cache = createCache(CACHE_TTL_COMMENTS);
 var BGM_TV = "https://bgm.tv";
 var BGM_PROXY2 = "https://bangumi.lol";
-function getBase(isChina6) {
-  return isChina6 ? BGM_PROXY2 : BGM_TV;
+function getBase(isChina7) {
+  return isChina7 ? BGM_PROXY2 : BGM_TV;
 }
 function parseUserLink(el) {
   const link = el.querySelector('strong > a[href^="/user/"], strong.userName > a[href^="/user/"]');
@@ -16011,11 +16394,11 @@ app5.get("/test", async (c) => {
 });
 app5.get("/character/:id", async (c) => {
   try {
-    const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const key2 = `char_${c.req.param("id")}_${isChina6}`;
+    const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
+    const key2 = `char_${c.req.param("id")}_${isChina7}`;
     const cached = cache.get(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina6)}/character/${c.req.param("id")}`);
+    const html = await fetchHTML(`${getBase(isChina7)}/character/${c.req.param("id")}`);
     const comments = parseTalkbox(html);
     cache.set(key2, comments);
     return c.json({ data: comments });
@@ -16025,11 +16408,11 @@ app5.get("/character/:id", async (c) => {
 });
 app5.get("/subject/:id", async (c) => {
   try {
-    const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const key2 = `subj_${c.req.param("id")}_${isChina6}`;
+    const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
+    const key2 = `subj_${c.req.param("id")}_${isChina7}`;
     const cached = cache.get(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina6)}/subject/${c.req.param("id")}`);
+    const html = await fetchHTML(`${getBase(isChina7)}/subject/${c.req.param("id")}`);
     const comments = parseSubjectTalkbox(html);
     cache.set(key2, comments);
     return c.json({ data: comments });
@@ -16039,11 +16422,11 @@ app5.get("/subject/:id", async (c) => {
 });
 app5.get("/subject/:id/topics", async (c) => {
   try {
-    const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const key2 = `topics_${c.req.param("id")}_${isChina6}`;
+    const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
+    const key2 = `topics_${c.req.param("id")}_${isChina7}`;
     const cached = cache.get(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina6)}/subject/${c.req.param("id")}/board`);
+    const html = await fetchHTML(`${getBase(isChina7)}/subject/${c.req.param("id")}/board`);
     const topics = parseTopics(html);
     cache.set(key2, topics);
     return c.json({ data: topics });
@@ -16053,11 +16436,11 @@ app5.get("/subject/:id/topics", async (c) => {
 });
 app5.get("/topic/:topicId", async (c) => {
   try {
-    const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const key2 = `topic_${c.req.param("topicId")}_${isChina6}`;
+    const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
+    const key2 = `topic_${c.req.param("topicId")}_${isChina7}`;
     const cached = cache.get(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina6)}/subject/topic/${c.req.param("topicId")}`);
+    const html = await fetchHTML(`${getBase(isChina7)}/subject/topic/${c.req.param("topicId")}`);
     const topic = parseTopicPage(html);
     cache.set(key2, topic);
     return c.json({ data: topic });
@@ -16067,11 +16450,11 @@ app5.get("/topic/:topicId", async (c) => {
 });
 app5.get("/person/:id", async (c) => {
   try {
-    const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const key2 = `person_${c.req.param("id")}_${isChina6}`;
+    const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
+    const key2 = `person_${c.req.param("id")}_${isChina7}`;
     const cached = cache.get(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina6)}/person/${c.req.param("id")}`);
+    const html = await fetchHTML(`${getBase(isChina7)}/person/${c.req.param("id")}`);
     const comments = parseTalkbox(html);
     cache.set(key2, comments);
     return c.json({ data: comments });
@@ -16088,8 +16471,8 @@ function extractChiiAuth(token) {
 }
 app5.post("/subject/:id/comment", async (c) => {
   try {
-    const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const base = getBase(isChina6);
+    const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
+    const base = getBase(isChina7);
     const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
     const { content } = await c.req.json();
@@ -16128,8 +16511,8 @@ app5.post("/subject/:id/comment", async (c) => {
 });
 app5.post("/topic/:topicId/reply", async (c) => {
   try {
-    const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const base = getBase(isChina6);
+    const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
+    const base = getBase(isChina7);
     const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
     const { content } = await c.req.json();
@@ -16168,8 +16551,8 @@ app5.post("/topic/:topicId/reply", async (c) => {
 });
 app5.post("/subject/:id/talkbox", async (c) => {
   try {
-    const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const base = getBase(isChina6);
+    const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
+    const base = getBase(isChina7);
     const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
     const { content } = await c.req.json();
@@ -16208,8 +16591,8 @@ app5.post("/subject/:id/talkbox", async (c) => {
 });
 app5.post("/subject/:id/topic", async (c) => {
   try {
-    const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const base = getBase(isChina6);
+    const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
+    const base = getBase(isChina7);
     const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
     const { title, content } = await c.req.json();
@@ -16380,7 +16763,7 @@ function cleanDoubanPage(html) {
   });
   return document.body ? document.body.innerHTML : document.documentElement.innerHTML;
 }
-function isChina4(c) {
+function isChina5(c) {
   return (c.env?.CF_IP_COUNTRY || "") === "CN";
 }
 async function findDoubanMatch(detail) {
@@ -16430,7 +16813,7 @@ app6.get("/by-name", async (c) => {
 app6.get("/:id", async (c) => {
   try {
     const subjectId = c.req.param("id");
-    const cn = isChina4(c);
+    const cn = isChina5(c);
     const detail = await getAnimeDetail(subjectId, { isChina: cn });
     if (!detail) return c.json({ data: null });
     const match2 = await findDoubanMatch(detail);
@@ -16456,7 +16839,7 @@ app6.get("/:id", async (c) => {
 app6.get("/:id/details", async (c) => {
   try {
     const subjectId = c.req.param("id");
-    const cn = isChina4(c);
+    const cn = isChina5(c);
     const cacheKey = `douban_details_${subjectId}_${cn}`;
     const cached = cache2.get(cacheKey);
     if (cached) return c.json({ data: cached });
@@ -16561,7 +16944,7 @@ var BILIBILI_HEADERS = {
   Cookie: `buvid3=${generateBuvid3()}; b_nut=${Date.now()}`
 };
 var cache3 = createCache(CACHE_TTL_BILIBILI);
-function isChina5(c) {
+function isChina6(c) {
   return (c.env?.CF_IP_COUNTRY || "") === "CN";
 }
 function stripTags3(s) {
@@ -16614,7 +16997,7 @@ app7.get("/by-name", async (c) => {
 app7.get("/:id", async (c) => {
   try {
     const subjectId = c.req.param("id");
-    const cn = isChina5(c);
+    const cn = isChina6(c);
     const cacheKey = `bilibili_${subjectId}_${cn}`;
     const cached = cache3.get(cacheKey);
     if (cached) return c.json({ data: cached });
@@ -16665,12 +17048,12 @@ function cleanMoegirlPage(html) {
   return document.body ? document.body.innerHTML : "";
 }
 function getMoegirlApi(c) {
-  const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-  return isChina6 ? MOEGIRL_CN : MOEGIRL_INTL;
+  const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
+  return isChina7 ? MOEGIRL_CN : MOEGIRL_INTL;
 }
 function getMoegirlBase(c) {
-  const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-  return isChina6 ? "https://zh.moegirl.org.cn" : "https://zh.moegirl.uk";
+  const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
+  return isChina7 ? "https://zh.moegirl.org.cn" : "https://zh.moegirl.uk";
 }
 async function fetchMoegirlJSON(apiBase, params) {
   const url = `${apiBase}?${params}`;
@@ -16804,10 +17187,7 @@ app8.get("/page/:name", async (c) => {
     return c.html(cached, 200, { "Content-Type": "text/html; charset=utf-8" });
   }
   const encoded = encodeURIComponent(name);
-  const candidates = [
-    `https://zh.moegirl.org.cn/${encoded}`,
-    `https://zh.moegirl.uk/${encoded}`
-  ];
+  const candidates = [`https://zh.moegirl.org.cn/${encoded}`, `https://zh.moegirl.uk/${encoded}`];
   for (const url of candidates) {
     try {
       const html = await fetchHTML(url, {
@@ -16838,8 +17218,8 @@ var HOSTS = {
 };
 var cache5 = createCache(CACHE_TTL_GROUPS);
 var lastSuccessStore = /* @__PURE__ */ new Map();
-function getBaseUrls(isChina6) {
-  if (isChina6) {
+function getBaseUrls(isChina7) {
+  if (isChina7) {
     return [HOSTS.mirror1, HOSTS.mirror2, HOSTS.main];
   }
   return [HOSTS.main, HOSTS.mirror1, HOSTS.mirror2];
@@ -16974,9 +17354,7 @@ function parseGroupDetailHTML(html, id, base) {
         author = unescapeHtml(stripTags(authorMatch[1]));
       }
       let reply_count = 0;
-      const replyMatch = context.match(
-        /<td[^>]*class="[^"]*posts[^"]*"[^>]*>([\s\S]*?)<\/td>/i
-      ) || context.match(/\((\d+)\s*(?:回复|reply|条)/i) || context.match(/(\d+)\s*(?:回复|reply)/i);
+      const replyMatch = context.match(/<td[^>]*class="[^"]*posts[^"]*"[^>]*>([\s\S]*?)<\/td>/i) || context.match(/\((\d+)\s*(?:回复|reply|条)/i) || context.match(/(\d+)\s*(?:回复|reply)/i);
       if (replyMatch) {
         reply_count = parseNumber(replyMatch[1]);
       }
@@ -16996,11 +17374,11 @@ function parseGroupDetailHTML(html, id, base) {
 }
 app9.get("/", async (c) => {
   try {
-    const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const cacheKey = `groups_list_${isChina6 ? "cn" : "global"}`;
+    const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
+    const cacheKey = `groups_list_${isChina7 ? "cn" : "global"}`;
     const cached = cache5.get(cacheKey);
     if (cached) return c.json({ data: cached });
-    const bases = getBaseUrls(isChina6);
+    const bases = getBaseUrls(isChina7);
     const urls = bases.map((base) => `${base}/group/all`);
     let groups = [];
     let baseUrl = bases[0];
@@ -17033,11 +17411,11 @@ app9.get("/search", async (c) => {
   try {
     const keyword = (c.req.query("keyword") || c.req.query("q") || "").trim();
     if (!keyword) return c.json({ data: [] });
-    const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const cacheKey = `groups_search_${keyword}_${isChina6 ? "cn" : "global"}`;
+    const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
+    const cacheKey = `groups_search_${keyword}_${isChina7 ? "cn" : "global"}`;
     const cached = cache5.get(cacheKey);
     if (cached) return c.json({ data: cached });
-    const bases = getBaseUrls(isChina6);
+    const bases = getBaseUrls(isChina7);
     const urls = bases.map((base) => `${base}/group/all`);
     let groups = [];
     let baseUrl = bases[0];
@@ -17071,11 +17449,11 @@ app9.get("/search", async (c) => {
 app9.get("/:id", async (c) => {
   try {
     const id = c.req.param("id");
-    const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const cacheKey = `groups_detail_${id}_${isChina6 ? "cn" : "global"}`;
+    const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
+    const cacheKey = `groups_detail_${id}_${isChina7 ? "cn" : "global"}`;
     const cached = cache5.get(cacheKey);
     if (cached) return c.json({ data: cached });
-    const bases = getBaseUrls(isChina6);
+    const bases = getBaseUrls(isChina7);
     const urls = bases.map((base) => `${base}/group/${id}`);
     try {
       const { html, url } = await fetchHTMLMulti(urls);
@@ -17141,7 +17519,7 @@ var authLimiter = rateLimit(RATE_LIMIT_WINDOW, 5);
 app10.use("/api/v1/auth/*", async (c, next) => {
   const path = c.req.path;
   const method = c.req.method.toUpperCase();
-  if (method === "POST" && (path === "/api/v1/auth/register" || path === "/api/v1/auth/login")) {
+  if (method === "POST" && (path === "/api/v1/auth/register" || path === "/api/v1/auth/login" || path === "/api/v1/auth/send-code")) {
     return authLimiter(c, next);
   }
   await next();

@@ -19,10 +19,46 @@ import {
   bindBangumi,
   unbindBangumi,
   refreshJwt,
-  getCurrentUser
+  getCurrentUser,
+  sendVerificationCode,
+  getUserBgmToken,
+  createOAuthBindState,
+  bindBangumiByOAuth
 } from '../services/auth.js'
+import { verifyTurnstile } from '../utils/turnstile.js'
 
 const app = new Hono()
+
+/** Bangumi OAuth 应用默认配置（与 routes/user.js 保持一致，可通过环境变量覆盖） */
+const DEFAULT_BGM_APP_ID = 'bgm61416a088eff71580'
+const DEFAULT_BGM_APP_SECRET = '6b8055c0159fcc5e998059536813026f'
+
+/**
+ * 判断请求是否来自国内节点（决定走 bgm.tv 还是 bangumi.lol 镜像）。
+ * @param {import('hono').Context} c
+ * @returns {boolean}
+ */
+function isChina(c) {
+  return (c.env?.CF_IP_COUNTRY || '') === 'CN'
+}
+
+/**
+ * 获取 OAuth 基础 URL（国内走镜像，海外走官方）。
+ * @param {import('hono').Context} c
+ * @returns {string}
+ */
+function oauthBase(c) {
+  return isChina(c) ? 'https://bangumi.lol' : 'https://bgm.tv'
+}
+
+/**
+ * 获取 OAuth 回调地址（生产环境从环境变量读取，开发环境回退到 localhost）。
+ * @param {import('hono').Context} c
+ * @returns {string}
+ */
+function redirectUri(c) {
+  return c.env?.OAUTH_REDIRECT_URI || 'http://localhost:5173/login/callback'
+}
 
 /**
  * 运行时依赖检查中间件
@@ -75,21 +111,67 @@ function errorResponse(err) {
 }
 
 /**
+ * POST /send-code
+ * Body: { email, captchaToken, purpose? }
+ * 发送邮箱验证码（用于注册）。
+ *
+ * - 若配置了 Turnstile secret：校验 captchaToken
+ * - 1 分钟内仅允许发送一次，返回剩余冷却秒数
+ * - 需配置 RESEND_API_KEY 才能发送
+ */
+app.post('/send-code', async c => {
+  try {
+    const body = await c.req.json().catch(() => ({}))
+    const { email, captchaToken, purpose = 'register' } = body || {}
+    if (!email || !EMAIL_REGEX.test(String(email))) {
+      return c.json({ data: null, error: '邮箱格式不正确', code: 400 }, 400)
+    }
+    // Turnstile 校验（未配置 secret 时跳过）
+    const turnstile = await verifyTurnstile(
+      captchaToken,
+      c.env?.TURNSTILE_SECRET_KEY,
+      c.req.header('CF-Connecting-IP')
+    )
+    if (!turnstile.success) {
+      return c.json({ data: null, error: '人机验证失败，请重试', code: 400 }, 400)
+    }
+    const result = await sendVerificationCode(c.env.DB, c.env, { email, purpose })
+    return c.json({ data: result, code: 200 })
+  } catch (err) {
+    return errorResponse(err)
+  }
+})
+
+/**
  * POST /register
- * Body: { email, password }
+ * Body: { email, password, code, captchaToken? }
  * 注册新用户并签发 JWT。
+ *
+ * - 必须提供有效的邮箱验证码（code）
+ * - 若配置了 Turnstile secret：必须提供有效的 captchaToken
  */
 app.post('/register', async c => {
   try {
     const body = await c.req.json().catch(() => ({}))
-    const { email, password } = body || {}
+    const { email, password, code, captchaToken } = body || {}
     if (!email || !EMAIL_REGEX.test(String(email))) {
       return c.json({ data: null, error: '邮箱格式不正确', code: 400 }, 400)
     }
     if (!password || String(password).length < 8) {
       return c.json({ data: null, error: '密码至少 8 位', code: 400 }, 400)
     }
-    const result = await registerUser(c.env.DB, c.env, { email, password })
+    // 若配置了 Turnstile secret，强制要求人机验证
+    if (c.env?.TURNSTILE_SECRET_KEY) {
+      const turnstile = await verifyTurnstile(
+        captchaToken,
+        c.env.TURNSTILE_SECRET_KEY,
+        c.req.header('CF-Connecting-IP')
+      )
+      if (!turnstile.success) {
+        return c.json({ data: null, error: '人机验证失败，请重试', code: 400 }, 400)
+      }
+    }
+    const result = await registerUser(c.env.DB, c.env, { email, password, code })
     return c.json({ data: { token: result.token, user: result.user }, code: 200 })
   } catch (err) {
     return errorResponse(err)
@@ -180,6 +262,83 @@ app.get('/me', jwtAuth(), async c => {
     const currentUser = c.get('user')
     const result = await getCurrentUser(c.env.DB, c.env, currentUser.userId)
     return c.json({ data: { user: result.user }, code: 200 })
+  } catch (err) {
+    return errorResponse(err)
+  }
+})
+
+/**
+ * GET /bgm-token
+ * Header: Authorization: Bearer <jwt>
+ *
+ * 返回当前用户解密后的 Bangumi Access Token。
+ *
+ * 用于：Bangmio 用户登录后前端获取 bgm token 以访问 Bangumi 相关 API
+ * （如收藏、评论）。token 在 D1 中以 AES-GCM 加密存储，本接口解密后返回明文。
+ *
+ * 未绑定 Bangumi 时返回 404。
+ */
+app.get('/bgm-token', jwtAuth(), async c => {
+  try {
+    const currentUser = c.get('user')
+    const bgmToken = await getUserBgmToken(c.env.DB, c.env, currentUser.userId)
+    if (!bgmToken) {
+      return c.json({ data: null, error: '未绑定 Bangumi 账号', code: 404 }, 404)
+    }
+    return c.json({ data: { bgmToken }, code: 200 })
+  } catch (err) {
+    return errorResponse(err)
+  }
+})
+
+/**
+ * GET /oauth-bind-url
+ * Header: Authorization: Bearer <jwt>
+ *
+ * 生成 OAuth 绑定流程的授权 URL（含 state JWT）。
+ * 前端跳转到此 URL，用户在 Bangumi 授权后回调到 /login/callback?code=xxx&state=xxx。
+ */
+app.get('/oauth-bind-url', jwtAuth(), async c => {
+  try {
+    const currentUser = c.get('user')
+    const state = await createOAuthBindState(c.env, currentUser.userId)
+    const appId = c.env?.BGM_APP_ID || DEFAULT_BGM_APP_ID
+    const url = `${oauthBase(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}&state=${encodeURIComponent(state)}`
+    return c.json({ data: { url }, code: 200 })
+  } catch (err) {
+    return errorResponse(err)
+  }
+})
+
+/**
+ * POST /oauth-bind-callback
+ * Header: Authorization: Bearer <jwt>
+ * Body: { code, state }
+ *
+ * 使用 OAuth 授权码完成 Bangumi 绑定。
+ * state 必须是 /oauth-bind-url 签发的 JWT，包含 userId 与 action='bind'。
+ */
+app.post('/oauth-bind-callback', jwtAuth(), async c => {
+  try {
+    const body = await c.req.json().catch(() => ({}))
+    const { code, state } = body || {}
+    if (!code || !state) {
+      return c.json({ data: null, error: '缺少授权码或 state', code: 400 }, 400)
+    }
+    const appId = c.env?.BGM_APP_ID || DEFAULT_BGM_APP_ID
+    const appSecret = c.env?.BGM_APP_SECRET || DEFAULT_BGM_APP_SECRET
+    const result = await bindBangumiByOAuth(c.env.DB, c.env, {
+      code,
+      state,
+      oauthBase: oauthBase(c),
+      appId,
+      appSecret,
+      redirectUri: redirectUri(c)
+    })
+    return c.json({
+      data: { token: result.token, user: result.user, bgmToken: result.bgmToken },
+      code: 200
+    })
   } catch (err) {
     return errorResponse(err)
   }

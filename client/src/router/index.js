@@ -70,6 +70,12 @@ const routes = [
     component: () => import(/* webpackChunkName: "login-callback" */ '../views/LoginCallback.vue')
   },
   {
+    path: '/bind-bangumi',
+    name: 'BindBangumi',
+    component: () => import(/* webpackChunkName: "bind-bangumi" */ '../views/BindBangumi.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/profile',
     name: 'Profile',
     component: () => import(/* webpackChunkName: "profile" */ '../views/Profile.vue'),

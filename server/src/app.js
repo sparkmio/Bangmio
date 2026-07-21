@@ -43,12 +43,17 @@ app.use('/api/v1/*', async (c, next) => {
   return limiter(c, next)
 })
 
-// 认证路由速率限制：register/login 5 次/分钟（比通用 POST 限制更严格，防止暴力破解）
+// 认证路由速率限制：register/login/send-code 5 次/分钟（比通用 POST 限制更严格，防止暴力破解与邮件滥用）
 const authLimiter = rateLimit(RATE_LIMIT_WINDOW, 5)
 app.use('/api/v1/auth/*', async (c, next) => {
   const path = c.req.path
   const method = c.req.method.toUpperCase()
-  if (method === 'POST' && (path === '/api/v1/auth/register' || path === '/api/v1/auth/login')) {
+  if (
+    method === 'POST' &&
+    (path === '/api/v1/auth/register' ||
+      path === '/api/v1/auth/login' ||
+      path === '/api/v1/auth/send-code')
+  ) {
     return authLimiter(c, next)
   }
   await next()
