@@ -401,7 +401,7 @@
       "format": "esm"
     },
     "server/src/routes/auth.js": {
-      "bytes": 5336,
+      "bytes": 5600,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -5072,7 +5072,7 @@
         "server/src/db/users.js": { "bytesInOutput": 2874 },
         "server/src/utils/http.js": { "bytesInOutput": 1749 },
         "server/src/services/auth.js": { "bytesInOutput": 3724 },
-        "server/src/routes/auth.js": { "bytesInOutput": 3670 },
+        "server/src/routes/auth.js": { "bytesInOutput": 3857 },
         "server/src/services/bangumi.js": { "bytesInOutput": 5574 },
         "server/src/routes/user.js": { "bytesInOutput": 15377 },
         "server/src/controllers/animeController.js": { "bytesInOutput": 4411 },
@@ -5310,7 +5310,7 @@
         "server/src/routes/groups.js": { "bytesInOutput": 10447 },
         "server/src/app.js": { "bytesInOutput": 1919 }
       },
-      "bytes": 646757
+      "bytes": 646944
     }
   }
 }

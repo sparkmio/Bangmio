@@ -4297,11 +4297,14 @@ async function getCurrentUser(db, env, userId) {
 // server/src/routes/auth.js
 var app = new Hono2();
 app.use("*", async (c, next) => {
-  if (!c.env?.DB && c.req.method === "POST") {
+  if (c.req.method === "POST" && (!c.env?.DB || !c.env?.JWT_SECRET)) {
+    const missing = [];
+    if (!c.env?.DB) missing.push("D1 \u6570\u636E\u5E93");
+    if (!c.env?.JWT_SECRET) missing.push("JWT_SECRET \u73AF\u5883\u53D8\u91CF");
     return c.json(
       {
         data: null,
-        error: "\u8D26\u53F7\u7CFB\u7EDF\u6682\u672A\u5F00\u653E\uFF08D1 \u6570\u636E\u5E93\u672A\u914D\u7F6E\uFF09\uFF0C\u8BF7\u4F7F\u7528 Bangumi \u76F4\u767B",
+        error: `\u8D26\u53F7\u7CFB\u7EDF\u6682\u672A\u5F00\u653E\uFF08\u7F3A\u5C11 ${missing.join("\u3001")}\uFF09\uFF0C\u8BF7\u4F7F\u7528 Bangumi \u76F4\u767B`,
         code: 503
       },
       503

@@ -25,15 +25,20 @@ import {
 const app = new Hono()
 
 /**
- * D1 可用性检查中间件
- * 当 D1 binding 未配置时，所有写操作路由返回 503 引导用户使用 Bangumi 直登
+ * 运行时依赖检查中间件
+ * - D1 binding 未配置：所有 POST 返回 503（账号写入不可用）
+ * - JWT_SECRET 未配置：所有 POST 返回 503（无法签发 JWT）
+ * 引导用户使用 Bangumi 直登
  */
 app.use('*', async (c, next) => {
-  if (!c.env?.DB && c.req.method === 'POST') {
+  if (c.req.method === 'POST' && (!c.env?.DB || !c.env?.JWT_SECRET)) {
+    const missing = []
+    if (!c.env?.DB) missing.push('D1 数据库')
+    if (!c.env?.JWT_SECRET) missing.push('JWT_SECRET 环境变量')
     return c.json(
       {
         data: null,
-        error: '账号系统暂未开放（D1 数据库未配置），请使用 Bangumi 直登',
+        error: `账号系统暂未开放（缺少 ${missing.join('、')}），请使用 Bangumi 直登`,
         code: 503
       },
       503
