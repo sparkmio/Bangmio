@@ -7,6 +7,28 @@ const api = axios.create({
   timeout: 15000
 })
 
+/**
+ * 创建可取消的请求控制器
+ * Axios 1.x 支持 AbortController，可通过 signal 配置传入实现请求取消
+ * @returns {{ signal: AbortSignal, cancel: Function }} 包含 signal 和 cancel 方法
+ */
+export function createCancelToken() {
+  const controller = new AbortController()
+  return {
+    signal: controller.signal,
+    cancel: reason => controller.abort(reason)
+  }
+}
+
+/**
+ * 判断错误是否为请求被取消（用于在 catch 中跳过取消类错误）
+ * @param {Error} err
+ * @returns {boolean}
+ */
+export function isCanceled(err) {
+  return err?.name === 'AbortError' || err?.code === 'ERR_CANCELED' || err?.message === 'canceled'
+}
+
 let isRefreshing = false
 let pendingRequests = []
 
@@ -25,7 +47,9 @@ api.interceptors.request.use(config => {
     if (user.username) {
       config.headers['X-Bangumi-Username'] = user.username
     }
-  } catch {}
+  } catch {
+    // ignore
+  }
   return config
 })
 
@@ -40,7 +64,11 @@ api.interceptors.response.use(
         if (!isRefreshing) {
           isRefreshing = true
           try {
-            const res = await axios.post(`${baseURL}/user/refresh-token`, { refreshToken }, { timeout: 15000 })
+            const res = await axios.post(
+              `${baseURL}/user/refresh-token`,
+              { refreshToken },
+              { timeout: 15000 }
+            )
             const newToken = res.data.data.token
             localStorage.setItem('bangmio_token', newToken)
             if (res.data.data.refreshToken) {

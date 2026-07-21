@@ -1,0 +1,34 @@
+# Checklist
+
+- [ ] server/src/utils/cache.js 存在并导出 createCache(ttl) 工厂函数
+- [ ] createCache 返回的实例有 get(key)、set(key, data)、clear() 方法
+- [ ] server/src/utils/http.js 存在并导出 SCRAPE_UA、fetchHTML、fetchHTMLMulti
+- [ ] fetchHTML 支持 timeout 参数（默认 8000ms），使用 AbortController
+- [ ] fetchHTMLMulti 支持多 URL 顺序重试，返回 { html, url }
+- [ ] http.js 导出辅助函数 stripTags、unescapeHtml、parseNumber、fixUrl
+- [ ] server/src/app.js 注册了 app.onError 全局错误兜底
+- [ ] server/src/app.js 注册了 404 兜底路由
+- [ ] user.js 中 APP_ID 从 c.env?.BGM_APP_ID 读取（含回退默认值）
+- [ ] user.js 中 APP_SECRET 从 c.env?.BGM_APP_SECRET 读取（含回退默认值）
+- [ ] .dev.vars.example 文件存在并说明了环境变量格式
+- [ ] comments.js 的 POST /subject/:id/comment 校验 content.length ≤ 5000
+- [ ] comments.js 的 POST /topic/:topicId/reply 校验 content.length ≤ 5000
+- [ ] comments.js 的 POST /subject/:id/talkbox 校验 content.length ≤ 5000
+- [ ] comments.js 的 POST /subject/:id/topic 校验 title.length ≤ 200、content.length ≤ 5000
+- [ ] groups.js 引用了 utils/cache.js 和 utils/http.js，无本地重复定义
+- [ ] comments.js 引用了 utils/cache.js 和 utils/http.js，无本地重复定义
+- [ ] douban.js 引用了 utils/cache.js，无本地重复定义
+- [ ] bilibili.js 引用了 utils/cache.js 和 utils/http.js，无本地重复定义
+- [ ] moegirl.js 引用了 utils/cache.js，无本地重复定义
+- [ ] user.js 引用了 utils/http.js，无本地重复定义
+- [ ] AnimeCard.vue img 标签有 loading="lazy" 和 decoding="async"
+- [ ] Detail.vue 非首屏 img 有 loading="lazy"
+- [ ] client/src/api/index.js 导出了 createCancelToken 工具函数
+- [ ] Browse.vue 搜索/翻页时取消上一个未完成请求
+- [ ] client/index.html 有 meta name="description"
+- [ ] client/index.html 有 Open Graph 标签
+- [ ] client/index.html 有 meta name="theme-color"
+- [ ] npm run build 无报错
+- [ ] Cloudflare Pages 部署成功
+- [ ] 线上 /api/health 正常返回
+- [ ] 线上 /api/v1/anime/calendar 正常返回

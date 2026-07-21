@@ -1,0 +1,7 @@
+dist/
+functions/api/_server.js
+node_modules/
+client/dist/
+client/node_modules/
+*.log
+bangmio-showcase.html

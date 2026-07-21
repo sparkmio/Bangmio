@@ -1,0 +1,25 @@
+# Checklist
+
+- [x] tailwind.config.js 中新增了 borderRadius（card, pill）、boxShadow（card, hover）、animation/keyframes（card-in）令牌
+- [x] main.css 中 anime-grid 间距调整为 1.5rem / 1rem，minmax(160px, 1fr)
+- [x] main.css 中滚动条宽度调整为 5px，圆角全圆，颜色为 primary 20%/40%
+- [x] main.css 中新增了 @keyframes cardIn 动画
+- [x] main.css 中新增了 .skeleton 骨架屏样式（shimmer 渐变动画）
+- [x] AnimeCard.vue 外框圆角为 rounded-xl
+- [x] AnimeCard.vue hover 上浮为 -translate-y-1，阴影为 shadow-hover
+- [x] AnimeCard.vue 入场动画使用 CSS animate-card-in + stagger delay，无 GSAP 依赖
+- [x] AnimeCard.vue 评分 badge 使用 bg-black/60 backdrop-blur-sm
+- [x] AnimeCard.vue 图片区域有骨架背景色 bg-base-300
+- [x] LoadingState.vue 支持 skeleton prop，渲染骨架卡片占位
+- [x] Home.vue typeTabs 按钮为 rounded-full 胶囊式
+- [x] Browse.vue typeOptions 按钮为 rounded-full 胶囊式
+- [x] Trending.vue Tab 按钮为自定义胶囊式，非 DaisyUI tabs-boxed
+- [x] Detail.vue Hero 海报圆角为 rounded-2xl
+- [x] Detail.vue 评分/统计卡片圆角为 rounded-xl
+- [x] Detail.vue Tab 栏底部边框为 border-base-300/50
+- [x] Detail.vue 章节列表项圆角为 rounded-xl
+- [x] Home.vue 集数按钮为 w-9 h-8 rounded-lg
+- [x] Home.vue 弹窗圆角为 rounded-2xl
+- [x] App.vue 路由转场 y 偏移为 8，时长 0.25s / 0.15s
+- [x] npm run build 无报错
+- [x] 部署到 Cloudflare Pages 成功

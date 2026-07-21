@@ -1,32 +1,29 @@
 import { Hono } from 'hono'
 import * as bangumiService from '../services/bangumi.js'
+import { createCache } from '../utils/cache.js'
+import { SCRAPE_UA } from '../utils/http.js'
+import { CACHE_TTL_BILIBILI } from '../config.js'
 
 const app = new Hono()
 
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-
 function generateBuvid3() {
-  const seg = () => Math.floor(Math.random() * 0x10000).toString(16).padStart(4, '0')
+  const seg = () =>
+    Math.floor(Math.random() * 0x10000)
+      .toString(16)
+      .padStart(4, '0')
   return `${seg()}${seg()}-${seg()}-${seg()}-${seg()}-${seg()}${seg()}${seg()}infoc`
 }
 
 const BILIBILI_HEADERS = {
-  'User-Agent': UA,
-  'Referer': 'https://search.bilibili.com/',
-  'Origin': 'https://search.bilibili.com',
-  'Accept': 'application/json, text/plain, */*',
+  'User-Agent': SCRAPE_UA,
+  Referer: 'https://search.bilibili.com/',
+  Origin: 'https://search.bilibili.com',
+  Accept: 'application/json, text/plain, */*',
   'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-  'Cookie': `buvid3=${generateBuvid3()}; b_nut=${Date.now()}`
+  Cookie: `buvid3=${generateBuvid3()}; b_nut=${Date.now()}`
 }
 
-const cache = new Map()
-function getCached(key) {
-  const c = cache.get(key)
-  return (c && Date.now() - c.time < 10 * 60 * 1000) ? c.data : null
-}
-function setCache(key, data) {
-  cache.set(key, { data, time: Date.now() })
-}
+const cache = createCache(CACHE_TTL_BILIBILI)
 
 function isChina(c) {
   return (c.env?.CF_IP_COUNTRY || '') === 'CN'
@@ -68,41 +65,41 @@ async function findBilibiliMatch(detail) {
   return null
 }
 
-app.get('/by-name', async (c) => {
+app.get('/by-name', async c => {
   try {
     const name = c.req.query('name')
     if (!name) return c.json({ data: null })
     const cacheKey = `bilibili_name_${name}`
-    const cached = getCached(cacheKey)
+    const cached = cache.get(cacheKey)
     if (cached) return c.json({ data: cached })
 
     const match = await searchBilibiliBangumi(name)
-    setCache(cacheKey, match || null)
+    cache.set(cacheKey, match || null)
     return c.json({ data: match || null })
   } catch {
     return c.json({ data: null })
   }
 })
 
-app.get('/:id', async (c) => {
+app.get('/:id', async c => {
   try {
     const subjectId = c.req.param('id')
     const cn = isChina(c)
     const cacheKey = `bilibili_${subjectId}_${cn}`
-    const cached = getCached(cacheKey)
+    const cached = cache.get(cacheKey)
     if (cached) return c.json({ data: cached })
 
     const detail = await bangumiService.getAnimeDetail(subjectId, { isChina: cn })
     if (!detail) return c.json({ data: null })
     const match = await findBilibiliMatch(detail)
-    setCache(cacheKey, match || null)
+    cache.set(cacheKey, match || null)
     return c.json({ data: match || null })
   } catch {
     return c.json({ data: null })
   }
 })
 
-app.get('/:id/details', async (c) => {
+app.get('/:id/details', async c => {
   return c.redirect(`/api/v1/bilibili/${c.req.param('id')}`, 307)
 })
 

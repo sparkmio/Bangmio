@@ -1,0 +1,7 @@
+# Cloudflare Pages 本地开发环境变量
+# 复制此文件为 .dev.vars 并填入实际值
+# 文档：https://developers.cloudflare.com/pages/functions/local-development/
+
+# Bangumi OAuth 凭据（从 https://bgm.tv/dev/app 获取）
+BGM_APP_ID=your_bangumi_app_id
+BGM_APP_SECRET=your_bangumi_app_secret

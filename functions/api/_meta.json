@@ -1,0 +1,5202 @@
+{
+  "inputs": {
+    "server/node_modules/hono/dist/compose.js": { "bytes": 1161, "imports": [], "format": "esm" },
+    "server/node_modules/hono/dist/http-exception.js": {
+      "bytes": 957,
+      "imports": [],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/request/constants.js": {
+      "bytes": 108,
+      "imports": [],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/utils/body.js": {
+      "bytes": 2246,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/request.js",
+          "kind": "import-statement",
+          "original": "../request.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/utils/url.js": { "bytes": 6458, "imports": [], "format": "esm" },
+    "server/node_modules/hono/dist/request.js": {
+      "bytes": 8054,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/http-exception.js",
+          "kind": "import-statement",
+          "original": "./http-exception.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/request/constants.js",
+          "kind": "import-statement",
+          "original": "./request/constants.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/utils/body.js",
+          "kind": "import-statement",
+          "original": "./utils/body.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/utils/url.js",
+          "kind": "import-statement",
+          "original": "./utils/url.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/utils/html.js": {
+      "bytes": 3001,
+      "imports": [],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/context.js": {
+      "bytes": 10916,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/request.js",
+          "kind": "import-statement",
+          "original": "./request.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/utils/html.js",
+          "kind": "import-statement",
+          "original": "./utils/html.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/router.js": { "bytes": 433, "imports": [], "format": "esm" },
+    "server/node_modules/hono/dist/utils/constants.js": {
+      "bytes": 102,
+      "imports": [],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/hono-base.js": {
+      "bytes": 11425,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/compose.js",
+          "kind": "import-statement",
+          "original": "./compose.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/context.js",
+          "kind": "import-statement",
+          "original": "./context.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/router.js",
+          "kind": "import-statement",
+          "original": "./router.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/utils/constants.js",
+          "kind": "import-statement",
+          "original": "./utils/constants.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/utils/url.js",
+          "kind": "import-statement",
+          "original": "./utils/url.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/router/reg-exp-router/matcher.js": {
+      "bytes": 670,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/router.js",
+          "kind": "import-statement",
+          "original": "../../router.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/router/reg-exp-router/node.js": {
+      "bytes": 3411,
+      "imports": [],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/router/reg-exp-router/trie.js": {
+      "bytes": 1689,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/router/reg-exp-router/node.js",
+          "kind": "import-statement",
+          "original": "./node.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/router/reg-exp-router/router.js": {
+      "bytes": 6502,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/router.js",
+          "kind": "import-statement",
+          "original": "../../router.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/utils/url.js",
+          "kind": "import-statement",
+          "original": "../../utils/url.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/router/reg-exp-router/matcher.js",
+          "kind": "import-statement",
+          "original": "./matcher.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/router/reg-exp-router/node.js",
+          "kind": "import-statement",
+          "original": "./node.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/router/reg-exp-router/trie.js",
+          "kind": "import-statement",
+          "original": "./trie.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/router/reg-exp-router/prepared-router.js": {
+      "bytes": 4252,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/router.js",
+          "kind": "import-statement",
+          "original": "../../router.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/router/reg-exp-router/matcher.js",
+          "kind": "import-statement",
+          "original": "./matcher.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/router/reg-exp-router/router.js",
+          "kind": "import-statement",
+          "original": "./router.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/router/reg-exp-router/index.js": {
+      "bytes": 274,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/router/reg-exp-router/router.js",
+          "kind": "import-statement",
+          "original": "./router.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/router/reg-exp-router/prepared-router.js",
+          "kind": "import-statement",
+          "original": "./prepared-router.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/router/smart-router/router.js": {
+      "bytes": 1496,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/router.js",
+          "kind": "import-statement",
+          "original": "../../router.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/router/smart-router/index.js": {
+      "bytes": 105,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/router/smart-router/router.js",
+          "kind": "import-statement",
+          "original": "./router.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/router/trie-router/node.js": {
+      "bytes": 6145,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/router.js",
+          "kind": "import-statement",
+          "original": "../../router.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/utils/url.js",
+          "kind": "import-statement",
+          "original": "../../utils/url.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/router/trie-router/router.js": {
+      "bytes": 633,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/utils/url.js",
+          "kind": "import-statement",
+          "original": "../../utils/url.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/router/trie-router/node.js",
+          "kind": "import-statement",
+          "original": "./node.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/router/trie-router/index.js": {
+      "bytes": 102,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/router/trie-router/router.js",
+          "kind": "import-statement",
+          "original": "./router.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/hono.js": {
+      "bytes": 610,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/hono-base.js",
+          "kind": "import-statement",
+          "original": "./hono-base.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/router/reg-exp-router/index.js",
+          "kind": "import-statement",
+          "original": "./router/reg-exp-router/index.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/router/smart-router/index.js",
+          "kind": "import-statement",
+          "original": "./router/smart-router/index.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/router/trie-router/index.js",
+          "kind": "import-statement",
+          "original": "./router/trie-router/index.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/index.js": {
+      "bytes": 120,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/hono.js",
+          "kind": "import-statement",
+          "original": "./hono.js"
+        },
+        {
+          "path": "server/node_modules/hono/dist/context.js",
+          "kind": "import-statement",
+          "original": "./context.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/middleware/cors/index.js": {
+      "bytes": 2614,
+      "imports": [],
+      "format": "esm"
+    },
+    "server/src/utils/logger.js": { "bytes": 1418, "imports": [], "format": "esm" },
+    "server/src/utils/rateLimit.js": {
+      "bytes": 1424,
+      "imports": [
+        {
+          "path": "server/src/utils/logger.js",
+          "kind": "import-statement",
+          "original": "./logger.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/src/middleware/security.js": { "bytes": 909, "imports": [], "format": "esm" },
+    "server/src/config.js": { "bytes": 1739, "imports": [], "format": "esm" },
+    "server/src/services/bangumi.js": { "bytes": 10766, "imports": [], "format": "esm" },
+    "server/src/utils/http.js": {
+      "bytes": 4625,
+      "imports": [
+        {
+          "path": "server/src/utils/logger.js",
+          "kind": "import-statement",
+          "original": "./logger.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/src/routes/user.js": {
+      "bytes": 16082,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/index.js",
+          "kind": "import-statement",
+          "original": "hono"
+        },
+        {
+          "path": "server/src/services/bangumi.js",
+          "kind": "import-statement",
+          "original": "../services/bangumi.js"
+        },
+        {
+          "path": "server/src/utils/http.js",
+          "kind": "import-statement",
+          "original": "../utils/http.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/src/controllers/animeController.js": {
+      "bytes": 4393,
+      "imports": [
+        {
+          "path": "server/src/services/bangumi.js",
+          "kind": "import-statement",
+          "original": "../services/bangumi.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/src/routes/anime.js": {
+      "bytes": 990,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/index.js",
+          "kind": "import-statement",
+          "original": "hono"
+        },
+        {
+          "path": "server/src/controllers/animeController.js",
+          "kind": "import-statement",
+          "original": "../controllers/animeController.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/src/routes/collection.js": {
+      "bytes": 6141,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/index.js",
+          "kind": "import-statement",
+          "original": "hono"
+        },
+        {
+          "path": "server/src/services/bangumi.js",
+          "kind": "import-statement",
+          "original": "../services/bangumi.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/shared/symbols.js": {
+      "bytes": 1905,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/htmlparser2/node_modules/entities/dist/esm/decode-codepoint.js": {
+      "bytes": 2094,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/htmlparser2/node_modules/entities/dist/esm/internal/decode-shared.js": {
+      "bytes": 1274,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/htmlparser2/node_modules/entities/dist/esm/generated/decode-data-html.js": {
+      "bytes": 32416,
+      "imports": [
+        {
+          "path": "node_modules/htmlparser2/node_modules/entities/dist/esm/internal/decode-shared.js",
+          "kind": "import-statement",
+          "original": "../internal/decode-shared.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/htmlparser2/node_modules/entities/dist/esm/generated/decode-data-xml.js": {
+      "bytes": 278,
+      "imports": [
+        {
+          "path": "node_modules/htmlparser2/node_modules/entities/dist/esm/internal/decode-shared.js",
+          "kind": "import-statement",
+          "original": "../internal/decode-shared.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/htmlparser2/node_modules/entities/dist/esm/internal/bin-trie-flags.js": {
+      "bytes": 942,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/htmlparser2/node_modules/entities/dist/esm/decode.js": {
+      "bytes": 23157,
+      "imports": [
+        {
+          "path": "node_modules/htmlparser2/node_modules/entities/dist/esm/decode-codepoint.js",
+          "kind": "import-statement",
+          "original": "./decode-codepoint.js"
+        },
+        {
+          "path": "node_modules/htmlparser2/node_modules/entities/dist/esm/generated/decode-data-html.js",
+          "kind": "import-statement",
+          "original": "./generated/decode-data-html.js"
+        },
+        {
+          "path": "node_modules/htmlparser2/node_modules/entities/dist/esm/generated/decode-data-xml.js",
+          "kind": "import-statement",
+          "original": "./generated/decode-data-xml.js"
+        },
+        {
+          "path": "node_modules/htmlparser2/node_modules/entities/dist/esm/internal/bin-trie-flags.js",
+          "kind": "import-statement",
+          "original": "./internal/bin-trie-flags.js"
+        },
+        {
+          "path": "node_modules/htmlparser2/node_modules/entities/dist/esm/decode-codepoint.js",
+          "kind": "import-statement",
+          "original": "./decode-codepoint.js"
+        },
+        {
+          "path": "node_modules/htmlparser2/node_modules/entities/dist/esm/generated/decode-data-html.js",
+          "kind": "import-statement",
+          "original": "./generated/decode-data-html.js"
+        },
+        {
+          "path": "node_modules/htmlparser2/node_modules/entities/dist/esm/generated/decode-data-xml.js",
+          "kind": "import-statement",
+          "original": "./generated/decode-data-xml.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/htmlparser2/dist/esm/Tokenizer.js": {
+      "bytes": 30579,
+      "imports": [
+        {
+          "path": "node_modules/htmlparser2/node_modules/entities/dist/esm/decode.js",
+          "kind": "import-statement",
+          "original": "entities/decode"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/htmlparser2/dist/esm/Parser.js": {
+      "bytes": 16720,
+      "imports": [
+        {
+          "path": "node_modules/htmlparser2/dist/esm/Tokenizer.js",
+          "kind": "import-statement",
+          "original": "./Tokenizer.js"
+        },
+        {
+          "path": "node_modules/htmlparser2/node_modules/entities/dist/esm/decode.js",
+          "kind": "import-statement",
+          "original": "entities/decode"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/domelementtype/lib/esm/index.js": {
+      "bytes": 1712,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/domhandler/lib/esm/node.js": {
+      "bytes": 9213,
+      "imports": [
+        {
+          "path": "node_modules/domelementtype/lib/esm/index.js",
+          "kind": "import-statement",
+          "original": "domelementtype"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/domhandler/lib/esm/index.js": {
+      "bytes": 4678,
+      "imports": [
+        {
+          "path": "node_modules/domelementtype/lib/esm/index.js",
+          "kind": "import-statement",
+          "original": "domelementtype"
+        },
+        {
+          "path": "node_modules/domhandler/lib/esm/node.js",
+          "kind": "import-statement",
+          "original": "./node.js"
+        },
+        {
+          "path": "node_modules/domhandler/lib/esm/node.js",
+          "kind": "import-statement",
+          "original": "./node.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/entities/lib/esm/generated/decode-data-html.js": {
+      "bytes": 47724,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/entities/lib/esm/generated/decode-data-xml.js": {
+      "bytes": 279,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/entities/lib/esm/decode_codepoint.js": {
+      "bytes": 2112,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/entities/lib/esm/decode.js": {
+      "bytes": 19810,
+      "imports": [
+        {
+          "path": "node_modules/entities/lib/esm/generated/decode-data-html.js",
+          "kind": "import-statement",
+          "original": "./generated/decode-data-html.js"
+        },
+        {
+          "path": "node_modules/entities/lib/esm/generated/decode-data-xml.js",
+          "kind": "import-statement",
+          "original": "./generated/decode-data-xml.js"
+        },
+        {
+          "path": "node_modules/entities/lib/esm/decode_codepoint.js",
+          "kind": "import-statement",
+          "original": "./decode_codepoint.js"
+        },
+        {
+          "path": "node_modules/entities/lib/esm/decode_codepoint.js",
+          "kind": "import-statement",
+          "original": "./decode_codepoint.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/entities/lib/esm/generated/encode-html.js": {
+      "bytes": 27039,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/entities/lib/esm/escape.js": { "bytes": 3965, "imports": [], "format": "esm" },
+    "node_modules/entities/lib/esm/encode.js": {
+      "bytes": 2569,
+      "imports": [
+        {
+          "path": "node_modules/entities/lib/esm/generated/encode-html.js",
+          "kind": "import-statement",
+          "original": "./generated/encode-html.js"
+        },
+        {
+          "path": "node_modules/entities/lib/esm/escape.js",
+          "kind": "import-statement",
+          "original": "./escape.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/entities/lib/esm/index.js": {
+      "bytes": 4057,
+      "imports": [
+        {
+          "path": "node_modules/entities/lib/esm/decode.js",
+          "kind": "import-statement",
+          "original": "./decode.js"
+        },
+        {
+          "path": "node_modules/entities/lib/esm/encode.js",
+          "kind": "import-statement",
+          "original": "./encode.js"
+        },
+        {
+          "path": "node_modules/entities/lib/esm/escape.js",
+          "kind": "import-statement",
+          "original": "./escape.js"
+        },
+        {
+          "path": "node_modules/entities/lib/esm/escape.js",
+          "kind": "import-statement",
+          "original": "./escape.js"
+        },
+        {
+          "path": "node_modules/entities/lib/esm/encode.js",
+          "kind": "import-statement",
+          "original": "./encode.js"
+        },
+        {
+          "path": "node_modules/entities/lib/esm/decode.js",
+          "kind": "import-statement",
+          "original": "./decode.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/dom-serializer/lib/esm/foreignNames.js": {
+      "bytes": 2047,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/dom-serializer/lib/esm/index.js": {
+      "bytes": 5381,
+      "imports": [
+        {
+          "path": "node_modules/domelementtype/lib/esm/index.js",
+          "kind": "import-statement",
+          "original": "domelementtype"
+        },
+        {
+          "path": "node_modules/entities/lib/esm/index.js",
+          "kind": "import-statement",
+          "original": "entities"
+        },
+        {
+          "path": "node_modules/dom-serializer/lib/esm/foreignNames.js",
+          "kind": "import-statement",
+          "original": "./foreignNames.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/domutils/lib/esm/stringify.js": {
+      "bytes": 2562,
+      "imports": [
+        {
+          "path": "node_modules/domhandler/lib/esm/index.js",
+          "kind": "import-statement",
+          "original": "domhandler"
+        },
+        {
+          "path": "node_modules/dom-serializer/lib/esm/index.js",
+          "kind": "import-statement",
+          "original": "dom-serializer"
+        },
+        {
+          "path": "node_modules/domelementtype/lib/esm/index.js",
+          "kind": "import-statement",
+          "original": "domelementtype"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/domutils/lib/esm/traversal.js": {
+      "bytes": 3092,
+      "imports": [
+        {
+          "path": "node_modules/domhandler/lib/esm/index.js",
+          "kind": "import-statement",
+          "original": "domhandler"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/domutils/lib/esm/manipulation.js": {
+      "bytes": 3376,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/domutils/lib/esm/querying.js": {
+      "bytes": 5124,
+      "imports": [
+        {
+          "path": "node_modules/domhandler/lib/esm/index.js",
+          "kind": "import-statement",
+          "original": "domhandler"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/domutils/lib/esm/legacy.js": {
+      "bytes": 5209,
+      "imports": [
+        {
+          "path": "node_modules/domhandler/lib/esm/index.js",
+          "kind": "import-statement",
+          "original": "domhandler"
+        },
+        {
+          "path": "node_modules/domutils/lib/esm/querying.js",
+          "kind": "import-statement",
+          "original": "./querying.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/domutils/lib/esm/helpers.js": {
+      "bytes": 4981,
+      "imports": [
+        {
+          "path": "node_modules/domhandler/lib/esm/index.js",
+          "kind": "import-statement",
+          "original": "domhandler"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/domutils/lib/esm/feeds.js": {
+      "bytes": 5981,
+      "imports": [
+        {
+          "path": "node_modules/domutils/lib/esm/stringify.js",
+          "kind": "import-statement",
+          "original": "./stringify.js"
+        },
+        {
+          "path": "node_modules/domutils/lib/esm/legacy.js",
+          "kind": "import-statement",
+          "original": "./legacy.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/domutils/lib/esm/index.js": {
+      "bytes": 405,
+      "imports": [
+        {
+          "path": "node_modules/domutils/lib/esm/stringify.js",
+          "kind": "import-statement",
+          "original": "./stringify.js"
+        },
+        {
+          "path": "node_modules/domutils/lib/esm/traversal.js",
+          "kind": "import-statement",
+          "original": "./traversal.js"
+        },
+        {
+          "path": "node_modules/domutils/lib/esm/manipulation.js",
+          "kind": "import-statement",
+          "original": "./manipulation.js"
+        },
+        {
+          "path": "node_modules/domutils/lib/esm/querying.js",
+          "kind": "import-statement",
+          "original": "./querying.js"
+        },
+        {
+          "path": "node_modules/domutils/lib/esm/legacy.js",
+          "kind": "import-statement",
+          "original": "./legacy.js"
+        },
+        {
+          "path": "node_modules/domutils/lib/esm/helpers.js",
+          "kind": "import-statement",
+          "original": "./helpers.js"
+        },
+        {
+          "path": "node_modules/domutils/lib/esm/feeds.js",
+          "kind": "import-statement",
+          "original": "./feeds.js"
+        },
+        {
+          "path": "node_modules/domhandler/lib/esm/index.js",
+          "kind": "import-statement",
+          "original": "domhandler"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/htmlparser2/dist/esm/index.js": {
+      "bytes": 2977,
+      "imports": [
+        {
+          "path": "node_modules/htmlparser2/dist/esm/Parser.js",
+          "kind": "import-statement",
+          "original": "./Parser.js"
+        },
+        {
+          "path": "node_modules/htmlparser2/dist/esm/Parser.js",
+          "kind": "import-statement",
+          "original": "./Parser.js"
+        },
+        {
+          "path": "node_modules/domhandler/lib/esm/index.js",
+          "kind": "import-statement",
+          "original": "domhandler"
+        },
+        {
+          "path": "node_modules/domhandler/lib/esm/index.js",
+          "kind": "import-statement",
+          "original": "domhandler"
+        },
+        {
+          "path": "node_modules/htmlparser2/dist/esm/Tokenizer.js",
+          "kind": "import-statement",
+          "original": "./Tokenizer.js"
+        },
+        {
+          "path": "node_modules/domelementtype/lib/esm/index.js",
+          "kind": "import-statement",
+          "original": "domelementtype"
+        },
+        {
+          "path": "node_modules/domutils/lib/esm/index.js",
+          "kind": "import-statement",
+          "original": "domutils"
+        },
+        {
+          "path": "node_modules/domutils/lib/esm/index.js",
+          "kind": "import-statement",
+          "original": "domutils"
+        },
+        {
+          "path": "node_modules/domutils/lib/esm/index.js",
+          "kind": "import-statement",
+          "original": "domutils"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/shared/constants.js": {
+      "bytes": 1194,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/shared/object.js": { "bytes": 243, "imports": [], "format": "esm" },
+    "node_modules/linkedom/esm/shared/utils.js": {
+      "bytes": 1715,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "./constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "./symbols.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/shared/shadow-roots.js": {
+      "bytes": 40,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/custom-element-registry.js": {
+      "bytes": 5482,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "../shared/constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/object.js",
+          "kind": "import-statement",
+          "original": "../shared/object.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/shadow-roots.js",
+          "kind": "import-statement",
+          "original": "../shared/shadow-roots.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/shared/parse-from-string.js": {
+      "bytes": 3656,
+      "imports": [
+        {
+          "path": "node_modules/htmlparser2/dist/esm/index.js",
+          "kind": "import-statement",
+          "original": "htmlparser2"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "./constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "./symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/object.js",
+          "kind": "import-statement",
+          "original": "./object.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/utils.js",
+          "kind": "import-statement",
+          "original": "./utils.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/custom-element-registry.js",
+          "kind": "import-statement",
+          "original": "../interface/custom-element-registry.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/shared/register-html-class.js": {
+      "bytes": 220,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/shared/jsdon.js": {
+      "bytes": 1691,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "./constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "./symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/utils.js",
+          "kind": "import-statement",
+          "original": "./utils.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/mutation-observer.js": {
+      "bytes": 5011,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/shared/attributes.js": {
+      "bytes": 2399,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "./symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/utils.js",
+          "kind": "import-statement",
+          "original": "./utils.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/custom-element-registry.js",
+          "kind": "import-statement",
+          "original": "../interface/custom-element-registry.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/mutation-observer.js",
+          "kind": "import-statement",
+          "original": "../interface/mutation-observer.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/event-target.js": {
+      "bytes": 2090,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/node-list.js": {
+      "bytes": 190,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/node.js": {
+      "bytes": 6258,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "../shared/constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/event-target.js",
+          "kind": "import-statement",
+          "original": "./event-target.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/node-list.js",
+          "kind": "import-statement",
+          "original": "./node-list.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/shared/text-escaper.js": {
+      "bytes": 500,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/attr.js": {
+      "bytes": 1677,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "../shared/constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/utils.js",
+          "kind": "import-statement",
+          "original": "../shared/utils.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/jsdon.js",
+          "kind": "import-statement",
+          "original": "../shared/jsdon.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/attributes.js",
+          "kind": "import-statement",
+          "original": "../shared/attributes.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/mutation-observer.js",
+          "kind": "import-statement",
+          "original": "./mutation-observer.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/custom-element-registry.js",
+          "kind": "import-statement",
+          "original": "./custom-element-registry.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/node.js",
+          "kind": "import-statement",
+          "original": "./node.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/text-escaper.js",
+          "kind": "import-statement",
+          "original": "../shared/text-escaper.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/shared/node.js": {
+      "bytes": 1056,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "./constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "./symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/utils.js",
+          "kind": "import-statement",
+          "original": "./utils.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/mixin/non-document-type-child-node.js": {
+      "bytes": 562,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "../shared/constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/node.js",
+          "kind": "import-statement",
+          "original": "../shared/node.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/mixin/child-node.js": {
+      "bytes": 1622,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "../shared/constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/utils.js",
+          "kind": "import-statement",
+          "original": "../shared/utils.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/mutation-observer.js",
+          "kind": "import-statement",
+          "original": "../interface/mutation-observer.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/custom-element-registry.js",
+          "kind": "import-statement",
+          "original": "../interface/custom-element-registry.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/character-data.js": {
+      "bytes": 2412,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/utils.js",
+          "kind": "import-statement",
+          "original": "../shared/utils.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/node.js",
+          "kind": "import-statement",
+          "original": "../shared/node.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/jsdon.js",
+          "kind": "import-statement",
+          "original": "../shared/jsdon.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/mixin/non-document-type-child-node.js",
+          "kind": "import-statement",
+          "original": "../mixin/non-document-type-child-node.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/mixin/child-node.js",
+          "kind": "import-statement",
+          "original": "../mixin/child-node.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/node.js",
+          "kind": "import-statement",
+          "original": "./node.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/mutation-observer.js",
+          "kind": "import-statement",
+          "original": "./mutation-observer.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/cdata-section.js": {
+      "bytes": 545,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "../shared/constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/character-data.js",
+          "kind": "import-statement",
+          "original": "./character-data.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/comment.js": {
+      "bytes": 508,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "../shared/constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/character-data.js",
+          "kind": "import-statement",
+          "original": "./character-data.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/boolbase/dist/index.js": {
+      "bytes": 98,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/css-what/dist/types.js": {
+      "bytes": 1419,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/css-what/dist/parse.js": {
+      "bytes": 19354,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/css-what/dist/types.js",
+          "kind": "import-statement",
+          "original": "./types.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/css-what/dist/stringify.js": {
+      "bytes": 4827,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/css-what/dist/types.js",
+          "kind": "import-statement",
+          "original": "./types.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/css-what/dist/index.js": {
+      "bytes": 121,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/css-what/dist/parse.js",
+          "kind": "import-statement",
+          "original": "./parse.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-what/dist/stringify.js",
+          "kind": "import-statement",
+          "original": "./stringify.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-what/dist/types.js",
+          "kind": "import-statement",
+          "original": "./types.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/domelementtype/dist/index.js": {
+      "bytes": 2222,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/domhandler/dist/node.js": {
+      "bytes": 9626,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/domelementtype/dist/index.js",
+          "kind": "import-statement",
+          "original": "domelementtype"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/domhandler/dist/index.js": {
+      "bytes": 4800,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/domelementtype/dist/index.js",
+          "kind": "import-statement",
+          "original": "domelementtype"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/domhandler/dist/node.js",
+          "kind": "import-statement",
+          "original": "./node.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/domhandler/dist/node.js",
+          "kind": "import-statement",
+          "original": "./node.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/domutils/dist/querying.js": {
+      "bytes": 4703,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/domhandler/dist/index.js",
+          "kind": "import-statement",
+          "original": "domhandler"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/domutils/dist/legacy.js": {
+      "bytes": 5320,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/domhandler/dist/index.js",
+          "kind": "import-statement",
+          "original": "domhandler"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/domutils/dist/querying.js",
+          "kind": "import-statement",
+          "original": "./querying.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/entities/dist/decode-codepoint.js": {
+      "bytes": 1160,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/entities/dist/internal/decode-shared.js": {
+      "bytes": 617,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/entities/dist/generated/decode-data-html.js": {
+      "bytes": 32453,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/entities/dist/internal/decode-shared.js",
+          "kind": "import-statement",
+          "original": "../internal/decode-shared.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/entities/dist/generated/decode-data-xml.js": {
+      "bytes": 314,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/entities/dist/internal/decode-shared.js",
+          "kind": "import-statement",
+          "original": "../internal/decode-shared.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/entities/dist/internal/bin-trie-flags.js": {
+      "bytes": 942,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/entities/dist/decode.js": {
+      "bytes": 22923,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/entities/dist/decode-codepoint.js",
+          "kind": "import-statement",
+          "original": "./decode-codepoint.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/entities/dist/generated/decode-data-html.js",
+          "kind": "import-statement",
+          "original": "./generated/decode-data-html.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/entities/dist/generated/decode-data-xml.js",
+          "kind": "import-statement",
+          "original": "./generated/decode-data-xml.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/entities/dist/internal/bin-trie-flags.js",
+          "kind": "import-statement",
+          "original": "./internal/bin-trie-flags.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/entities/dist/decode-codepoint.js",
+          "kind": "import-statement",
+          "original": "./decode-codepoint.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/entities/dist/generated/decode-data-html.js",
+          "kind": "import-statement",
+          "original": "./generated/decode-data-html.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/entities/dist/generated/decode-data-xml.js",
+          "kind": "import-statement",
+          "original": "./generated/decode-data-xml.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/entities/dist/escape.js": {
+      "bytes": 4740,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/entities/dist/internal/encode-shared.js": {
+      "bytes": 3618,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/entities/dist/generated/encode-html.js": {
+      "bytes": 13401,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/entities/dist/internal/encode-shared.js",
+          "kind": "import-statement",
+          "original": "../internal/encode-shared.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/entities/dist/encode.js": {
+      "bytes": 3272,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/entities/dist/escape.js",
+          "kind": "import-statement",
+          "original": "./escape.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/entities/dist/generated/encode-html.js",
+          "kind": "import-statement",
+          "original": "./generated/encode-html.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/entities/dist/index.js": {
+      "bytes": 3604,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/entities/dist/decode.js",
+          "kind": "import-statement",
+          "original": "./decode.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/entities/dist/encode.js",
+          "kind": "import-statement",
+          "original": "./encode.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/entities/dist/escape.js",
+          "kind": "import-statement",
+          "original": "./escape.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/entities/dist/decode.js",
+          "kind": "import-statement",
+          "original": "./decode.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/entities/dist/encode.js",
+          "kind": "import-statement",
+          "original": "./encode.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/entities/dist/escape.js",
+          "kind": "import-statement",
+          "original": "./escape.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/dom-serializer/dist/foreign-names.js": {
+      "bytes": 1792,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/dom-serializer/dist/index.js": {
+      "bytes": 7202,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/domelementtype/dist/index.js",
+          "kind": "import-statement",
+          "original": "domelementtype"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/entities/dist/index.js",
+          "kind": "import-statement",
+          "original": "entities"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/dom-serializer/dist/foreign-names.js",
+          "kind": "import-statement",
+          "original": "./foreign-names.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/domutils/dist/stringify.js": {
+      "bytes": 2562,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/dom-serializer/dist/index.js",
+          "kind": "import-statement",
+          "original": "dom-serializer"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/domelementtype/dist/index.js",
+          "kind": "import-statement",
+          "original": "domelementtype"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/domhandler/dist/index.js",
+          "kind": "import-statement",
+          "original": "domhandler"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/domutils/dist/feeds.js": {
+      "bytes": 5811,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/domutils/dist/legacy.js",
+          "kind": "import-statement",
+          "original": "./legacy.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/domutils/dist/stringify.js",
+          "kind": "import-statement",
+          "original": "./stringify.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/domutils/dist/helpers.js": {
+      "bytes": 5024,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/domhandler/dist/index.js",
+          "kind": "import-statement",
+          "original": "domhandler"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/domutils/dist/manipulation.js": {
+      "bytes": 3676,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/domutils/dist/traversal.js": {
+      "bytes": 3076,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/domhandler/dist/index.js",
+          "kind": "import-statement",
+          "original": "domhandler"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/domutils/dist/index.js": {
+      "bytes": 250,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/domutils/dist/feeds.js",
+          "kind": "import-statement",
+          "original": "./feeds.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/domutils/dist/helpers.js",
+          "kind": "import-statement",
+          "original": "./helpers.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/domutils/dist/legacy.js",
+          "kind": "import-statement",
+          "original": "./legacy.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/domutils/dist/manipulation.js",
+          "kind": "import-statement",
+          "original": "./manipulation.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/domutils/dist/querying.js",
+          "kind": "import-statement",
+          "original": "./querying.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/domutils/dist/stringify.js",
+          "kind": "import-statement",
+          "original": "./stringify.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/domutils/dist/traversal.js",
+          "kind": "import-statement",
+          "original": "./traversal.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/css-select/dist/attributes.js": {
+      "bytes": 7094,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/boolbase/dist/index.js",
+          "kind": "import-statement",
+          "original": "boolbase"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/css-select/dist/helpers/querying.js": {
+      "bytes": 4443,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/aliases.js": {
+      "bytes": 2387,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/nth-check/dist/compile.js": {
+      "bytes": 3331,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/boolbase/dist/index.js",
+          "kind": "import-statement",
+          "original": "boolbase"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/nth-check/dist/parse.js": {
+      "bytes": 2368,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/nth-check/dist/index.js": {
+      "bytes": 1695,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/nth-check/dist/compile.js",
+          "kind": "import-statement",
+          "original": "./compile.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/nth-check/dist/parse.js",
+          "kind": "import-statement",
+          "original": "./parse.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/nth-check/dist/compile.js",
+          "kind": "import-statement",
+          "original": "./compile.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/nth-check/dist/parse.js",
+          "kind": "import-statement",
+          "original": "./parse.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/css-select/dist/helpers/cache.js": {
+      "bytes": 1979,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/helpers/querying.js",
+          "kind": "import-statement",
+          "original": "./querying.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/css-select/dist/helpers/options.js": {
+      "bytes": 460,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/filters.js": {
+      "bytes": 6735,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/boolbase/dist/index.js",
+          "kind": "import-statement",
+          "original": "boolbase"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-what/dist/index.js",
+          "kind": "import-statement",
+          "original": "css-what"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/nth-check/dist/index.js",
+          "kind": "import-statement",
+          "original": "nth-check"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/helpers/cache.js",
+          "kind": "import-statement",
+          "original": "../helpers/cache.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/helpers/options.js",
+          "kind": "import-statement",
+          "original": "../helpers/options.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/helpers/querying.js",
+          "kind": "import-statement",
+          "original": "../helpers/querying.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/pseudos.js": {
+      "bytes": 4010,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/css-select/dist/helpers/selectors.js": {
+      "bytes": 3655,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/css-what/dist/index.js",
+          "kind": "import-statement",
+          "original": "css-what"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/subselects.js": {
+      "bytes": 3906,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/boolbase/dist/index.js",
+          "kind": "import-statement",
+          "original": "boolbase"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/helpers/cache.js",
+          "kind": "import-statement",
+          "original": "../helpers/cache.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/helpers/options.js",
+          "kind": "import-statement",
+          "original": "../helpers/options.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/helpers/querying.js",
+          "kind": "import-statement",
+          "original": "../helpers/querying.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/helpers/selectors.js",
+          "kind": "import-statement",
+          "original": "../helpers/selectors.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/index.js": {
+      "bytes": 2712,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/css-what/dist/index.js",
+          "kind": "import-statement",
+          "original": "css-what"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/aliases.js",
+          "kind": "import-statement",
+          "original": "./aliases.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/filters.js",
+          "kind": "import-statement",
+          "original": "./filters.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/pseudos.js",
+          "kind": "import-statement",
+          "original": "./pseudos.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/subselects.js",
+          "kind": "import-statement",
+          "original": "./subselects.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/aliases.js",
+          "kind": "import-statement",
+          "original": "./aliases.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/filters.js",
+          "kind": "import-statement",
+          "original": "./filters.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/pseudos.js",
+          "kind": "import-statement",
+          "original": "./pseudos.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/css-select/dist/general.js": {
+      "bytes": 6499,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/css-what/dist/index.js",
+          "kind": "import-statement",
+          "original": "css-what"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/attributes.js",
+          "kind": "import-statement",
+          "original": "./attributes.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/helpers/querying.js",
+          "kind": "import-statement",
+          "original": "./helpers/querying.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/index.js",
+          "kind": "import-statement",
+          "original": "./pseudo-selectors/index.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/css-select/dist/compile.js": {
+      "bytes": 3993,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/boolbase/dist/index.js",
+          "kind": "import-statement",
+          "original": "boolbase"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-what/dist/index.js",
+          "kind": "import-statement",
+          "original": "css-what"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/general.js",
+          "kind": "import-statement",
+          "original": "./general.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/helpers/querying.js",
+          "kind": "import-statement",
+          "original": "./helpers/querying.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/helpers/selectors.js",
+          "kind": "import-statement",
+          "original": "./helpers/selectors.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/subselects.js",
+          "kind": "import-statement",
+          "original": "./pseudo-selectors/subselects.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/node_modules/css-select/dist/index.js": {
+      "bytes": 5833,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/boolbase/dist/index.js",
+          "kind": "import-statement",
+          "original": "boolbase"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-what/dist/index.js",
+          "kind": "import-statement",
+          "original": "css-what"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/domhandler/dist/index.js",
+          "kind": "import-statement",
+          "original": "domhandler"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/domutils/dist/index.js",
+          "kind": "import-statement",
+          "original": "domutils"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/compile.js",
+          "kind": "import-statement",
+          "original": "./compile.js"
+        },
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/helpers/querying.js",
+          "kind": "import-statement",
+          "original": "./helpers/querying.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/shared/matches.js": {
+      "bytes": 2670,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/node_modules/css-select/dist/index.js",
+          "kind": "import-statement",
+          "original": "css-select"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "./constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/utils.js",
+          "kind": "import-statement",
+          "original": "./utils.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/text.js": {
+      "bytes": 1086,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "../shared/constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/text-escaper.js",
+          "kind": "import-statement",
+          "original": "../shared/text-escaper.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/character-data.js",
+          "kind": "import-statement",
+          "original": "./character-data.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/mixin/parent-node.js": {
+      "bytes": 7855,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "../shared/constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/matches.js",
+          "kind": "import-statement",
+          "original": "../shared/matches.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/node.js",
+          "kind": "import-statement",
+          "original": "../shared/node.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/utils.js",
+          "kind": "import-statement",
+          "original": "../shared/utils.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/node.js",
+          "kind": "import-statement",
+          "original": "../interface/node.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/text.js",
+          "kind": "import-statement",
+          "original": "../interface/text.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/node-list.js",
+          "kind": "import-statement",
+          "original": "../interface/node-list.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/mutation-observer.js",
+          "kind": "import-statement",
+          "original": "../interface/mutation-observer.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/custom-element-registry.js",
+          "kind": "import-statement",
+          "original": "../interface/custom-element-registry.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/mixin/non-document-type-child-node.js",
+          "kind": "import-statement",
+          "original": "./non-document-type-child-node.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/mixin/non-element-parent-node.js": {
+      "bytes": 1094,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "../shared/constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/jsdon.js",
+          "kind": "import-statement",
+          "original": "../shared/jsdon.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/mixin/parent-node.js",
+          "kind": "import-statement",
+          "original": "./parent-node.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/document-fragment.js": {
+      "bytes": 359,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "../shared/constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/mixin/non-element-parent-node.js",
+          "kind": "import-statement",
+          "original": "../mixin/non-element-parent-node.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/document-type.js": {
+      "bytes": 1050,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "../shared/constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/jsdon.js",
+          "kind": "import-statement",
+          "original": "../shared/jsdon.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/node.js",
+          "kind": "import-statement",
+          "original": "./node.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/mixin/inner-html.js": {
+      "bytes": 1017,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "../shared/constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/parse-from-string.js",
+          "kind": "import-statement",
+          "original": "../shared/parse-from-string.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/utils.js",
+          "kind": "import-statement",
+          "original": "../shared/utils.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/uhyphen/esm/index.js": { "bytes": 149, "imports": [], "format": "esm" },
+    "node_modules/linkedom/esm/dom/string-map.js": {
+      "bytes": 1027,
+      "imports": [
+        {
+          "path": "node_modules/uhyphen/esm/index.js",
+          "kind": "import-statement",
+          "original": "uhyphen"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/object.js",
+          "kind": "import-statement",
+          "original": "../shared/object.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/dom/token-list.js": {
+      "bytes": 1994,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/attributes.js",
+          "kind": "import-statement",
+          "original": "../shared/attributes.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/attr.js",
+          "kind": "import-statement",
+          "original": "../interface/attr.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/css-style-declaration.js": {
+      "bytes": 2877,
+      "imports": [
+        {
+          "path": "node_modules/uhyphen/esm/index.js",
+          "kind": "import-statement",
+          "original": "uhyphen"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/event.js": {
+      "bytes": 1693,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/named-node-map.js": {
+      "bytes": 847,
+      "imports": [],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/shadow-root.js": {
+      "bytes": 540,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "../shared/constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/mixin/inner-html.js",
+          "kind": "import-statement",
+          "original": "../mixin/inner-html.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/mixin/non-element-parent-node.js",
+          "kind": "import-statement",
+          "original": "../mixin/non-element-parent-node.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/element.js": {
+      "bytes": 13605,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "../shared/constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/attributes.js",
+          "kind": "import-statement",
+          "original": "../shared/attributes.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/utils.js",
+          "kind": "import-statement",
+          "original": "../shared/utils.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/jsdon.js",
+          "kind": "import-statement",
+          "original": "../shared/jsdon.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/matches.js",
+          "kind": "import-statement",
+          "original": "../shared/matches.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/shadow-roots.js",
+          "kind": "import-statement",
+          "original": "../shared/shadow-roots.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/node.js",
+          "kind": "import-statement",
+          "original": "../shared/node.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/mixin/non-document-type-child-node.js",
+          "kind": "import-statement",
+          "original": "../mixin/non-document-type-child-node.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/mixin/child-node.js",
+          "kind": "import-statement",
+          "original": "../mixin/child-node.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/mixin/inner-html.js",
+          "kind": "import-statement",
+          "original": "../mixin/inner-html.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/mixin/parent-node.js",
+          "kind": "import-statement",
+          "original": "../mixin/parent-node.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/dom/string-map.js",
+          "kind": "import-statement",
+          "original": "../dom/string-map.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/dom/token-list.js",
+          "kind": "import-statement",
+          "original": "../dom/token-list.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/css-style-declaration.js",
+          "kind": "import-statement",
+          "original": "./css-style-declaration.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/event.js",
+          "kind": "import-statement",
+          "original": "./event.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/named-node-map.js",
+          "kind": "import-statement",
+          "original": "./named-node-map.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/shadow-root.js",
+          "kind": "import-statement",
+          "original": "./shadow-root.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/node-list.js",
+          "kind": "import-statement",
+          "original": "./node-list.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/attr.js",
+          "kind": "import-statement",
+          "original": "./attr.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/text.js",
+          "kind": "import-statement",
+          "original": "./text.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/text-escaper.js",
+          "kind": "import-statement",
+          "original": "../shared/text-escaper.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/svg/element.js": {
+      "bytes": 1312,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/interface/element.js",
+          "kind": "import-statement",
+          "original": "../interface/element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/utils.js",
+          "kind": "import-statement",
+          "original": "../shared/utils.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/shared/facades.js": {
+      "bytes": 2602,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/interface/attr.js",
+          "kind": "import-statement",
+          "original": "../interface/attr.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/character-data.js",
+          "kind": "import-statement",
+          "original": "../interface/character-data.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/cdata-section.js",
+          "kind": "import-statement",
+          "original": "../interface/cdata-section.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/comment.js",
+          "kind": "import-statement",
+          "original": "../interface/comment.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/document-fragment.js",
+          "kind": "import-statement",
+          "original": "../interface/document-fragment.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/document-type.js",
+          "kind": "import-statement",
+          "original": "../interface/document-type.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/element.js",
+          "kind": "import-statement",
+          "original": "../interface/element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/node.js",
+          "kind": "import-statement",
+          "original": "../interface/node.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/shadow-root.js",
+          "kind": "import-statement",
+          "original": "../interface/shadow-root.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/text.js",
+          "kind": "import-statement",
+          "original": "../interface/text.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/svg/element.js",
+          "kind": "import-statement",
+          "original": "../svg/element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/object.js",
+          "kind": "import-statement",
+          "original": "./object.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/element.js": {
+      "bytes": 12670,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/attributes.js",
+          "kind": "import-statement",
+          "original": "../shared/attributes.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/event.js",
+          "kind": "import-statement",
+          "original": "../interface/event.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/element.js",
+          "kind": "import-statement",
+          "original": "../interface/element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/custom-element-registry.js",
+          "kind": "import-statement",
+          "original": "../interface/custom-element-registry.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/template-element.js": {
+      "bytes": 784,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/html-element.js": {
+      "bytes": 238,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/text-element.js": {
+      "bytes": 376,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/script-element.js": {
+      "bytes": 1779,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/attributes.js",
+          "kind": "import-statement",
+          "original": "../shared/attributes.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/text-element.js",
+          "kind": "import-statement",
+          "original": "./text-element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/frame-element.js": {
+      "bytes": 241,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/i-frame-element.js": {
+      "bytes": 1509,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/attributes.js",
+          "kind": "import-statement",
+          "original": "../shared/attributes.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/object-element.js": {
+      "bytes": 244,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/head-element.js": {
+      "bytes": 238,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/body-element.js": {
+      "bytes": 238,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/cssom/lib/StyleSheet.js": { "bytes": 272, "imports": [], "format": "cjs" },
+    "node_modules/cssom/lib/CSSRule.js": { "bytes": 1052, "imports": [], "format": "cjs" },
+    "node_modules/cssom/lib/CSSStyleRule.js": {
+      "bytes": 3617,
+      "imports": [
+        {
+          "path": "node_modules/cssom/lib/CSSStyleDeclaration.js",
+          "kind": "require-call",
+          "original": "./CSSStyleDeclaration"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSRule.js",
+          "kind": "require-call",
+          "original": "./CSSRule"
+        }
+      ],
+      "format": "cjs"
+    },
+    "node_modules/cssom/lib/CSSStyleSheet.js": {
+      "bytes": 2422,
+      "imports": [
+        {
+          "path": "node_modules/cssom/lib/StyleSheet.js",
+          "kind": "require-call",
+          "original": "./StyleSheet"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSStyleRule.js",
+          "kind": "require-call",
+          "original": "./CSSStyleRule"
+        },
+        { "path": "node_modules/cssom/lib/parse.js", "kind": "require-call", "original": "./parse" }
+      ],
+      "format": "cjs"
+    },
+    "node_modules/cssom/lib/MediaList.js": { "bytes": 1028, "imports": [], "format": "cjs" },
+    "node_modules/cssom/lib/CSSImportRule.js": {
+      "bytes": 3321,
+      "imports": [
+        {
+          "path": "node_modules/cssom/lib/CSSRule.js",
+          "kind": "require-call",
+          "original": "./CSSRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSStyleSheet.js",
+          "kind": "require-call",
+          "original": "./CSSStyleSheet"
+        },
+        {
+          "path": "node_modules/cssom/lib/MediaList.js",
+          "kind": "require-call",
+          "original": "./MediaList"
+        }
+      ],
+      "format": "cjs"
+    },
+    "node_modules/cssom/lib/CSSGroupingRule.js": {
+      "bytes": 1893,
+      "imports": [
+        {
+          "path": "node_modules/cssom/lib/CSSRule.js",
+          "kind": "require-call",
+          "original": "./CSSRule"
+        }
+      ],
+      "format": "cjs"
+    },
+    "node_modules/cssom/lib/CSSConditionRule.js": {
+      "bytes": 678,
+      "imports": [
+        {
+          "path": "node_modules/cssom/lib/CSSRule.js",
+          "kind": "require-call",
+          "original": "./CSSRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSGroupingRule.js",
+          "kind": "require-call",
+          "original": "./CSSGroupingRule"
+        }
+      ],
+      "format": "cjs"
+    },
+    "node_modules/cssom/lib/CSSMediaRule.js": {
+      "bytes": 1445,
+      "imports": [
+        {
+          "path": "node_modules/cssom/lib/CSSRule.js",
+          "kind": "require-call",
+          "original": "./CSSRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSGroupingRule.js",
+          "kind": "require-call",
+          "original": "./CSSGroupingRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSConditionRule.js",
+          "kind": "require-call",
+          "original": "./CSSConditionRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/MediaList.js",
+          "kind": "require-call",
+          "original": "./MediaList"
+        }
+      ],
+      "format": "cjs"
+    },
+    "node_modules/cssom/lib/CSSSupportsRule.js": {
+      "bytes": 990,
+      "imports": [
+        {
+          "path": "node_modules/cssom/lib/CSSRule.js",
+          "kind": "require-call",
+          "original": "./CSSRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSGroupingRule.js",
+          "kind": "require-call",
+          "original": "./CSSGroupingRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSConditionRule.js",
+          "kind": "require-call",
+          "original": "./CSSConditionRule"
+        }
+      ],
+      "format": "cjs"
+    },
+    "node_modules/cssom/lib/CSSFontFaceRule.js": {
+      "bytes": 1065,
+      "imports": [
+        {
+          "path": "node_modules/cssom/lib/CSSStyleDeclaration.js",
+          "kind": "require-call",
+          "original": "./CSSStyleDeclaration"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSRule.js",
+          "kind": "require-call",
+          "original": "./CSSRule"
+        }
+      ],
+      "format": "cjs"
+    },
+    "node_modules/cssom/lib/CSSHostRule.js": {
+      "bytes": 913,
+      "imports": [
+        {
+          "path": "node_modules/cssom/lib/CSSRule.js",
+          "kind": "require-call",
+          "original": "./CSSRule"
+        }
+      ],
+      "format": "cjs"
+    },
+    "node_modules/cssom/lib/CSSKeyframeRule.js": {
+      "bytes": 1099,
+      "imports": [
+        {
+          "path": "node_modules/cssom/lib/CSSRule.js",
+          "kind": "require-call",
+          "original": "./CSSRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSStyleDeclaration.js",
+          "kind": "require-call",
+          "original": "./CSSStyleDeclaration"
+        }
+      ],
+      "format": "cjs"
+    },
+    "node_modules/cssom/lib/CSSKeyframesRule.js": {
+      "bytes": 1177,
+      "imports": [
+        {
+          "path": "node_modules/cssom/lib/CSSRule.js",
+          "kind": "require-call",
+          "original": "./CSSRule"
+        }
+      ],
+      "format": "cjs"
+    },
+    "node_modules/cssom/lib/CSSValue.js": { "bytes": 887, "imports": [], "format": "cjs" },
+    "node_modules/cssom/lib/CSSValueExpression.js": {
+      "bytes": 5368,
+      "imports": [
+        {
+          "path": "node_modules/cssom/lib/CSSValue.js",
+          "kind": "require-call",
+          "original": "./CSSValue"
+        }
+      ],
+      "format": "cjs"
+    },
+    "node_modules/cssom/lib/MatcherList.js": { "bytes": 1340, "imports": [], "format": "cjs" },
+    "node_modules/cssom/lib/CSSDocumentRule.js": {
+      "bytes": 1126,
+      "imports": [
+        {
+          "path": "node_modules/cssom/lib/CSSRule.js",
+          "kind": "require-call",
+          "original": "./CSSRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/MatcherList.js",
+          "kind": "require-call",
+          "original": "./MatcherList"
+        }
+      ],
+      "format": "cjs"
+    },
+    "node_modules/cssom/lib/parse.js": {
+      "bytes": 11889,
+      "imports": [
+        {
+          "path": "node_modules/cssom/lib/CSSStyleSheet.js",
+          "kind": "require-call",
+          "original": "./CSSStyleSheet"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSStyleRule.js",
+          "kind": "require-call",
+          "original": "./CSSStyleRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSImportRule.js",
+          "kind": "require-call",
+          "original": "./CSSImportRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSGroupingRule.js",
+          "kind": "require-call",
+          "original": "./CSSGroupingRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSMediaRule.js",
+          "kind": "require-call",
+          "original": "./CSSMediaRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSConditionRule.js",
+          "kind": "require-call",
+          "original": "./CSSConditionRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSSupportsRule.js",
+          "kind": "require-call",
+          "original": "./CSSSupportsRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSFontFaceRule.js",
+          "kind": "require-call",
+          "original": "./CSSFontFaceRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSHostRule.js",
+          "kind": "require-call",
+          "original": "./CSSHostRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSStyleDeclaration.js",
+          "kind": "require-call",
+          "original": "./CSSStyleDeclaration"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSKeyframeRule.js",
+          "kind": "require-call",
+          "original": "./CSSKeyframeRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSKeyframesRule.js",
+          "kind": "require-call",
+          "original": "./CSSKeyframesRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSValueExpression.js",
+          "kind": "require-call",
+          "original": "./CSSValueExpression"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSDocumentRule.js",
+          "kind": "require-call",
+          "original": "./CSSDocumentRule"
+        }
+      ],
+      "format": "cjs"
+    },
+    "node_modules/cssom/lib/CSSStyleDeclaration.js": {
+      "bytes": 3590,
+      "imports": [
+        { "path": "node_modules/cssom/lib/parse.js", "kind": "require-call", "original": "./parse" }
+      ],
+      "format": "cjs"
+    },
+    "node_modules/cssom/lib/clone.js": {
+      "bytes": 2094,
+      "imports": [
+        {
+          "path": "node_modules/cssom/lib/CSSStyleSheet.js",
+          "kind": "require-call",
+          "original": "./CSSStyleSheet"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSRule.js",
+          "kind": "require-call",
+          "original": "./CSSRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSStyleRule.js",
+          "kind": "require-call",
+          "original": "./CSSStyleRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSGroupingRule.js",
+          "kind": "require-call",
+          "original": "./CSSGroupingRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSConditionRule.js",
+          "kind": "require-call",
+          "original": "./CSSConditionRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSMediaRule.js",
+          "kind": "require-call",
+          "original": "./CSSMediaRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSSupportsRule.js",
+          "kind": "require-call",
+          "original": "./CSSSupportsRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSStyleDeclaration.js",
+          "kind": "require-call",
+          "original": "./CSSStyleDeclaration"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSKeyframeRule.js",
+          "kind": "require-call",
+          "original": "./CSSKeyframeRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSKeyframesRule.js",
+          "kind": "require-call",
+          "original": "./CSSKeyframesRule"
+        }
+      ],
+      "format": "cjs"
+    },
+    "node_modules/cssom/lib/index.js": {
+      "bytes": 1362,
+      "imports": [
+        {
+          "path": "node_modules/cssom/lib/CSSStyleDeclaration.js",
+          "kind": "require-call",
+          "original": "./CSSStyleDeclaration"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSRule.js",
+          "kind": "require-call",
+          "original": "./CSSRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSGroupingRule.js",
+          "kind": "require-call",
+          "original": "./CSSGroupingRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSConditionRule.js",
+          "kind": "require-call",
+          "original": "./CSSConditionRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSStyleRule.js",
+          "kind": "require-call",
+          "original": "./CSSStyleRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/MediaList.js",
+          "kind": "require-call",
+          "original": "./MediaList"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSMediaRule.js",
+          "kind": "require-call",
+          "original": "./CSSMediaRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSSupportsRule.js",
+          "kind": "require-call",
+          "original": "./CSSSupportsRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSImportRule.js",
+          "kind": "require-call",
+          "original": "./CSSImportRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSFontFaceRule.js",
+          "kind": "require-call",
+          "original": "./CSSFontFaceRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSHostRule.js",
+          "kind": "require-call",
+          "original": "./CSSHostRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/StyleSheet.js",
+          "kind": "require-call",
+          "original": "./StyleSheet"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSStyleSheet.js",
+          "kind": "require-call",
+          "original": "./CSSStyleSheet"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSKeyframesRule.js",
+          "kind": "require-call",
+          "original": "./CSSKeyframesRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSKeyframeRule.js",
+          "kind": "require-call",
+          "original": "./CSSKeyframeRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/MatcherList.js",
+          "kind": "require-call",
+          "original": "./MatcherList"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSDocumentRule.js",
+          "kind": "require-call",
+          "original": "./CSSDocumentRule"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSValue.js",
+          "kind": "require-call",
+          "original": "./CSSValue"
+        },
+        {
+          "path": "node_modules/cssom/lib/CSSValueExpression.js",
+          "kind": "require-call",
+          "original": "./CSSValueExpression"
+        },
+        {
+          "path": "node_modules/cssom/lib/parse.js",
+          "kind": "require-call",
+          "original": "./parse"
+        },
+        { "path": "node_modules/cssom/lib/clone.js", "kind": "require-call", "original": "./clone" }
+      ],
+      "format": "cjs"
+    },
+    "node_modules/linkedom/esm/html/style-element.js": {
+      "bytes": 1094,
+      "imports": [
+        {
+          "path": "node_modules/cssom/lib/index.js",
+          "kind": "import-statement",
+          "original": "cssom"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/text-element.js",
+          "kind": "import-statement",
+          "original": "./text-element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/time-element.js": {
+      "bytes": 600,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/attributes.js",
+          "kind": "import-statement",
+          "original": "../shared/attributes.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/field-set-element.js": {
+      "bytes": 250,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/embed-element.js": {
+      "bytes": 241,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/hr-element.js": {
+      "bytes": 232,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/progress-element.js": {
+      "bytes": 250,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/paragraph-element.js": {
+      "bytes": 245,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/table-element.js": {
+      "bytes": 241,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/frame-set-element.js": {
+      "bytes": 250,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/li-element.js": {
+      "bytes": 232,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/base-element.js": {
+      "bytes": 238,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/data-list-element.js": {
+      "bytes": 250,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/input-element.js": {
+      "bytes": 1300,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/attributes.js",
+          "kind": "import-statement",
+          "original": "../shared/attributes.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/param-element.js": {
+      "bytes": 241,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/media-element.js": {
+      "bytes": 241,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/audio-element.js": {
+      "bytes": 241,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/heading-element.js": {
+      "bytes": 441,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/directory-element.js": {
+      "bytes": 247,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/quote-element.js": {
+      "bytes": 241,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/commonjs/canvas-shim.cjs": {
+      "bytes": 260,
+      "imports": [],
+      "format": "cjs"
+    },
+    "node_modules/linkedom/commonjs/canvas.cjs": {
+      "bytes": 159,
+      "imports": [
+        { "path": "canvas", "kind": "require-call", "external": true },
+        {
+          "path": "node_modules/linkedom/commonjs/canvas-shim.cjs",
+          "kind": "require-call",
+          "original": "./canvas-shim.cjs"
+        }
+      ],
+      "format": "cjs"
+    },
+    "node_modules/linkedom/esm/html/canvas-element.js": {
+      "bytes": 1090,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/attributes.js",
+          "kind": "import-statement",
+          "original": "../shared/attributes.js"
+        },
+        {
+          "path": "node_modules/linkedom/commonjs/canvas.cjs",
+          "kind": "import-statement",
+          "original": "../../commonjs/canvas.cjs"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/legend-element.js": {
+      "bytes": 244,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/option-element.js": {
+      "bytes": 946,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/attributes.js",
+          "kind": "import-statement",
+          "original": "../shared/attributes.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/span-element.js": {
+      "bytes": 238,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/meter-element.js": {
+      "bytes": 241,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/video-element.js": {
+      "bytes": 241,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/table-cell-element.js": {
+      "bytes": 246,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/title-element.js": {
+      "bytes": 409,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/text-element.js",
+          "kind": "import-statement",
+          "original": "./text-element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/output-element.js": {
+      "bytes": 244,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/table-row-element.js": {
+      "bytes": 244,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/data-element.js": {
+      "bytes": 238,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/menu-element.js": {
+      "bytes": 238,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/select-element.js": {
+      "bytes": 1264,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/attributes.js",
+          "kind": "import-statement",
+          "original": "../shared/attributes.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/node-list.js",
+          "kind": "import-statement",
+          "original": "../interface/node-list.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/br-element.js": {
+      "bytes": 232,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/button-element.js": {
+      "bytes": 872,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/attributes.js",
+          "kind": "import-statement",
+          "original": "../shared/attributes.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/map-element.js": {
+      "bytes": 235,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/opt-group-element.js": {
+      "bytes": 250,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/d-list-element.js": {
+      "bytes": 238,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/text-area-element.js": {
+      "bytes": 1120,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/attributes.js",
+          "kind": "import-statement",
+          "original": "../shared/attributes.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/text-element.js",
+          "kind": "import-statement",
+          "original": "./text-element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/font-element.js": {
+      "bytes": 238,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/div-element.js": {
+      "bytes": 235,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/link-element.js": {
+      "bytes": 1351,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/attributes.js",
+          "kind": "import-statement",
+          "original": "../shared/attributes.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/slot-element.js": {
+      "bytes": 1718,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/form-element.js": {
+      "bytes": 238,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/image-element.js": {
+      "bytes": 1416,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/attributes.js",
+          "kind": "import-statement",
+          "original": "../shared/attributes.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/pre-element.js": {
+      "bytes": 235,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/u-list-element.js": {
+      "bytes": 238,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/meta-element.js": {
+      "bytes": 1153,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/attributes.js",
+          "kind": "import-statement",
+          "original": "../shared/attributes.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/picture-element.js": {
+      "bytes": 247,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/area-element.js": {
+      "bytes": 238,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/o-list-element.js": {
+      "bytes": 238,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/table-caption-element.js": {
+      "bytes": 257,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/anchor-element.js": {
+      "bytes": 1266,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/attributes.js",
+          "kind": "import-statement",
+          "original": "../shared/attributes.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/label-element.js": {
+      "bytes": 241,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/unknown-element.js": {
+      "bytes": 247,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/mod-element.js": {
+      "bytes": 235,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/details-element.js": {
+      "bytes": 247,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/source-element.js": {
+      "bytes": 1017,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/attributes.js",
+          "kind": "import-statement",
+          "original": "../shared/attributes.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/track-element.js": {
+      "bytes": 241,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/marquee-element.js": {
+      "bytes": 247,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/shared/html-classes.js": {
+      "bytes": 6899,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "../html/element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/template-element.js",
+          "kind": "import-statement",
+          "original": "../html/template-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/html-element.js",
+          "kind": "import-statement",
+          "original": "../html/html-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/script-element.js",
+          "kind": "import-statement",
+          "original": "../html/script-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/frame-element.js",
+          "kind": "import-statement",
+          "original": "../html/frame-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/i-frame-element.js",
+          "kind": "import-statement",
+          "original": "../html/i-frame-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/object-element.js",
+          "kind": "import-statement",
+          "original": "../html/object-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/head-element.js",
+          "kind": "import-statement",
+          "original": "../html/head-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/body-element.js",
+          "kind": "import-statement",
+          "original": "../html/body-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/style-element.js",
+          "kind": "import-statement",
+          "original": "../html/style-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/time-element.js",
+          "kind": "import-statement",
+          "original": "../html/time-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/field-set-element.js",
+          "kind": "import-statement",
+          "original": "../html/field-set-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/embed-element.js",
+          "kind": "import-statement",
+          "original": "../html/embed-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/hr-element.js",
+          "kind": "import-statement",
+          "original": "../html/hr-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/progress-element.js",
+          "kind": "import-statement",
+          "original": "../html/progress-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/paragraph-element.js",
+          "kind": "import-statement",
+          "original": "../html/paragraph-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/table-element.js",
+          "kind": "import-statement",
+          "original": "../html/table-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/frame-set-element.js",
+          "kind": "import-statement",
+          "original": "../html/frame-set-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/li-element.js",
+          "kind": "import-statement",
+          "original": "../html/li-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/base-element.js",
+          "kind": "import-statement",
+          "original": "../html/base-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/data-list-element.js",
+          "kind": "import-statement",
+          "original": "../html/data-list-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/input-element.js",
+          "kind": "import-statement",
+          "original": "../html/input-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/param-element.js",
+          "kind": "import-statement",
+          "original": "../html/param-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/media-element.js",
+          "kind": "import-statement",
+          "original": "../html/media-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/audio-element.js",
+          "kind": "import-statement",
+          "original": "../html/audio-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/heading-element.js",
+          "kind": "import-statement",
+          "original": "../html/heading-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/directory-element.js",
+          "kind": "import-statement",
+          "original": "../html/directory-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/quote-element.js",
+          "kind": "import-statement",
+          "original": "../html/quote-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/canvas-element.js",
+          "kind": "import-statement",
+          "original": "../html/canvas-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/legend-element.js",
+          "kind": "import-statement",
+          "original": "../html/legend-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/option-element.js",
+          "kind": "import-statement",
+          "original": "../html/option-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/span-element.js",
+          "kind": "import-statement",
+          "original": "../html/span-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/meter-element.js",
+          "kind": "import-statement",
+          "original": "../html/meter-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/video-element.js",
+          "kind": "import-statement",
+          "original": "../html/video-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/table-cell-element.js",
+          "kind": "import-statement",
+          "original": "../html/table-cell-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/title-element.js",
+          "kind": "import-statement",
+          "original": "../html/title-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/output-element.js",
+          "kind": "import-statement",
+          "original": "../html/output-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/table-row-element.js",
+          "kind": "import-statement",
+          "original": "../html/table-row-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/data-element.js",
+          "kind": "import-statement",
+          "original": "../html/data-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/menu-element.js",
+          "kind": "import-statement",
+          "original": "../html/menu-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/select-element.js",
+          "kind": "import-statement",
+          "original": "../html/select-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/br-element.js",
+          "kind": "import-statement",
+          "original": "../html/br-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/button-element.js",
+          "kind": "import-statement",
+          "original": "../html/button-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/map-element.js",
+          "kind": "import-statement",
+          "original": "../html/map-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/opt-group-element.js",
+          "kind": "import-statement",
+          "original": "../html/opt-group-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/d-list-element.js",
+          "kind": "import-statement",
+          "original": "../html/d-list-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/text-area-element.js",
+          "kind": "import-statement",
+          "original": "../html/text-area-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/font-element.js",
+          "kind": "import-statement",
+          "original": "../html/font-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/div-element.js",
+          "kind": "import-statement",
+          "original": "../html/div-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/link-element.js",
+          "kind": "import-statement",
+          "original": "../html/link-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/slot-element.js",
+          "kind": "import-statement",
+          "original": "../html/slot-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/form-element.js",
+          "kind": "import-statement",
+          "original": "../html/form-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/image-element.js",
+          "kind": "import-statement",
+          "original": "../html/image-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/pre-element.js",
+          "kind": "import-statement",
+          "original": "../html/pre-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/u-list-element.js",
+          "kind": "import-statement",
+          "original": "../html/u-list-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/meta-element.js",
+          "kind": "import-statement",
+          "original": "../html/meta-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/picture-element.js",
+          "kind": "import-statement",
+          "original": "../html/picture-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/area-element.js",
+          "kind": "import-statement",
+          "original": "../html/area-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/o-list-element.js",
+          "kind": "import-statement",
+          "original": "../html/o-list-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/table-caption-element.js",
+          "kind": "import-statement",
+          "original": "../html/table-caption-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/anchor-element.js",
+          "kind": "import-statement",
+          "original": "../html/anchor-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/label-element.js",
+          "kind": "import-statement",
+          "original": "../html/label-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/unknown-element.js",
+          "kind": "import-statement",
+          "original": "../html/unknown-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/mod-element.js",
+          "kind": "import-statement",
+          "original": "../html/mod-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/details-element.js",
+          "kind": "import-statement",
+          "original": "../html/details-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/source-element.js",
+          "kind": "import-statement",
+          "original": "../html/source-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/track-element.js",
+          "kind": "import-statement",
+          "original": "../html/track-element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/marquee-element.js",
+          "kind": "import-statement",
+          "original": "../html/marquee-element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/shared/mime.js": { "bytes": 837, "imports": [], "format": "esm" },
+    "node_modules/linkedom/esm/interface/custom-event.js": {
+      "bytes": 386,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/interface/event.js",
+          "kind": "import-statement",
+          "original": "./event.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/input-event.js": {
+      "bytes": 583,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/interface/event.js",
+          "kind": "import-statement",
+          "original": "./event.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/image.js": {
+      "bytes": 457,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/html/image-element.js",
+          "kind": "import-statement",
+          "original": "../html/image-element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/range.js": {
+      "bytes": 3080,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/svg/element.js",
+          "kind": "import-statement",
+          "original": "../svg/element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/utils.js",
+          "kind": "import-statement",
+          "original": "../shared/utils.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/tree-walker.js": {
+      "bytes": 1307,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "../shared/constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/document.js": {
+      "bytes": 9067,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "../shared/constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/facades.js",
+          "kind": "import-statement",
+          "original": "../shared/facades.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/html-classes.js",
+          "kind": "import-statement",
+          "original": "../shared/html-classes.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/mime.js",
+          "kind": "import-statement",
+          "original": "../shared/mime.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/utils.js",
+          "kind": "import-statement",
+          "original": "../shared/utils.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/object.js",
+          "kind": "import-statement",
+          "original": "../shared/object.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/mixin/non-element-parent-node.js",
+          "kind": "import-statement",
+          "original": "../mixin/non-element-parent-node.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/svg/element.js",
+          "kind": "import-statement",
+          "original": "../svg/element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/attr.js",
+          "kind": "import-statement",
+          "original": "./attr.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/cdata-section.js",
+          "kind": "import-statement",
+          "original": "./cdata-section.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/comment.js",
+          "kind": "import-statement",
+          "original": "./comment.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/custom-element-registry.js",
+          "kind": "import-statement",
+          "original": "./custom-element-registry.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/custom-event.js",
+          "kind": "import-statement",
+          "original": "./custom-event.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/document-fragment.js",
+          "kind": "import-statement",
+          "original": "./document-fragment.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/document-type.js",
+          "kind": "import-statement",
+          "original": "./document-type.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/event.js",
+          "kind": "import-statement",
+          "original": "./event.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/event-target.js",
+          "kind": "import-statement",
+          "original": "./event-target.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/input-event.js",
+          "kind": "import-statement",
+          "original": "./input-event.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/image.js",
+          "kind": "import-statement",
+          "original": "./image.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/mutation-observer.js",
+          "kind": "import-statement",
+          "original": "./mutation-observer.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/named-node-map.js",
+          "kind": "import-statement",
+          "original": "./named-node-map.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/node-list.js",
+          "kind": "import-statement",
+          "original": "./node-list.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/range.js",
+          "kind": "import-statement",
+          "original": "./range.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/text.js",
+          "kind": "import-statement",
+          "original": "./text.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/tree-walker.js",
+          "kind": "import-statement",
+          "original": "./tree-walker.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/html/document.js": {
+      "bytes": 2833,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "../shared/constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "../shared/register-html-class.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/document.js",
+          "kind": "import-statement",
+          "original": "../interface/document.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/node-list.js",
+          "kind": "import-statement",
+          "original": "../interface/node-list.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/custom-element-registry.js",
+          "kind": "import-statement",
+          "original": "../interface/custom-element-registry.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "./element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/svg/document.js": {
+      "bytes": 297,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/document.js",
+          "kind": "import-statement",
+          "original": "../interface/document.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/xml/document.js": {
+      "bytes": 295,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/document.js",
+          "kind": "import-statement",
+          "original": "../interface/document.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/dom/parser.js": {
+      "bytes": 1250,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "../shared/symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/parse-from-string.js",
+          "kind": "import-statement",
+          "original": "../shared/parse-from-string.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/document.js",
+          "kind": "import-statement",
+          "original": "../html/document.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/svg/document.js",
+          "kind": "import-statement",
+          "original": "../svg/document.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/xml/document.js",
+          "kind": "import-statement",
+          "original": "../xml/document.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/shared/parse-json.js": {
+      "bytes": 4064,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "./constants.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/symbols.js",
+          "kind": "import-statement",
+          "original": "./symbols.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/register-html-class.js",
+          "kind": "import-statement",
+          "original": "./register-html-class.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/utils.js",
+          "kind": "import-statement",
+          "original": "./utils.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/attr.js",
+          "kind": "import-statement",
+          "original": "../interface/attr.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/cdata-section.js",
+          "kind": "import-statement",
+          "original": "../interface/cdata-section.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/comment.js",
+          "kind": "import-statement",
+          "original": "../interface/comment.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/document-type.js",
+          "kind": "import-statement",
+          "original": "../interface/document-type.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/text.js",
+          "kind": "import-statement",
+          "original": "../interface/text.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/document.js",
+          "kind": "import-statement",
+          "original": "../html/document.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/html/element.js",
+          "kind": "import-statement",
+          "original": "../html/element.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/svg/element.js",
+          "kind": "import-statement",
+          "original": "../svg/element.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/interface/node-filter.js": {
+      "bytes": 412,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/shared/constants.js",
+          "kind": "import-statement",
+          "original": "../shared/constants.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/linkedom/esm/index.js": {
+      "bytes": 948,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/dom/parser.js",
+          "kind": "import-statement",
+          "original": "./dom/parser.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/document.js",
+          "kind": "import-statement",
+          "original": "./interface/document.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/facades.js",
+          "kind": "import-statement",
+          "original": "./shared/facades.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/object.js",
+          "kind": "import-statement",
+          "original": "./shared/object.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/parse-json.js",
+          "kind": "import-statement",
+          "original": "./shared/parse-json.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/facades.js",
+          "kind": "import-statement",
+          "original": "./shared/facades.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/shared/html-classes.js",
+          "kind": "import-statement",
+          "original": "./shared/html-classes.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/custom-event.js",
+          "kind": "import-statement",
+          "original": "./interface/custom-event.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/event.js",
+          "kind": "import-statement",
+          "original": "./interface/event.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/event-target.js",
+          "kind": "import-statement",
+          "original": "./interface/event-target.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/input-event.js",
+          "kind": "import-statement",
+          "original": "./interface/input-event.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/node-list.js",
+          "kind": "import-statement",
+          "original": "./interface/node-list.js"
+        },
+        {
+          "path": "node_modules/linkedom/esm/interface/node-filter.js",
+          "kind": "import-statement",
+          "original": "./interface/node-filter.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/src/utils/cache.js": { "bytes": 1717, "imports": [], "format": "esm" },
+    "server/src/routes/comments.js": {
+      "bytes": 17544,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/index.js",
+          "kind": "import-statement",
+          "original": "hono"
+        },
+        {
+          "path": "node_modules/linkedom/esm/index.js",
+          "kind": "import-statement",
+          "original": "linkedom"
+        },
+        {
+          "path": "server/src/utils/cache.js",
+          "kind": "import-statement",
+          "original": "../utils/cache.js"
+        },
+        {
+          "path": "server/src/utils/http.js",
+          "kind": "import-statement",
+          "original": "../utils/http.js"
+        },
+        { "path": "server/src/config.js", "kind": "import-statement", "original": "../config.js" }
+      ],
+      "format": "esm"
+    },
+    "server/src/services/douban.js": { "bytes": 6739, "imports": [], "format": "esm" },
+    "server/src/routes/douban.js": {
+      "bytes": 4512,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/index.js",
+          "kind": "import-statement",
+          "original": "hono"
+        },
+        {
+          "path": "server/src/services/bangumi.js",
+          "kind": "import-statement",
+          "original": "../services/bangumi.js"
+        },
+        {
+          "path": "server/src/services/douban.js",
+          "kind": "import-statement",
+          "original": "../services/douban.js"
+        },
+        {
+          "path": "server/src/utils/cache.js",
+          "kind": "import-statement",
+          "original": "../utils/cache.js"
+        },
+        { "path": "server/src/config.js", "kind": "import-statement", "original": "../config.js" }
+      ],
+      "format": "esm"
+    },
+    "server/src/routes/bilibili.js": {
+      "bytes": 3223,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/index.js",
+          "kind": "import-statement",
+          "original": "hono"
+        },
+        {
+          "path": "server/src/services/bangumi.js",
+          "kind": "import-statement",
+          "original": "../services/bangumi.js"
+        },
+        {
+          "path": "server/src/utils/cache.js",
+          "kind": "import-statement",
+          "original": "../utils/cache.js"
+        },
+        {
+          "path": "server/src/utils/http.js",
+          "kind": "import-statement",
+          "original": "../utils/http.js"
+        },
+        { "path": "server/src/config.js", "kind": "import-statement", "original": "../config.js" }
+      ],
+      "format": "esm"
+    },
+    "server/src/routes/moegirl.js": {
+      "bytes": 3733,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/index.js",
+          "kind": "import-statement",
+          "original": "hono"
+        },
+        {
+          "path": "server/src/utils/cache.js",
+          "kind": "import-statement",
+          "original": "../utils/cache.js"
+        },
+        { "path": "server/src/config.js", "kind": "import-statement", "original": "../config.js" }
+      ],
+      "format": "esm"
+    },
+    "server/src/routes/groups.js": {
+      "bytes": 10962,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/index.js",
+          "kind": "import-statement",
+          "original": "hono"
+        },
+        {
+          "path": "server/src/utils/cache.js",
+          "kind": "import-statement",
+          "original": "../utils/cache.js"
+        },
+        {
+          "path": "server/src/utils/http.js",
+          "kind": "import-statement",
+          "original": "../utils/http.js"
+        },
+        { "path": "server/src/config.js", "kind": "import-statement", "original": "../config.js" }
+      ],
+      "format": "esm"
+    },
+    "server/src/app.js": {
+      "bytes": 2535,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/index.js",
+          "kind": "import-statement",
+          "original": "hono"
+        },
+        {
+          "path": "server/node_modules/hono/dist/middleware/cors/index.js",
+          "kind": "import-statement",
+          "original": "hono/cors"
+        },
+        {
+          "path": "server/src/utils/logger.js",
+          "kind": "import-statement",
+          "original": "./utils/logger.js"
+        },
+        {
+          "path": "server/src/utils/rateLimit.js",
+          "kind": "import-statement",
+          "original": "./utils/rateLimit.js"
+        },
+        {
+          "path": "server/src/middleware/security.js",
+          "kind": "import-statement",
+          "original": "./middleware/security.js"
+        },
+        { "path": "server/src/config.js", "kind": "import-statement", "original": "./config.js" },
+        {
+          "path": "server/src/routes/user.js",
+          "kind": "import-statement",
+          "original": "./routes/user.js"
+        },
+        {
+          "path": "server/src/routes/anime.js",
+          "kind": "import-statement",
+          "original": "./routes/anime.js"
+        },
+        {
+          "path": "server/src/routes/collection.js",
+          "kind": "import-statement",
+          "original": "./routes/collection.js"
+        },
+        {
+          "path": "server/src/routes/comments.js",
+          "kind": "import-statement",
+          "original": "./routes/comments.js"
+        },
+        {
+          "path": "server/src/routes/douban.js",
+          "kind": "import-statement",
+          "original": "./routes/douban.js"
+        },
+        {
+          "path": "server/src/routes/bilibili.js",
+          "kind": "import-statement",
+          "original": "./routes/bilibili.js"
+        },
+        {
+          "path": "server/src/routes/moegirl.js",
+          "kind": "import-statement",
+          "original": "./routes/moegirl.js"
+        },
+        {
+          "path": "server/src/routes/groups.js",
+          "kind": "import-statement",
+          "original": "./routes/groups.js"
+        }
+      ],
+      "format": "esm"
+    }
+  },
+  "outputs": {
+    "functions/api/_server.js": {
+      "imports": [{ "path": "canvas", "kind": "require-call", "external": true }],
+      "exports": ["default"],
+      "entryPoint": "server/src/app.js",
+      "inputs": {
+        "node_modules/cssom/lib/StyleSheet.js": { "bytesInOutput": 251 },
+        "node_modules/cssom/lib/CSSRule.js": { "bytesInOutput": 992 },
+        "node_modules/cssom/lib/CSSStyleRule.js": { "bytesInOutput": 4514 },
+        "node_modules/cssom/lib/CSSStyleSheet.js": { "bytesInOutput": 1384 },
+        "node_modules/cssom/lib/MediaList.js": { "bytesInOutput": 1205 },
+        "node_modules/cssom/lib/CSSImportRule.js": { "bytesInOutput": 3436 },
+        "node_modules/cssom/lib/CSSGroupingRule.js": { "bytesInOutput": 1090 },
+        "node_modules/cssom/lib/CSSConditionRule.js": { "bytesInOutput": 680 },
+        "node_modules/cssom/lib/CSSMediaRule.js": { "bytesInOutput": 1398 },
+        "node_modules/cssom/lib/CSSSupportsRule.js": { "bytesInOutput": 1012 },
+        "node_modules/cssom/lib/CSSFontFaceRule.js": { "bytesInOutput": 837 },
+        "node_modules/cssom/lib/CSSHostRule.js": { "bytesInOutput": 812 },
+        "node_modules/cssom/lib/CSSKeyframeRule.js": { "bytesInOutput": 868 },
+        "node_modules/cssom/lib/CSSKeyframesRule.js": { "bytesInOutput": 957 },
+        "node_modules/cssom/lib/CSSValue.js": { "bytesInOutput": 895 },
+        "node_modules/cssom/lib/CSSValueExpression.js": { "bytesInOutput": 5011 },
+        "node_modules/cssom/lib/MatcherList.js": { "bytesInOutput": 1234 },
+        "node_modules/cssom/lib/CSSDocumentRule.js": { "bytesInOutput": 996 },
+        "node_modules/cssom/lib/parse.js": { "bytesInOutput": 14627 },
+        "node_modules/cssom/lib/CSSStyleDeclaration.js": { "bytesInOutput": 3847 },
+        "node_modules/cssom/lib/clone.js": { "bytesInOutput": 2159 },
+        "node_modules/cssom/lib/index.js": { "bytesInOutput": 1472 },
+        "node_modules/linkedom/commonjs/canvas-shim.cjs": { "bytesInOutput": 444 },
+        "node_modules/linkedom/commonjs/canvas.cjs": { "bytesInOutput": 238 },
+        "server/node_modules/hono/dist/compose.js": { "bytesInOutput": 1129 },
+        "server/node_modules/hono/dist/request/constants.js": { "bytesInOutput": 49 },
+        "server/node_modules/hono/dist/utils/body.js": { "bytesInOutput": 2189 },
+        "server/node_modules/hono/dist/utils/url.js": { "bytesInOutput": 6085 },
+        "server/node_modules/hono/dist/request.js": { "bytesInOutput": 6919 },
+        "server/node_modules/hono/dist/utils/html.js": { "bytesInOutput": 1060 },
+        "server/node_modules/hono/dist/context.js": { "bytesInOutput": 10767 },
+        "server/node_modules/hono/dist/router.js": { "bytesInOutput": 286 },
+        "server/node_modules/hono/dist/utils/constants.js": { "bytesInOutput": 45 },
+        "server/node_modules/hono/dist/hono-base.js": { "bytesInOutput": 11121 },
+        "server/node_modules/hono/dist/router/reg-exp-router/matcher.js": { "bytesInOutput": 545 },
+        "server/node_modules/hono/dist/router/reg-exp-router/node.js": { "bytesInOutput": 3341 },
+        "server/node_modules/hono/dist/router/reg-exp-router/trie.js": { "bytesInOutput": 1599 },
+        "server/node_modules/hono/dist/router/reg-exp-router/router.js": { "bytesInOutput": 6148 },
+        "server/node_modules/hono/dist/router/smart-router/router.js": { "bytesInOutput": 1345 },
+        "server/node_modules/hono/dist/router/trie-router/node.js": { "bytesInOutput": 6013 },
+        "server/node_modules/hono/dist/router/trie-router/router.js": { "bytesInOutput": 481 },
+        "server/node_modules/hono/dist/hono.js": { "bytesInOutput": 343 },
+        "server/node_modules/hono/dist/middleware/cors/index.js": { "bytesInOutput": 2570 },
+        "server/src/utils/logger.js": { "bytesInOutput": 319 },
+        "server/src/utils/rateLimit.js": { "bytesInOutput": 965 },
+        "server/src/middleware/security.js": { "bytesInOutput": 685 },
+        "server/src/config.js": { "bytesInOutput": 383 },
+        "server/src/services/bangumi.js": { "bytesInOutput": 5574 },
+        "server/src/utils/http.js": { "bytesInOutput": 1749 },
+        "server/src/routes/user.js": { "bytesInOutput": 15362 },
+        "server/src/controllers/animeController.js": { "bytesInOutput": 4411 },
+        "server/src/routes/anime.js": { "bytesInOutput": 683 },
+        "server/src/routes/collection.js": { "bytesInOutput": 6365 },
+        "node_modules/linkedom/esm/shared/symbols.js": { "bytesInOutput": 1096 },
+        "node_modules/htmlparser2/dist/esm/index.js": { "bytesInOutput": 1277 },
+        "node_modules/htmlparser2/node_modules/entities/dist/esm/decode-codepoint.js": {
+          "bytesInOutput": 1239
+        },
+        "node_modules/htmlparser2/node_modules/entities/dist/esm/internal/decode-shared.js": {
+          "bytesInOutput": 1042
+        },
+        "node_modules/htmlparser2/node_modules/entities/dist/esm/generated/decode-data-html.js": {
+          "bytesInOutput": 32255
+        },
+        "node_modules/htmlparser2/node_modules/entities/dist/esm/generated/decode-data-xml.js": {
+          "bytesInOutput": 118
+        },
+        "node_modules/htmlparser2/node_modules/entities/dist/esm/internal/bin-trie-flags.js": {
+          "bytesInOutput": 360
+        },
+        "node_modules/htmlparser2/node_modules/entities/dist/esm/decode.js": {
+          "bytesInOutput": 14148
+        },
+        "node_modules/htmlparser2/dist/esm/Tokenizer.js": { "bytesInOutput": 24038 },
+        "node_modules/htmlparser2/dist/esm/Parser.js": { "bytesInOutput": 13933 },
+        "node_modules/domelementtype/lib/esm/index.js": { "bytesInOutput": 1145 },
+        "node_modules/domhandler/lib/esm/node.js": { "bytesInOutput": 6709 },
+        "node_modules/domhandler/lib/esm/index.js": { "bytesInOutput": 3575 },
+        "node_modules/domutils/lib/esm/index.js": { "bytesInOutput": 1505 },
+        "node_modules/entities/lib/esm/generated/decode-data-html.js": { "bytesInOutput": 47244 },
+        "node_modules/entities/lib/esm/generated/decode-data-xml.js": { "bytesInOutput": 186 },
+        "node_modules/entities/lib/esm/decode_codepoint.js": { "bytesInOutput": 1253 },
+        "node_modules/entities/lib/esm/decode.js": { "bytesInOutput": 13742 },
+        "node_modules/entities/lib/esm/generated/encode-html.js": { "bytesInOutput": 26935 },
+        "node_modules/entities/lib/esm/escape.js": { "bytesInOutput": 1884 },
+        "node_modules/entities/lib/esm/index.js": { "bytesInOutput": 555 },
+        "node_modules/dom-serializer/lib/esm/foreignNames.js": { "bytesInOutput": 1835 },
+        "node_modules/dom-serializer/lib/esm/index.js": { "bytesInOutput": 3883 },
+        "node_modules/domutils/lib/esm/stringify.js": { "bytesInOutput": 1030 },
+        "node_modules/domutils/lib/esm/traversal.js": { "bytesInOutput": 1107 },
+        "node_modules/domutils/lib/esm/manipulation.js": { "bytesInOutput": 2140 },
+        "node_modules/domutils/lib/esm/querying.js": { "bytesInOutput": 2092 },
+        "node_modules/domutils/lib/esm/legacy.js": { "bytesInOutput": 2086 },
+        "node_modules/domutils/lib/esm/helpers.js": { "bytesInOutput": 2397 },
+        "node_modules/domutils/lib/esm/feeds.js": { "bytesInOutput": 4086 },
+        "node_modules/linkedom/esm/shared/constants.js": { "bytesInOutput": 917 },
+        "node_modules/linkedom/esm/shared/object.js": { "bytesInOutput": 123 },
+        "node_modules/linkedom/esm/shared/utils.js": { "bytesInOutput": 1324 },
+        "node_modules/linkedom/esm/shared/shadow-roots.js": { "bytesInOutput": 49 },
+        "node_modules/linkedom/esm/interface/custom-element-registry.js": { "bytesInOutput": 5070 },
+        "node_modules/linkedom/esm/shared/parse-from-string.js": { "bytesInOutput": 2918 },
+        "node_modules/linkedom/esm/shared/register-html-class.js": { "bytesInOutput": 219 },
+        "node_modules/linkedom/esm/shared/jsdon.js": { "bytesInOutput": 1406 },
+        "node_modules/linkedom/esm/interface/mutation-observer.js": { "bytesInOutput": 4678 },
+        "node_modules/linkedom/esm/shared/attributes.js": { "bytesInOutput": 1809 },
+        "node_modules/linkedom/esm/interface/event-target.js": { "bytesInOutput": 1896 },
+        "node_modules/linkedom/esm/interface/node-list.js": { "bytesInOutput": 101 },
+        "node_modules/linkedom/esm/interface/node.js": { "bytesInOutput": 5837 },
+        "node_modules/linkedom/esm/shared/text-escaper.js": { "bytesInOutput": 199 },
+        "node_modules/linkedom/esm/interface/attr.js": { "bytesInOutput": 1160 },
+        "node_modules/linkedom/esm/shared/node.js": { "bytesInOutput": 801 },
+        "node_modules/linkedom/esm/mixin/non-document-type-child-node.js": { "bytesInOutput": 345 },
+        "node_modules/linkedom/esm/mixin/child-node.js": { "bytesInOutput": 1204 },
+        "node_modules/linkedom/esm/interface/character-data.js": { "bytesInOutput": 1890 },
+        "node_modules/linkedom/esm/interface/cdata-section.js": { "bytesInOutput": 363 },
+        "node_modules/linkedom/esm/interface/comment.js": { "bytesInOutput": 333 },
+        "node_modules/linkedom/node_modules/boolbase/dist/index.js": { "bytesInOutput": 80 },
+        "node_modules/linkedom/node_modules/css-what/dist/types.js": { "bytesInOutput": 966 },
+        "node_modules/linkedom/node_modules/css-what/dist/parse.js": { "bytesInOutput": 14267 },
+        "node_modules/linkedom/node_modules/css-what/dist/index.js": { "bytesInOutput": 0 },
+        "node_modules/linkedom/node_modules/domelementtype/dist/index.js": { "bytesInOutput": 869 },
+        "node_modules/linkedom/node_modules/domhandler/dist/node.js": { "bytesInOutput": 338 },
+        "node_modules/linkedom/node_modules/domutils/dist/index.js": { "bytesInOutput": 1336 },
+        "node_modules/linkedom/node_modules/domutils/dist/querying.js": { "bytesInOutput": 2041 },
+        "node_modules/linkedom/node_modules/domutils/dist/legacy.js": { "bytesInOutput": 2228 },
+        "node_modules/linkedom/node_modules/entities/dist/escape.js": { "bytesInOutput": 2033 },
+        "node_modules/linkedom/node_modules/entities/dist/index.js": { "bytesInOutput": 561 },
+        "node_modules/linkedom/node_modules/dom-serializer/dist/foreign-names.js": {
+          "bytesInOutput": 1383
+        },
+        "node_modules/linkedom/node_modules/dom-serializer/dist/index.js": {
+          "bytesInOutput": 3494
+        },
+        "node_modules/linkedom/node_modules/domutils/dist/stringify.js": { "bytesInOutput": 1051 },
+        "node_modules/linkedom/node_modules/domutils/dist/feeds.js": { "bytesInOutput": 3941 },
+        "node_modules/linkedom/node_modules/domutils/dist/helpers.js": { "bytesInOutput": 2460 },
+        "node_modules/linkedom/node_modules/domutils/dist/manipulation.js": {
+          "bytesInOutput": 2417
+        },
+        "node_modules/linkedom/node_modules/domutils/dist/traversal.js": { "bytesInOutput": 1128 },
+        "node_modules/linkedom/node_modules/css-select/dist/attributes.js": {
+          "bytesInOutput": 5508
+        },
+        "node_modules/linkedom/node_modules/css-select/dist/helpers/querying.js": {
+          "bytesInOutput": 2056
+        },
+        "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/aliases.js": {
+          "bytesInOutput": 1932
+        },
+        "node_modules/linkedom/node_modules/nth-check/dist/compile.js": { "bytesInOutput": 484 },
+        "node_modules/linkedom/node_modules/nth-check/dist/parse.js": { "bytesInOutput": 1490 },
+        "node_modules/linkedom/node_modules/nth-check/dist/index.js": { "bytesInOutput": 66 },
+        "node_modules/linkedom/node_modules/css-select/dist/helpers/cache.js": {
+          "bytesInOutput": 892
+        },
+        "node_modules/linkedom/node_modules/css-select/dist/helpers/options.js": {
+          "bytesInOutput": 110
+        },
+        "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/filters.js": {
+          "bytesInOutput": 4868
+        },
+        "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/pseudos.js": {
+          "bytesInOutput": 2974
+        },
+        "node_modules/linkedom/node_modules/css-select/dist/helpers/selectors.js": {
+          "bytesInOutput": 2289
+        },
+        "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/subselects.js": {
+          "bytesInOutput": 2265
+        },
+        "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/index.js": {
+          "bytesInOutput": 1224
+        },
+        "node_modules/linkedom/node_modules/css-select/dist/general.js": { "bytesInOutput": 4553 },
+        "node_modules/linkedom/node_modules/css-select/dist/compile.js": { "bytesInOutput": 2517 },
+        "node_modules/linkedom/node_modules/css-select/dist/index.js": { "bytesInOutput": 2403 },
+        "node_modules/linkedom/esm/shared/matches.js": { "bytesInOutput": 2571 },
+        "node_modules/linkedom/esm/interface/text.js": { "bytesInOutput": 908 },
+        "node_modules/linkedom/esm/mixin/parent-node.js": { "bytesInOutput": 6443 },
+        "node_modules/linkedom/esm/mixin/non-element-parent-node.js": { "bytesInOutput": 803 },
+        "node_modules/linkedom/esm/interface/document-fragment.js": { "bytesInOutput": 170 },
+        "node_modules/linkedom/esm/interface/document-type.js": { "bytesInOutput": 872 },
+        "node_modules/linkedom/esm/mixin/inner-html.js": { "bytesInOutput": 657 },
+        "node_modules/uhyphen/esm/index.js": { "bytesInOutput": 125 },
+        "node_modules/linkedom/esm/dom/string-map.js": { "bytesInOutput": 911 },
+        "node_modules/linkedom/esm/dom/token-list.js": { "bytesInOutput": 1809 },
+        "node_modules/linkedom/esm/interface/css-style-declaration.js": { "bytesInOutput": 2727 },
+        "node_modules/linkedom/esm/interface/event.js": { "bytesInOutput": 1455 },
+        "node_modules/linkedom/esm/interface/named-node-map.js": { "bytesInOutput": 793 },
+        "node_modules/linkedom/esm/interface/shadow-root.js": { "bytesInOutput": 289 },
+        "node_modules/linkedom/esm/interface/element.js": { "bytesInOutput": 11961 },
+        "node_modules/linkedom/esm/svg/element.js": { "bytesInOutput": 1177 },
+        "node_modules/linkedom/esm/shared/facades.js": { "bytesInOutput": 1846 },
+        "node_modules/linkedom/esm/html/element.js": { "bytesInOutput": 13229 },
+        "node_modules/linkedom/esm/html/template-element.js": { "bytesInOutput": 533 },
+        "node_modules/linkedom/esm/html/html-element.js": { "bytesInOutput": 145 },
+        "node_modules/linkedom/esm/html/text-element.js": { "bytesInOutput": 342 },
+        "node_modules/linkedom/esm/html/script-element.js": { "bytesInOutput": 1506 },
+        "node_modules/linkedom/esm/html/frame-element.js": { "bytesInOutput": 147 },
+        "node_modules/linkedom/esm/html/i-frame-element.js": { "bytesInOutput": 1320 },
+        "node_modules/linkedom/esm/html/object-element.js": { "bytesInOutput": 149 },
+        "node_modules/linkedom/esm/html/head-element.js": { "bytesInOutput": 145 },
+        "node_modules/linkedom/esm/html/body-element.js": { "bytesInOutput": 145 },
+        "node_modules/linkedom/esm/html/style-element.js": { "bytesInOutput": 892 },
+        "node_modules/linkedom/esm/html/time-element.js": { "bytesInOutput": 372 },
+        "node_modules/linkedom/esm/html/field-set-element.js": { "bytesInOutput": 153 },
+        "node_modules/linkedom/esm/html/embed-element.js": { "bytesInOutput": 147 },
+        "node_modules/linkedom/esm/html/hr-element.js": { "bytesInOutput": 141 },
+        "node_modules/linkedom/esm/html/progress-element.js": { "bytesInOutput": 153 },
+        "node_modules/linkedom/esm/html/paragraph-element.js": { "bytesInOutput": 147 },
+        "node_modules/linkedom/esm/html/table-element.js": { "bytesInOutput": 147 },
+        "node_modules/linkedom/esm/html/frame-set-element.js": { "bytesInOutput": 153 },
+        "node_modules/linkedom/esm/html/li-element.js": { "bytesInOutput": 141 },
+        "node_modules/linkedom/esm/html/base-element.js": { "bytesInOutput": 145 },
+        "node_modules/linkedom/esm/html/data-list-element.js": { "bytesInOutput": 153 },
+        "node_modules/linkedom/esm/html/input-element.js": { "bytesInOutput": 1106 },
+        "node_modules/linkedom/esm/html/param-element.js": { "bytesInOutput": 147 },
+        "node_modules/linkedom/esm/html/media-element.js": { "bytesInOutput": 147 },
+        "node_modules/linkedom/esm/html/audio-element.js": { "bytesInOutput": 147 },
+        "node_modules/linkedom/esm/html/heading-element.js": { "bytesInOutput": 252 },
+        "node_modules/linkedom/esm/html/directory-element.js": { "bytesInOutput": 149 },
+        "node_modules/linkedom/esm/html/quote-element.js": { "bytesInOutput": 147 },
+        "node_modules/linkedom/esm/html/canvas-element.js": { "bytesInOutput": 809 },
+        "node_modules/linkedom/esm/html/legend-element.js": { "bytesInOutput": 149 },
+        "node_modules/linkedom/esm/html/option-element.js": { "bytesInOutput": 701 },
+        "node_modules/linkedom/esm/html/span-element.js": { "bytesInOutput": 145 },
+        "node_modules/linkedom/esm/html/meter-element.js": { "bytesInOutput": 147 },
+        "node_modules/linkedom/esm/html/video-element.js": { "bytesInOutput": 147 },
+        "node_modules/linkedom/esm/html/table-cell-element.js": { "bytesInOutput": 148 },
+        "node_modules/linkedom/esm/html/title-element.js": { "bytesInOutput": 219 },
+        "node_modules/linkedom/esm/html/output-element.js": { "bytesInOutput": 149 },
+        "node_modules/linkedom/esm/html/table-row-element.js": { "bytesInOutput": 147 },
+        "node_modules/linkedom/esm/html/data-element.js": { "bytesInOutput": 145 },
+        "node_modules/linkedom/esm/html/menu-element.js": { "bytesInOutput": 145 },
+        "node_modules/linkedom/esm/html/select-element.js": { "bytesInOutput": 999 },
+        "node_modules/linkedom/esm/html/br-element.js": { "bytesInOutput": 141 },
+        "node_modules/linkedom/esm/html/button-element.js": { "bytesInOutput": 663 },
+        "node_modules/linkedom/esm/html/map-element.js": { "bytesInOutput": 143 },
+        "node_modules/linkedom/esm/html/opt-group-element.js": { "bytesInOutput": 153 },
+        "node_modules/linkedom/esm/html/d-list-element.js": { "bytesInOutput": 144 },
+        "node_modules/linkedom/esm/html/text-area-element.js": { "bytesInOutput": 924 },
+        "node_modules/linkedom/esm/html/font-element.js": { "bytesInOutput": 145 },
+        "node_modules/linkedom/esm/html/div-element.js": { "bytesInOutput": 143 },
+        "node_modules/linkedom/esm/html/link-element.js": { "bytesInOutput": 1163 },
+        "node_modules/linkedom/esm/html/slot-element.js": { "bytesInOutput": 1314 },
+        "node_modules/linkedom/esm/html/form-element.js": { "bytesInOutput": 145 },
+        "node_modules/linkedom/esm/html/image-element.js": { "bytesInOutput": 1236 },
+        "node_modules/linkedom/esm/html/pre-element.js": { "bytesInOutput": 143 },
+        "node_modules/linkedom/esm/html/u-list-element.js": { "bytesInOutput": 144 },
+        "node_modules/linkedom/esm/html/meta-element.js": { "bytesInOutput": 991 },
+        "node_modules/linkedom/esm/html/picture-element.js": { "bytesInOutput": 151 },
+        "node_modules/linkedom/esm/html/area-element.js": { "bytesInOutput": 145 },
+        "node_modules/linkedom/esm/html/o-list-element.js": { "bytesInOutput": 144 },
+        "node_modules/linkedom/esm/html/table-caption-element.js": { "bytesInOutput": 156 },
+        "node_modules/linkedom/esm/html/anchor-element.js": { "bytesInOutput": 1081 },
+        "node_modules/linkedom/esm/html/label-element.js": { "bytesInOutput": 147 },
+        "node_modules/linkedom/esm/html/unknown-element.js": { "bytesInOutput": 151 },
+        "node_modules/linkedom/esm/html/mod-element.js": { "bytesInOutput": 143 },
+        "node_modules/linkedom/esm/html/details-element.js": { "bytesInOutput": 151 },
+        "node_modules/linkedom/esm/html/source-element.js": { "bytesInOutput": 820 },
+        "node_modules/linkedom/esm/html/track-element.js": { "bytesInOutput": 147 },
+        "node_modules/linkedom/esm/html/marquee-element.js": { "bytesInOutput": 151 },
+        "node_modules/linkedom/esm/shared/html-classes.js": { "bytesInOutput": 1410 },
+        "node_modules/linkedom/esm/shared/mime.js": { "bytesInOutput": 794 },
+        "node_modules/linkedom/esm/interface/custom-event.js": { "bytesInOutput": 167 },
+        "node_modules/linkedom/esm/interface/input-event.js": { "bytesInOutput": 366 },
+        "node_modules/linkedom/esm/interface/image.js": { "bytesInOutput": 430 },
+        "node_modules/linkedom/esm/interface/range.js": { "bytesInOutput": 2819 },
+        "node_modules/linkedom/esm/interface/tree-walker.js": { "bytesInOutput": 1003 },
+        "node_modules/linkedom/esm/interface/document.js": { "bytesInOutput": 7425 },
+        "node_modules/linkedom/esm/html/document.js": { "bytesInOutput": 2437 },
+        "node_modules/linkedom/esm/svg/document.js": { "bytesInOutput": 166 },
+        "node_modules/linkedom/esm/xml/document.js": { "bytesInOutput": 161 },
+        "node_modules/linkedom/esm/dom/parser.js": { "bytesInOutput": 925 },
+        "node_modules/linkedom/esm/shared/parse-json.js": { "bytesInOutput": 30 },
+        "node_modules/linkedom/esm/index.js": { "bytesInOutput": 242 },
+        "server/src/utils/cache.js": { "bytesInOutput": 906 },
+        "server/src/routes/comments.js": { "bytesInOutput": 17997 },
+        "server/src/services/douban.js": { "bytesInOutput": 4613 },
+        "server/src/routes/douban.js": { "bytesInOutput": 4198 },
+        "server/src/routes/bilibili.js": { "bytesInOutput": 3024 },
+        "server/src/routes/moegirl.js": { "bytesInOutput": 3479 },
+        "server/src/routes/groups.js": { "bytesInOutput": 10163 },
+        "server/src/app.js": { "bytesInOutput": 1532 }
+      },
+      "bytes": 624866
+    }
+  }
+}

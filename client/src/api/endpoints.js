@@ -1,95 +1,178 @@
 import api from './index'
 
 export const userAPI = {
-  auth(token) { return api.post('/user/auth', { token }) },
-  getMe() { return api.get('/user/me') },
-  getOAuthUrl() { return api.get('/user/oauth-url') },
-  oauthCallback(code) { return api.post('/user/oauth-callback', { code }) },
-  getUser(username) { return api.get(`/user/${username}`) },
-  getCharacters(username) {
-    return api.get(`/user/${username}/characters`)
+  auth(token, config = {}) {
+    return api.post('/user/auth', { token }, config)
   },
-  getPersons(username) {
-    return api.get(`/user/${username}/persons`)
+  getMe(config = {}) {
+    return api.get('/user/me', config)
   },
-  getIndexes(username) {
-    return api.get(`/user/${username}/indexes`)
+  getOAuthUrl(config = {}) {
+    return api.get('/user/oauth-url', config)
   },
-  getFriends(username) { return api.get(`/user/${username}/friends`) },
-  getGroups(username) { return api.get(`/user/${username}/groups`) },
-  getTimeline(username) { return api.get(`/user/${username}/timeline`) },
-  getYearlyStats(username) { return api.get(`/user/${username}/stats-yearly`) }
+  oauthCallback(code, config = {}) {
+    return api.post('/user/oauth-callback', { code }, config)
+  },
+  getUser(username, config = {}) {
+    return api.get(`/user/${username}`, config)
+  },
+  getCharacters(username, config = {}) {
+    return api.get(`/user/${username}/characters`, config)
+  },
+  getPersons(username, config = {}) {
+    return api.get(`/user/${username}/persons`, config)
+  },
+  getIndexes(username, config = {}) {
+    return api.get(`/user/${username}/indexes`, config)
+  },
+  getFriends(username, config = {}) {
+    return api.get(`/user/${username}/friends`, config)
+  },
+  getGroups(username, config = {}) {
+    return api.get(`/user/${username}/groups`, config)
+  },
+  getTimeline(username, config = {}) {
+    return api.get(`/user/${username}/timeline`, config)
+  },
+  getYearlyStats(username, config = {}) {
+    return api.get(`/user/${username}/stats-yearly`, config)
+  }
 }
 
 export const animeAPI = {
-  search(params) { return api.get('/anime/search', { params }) },
-  browse(params) { return api.get('/anime/browse', { params }) },
-  getDetail(id) { return api.get(`/anime/${id}`) },
-  getEpisodes(id, params) { return api.get(`/anime/${id}/episodes`, { params }) },
-  getCharacters(id) { return api.get(`/anime/${id}/characters`) },
-  getPersons(id) { return api.get(`/anime/${id}/persons`) },
-  getRelations(id) { return api.get(`/anime/${id}/relations`) },
-  getCalendar() { return api.get('/anime/calendar') },
-  getTags() { return api.get('/anime/tags') },
-  getCharacterDetail(id) { return api.get(`/anime/character/${id}`) },
-  getCharacterSubjects(id) { return api.get(`/anime/character/${id}/subjects`) },
-  getCharacterPersons(id) { return api.get(`/anime/character/${id}/persons`) },
-  getPersonDetail(id) { return api.get(`/anime/person/${id}`) },
-  getPersonSubjects(id) { return api.get(`/anime/person/${id}/subjects`) }
+  search(params, config = {}) {
+    return api.get('/anime/search', { params, ...config })
+  },
+  browse(params, config = {}) {
+    return api.get('/anime/browse', { params, ...config })
+  },
+  getDetail(id, config = {}) {
+    return api.get(`/anime/${id}`, config)
+  },
+  getEpisodes(id, params, config = {}) {
+    return api.get(`/anime/${id}/episodes`, { params, ...config })
+  },
+  getCharacters(id, config = {}) {
+    return api.get(`/anime/${id}/characters`, config)
+  },
+  getPersons(id, config = {}) {
+    return api.get(`/anime/${id}/persons`, config)
+  },
+  getRelations(id, config = {}) {
+    return api.get(`/anime/${id}/relations`, config)
+  },
+  getCalendar(config = {}) {
+    return api.get('/anime/calendar', config)
+  },
+  getTags(config = {}) {
+    return api.get('/anime/tags', config)
+  },
+  getCharacterDetail(id, config = {}) {
+    return api.get(`/anime/character/${id}`, config)
+  },
+  getCharacterSubjects(id, config = {}) {
+    return api.get(`/anime/character/${id}/subjects`, config)
+  },
+  getCharacterPersons(id, config = {}) {
+    return api.get(`/anime/character/${id}/persons`, config)
+  },
+  getPersonDetail(id, config = {}) {
+    return api.get(`/anime/person/${id}`, config)
+  },
+  getPersonSubjects(id, config = {}) {
+    return api.get(`/anime/person/${id}/subjects`, config)
+  }
 }
 
 export const collectionAPI = {
-  getList(params) { return api.get('/collection/list', { params }) },
-  getOne(animeId) { return api.get(`/collection/${animeId}`) },
-  save(animeId, body) { return api.post(`/collection/${animeId}`, body) },
-  remove(animeId) { return api.delete(`/collection/${animeId}`) },
-  getStats() { return api.get('/collection/stats') }
+  getList(params, config = {}) {
+    return api.get('/collection/list', { params, ...config })
+  },
+  getOne(animeId, config = {}) {
+    return api.get(`/collection/${animeId}`, config)
+  },
+  save(animeId, body, config = {}) {
+    return api.post(`/collection/${animeId}`, body, config)
+  },
+  remove(animeId, config = {}) {
+    return api.delete(`/collection/${animeId}`, config)
+  },
+  getStats(config = {}) {
+    return api.get('/collection/stats', config)
+  }
 }
 
 export const commentsAPI = {
-  getCharacterComments(id) { return api.get(`/comments/character/${id}`) },
-  getSubjectComments(id) { return api.get(`/comments/subject/${id}`) },
-  getSubjectTopics(id) { return api.get(`/comments/subject/${id}/topics`) },
-  getTopicDetail(topicId) { return api.get(`/comments/topic/${topicId}`) },
-  getPersonComments(id) { return api.get(`/comments/person/${id}`) },
-  postComment(subjectId, body) { return api.post(`/comments/subject/${subjectId}/comment`, body) },
-  postReply(topicId, body) { return api.post(`/comments/topic/${topicId}/reply`, body) },
-  postTalkbox(subjectId, body) { return api.post(`/comments/subject/${subjectId}/talkbox`, body) },
-  postTopic(subjectId, body) { return api.post(`/comments/subject/${subjectId}/topic`, body) },
+  getCharacterComments(id, config = {}) {
+    return api.get(`/comments/character/${id}`, config)
+  },
+  getSubjectComments(id, config = {}) {
+    return api.get(`/comments/subject/${id}`, config)
+  },
+  getSubjectTopics(id, config = {}) {
+    return api.get(`/comments/subject/${id}/topics`, config)
+  },
+  getTopicDetail(topicId, config = {}) {
+    return api.get(`/comments/topic/${topicId}`, config)
+  },
+  getPersonComments(id, config = {}) {
+    return api.get(`/comments/person/${id}`, config)
+  },
+  postComment(subjectId, body, config = {}) {
+    return api.post(`/comments/subject/${subjectId}/comment`, body, config)
+  },
+  postReply(topicId, body, config = {}) {
+    return api.post(`/comments/topic/${topicId}/reply`, body, config)
+  },
+  postTalkbox(subjectId, body, config = {}) {
+    return api.post(`/comments/subject/${subjectId}/talkbox`, body, config)
+  },
+  postTopic(subjectId, body, config = {}) {
+    return api.post(`/comments/subject/${subjectId}/topic`, body, config)
+  }
 }
 
 export const doubanAPI = {
-  getRating(id) { return api.get(`/douban/${id}`) },
-  getDetails(id, name) {
+  getRating(id, config = {}) {
+    return api.get(`/douban/${id}`, config)
+  },
+  getDetails(id, name, config = {}) {
     if (name) {
-      return api.get('/douban/by-name', { params: { name } })
+      return api.get('/douban/by-name', { params: { name }, ...config })
     }
-    return api.get(`/douban/${id}/details`)
+    return api.get(`/douban/${id}/details`, config)
   },
-  getComments(id) {
-    return api.get(`/douban/${id}/comments`)
+  getComments(id, config = {}) {
+    return api.get(`/douban/${id}/comments`, config)
   },
-  getReviews(id) { return api.get(`/douban/${id}/reviews`) }
+  getReviews(id, config = {}) {
+    return api.get(`/douban/${id}/reviews`, config)
+  }
 }
 
 export const bilibiliAPI = {
-  getDetails(id, name) {
+  getDetails(id, name, config = {}) {
     if (name) {
-      return api.get('/bilibili/by-name', { params: { name } })
+      return api.get('/bilibili/by-name', { params: { name }, ...config })
     }
-    return api.get(`/bilibili/${id}`)
+    return api.get(`/bilibili/${id}`, config)
   }
 }
 
 export const moegirlAPI = {
-  search(q) { return api.get('/moegirl/search', { params: { q } }) },
+  search(q, config = {}) {
+    return api.get('/moegirl/search', { params: { q }, ...config })
+  }
 }
 
 export const groupAPI = {
-  getList() {
-    return api.get('/groups/')
+  getList(config = {}) {
+    return api.get('/groups/', config)
   },
-  getDetail(id) {
-    return api.get(`/groups/${id}`)
+  search(keyword, config = {}) {
+    return api.get('/groups/search', { params: { keyword }, ...config })
+  },
+  getDetail(id, config = {}) {
+    return api.get(`/groups/${id}`, config)
   }
 }

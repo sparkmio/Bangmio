@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bangmio — 一站式追番社区</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,800;9..144,900&family=DM+Sans:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --pink: #fda4af;
+  --pink-deep: #ff6b81;
+  --pink-soft: #fff0f3;
+  --pink-glow: rgba(253, 164, 175, 0.15);
+  --ink: #1a1118;
+  --ink-soft: #4a3a44;
+  --ink-muted: #8a7a84;
+  --paper: #fff;
+  --paper-warm: #fdf8f8;
+  --paper-dark: #0d0d14;
+  --paper-dark-2: #141420;
+  --line: rgba(26, 17, 24, 0.08);
+  --line-dark: rgba(255, 255, 255, 0.08);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'DM Sans', 'Noto Sans SC', sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--pink); color: #fff; }
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--pink); border-radius: 999px; }
+
+/* ─── Nav ─── */
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 2rem;
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.7);
+  border-bottom: 1px solid var(--line);
+  transition: padding 0.3s ease;
+}
+.nav-logo {
+  font-family: 'Fraunces', serif;
+  font-weight: 800; font-size: 1.3rem;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+.nav-logo span { color: var(--pink-deep); }
+.nav-links {
+  display: flex; gap: 1.5rem; align-items: center;
+}
+.nav-links a {
+  font-size: 0.875rem; font-weight: 500;
+  color: var(--ink-soft); text-decoration: none;
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--pink-deep); }
+.nav-cta {
+  padding: 0.5rem 1.25rem;
+  background: var(--ink); color: var(--paper) !important;
+  border-radius: 999px; font-weight: 600;
+  transition: all 0.3s;
+}
+.nav-cta:hover { background: var(--pink-deep); !important; }
+
+@media (max-width: 640px) {
+  .nav-links a:not(.nav-cta) { display: none; }
+}
+
+/* ─── Hero ─── */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center;
+  overflow: hidden;
+  background: var(--paper-warm);
+}
+.hero-bg {
+  position: absolute; inset: 0;
+  overflow: hidden;
+  z-index: 0;
+}
+.hero-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.4;
+  animation: float 12s ease-in-out infinite;
+}
+.hero-blob:nth-child(1) {
+  width: 400px; height: 400px;
+  background: var(--pink);
+  top: -100px; left: -100px;
+}
+.hero-blob:nth-child(2) {
+  width: 300px; height: 300px;
+  background: #ffc4d6;
+  bottom: -50px; right: 10%;
+  animation-delay: -4s;
+}
+.hero-blob:nth-child(3) {
+  width: 250px; height: 250px;
+  background: var(--pink-deep);
+  top: 30%; right: -80px;
+  animation-delay: -8s;
+  opacity: 0.2;
+}
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -30px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.95); }
+}
+.hero-grain {
+  position: absolute; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.4'/%3E%3C/svg%3E");
+  opacity: 0.06;
+  pointer-events: none;
+  z-index: 1;
+}
+.hero-content {
+  position: relative; z-index: 2;
+  padding: 0 1.5rem;
+  max-width: 800px;
+}
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  padding: 0.4rem 1rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.75rem; font-weight: 600;
+  color: var(--ink-soft);
+  margin-bottom: 2rem;
+  font-family: 'JetBrains Mono', monospace;
+  animation: fadeUp 0.6s ease-out both;
+}
+.hero-badge::before {
+  content: '';
+  width: 8px; height: 8px;
+  background: var(--pink-deep);
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.3); }
+}
+.hero-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 900;
+  font-size: clamp(3.5rem, 12vw, 7rem);
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+  margin-bottom: 1rem;
+  animation: fadeUp 0.7s ease-out 0.1s both;
+}
+.hero-title em {
+  font-style: italic;
+  font-weight: 300;
+  color: var(--pink-deep);
+}
+.hero-sub {
+  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  color: var(--ink-soft);
+  line-height: 1.6;
+  max-width: 540px;
+  margin: 0 auto 2.5rem;
+  animation: fadeUp 0.7s ease-out 0.2s both;
+}
+.hero-actions {
+  display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;
+  animation: fadeUp 0.7s ease-out 0.3s both;
+}
+.btn {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  padding: 0.875rem 1.75rem;
+  border-radius: 999px;
+  font-size: 0.9rem; font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s;
+  cursor: pointer; border: none;
+  font-family: inherit;
+}
+.btn-primary {
+  background: var(--ink); color: var(--paper);
+}
+.btn-primary:hover {
+  background: var(--pink-deep);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px -8px rgba(255, 107, 129, 0.4);
+}
+.btn-ghost {
+  background: transparent; color: var(--ink);
+  border: 1px solid var(--line);
+}
+.btn-ghost:hover {
+  border-color: var(--ink);
+  transform: translateY(-2px);
+}
+.btn svg {
+  width: 1rem; height: 1rem;
+  transition: transform 0.3s;
+}
+.btn:hover svg { transform: translateX(3px); }
+
+.hero-scroll {
+  position: absolute; bottom: 2rem; left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  animation: fadeUp 1s ease-out 0.5s both;
+}
+.hero-scroll-line {
+  width: 1px; height: 40px;
+  background: linear-gradient(to bottom, var(--ink-muted), transparent);
+  margin: 0 auto;
+  animation: scrollLine 2s ease-in-out infinite;
+}
+@keyframes scrollLine {
+  0% { transform: scaleY(0); transform-origin: top; }
+  50% { transform: scaleY(1); transform-origin: top; }
+  51% { transform: scaleY(1); transform-origin: bottom; }
+  100% { transform: scaleY(0); transform-origin: bottom; }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Section base ─── */
+.section {
+  padding: 6rem 2rem;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+.section-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem; font-weight: 600;
+  color: var(--pink-deep);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 1rem;
+}
+.section-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  margin-bottom: 1.5rem;
+}
+.section-text {
+  font-size: 1.05rem;
+  line-height: 1.75;
+  color: var(--ink-soft);
+  max-width: 640px;
+}
+
+/* ─── Intro Section ─── */
+.intro {
+  background: var(--paper);
+}
+.intro-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
+  align-items: start;
+}
+@media (max-width: 768px) {
+  .intro-grid { grid-template-columns: 1fr; gap: 2rem; }
+}
+.intro-quote {
+  font-family: 'Fraunces', serif;
+  font-weight: 300;
+  font-style: italic;
+  font-size: 1.3rem;
+  line-height: 1.7;
+  color: var(--ink);
+  padding: 2rem;
+  background: var(--pink-soft);
+  border-radius: 16px;
+  border-left: 3px solid var(--pink-deep);
+}
+.intro-author {
+  display: block;
+  margin-top: 1rem;
+  font-family: 'DM Sans', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+}
+
+/* ─── Pain Points ─── */
+.pain {
+  background: var(--paper-dark);
+  color: #e8e0f0;
+}
+.pain .section-title { color: #fff; }
+.pain .section-label { color: var(--pink); }
+.pain .section-text { color: rgba(255,255,255,0.6); }
+.pain-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-top: 3rem;
+}
+.pain-card {
+  padding: 2rem;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--line-dark);
+  border-radius: 16px;
+  transition: all 0.4s;
+}
+.pain-card:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(253, 164, 175, 0.3);
+  transform: translateY(-4px);
+}
+.pain-icon {
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(253, 164, 175, 0.12);
+  border-radius: 12px;
+  margin-bottom: 1.25rem;
+}
+.pain-icon svg {
+  width: 22px; height: 22px;
+  color: var(--pink);
+}
+.pain-card h3 {
+  font-size: 1.05rem; font-weight: 600;
+  color: #fff;
+  margin-bottom: 0.5rem;
+}
+.pain-card p {
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.5);
+  line-height: 1.6;
+}
+
+/* ─── Features ─── */
+.features {
+  background: var(--paper);
+}
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border-radius: 20px;
+  overflow: hidden;
+  margin-top: 3rem;
+  border: 1px solid var(--line);
+}
+.feature-cell {
+  padding: 2rem 1.75rem;
+  background: var(--paper);
+  transition: background 0.3s;
+  position: relative;
+}
+.feature-cell:hover {
+  background: var(--pink-soft);
+}
+.feature-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem; font-weight: 600;
+  color: var(--ink-muted);
+  margin-bottom: 0.75rem;
+}
+.feature-cell h3 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 1.15rem;
+  color: var(--ink);
+  margin-bottom: 0.5rem;
+}
+.feature-cell p {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+.feature-tag {
+  display: inline-block;
+  margin-top: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  background: var(--pink-glow);
+  border-radius: 999px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--pink-deep);
+}
+
+/* ─── Value ─── */
+.value {
+  background: var(--pink-soft);
+}
+.value-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-top: 3rem;
+}
+@media (max-width: 768px) {
+  .value-grid { grid-template-columns: 1fr; }
+}
+.value-card {
+  padding: 2.5rem;
+  background: var(--paper);
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  transition: all 0.4s;
+}
+.value-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 40px -12px rgba(253, 164, 175, 0.25);
+}
+.value-card-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem; font-weight: 600;
+  color: var(--pink-deep);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 1rem;
+}
+.value-card h3 {
+  font-family: 'Fraunces', serif;
+  font-weight: 700;
+  font-size: 1.4rem;
+  color: var(--ink);
+  margin-bottom: 0.75rem;
+  line-height: 1.3;
+}
+.value-card p {
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+  line-height: 1.7;
+}
+
+/* ─── Tech Stack ─── */
+.tech {
+  background: var(--paper);
+  text-align: center;
+}
+.tech-pills {
+  display: flex; flex-wrap: wrap; gap: 0.75rem;
+  justify-content: center;
+  margin-top: 2rem;
+}
+.tech-pill {
+  padding: 0.5rem 1.25rem;
+  background: var(--paper-warm);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem; font-weight: 500;
+  color: var(--ink-soft);
+  transition: all 0.3s;
+}
+.tech-pill:hover {
+  border-color: var(--pink);
+  color: var(--pink-deep);
+  background: var(--pink-soft);
+}
+
+/* ─── CTA ─── */
+.cta {
+  position: relative;
+  padding: 8rem 2rem;
+  text-align: center;
+  overflow: hidden;
+  background: var(--paper-dark);
+}
+.cta-bg {
+  position: absolute; inset: 0;
+  overflow: hidden;
+}
+.cta-bg::before {
+  content: '';
+  position: absolute;
+  width: 500px; height: 500px;
+  background: var(--pink-deep);
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.15;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+}
+.cta-content {
+  position: relative; z-index: 1;
+  max-width: 600px;
+  margin: 0 auto;
+}
+.cta-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: #fff;
+  margin-bottom: 1.5rem;
+}
+.cta-title em {
+  font-style: italic;
+  font-weight: 300;
+  color: var(--pink);
+}
+.cta-text {
+  font-size: 1.05rem;
+  color: rgba(255,255,255,0.6);
+  line-height: 1.7;
+  margin-bottom: 2.5rem;
+}
+.cta-actions {
+  display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;
+}
+.cta .btn-primary {
+  background: var(--pink-deep);
+}
+.cta .btn-primary:hover {
+  background: var(--pink);
+  box-shadow: 0 12px 30px -8px rgba(253, 164, 175, 0.5);
+}
+.cta .btn-ghost {
+  color: rgba(255,255,255,0.8);
+  border-color: rgba(255,255,255,0.15);
+}
+.cta .btn-ghost:hover {
+  border-color: rgba(255,255,255,0.4);
+  background: rgba(255,255,255,0.05);
+}
+
+/* ─── Footer ─── */
+.footer {
+  padding: 2rem;
+  background: var(--paper-dark);
+  border-top: 1px solid var(--line-dark);
+  text-align: center;
+}
+.footer-text {
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.3);
+  font-family: 'JetBrains Mono', monospace;
+}
+.footer-text a {
+  color: var(--pink);
+  text-decoration: none;
+}
+
+/* ─── Scroll reveal ─── */
+.reveal {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="nav">
+  <div class="nav-logo">Bang<span>mio</span></div>
+  <div class="nav-links">
+    <a href="#intro">创意介绍</a>
+    <a href="#pain">用户痛点</a>
+    <a href="#features">功能</a>
+    <a href="#value">价值</a>
+    <a href="https://bangmio.pages.dev" target="_blank" class="nav-cta">访问网站 →</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-bg">
+    <div class="hero-blob"></div>
+    <div class="hero-blob"></div>
+    <div class="hero-blob"></div>
+  </div>
+  <div class="hero-grain"></div>
+  <div class="hero-content">
+    <div class="hero-badge">TRAE AI 创造力大赛参赛作品</div>
+    <h1 class="hero-title">Bang<em>mio</em></h1>
+    <p class="hero-sub">一个集合 Bangumi、萌娘百科、豆瓣、B站等多平台数据的一站式追番社区。不用再多个网站到处跑，在这里解决追番中遇到的一切问题。</p>
+    <div class="hero-actions">
+      <a href="https://bangmio.pages.dev" target="_blank" class="btn btn-primary">
+        访问网站
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <a href="https://github.com/sparkmio/Bangmio" target="_blank" class="btn btn-ghost">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </div>
+  <div class="hero-scroll">
+    <div class="hero-scroll-line"></div>
+  </div>
+</section>
+
+<!-- Intro -->
+<section class="section intro" id="intro">
+  <div class="intro-grid">
+    <div class="reveal">
+      <div class="section-label">01 — 创意介绍</div>
+      <h2 class="section-title">为什么会想到做这个</h2>
+      <p class="section-text">
+        作者本身是个二次元，喜欢在闲暇时间看看番剧。但现有的相关番剧社区都有缺点：Bangumi UI 太过古老且部分介绍是日语，B站信息不全，萌娘百科交流功能少，也没有评分和追番进度的功能。其他几个网站也都有各自的缺点，因此做一个集合型的网站很有必要。
+      </p>
+      <p class="section-text" style="margin-top: 1rem;">
+        Bangmio 就是在这个想法下诞生的——一个聚合 Bangumi、萌娘百科、豆瓣评分、B站、第三方视频/音乐平台的一站式追番网站。
+      </p>
+    </div>
+    <div class="reveal">
+      <div class="intro-quote">
+        "这是一个高中生好玩做的 VibeCoding 项目，主要是用 DeepSeek V4 Pro 和 MiMo-V2.5-Pro 做的，用了快 2 亿 tokens。这个项目虽然没啥人关注，但我会尽我所能持续进行维护和更新。"
+        <span class="intro-author">— Bangmio 作者</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Pain Points -->
+<section class="section pain" id="pain" style="max-width: 1000px; margin: 0 auto;">
+  <div class="reveal">
+    <div class="section-label">02 — 目标用户及痛点</div>
+    <h2 class="section-title">面向二次元及泛二次元人群</h2>
+    <p class="section-text">在追番/剧时了解评分，跟同好在社区中进行交流，查看番剧的制作信息等场景下使用。</p>
+  </div>
+  <div class="pain-grid">
+    <div class="pain-card reveal">
+      <div class="pain-icon">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z M7 7V5a2 2 0 012-2h6a2 2 0 012 2v2"/></svg>
+      </div>
+      <h3>资料不全</h3>
+      <p>已有平台各有侧重，单一平台的番剧信息覆盖不完整，制作人员、角色、音乐等常常缺失。</p>
+    </div>
+    <div class="pain-card reveal">
+      <div class="pain-icon">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      </div>
+      <h3>多平台到处跑</h3>
+      <p>追番时需要在 Bangumi 管理进度、豆瓣看评分、B站看视频、萌娘百科查介绍，频繁切换非常低效。</p>
+    </div>
+    <div class="pain-card reveal">
+      <div class="pain-icon">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.723 8.77 15.868 4 19"/></svg>
+      </div>
+      <h3>日语资料阅读障碍</h3>
+      <p>部分日漫的资料只有日语，国内用户难以获取完整信息，需要中文二次元百科和社区支持。</p>
+    </div>
+    <div class="pain-card reveal">
+      <div class="pain-icon">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+      </div>
+      <h3>UI 古老体验差</h3>
+      <p>Bangumi 界面设计年代久远，交互体验不够现代化，对新用户不够友好。</p>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="section features" id="features">
+  <div class="reveal">
+    <div class="section-label">03 — 核心功能</div>
+    <h2 class="section-title">原版功能 + 特色功能</h2>
+    <p class="section-text">基于 Bangumi API 的完整第三方客户端，在此之上扩展了多平台聚合能力。</p>
+  </div>
+  <div class="feature-grid reveal">
+    <div class="feature-cell">
+      <div class="feature-num">01</div>
+      <h3>OAuth 登录</h3>
+      <p>一键登录或手动粘贴 Access Token，安全便捷。</p>
+      <span class="feature-tag">原版功能</span>
+    </div>
+    <div class="feature-cell">
+      <div class="feature-num">02</div>
+      <h3>收藏管理</h3>
+      <p>想看/在看/看过/搁置/弃番，支持评分和短评。</p>
+      <span class="feature-tag">原版功能</span>
+    </div>
+    <div class="feature-cell">
+      <div class="feature-num">03</div>
+      <h3>番剧详情</h3>
+      <p>评分分布、收藏统计、制作人员、角色、相关条目。</p>
+      <span class="feature-tag">原版功能</span>
+    </div>
+    <div class="feature-cell">
+      <div class="feature-num">04</div>
+      <h3>吐槽箱 & 讨论版</h3>
+      <p>角色页嵌入式展示，番剧/人物页独立子页面。</p>
+      <span class="feature-tag">原版功能</span>
+    </div>
+    <div class="feature-cell">
+      <div class="feature-num">05</div>
+      <h3>豆瓣评分</h3>
+      <p>一站式查看多平台评分信息，不用多头跑。</p>
+      <span class="feature-tag">特色功能</span>
+    </div>
+    <div class="feature-cell">
+      <div class="feature-num">06</div>
+      <h3>B站评分 & 观看</h3>
+      <p>整合 B站番剧搜索与评分，直达在线观看。</p>
+      <span class="feature-tag">特色功能</span>
+    </div>
+    <div class="feature-cell">
+      <div class="feature-num">07</div>
+      <h3>萌娘百科</h3>
+      <p>链接萌娘百科，查看更全的中文番剧简介。</p>
+      <span class="feature-tag">特色功能</span>
+    </div>
+    <div class="feature-cell">
+      <div class="feature-num">08</div>
+      <h3>相关音乐</h3>
+      <p>一键跳转该番剧/游戏有关的音乐，不用到处找。</p>
+      <span class="feature-tag">特色功能</span>
+    </div>
+    <div class="feature-cell">
+      <div class="feature-num">09</div>
+      <h3>在线观看</h3>
+      <p>链接第三方番剧在线播放平台，一键跳转。</p>
+      <span class="feature-tag">特色功能</span>
+    </div>
+  </div>
+</section>
+
+<!-- Value -->
+<section class="section value" id="value">
+  <div class="reveal">
+    <div class="section-label">04 — 价值与意义</div>
+    <h2 class="section-title">一站式解决追番中的问题</h2>
+    <p class="section-text">不用再跑好几个交流群、评分网站、百科网站，在 Bangmio 一站搞定。</p>
+  </div>
+  <div class="value-grid">
+    <div class="value-card reveal">
+      <div class="value-card-label">商业价值</div>
+      <h3>已有现成框架，可快速上线</h3>
+      <p>网站已部署在 Cloudflare Pages，全球 CDN 加速。只需将数据库从第三方改为自有数据库，即可完全独立上线运营。前端、后端、部署链路均已打通。</p>
+    </div>
+    <div class="value-card reveal">
+      <div class="value-card-label">效率提升</div>
+      <h3>从多平台切换到一站式体验</h3>
+      <p>将 Bangumi 的数据管理、豆瓣的评分参考、B站的观看入口、萌娘百科的中文资料整合到统一界面中。用户无需在 5+ 个平台间来回切换，大幅提升追番效率。</p>
+    </div>
+  </div>
+</section>
+
+<!-- Tech Stack -->
+<section class="section tech">
+  <div class="reveal">
+    <div class="section-label">05 — 技术栈</div>
+    <h2 class="section-title" style="text-align: center;">Built with modern tools</h2>
+  </div>
+  <div class="tech-pills reveal">
+    <span class="tech-pill">Vue 3</span>
+    <span class="tech-pill">Vite</span>
+    <span class="tech-pill">Pinia</span>
+    <span class="tech-pill">TailwindCSS</span>
+    <span class="tech-pill">DaisyUI</span>
+    <span class="tech-pill">GSAP</span>
+    <span class="tech-pill">Hono</span>
+    <span class="tech-pill">Cloudflare Pages Functions</span>
+    <span class="tech-pill">Bangumi API v0</span>
+    <span class="tech-pill">网页抓取</span>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <div class="cta-bg"></div>
+  <div class="cta-content reveal">
+    <h2 class="cta-title">开始你的<em>追番之旅</em></h2>
+    <p class="cta-text">Bangmio 已上线运行，立即访问体验一站式追番社区。也可在 GitHub 查看源码，欢迎提出建议和反馈。</p>
+    <div class="cta-actions">
+      <a href="https://bangmio.pages.dev" target="_blank" class="btn btn-primary">
+        访问 Bangmio
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <a href="https://github.com/sparkmio/Bangmio" target="_blank" class="btn btn-ghost">
+        查看源码
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <p class="footer-text">Bangmio — TRAE AI 创造力大赛参赛作品 · <a href="https://github.com/sparkmio/Bangmio">GitHub</a> · <a href="https://bangmio.pages.dev">bangmio.pages.dev</a></p>
+</footer>
+
+<script>
+// Scroll reveal
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// Nav shrink on scroll
+const nav = document.querySelector('.nav');
+window.addEventListener('scroll', () => {
+  if (window.scrollY > 60) {
+    nav.style.padding = '0.6rem 2rem';
+  } else {
+    nav.style.padding = '1rem 2rem';
+  }
+});
+</script>
+
+</body>
+</html>

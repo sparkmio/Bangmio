@@ -4,101 +4,101 @@ const routes = [
   {
     path: '/',
     name: 'Home',
-    component: () => import('../views/Home.vue')
+    component: () => import(/* webpackChunkName: "home" */ '../views/Home.vue')
   },
   {
     path: '/trending',
     name: 'Trending',
-    component: () => import('../views/Trending.vue')
+    component: () => import(/* webpackChunkName: "trending" */ '../views/Trending.vue')
   },
   {
     path: '/anime',
     name: 'Browse',
-    component: () => import('../views/Browse.vue')
+    component: () => import(/* webpackChunkName: "browse" */ '../views/Browse.vue')
   },
   {
     path: '/anime/:id',
     name: 'Detail',
-    component: () => import('../views/Detail.vue')
+    component: () => import(/* webpackChunkName: "anime-detail" */ '../views/Detail.vue')
   },
   {
     path: '/character/:id',
     name: 'Character',
-    component: () => import('../views/Character.vue')
+    component: () => import(/* webpackChunkName: "character" */ '../views/Character.vue')
   },
   {
     path: '/person/:id',
     name: 'Person',
-    component: () => import('../views/Person.vue')
+    component: () => import(/* webpackChunkName: "person" */ '../views/Person.vue')
   },
   {
     path: '/anime/:id/talkbox',
     name: 'SubjectTalkbox',
-    component: () => import('../views/Talkbox.vue'),
+    component: () => import(/* webpackChunkName: "subject-talkbox" */ '../views/Talkbox.vue'),
     props: { type: 'subject' }
   },
   {
     path: '/anime/:id/topics',
     name: 'SubjectTopics',
-    component: () => import('../views/TopicBoard.vue')
+    component: () => import(/* webpackChunkName: "subject-topics" */ '../views/TopicBoard.vue')
   },
   {
     path: '/person/:id/talkbox',
     name: 'PersonTalkbox',
-    component: () => import('../views/Talkbox.vue'),
+    component: () => import(/* webpackChunkName: "person-talkbox" */ '../views/Talkbox.vue'),
     props: { type: 'person' }
   },
   {
     path: '/topic/:id',
     name: 'TopicDetail',
-    component: () => import('../views/TopicDetail.vue')
+    component: () => import(/* webpackChunkName: "topic-detail" */ '../views/TopicDetail.vue')
   },
   {
     path: '/login',
     name: 'Login',
-    component: () => import('../views/Login.vue')
+    component: () => import(/* webpackChunkName: "login" */ '../views/Login.vue')
   },
   {
     path: '/login/callback',
     name: 'LoginCallback',
-    component: () => import('../views/LoginCallback.vue')
+    component: () => import(/* webpackChunkName: "login-callback" */ '../views/LoginCallback.vue')
   },
   {
     path: '/profile',
     name: 'Profile',
-    component: () => import('../views/Profile.vue'),
+    component: () => import(/* webpackChunkName: "profile" */ '../views/Profile.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/profile/:username',
     name: 'UserProfile',
-    component: () => import('../views/Profile.vue')
+    component: () => import(/* webpackChunkName: "user-profile" */ '../views/Profile.vue')
   },
   {
     path: '/about',
     name: 'About',
-    component: () => import('../views/About.vue')
+    component: () => import(/* webpackChunkName: "about" */ '../views/About.vue')
   },
   {
     path: '/watching',
     name: 'Watching',
-    component: () => import('../views/Watching.vue'),
+    component: () => import(/* webpackChunkName: "watching" */ '../views/Watching.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/groups',
     name: 'Groups',
-    component: () => import('../views/Groups.vue')
+    component: () => import(/* webpackChunkName: "groups" */ '../views/Groups.vue')
   },
   {
     path: '/group/:id',
     name: 'GroupDetail',
-    component: () => import('../views/GroupDetail.vue')
+    component: () => import(/* webpackChunkName: "group-detail" */ '../views/GroupDetail.vue')
   },
   {
     path: '/settings',
     name: 'Settings',
-    component: () => import('../views/Settings.vue')
+    component: () => import(/* webpackChunkName: "settings" */ '../views/Settings.vue')
   }
 ]
 

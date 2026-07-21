@@ -6,9 +6,11 @@
         :key="toast.id"
         :class="[
           'alert shadow-lg text-sm min-w-60',
-          toast.type === 'success' ? 'alert-success' :
-          toast.type === 'error' ? 'alert-error' :
-          'alert-info'
+          toast.type === 'success'
+            ? 'alert-success'
+            : toast.type === 'error'
+              ? 'alert-error'
+              : 'alert-info'
         ]"
       >
         <span>{{ toast.message }}</span>

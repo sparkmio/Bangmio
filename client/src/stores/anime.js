@@ -39,7 +39,9 @@ export const useAnimeStore = defineStore('anime', () => {
     try {
       const res = await collectionAPI.getStats()
       stats.value = res.data.data
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   function getCollection(animeId) {
@@ -47,7 +49,12 @@ export const useAnimeStore = defineStore('anime', () => {
   }
 
   return {
-    collections, stats,
-    fetchCollection, saveCollection, removeCollection, fetchStats, getCollection
+    collections,
+    stats,
+    fetchCollection,
+    saveCollection,
+    removeCollection,
+    fetchStats,
+    getCollection
   }
 })

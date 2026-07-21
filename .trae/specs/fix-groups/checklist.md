@@ -1,0 +1,21 @@
+# Checklist
+
+- [x] server/src/routes/groups.js 实现了 fetchHTMLWithRetry 多源重试
+- [x] server/src/routes/groups.js 使用了 5 分钟内存缓存
+- [x] server/src/routes/groups.js 兜底列表精简为 8 个高活跃小组
+- [x] GET /groups 可返回真实抓取或兜底小组列表
+- [x] GET /groups/:id 在抓取失败时返回含 name/url/topics[] 的兜底对象
+- [x] HTML 解析器能匹配 Bangumi 当前 DOM 结构
+- [x] client/src/views/Groups.vue 卡片圆角为 rounded-xl
+- [x] client/src/views/Groups.vue hover 阴影为 shadow-hover
+- [x] client/src/views/Groups.vue 搜索按钮可触发服务端搜索
+- [x] client/src/views/Groups.vue 空搜索框恢复全量列表
+- [x] client/src/views/Groups.vue 无结果提示含 Bangumi 原站链接
+- [x] client/src/views/GroupDetail.vue 信息卡片圆角为 rounded-xl
+- [x] client/src/views/GroupDetail.vue 话题为空提示含 Bangumi 原站链接
+- [x] client/src/views/GroupDetail.vue 加载失败时显示原站链接
+- [x] client/src/api/endpoints.js 中 groupAPI 新增 search 方法
+- [x] npm run build 无报错
+- [x] Cloudflare Pages 部署成功
+- [x] 线上小组列表页可加载
+- [x] 线上小组详情页可加载

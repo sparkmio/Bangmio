@@ -5,16 +5,41 @@
   "type": "module",
   "scripts": {
     "dev": "npm run dev --prefix client",
-    "build": "npm run server:build && cd client && npm install --no-audit --no-fund && npm run build",
-    "server:build": "npx esbuild server/src/app.js --bundle --platform=node --format=esm --outfile=functions/api/_server.js",
-    "postinstall": "npm install --prefix client"
+    "dev:server": "node --watch server/src/app.js",
+    "dev:all": "concurrently -n server,client -c yellow,cyan \"npm:dev:server\" \"npm:dev\"",
+    "build": "npm run server:build && npm run bundle:size && cd client && npm install --no-audit --no-fund && npm run build",
+    "server:build": "npx esbuild server/src/app.js --bundle --platform=node --format=esm --outfile=functions/api/_server.js --metafile=functions/api/_meta.json",
+    "bundle:size": "node scripts/bundle-size.mjs",
+    "postinstall": "npm install --prefix client",
+    "prepare": "husky",
+    "lint": "eslint . --ext .js,.vue",
+    "lint:fix": "eslint . --ext .js,.vue --fix",
+    "format": "prettier --write \"**/*.{js,vue,json,css,md}\"",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
-    "esbuild": "^0.28.1"
+    "concurrently": "^9.1.0",
+    "esbuild": "^0.28.1",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^9.27.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.3.3",
+    "vitest": "^2.1.8"
   },
   "dependencies": {
-    "cheerio": "^1.2.0",
     "hono": "^4.12.27",
     "linkedom": "^0.18.12"
+  },
+  "lint-staged": {
+    "*.{js,vue}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,css,md}": [
+      "prettier --write"
+    ]
   }
 }

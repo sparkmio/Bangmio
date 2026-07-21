@@ -3,38 +3,76 @@
     <!-- 未登录且未指定用户名时提示 -->
     <div v-if="!auth.isLoggedIn && !route.params.username" class="py-20 text-center">
       <p class="text-base-content/50 mb-3">请先登录</p>
-      <router-link to="/login" class="btn btn-primary btn-sm">登录 Bangmio</router-link>
+      <router-link to="/login" class="btn btn-primary btn-sm"> 登录 Bangmio </router-link>
     </div>
 
     <div v-else>
       <!-- 用户卡 -->
       <div class="card bg-base-100 border border-base-300 mb-4 overflow-hidden">
-        <div class="h-16 bg-gradient-to-r from-primary/30 via-secondary/20 to-accent/30"></div>
+        <div class="h-16 bg-gradient-to-r from-primary/30 via-secondary/20 to-accent/30" />
         <div class="card-body p-4 pt-0">
           <div class="flex flex-col sm:flex-row sm:items-end gap-3 -mt-8">
             <div class="avatar shrink-0">
               <div class="w-16 h-16 rounded-xl ring-4 ring-base-100 shadow-lg">
-                <img v-if="profileUser?.avatar?.large" :src="profileUser.avatar.large" />
-                <div v-else class="w-16 h-16 rounded-xl bg-primary text-primary-content flex items-center justify-center text-2xl font-bold">
-                  {{ profileUser?.nickname?.[0] || profileUser?.username?.[0]?.toUpperCase() || '?' }}
+                <img
+                  v-if="profileUser?.avatar?.large"
+                  :src="profileUser.avatar.large"
+                  :alt="profileUser?.nickname || profileUser?.username || ''"
+                  decoding="async"
+                />
+                <div
+                  v-else
+                  class="w-16 h-16 rounded-xl bg-primary text-primary-content flex items-center justify-center text-2xl font-bold"
+                >
+                  {{
+                    profileUser?.nickname?.[0] || profileUser?.username?.[0]?.toUpperCase() || '?'
+                  }}
                 </div>
               </div>
             </div>
             <div class="flex-1 min-w-0 pb-1">
               <div class="flex items-center gap-2 flex-wrap">
-                <h1 class="text-xl font-bold text-base-content">{{ profileUser?.nickname || profileUser?.username }}</h1>
-                <span v-if="profileUser?.user_group" class="badge badge-sm badge-outline">{{ profileUser.user_group }}</span>
+                <h1 class="text-xl font-bold text-base-content">
+                  {{ profileUser?.nickname || profileUser?.username }}
+                </h1>
+                <span v-if="profileUser?.user_group" class="badge badge-sm badge-outline">{{
+                  profileUser.user_group
+                }}</span>
               </div>
-              <p class="text-sm text-base-content/50 mt-0.5">@{{ profileUser?.username }} · UID: {{ profileUser?.id }}</p>
-              <p v-if="profileUser?.sign" class="text-sm mt-2 text-base-content/70 line-clamp-2">{{ profileUser.sign }}</p>
+              <p class="text-sm text-base-content/50 mt-0.5">
+                @{{ profileUser?.username }} · UID: {{ profileUser?.id }}
+              </p>
+              <p v-if="profileUser?.sign" class="text-sm mt-2 text-base-content/70 line-clamp-2">
+                {{ profileUser.sign }}
+              </p>
               <div class="flex gap-4 mt-2 text-xs text-base-content/40 flex-wrap items-center">
                 <span v-if="profileUser?.join_date">加入于 {{ profileUser.join_date }}</span>
-                <a v-if="profileUser?.website" :href="profileUser.website" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 link link-hover text-primary/70 hover:text-primary truncate max-w-[200px]">
-                  <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                <a
+                  v-if="profileUser?.website"
+                  :href="profileUser.website"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center gap-1 link link-hover text-primary/70 hover:text-primary truncate max-w-[200px]"
+                >
+                  <svg
+                    class="w-3 h-3 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                    />
+                  </svg>
                   <span class="truncate">{{ profileUser.website }}</span>
                 </a>
               </div>
-              <p v-if="profileUser?.bio" class="text-sm mt-2 text-base-content/60 line-clamp-3">{{ profileUser.bio }}</p>
+              <p v-if="profileUser?.bio" class="text-sm mt-2 text-base-content/60 line-clamp-3">
+                {{ profileUser.bio }}
+              </p>
             </div>
           </div>
         </div>
@@ -46,9 +84,13 @@
           <button
             v-for="tab in navTabs"
             :key="tab.label"
-            @click="handleNavClick(tab)"
             class="px-3 py-2 text-sm whitespace-nowrap transition-colors rounded-lg"
-            :class="tab.label === '时光机' ? 'text-primary font-medium bg-primary/10' : 'text-base-content/60 hover:text-base-content hover:bg-base-200'"
+            :class="
+              tab.label === '时光机'
+                ? 'text-primary font-medium bg-primary/10'
+                : 'text-base-content/60 hover:text-base-content hover:bg-base-200'
+            "
+            @click="handleNavClick(tab)"
           >
             {{ tab.label }}
           </button>
@@ -71,7 +113,10 @@
                 <h2 class="text-base font-bold text-base-content">我的{{ config.label }}</h2>
                 <div class="flex items-center gap-3 text-xs text-base-content/50 flex-wrap">
                   <span v-for="s in config.statuses" :key="s.type">
-                    {{ s.label }} <span class="text-base-content font-medium">{{ statusCounts[subjectType]?.[s.type] || 0 }}</span>
+                    {{ s.label }}
+                    <span class="text-base-content font-medium">{{
+                      statusCounts[subjectType]?.[s.type] || 0
+                    }}</span>
                   </span>
                 </div>
               </div>
@@ -80,11 +125,17 @@
               <div v-for="s in config.statuses" :key="s.type" class="mb-4 last:mb-0">
                 <div class="flex items-center justify-between mb-2">
                   <span class="text-sm font-medium text-base-content">{{ s.label }}</span>
-                  <span v-if="groupedCollections[subjectType]?.[s.type]?.length" class="text-xs text-base-content/40">
+                  <span
+                    v-if="groupedCollections[subjectType]?.[s.type]?.length"
+                    class="text-xs text-base-content/40"
+                  >
                     {{ groupedCollections[subjectType][s.type].length }} 部
                   </span>
                 </div>
-                <div v-if="groupedCollections[subjectType]?.[s.type]?.length" class="flex gap-2 overflow-x-auto pb-1">
+                <div
+                  v-if="groupedCollections[subjectType]?.[s.type]?.length"
+                  class="flex gap-2 overflow-x-auto pb-1"
+                >
                   <router-link
                     v-for="col in groupedCollections[subjectType][s.type]"
                     :key="col.subject?.id || col.anime_id"
@@ -92,24 +143,47 @@
                     class="shrink-0 group"
                     :title="col.subject?.name_cn || col.subject?.name"
                   >
-                    <div class="w-[72px] h-[100px] rounded-md overflow-hidden bg-base-200 shadow-sm relative">
+                    <div
+                      class="w-[72px] h-[100px] rounded-md overflow-hidden bg-base-200 shadow-sm relative"
+                    >
                       <img
-                        v-if="col.subject?.images?.common || col.subject?.images?.grid || col.subject?.images?.medium"
-                        :src="col.subject?.images?.common || col.subject?.images?.grid || col.subject?.images?.medium"
+                        v-if="
+                          col.subject?.images?.common ||
+                          col.subject?.images?.grid ||
+                          col.subject?.images?.medium
+                        "
+                        :src="
+                          col.subject?.images?.common ||
+                          col.subject?.images?.grid ||
+                          col.subject?.images?.medium
+                        "
                         :alt="col.subject?.name_cn || col.subject?.name"
                         class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                         loading="lazy"
+                        decoding="async"
                       />
-                      <div v-else class="w-full h-full flex items-center justify-center text-xs text-base-content/40 p-2 text-center">
+                      <div
+                        v-else
+                        class="w-full h-full flex items-center justify-center text-xs text-base-content/40 p-2 text-center"
+                      >
                         {{ col.subject?.name_cn || col.subject?.name || '无封面' }}
                       </div>
                       <!-- 评分角标 -->
-                      <div v-if="col.rate" class="absolute top-1 right-1 px-1 py-0.5 bg-black/70 rounded text-[10px] font-bold text-amber-400 flex items-center gap-0.5">
-                        <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                      <div
+                        v-if="col.rate"
+                        class="absolute top-1 right-1 px-1 py-0.5 bg-black/70 rounded text-[10px] font-bold text-amber-400 flex items-center gap-0.5"
+                      >
+                        <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path
+                            d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
+                          />
+                        </svg>
                         {{ col.rate }}
                       </div>
                     </div>
-                    <p class="text-[10px] text-center mt-1 text-base-content/60 line-clamp-1 w-[72px] group-hover:text-primary transition-colors">
+                    <p
+                      class="text-[10px] text-center mt-1 text-base-content/60 line-clamp-1 w-[72px] group-hover:text-primary transition-colors"
+                    >
                       {{ col.subject?.name_cn || col.subject?.name }}
                     </p>
                   </router-link>
@@ -132,18 +206,30 @@
                   target="_blank"
                   rel="noopener noreferrer"
                   class="text-xs text-base-content/40 hover:text-primary"
-                >...more</a>
+                  >...more</a
+                >
               </div>
               <div v-if="timeline.length" class="relative">
-                <div class="absolute left-[5px] top-1 bottom-1 w-px bg-base-300"></div>
+                <div class="absolute left-[5px] top-1 bottom-1 w-px bg-base-300" />
                 <div v-for="(item, i) in timeline" :key="i" class="relative pl-6 pb-3 last:pb-0">
-                  <div class="absolute left-0 top-1.5 w-[11px] h-[11px] rounded-full bg-primary ring-2 ring-base-100"></div>
-                  <router-link :to="`/anime/${item.subject_id || item.subject?.id || item.anime_id}`" class="block hover:text-primary transition-colors">
+                  <div
+                    class="absolute left-0 top-1.5 w-[11px] h-[11px] rounded-full bg-primary ring-2 ring-base-100"
+                  />
+                  <router-link
+                    :to="`/anime/${item.subject_id || item.subject?.id || item.anime_id}`"
+                    class="block hover:text-primary transition-colors"
+                  >
                     <div class="flex items-center gap-2 text-sm flex-wrap">
-                      <span class="badge badge-xs" :class="timelineBadgeClass(item)">{{ timelineTypeLabel(item) }}</span>
-                      <span class="font-medium line-clamp-1">{{ item.subject_name || item.subject?.name_cn || item.subject?.name }}</span>
+                      <span class="badge badge-xs" :class="timelineBadgeClass(item)">{{
+                        timelineTypeLabel(item)
+                      }}</span>
+                      <span class="font-medium line-clamp-1">{{
+                        item.subject_name || item.subject?.name_cn || item.subject?.name
+                      }}</span>
                     </div>
-                    <p class="text-xs text-base-content/40 mt-0.5">{{ formatRelativeTime(item.time || item.updated_at || item.created_at) }}</p>
+                    <p class="text-xs text-base-content/40 mt-0.5">
+                      {{ formatRelativeTime(item.time || item.updated_at || item.created_at) }}
+                    </p>
                   </router-link>
                 </div>
               </div>
@@ -159,9 +245,13 @@
                 <button
                   v-for="tab in statsTabs"
                   :key="tab.value"
-                  @click="statsFilter = tab.value"
                   class="px-3 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors"
-                  :class="statsFilter === tab.value ? 'border-primary text-primary' : 'border-transparent text-base-content/50 hover:text-base-content'"
+                  :class="
+                    statsFilter === tab.value
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-base-content/50 hover:text-base-content'
+                  "
+                  @click="statsFilter = tab.value"
                 >
                   {{ tab.label }}
                 </button>
@@ -170,11 +260,15 @@
               <!-- 6 彩色统计卡片 -->
               <div class="grid grid-cols-2 gap-2 mb-4">
                 <div class="rounded-2xl border border-pink-500/30 bg-pink-500/10 p-3">
-                  <p class="text-xl font-bold text-pink-700">{{ computedStats.total }}</p>
+                  <p class="text-xl font-bold text-pink-700">
+                    {{ computedStats.total }}
+                  </p>
                   <p class="text-xs text-pink-600 mt-1">收藏数</p>
                 </div>
                 <div class="rounded-2xl border border-green-500/30 bg-green-500/10 p-3">
-                  <p class="text-xl font-bold text-green-700">{{ computedStats.completed }}</p>
+                  <p class="text-xl font-bold text-green-700">
+                    {{ computedStats.completed }}
+                  </p>
                   <p class="text-xs text-green-600 mt-1">完成数</p>
                 </div>
                 <div class="rounded-2xl border border-blue-500/30 bg-blue-500/10 p-3">
@@ -182,15 +276,21 @@
                   <p class="text-xs text-blue-600 mt-1">完成率</p>
                 </div>
                 <div class="rounded-2xl border border-orange-500/30 bg-orange-500/10 p-3">
-                  <p class="text-xl font-bold text-orange-700">{{ computedStats.avg }}</p>
+                  <p class="text-xl font-bold text-orange-700">
+                    {{ computedStats.avg }}
+                  </p>
                   <p class="text-xs text-orange-600 mt-1">平均分</p>
                 </div>
                 <div class="rounded-2xl border border-purple-500/30 bg-purple-500/10 p-3">
-                  <p class="text-2xl font-bold text-purple-700">{{ computedStats.stdDev }}</p>
+                  <p class="text-2xl font-bold text-purple-700">
+                    {{ computedStats.stdDev }}
+                  </p>
                   <p class="text-xs text-purple-600 mt-1">标准差</p>
                 </div>
                 <div class="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-3">
-                  <p class="text-xl font-bold text-cyan-700">{{ computedStats.rateTotal }}</p>
+                  <p class="text-xl font-bold text-cyan-700">
+                    {{ computedStats.rateTotal }}
+                  </p>
                   <p class="text-xs text-cyan-600 mt-1">评分数</p>
                 </div>
               </div>
@@ -202,19 +302,30 @@
                   <span>共 {{ computedStats.rateTotal }} 条评分</span>
                 </div>
                 <div v-for="r in rateDistribution" :key="r.rate" class="flex items-center gap-2">
-                  <span class="text-xs w-6 text-right text-base-content/70 flex items-center justify-end gap-0.5">
+                  <span
+                    class="text-xs w-6 text-right text-base-content/70 flex items-center justify-end gap-0.5"
+                  >
                     {{ r.rate }}
-                    <svg class="w-2.5 h-2.5 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                    <svg class="w-2.5 h-2.5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path
+                        d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
+                      />
+                    </svg>
                   </span>
                   <div class="flex-1 bg-base-200 rounded h-4 overflow-hidden relative">
                     <div
                       class="h-full transition-all duration-500"
                       :class="rateBarClass(r.rate)"
                       :style="{ width: Math.max(r.percent, r.count > 0 ? 4 : 0) + '%' }"
-                    ></div>
-                    <span class="absolute inset-0 flex items-center justify-end pr-2 text-[10px] font-medium text-base-content/60">{{ r.percent }}%</span>
+                    />
+                    <span
+                      class="absolute inset-0 flex items-center justify-end pr-2 text-[10px] font-medium text-base-content/60"
+                      >{{ r.percent }}%</span
+                    >
                   </div>
-                  <span class="text-xs w-6 text-right text-base-content font-medium shrink-0">{{ r.count }}</span>
+                  <span class="text-xs w-6 text-right text-base-content font-medium shrink-0">{{
+                    r.count
+                  }}</span>
                 </div>
               </div>
               <div v-else class="text-xs text-base-content/40 py-2">暂无评分数据</div>
@@ -222,7 +333,7 @@
           </div>
 
           <!-- 我的朋友 -->
-          <div id="friends" v-if="friends.length" class="card bg-base-100 border border-base-300">
+          <div v-if="friends.length" id="friends" class="card bg-base-100 border border-base-300">
             <div class="card-body p-4">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-bold text-base-content/70">/ 我的朋友</h3>
@@ -231,7 +342,8 @@
                   target="_blank"
                   rel="noopener noreferrer"
                   class="text-xs text-base-content/40 hover:text-primary"
-                >...more</a>
+                  >...more</a
+                >
               </div>
               <div class="grid grid-cols-6 gap-2">
                 <router-link
@@ -240,20 +352,34 @@
                   :to="`/profile/${f.username}`"
                   class="block text-center group"
                 >
-                  <div class="w-10 h-10 mx-auto rounded-full overflow-hidden bg-base-200 ring-2 ring-base-100 shadow-sm group-hover:ring-primary transition">
-                    <img v-if="f.avatar" :src="f.avatar" :alt="f.nickname" class="w-full h-full object-cover" loading="lazy" />
-                    <div v-else class="w-full h-full flex items-center justify-center text-lg font-bold text-base-content/50">
+                  <div
+                    class="w-10 h-10 mx-auto rounded-full overflow-hidden bg-base-200 ring-2 ring-base-100 shadow-sm group-hover:ring-primary transition"
+                  >
+                    <img
+                      v-if="f.avatar"
+                      :src="f.avatar"
+                      :alt="f.nickname"
+                      class="w-full h-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <div
+                      v-else
+                      class="w-full h-full flex items-center justify-center text-lg font-bold text-base-content/50"
+                    >
                       {{ f.nickname?.[0] || f.username?.[0]?.toUpperCase() || '?' }}
                     </div>
                   </div>
-                  <p class="text-xs mt-1 line-clamp-1 group-hover:text-primary transition-colors">{{ f.nickname || f.username }}</p>
+                  <p class="text-xs mt-1 line-clamp-1 group-hover:text-primary transition-colors">
+                    {{ f.nickname || f.username }}
+                  </p>
                 </router-link>
               </div>
             </div>
           </div>
 
           <!-- 我参加的小组 -->
-          <div id="groups" v-if="groups.length" class="card bg-base-100 border border-base-300">
+          <div v-if="groups.length" id="groups" class="card bg-base-100 border border-base-300">
             <div class="card-body p-4">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-bold text-base-content/70">/ 我参加的小组</h3>
@@ -262,7 +388,8 @@
                   target="_blank"
                   rel="noopener noreferrer"
                   class="text-xs text-base-content/40 hover:text-primary"
-                >...more</a>
+                  >...more</a
+                >
               </div>
               <div class="space-y-3">
                 <router-link
@@ -271,12 +398,30 @@
                   :to="`/group/${g.id}`"
                   class="flex items-center gap-3 group"
                 >
-                  <div class="w-8 h-8 rounded-full overflow-hidden bg-base-200 shrink-0 ring-2 ring-base-100 group-hover:ring-primary transition">
-                    <img v-if="g.avatar" :src="g.avatar" :alt="g.name" class="w-full h-full object-cover" loading="lazy" />
-                    <div v-else class="w-full h-full flex items-center justify-center text-xs text-base-content/40">{{ g.name?.[0] || '?' }}</div>
+                  <div
+                    class="w-8 h-8 rounded-full overflow-hidden bg-base-200 shrink-0 ring-2 ring-base-100 group-hover:ring-primary transition"
+                  >
+                    <img
+                      v-if="g.avatar"
+                      :src="g.avatar"
+                      :alt="g.name"
+                      class="w-full h-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <div
+                      v-else
+                      class="w-full h-full flex items-center justify-center text-xs text-base-content/40"
+                    >
+                      {{ g.name?.[0] || '?' }}
+                    </div>
                   </div>
                   <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium truncate group-hover:text-primary transition-colors">{{ g.name }}</p>
+                    <p
+                      class="text-sm font-medium truncate group-hover:text-primary transition-colors"
+                    >
+                      {{ g.name }}
+                    </p>
                     <p class="text-xs text-base-content/40">{{ g.member_count || 0 }} 成员</p>
                   </div>
                 </router-link>
@@ -285,7 +430,7 @@
           </div>
 
           <!-- 我的目录 -->
-          <div id="indexes" v-if="indexes.length" class="card bg-base-100 border border-base-300">
+          <div v-if="indexes.length" id="indexes" class="card bg-base-100 border border-base-300">
             <div class="card-body p-4">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-bold text-base-content/70">/ 我的目录</h3>
@@ -294,7 +439,8 @@
                   target="_blank"
                   rel="noopener noreferrer"
                   class="text-xs text-base-content/40 hover:text-primary"
-                >...more</a>
+                  >...more</a
+                >
               </div>
               <div class="space-y-2">
                 <a
@@ -312,7 +458,11 @@
           </div>
 
           <!-- 我收藏的人物 -->
-          <div id="characters" v-if="characters.length || persons.length" class="card bg-base-100 border border-base-300">
+          <div
+            v-if="characters.length || persons.length"
+            id="characters"
+            class="card bg-base-100 border border-base-300"
+          >
             <div class="card-body p-4">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm font-bold text-base-content/70">/ 我收藏的人物</h3>
@@ -321,7 +471,8 @@
                   target="_blank"
                   rel="noopener noreferrer"
                   class="text-xs text-base-content/40 hover:text-primary"
-                >...more</a>
+                  >...more</a
+                >
               </div>
               <div class="grid grid-cols-6 gap-2">
                 <router-link
@@ -330,11 +481,27 @@
                   :to="`/character/${char.id}`"
                   class="block text-center group"
                 >
-                  <div class="w-14 h-14 mx-auto rounded overflow-hidden bg-base-200 shadow-sm group-hover:ring-2 group-hover:ring-primary transition">
-                    <img v-if="char.images?.medium" :src="char.images.medium" :alt="char.name" class="w-full h-full object-cover" loading="lazy" />
-                    <div v-else class="w-full h-full flex items-center justify-center text-xs text-base-content/50">{{ char.name?.[0] || '?' }}</div>
+                  <div
+                    class="w-14 h-14 mx-auto rounded overflow-hidden bg-base-200 shadow-sm group-hover:ring-2 group-hover:ring-primary transition"
+                  >
+                    <img
+                      v-if="char.images?.medium"
+                      :src="char.images.medium"
+                      :alt="char.name"
+                      class="w-full h-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <div
+                      v-else
+                      class="w-full h-full flex items-center justify-center text-xs text-base-content/50"
+                    >
+                      {{ char.name?.[0] || '?' }}
+                    </div>
                   </div>
-                  <p class="text-xs mt-1 line-clamp-1 group-hover:text-primary transition-colors">{{ char.name }}</p>
+                  <p class="text-xs mt-1 line-clamp-1 group-hover:text-primary transition-colors">
+                    {{ char.name }}
+                  </p>
                 </router-link>
                 <router-link
                   v-for="person in persons.slice(0, 10)"
@@ -342,11 +509,27 @@
                   :to="`/person/${person.id}`"
                   class="block text-center group"
                 >
-                  <div class="w-14 h-14 mx-auto rounded overflow-hidden bg-base-200 shadow-sm group-hover:ring-2 group-hover:ring-primary transition">
-                    <img v-if="person.images?.medium" :src="person.images.medium" :alt="person.name" class="w-full h-full object-cover" loading="lazy" />
-                    <div v-else class="w-full h-full flex items-center justify-center text-xs text-base-content/50">{{ person.name?.[0] || '?' }}</div>
+                  <div
+                    class="w-14 h-14 mx-auto rounded overflow-hidden bg-base-200 shadow-sm group-hover:ring-2 group-hover:ring-primary transition"
+                  >
+                    <img
+                      v-if="person.images?.medium"
+                      :src="person.images.medium"
+                      :alt="person.name"
+                      class="w-full h-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <div
+                      v-else
+                      class="w-full h-full flex items-center justify-center text-xs text-base-content/50"
+                    >
+                      {{ person.name?.[0] || '?' }}
+                    </div>
                   </div>
-                  <p class="text-xs mt-1 line-clamp-1 group-hover:text-primary transition-colors">{{ person.name }}</p>
+                  <p class="text-xs mt-1 line-clamp-1 group-hover:text-primary transition-colors">
+                    {{ person.name }}
+                  </p>
                 </router-link>
               </div>
             </div>
@@ -362,7 +545,14 @@
                   rel="noopener noreferrer"
                   class="inline-flex items-center gap-1.5 text-primary hover:underline"
                 >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 5c7.18 0 13 5.82 13 13M6 11a7 7 0 017 7m-6 0a1 1 0 11-2 0 1 1 0 012 0z"/></svg>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M6 5c7.18 0 13 5.82 13 13M6 11a7 7 0 017 7m-6 0a1 1 0 11-2 0 1 1 0 012 0z"
+                    />
+                  </svg>
                   RSS2.0
                 </a>
                 <a
@@ -371,7 +561,14 @@
                   rel="noopener noreferrer"
                   class="inline-flex items-center gap-1.5 text-primary hover:underline"
                 >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                    />
+                  </svg>
                   我的维基编辑
                 </a>
               </div>
@@ -489,13 +686,15 @@ function statusLabel(s) {
 }
 
 function statusBadgeClass(s) {
-  return {
-    1: 'badge-info',
-    2: 'badge-secondary',
-    3: 'badge-success',
-    4: 'badge-warning',
-    5: 'badge-error'
-  }[s] || 'badge-ghost'
+  return (
+    {
+      1: 'badge-info',
+      2: 'badge-secondary',
+      3: 'badge-success',
+      4: 'badge-warning',
+      5: 'badge-error'
+    }[s] || 'badge-ghost'
+  )
 }
 
 // timeline 项类型标签：兼容字符串与数字
@@ -507,7 +706,7 @@ function timelineTypeLabel(item) {
 // timeline 项 badge 样式
 function timelineBadgeClass(item) {
   if (typeof item.type === 'number') return statusBadgeClass(item.type)
-  const map = { '收藏': 'badge-info', '评论': 'badge-secondary', '进度': 'badge-success' }
+  const map = { 收藏: 'badge-info', 评论: 'badge-secondary', 进度: 'badge-success' }
   return map[item.type] || 'badge-ghost'
 }
 
@@ -523,7 +722,9 @@ function formatRelativeTime(t) {
     if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`
     if (diff < 2592000) return `${Math.floor(diff / 86400)}天前`
     return `${d.getMonth() + 1}月${d.getDate()}日`
-  } catch { return '' }
+  } catch {
+    return ''
+  }
 }
 
 // 评分条颜色：10-9 绿/蓝，8-7 青，6-5 黄，4-3 橙，2-1 红
@@ -577,7 +778,9 @@ async function loadProfile() {
     try {
       const res = await userAPI.getUser(username)
       profileUser.value = res.data?.data
-    } catch { profileUser.value = null }
+    } catch {
+      profileUser.value = null
+    }
   } else {
     profileUser.value = auth.user
   }
@@ -594,18 +797,22 @@ async function fetchTimeline() {
         timeline.value = data.slice(0, 20)
         return
       }
-    } catch { /* 回退 */ }
+    } catch {
+      /* 回退 */
+    }
   }
   try {
     const params = { limit: 20 }
     if (route.params.username) params.username = route.params.username
     const res = await collectionAPI.getList(params)
     const list = res.data?.data || []
-    timeline.value = list.sort((a, b) => {
-      const ta = new Date(a.updated_at || a.created_at || 0).getTime()
-      const tb = new Date(b.updated_at || b.created_at || 0).getTime()
-      return tb - ta
-    }).slice(0, 20)
+    timeline.value = list
+      .sort((a, b) => {
+        const ta = new Date(a.updated_at || a.created_at || 0).getTime()
+        const tb = new Date(b.updated_at || b.created_at || 0).getTime()
+        return tb - ta
+      })
+      .slice(0, 20)
   } catch {
     timeline.value = []
   }
@@ -614,7 +821,10 @@ async function fetchTimeline() {
 // 我的目录
 async function fetchIndexes() {
   const username = currentUsername.value
-  if (!username) { indexes.value = []; return }
+  if (!username) {
+    indexes.value = []
+    return
+  }
   try {
     const res = await userAPI.getIndexes(username)
     indexes.value = res.data?.data || []
@@ -626,7 +836,10 @@ async function fetchIndexes() {
 // 收藏角色
 async function fetchCharacters() {
   const username = currentUsername.value
-  if (!username) { characters.value = []; return }
+  if (!username) {
+    characters.value = []
+    return
+  }
   try {
     const res = await userAPI.getCharacters(username)
     characters.value = res.data?.data || []
@@ -638,7 +851,10 @@ async function fetchCharacters() {
 // 收藏人物
 async function fetchPersons() {
   const username = currentUsername.value
-  if (!username) { persons.value = []; return }
+  if (!username) {
+    persons.value = []
+    return
+  }
   try {
     const res = await userAPI.getPersons(username)
     persons.value = res.data?.data || []
@@ -650,7 +866,10 @@ async function fetchPersons() {
 // 好友
 async function fetchFriends() {
   const username = currentUsername.value
-  if (!username) { friends.value = []; return }
+  if (!username) {
+    friends.value = []
+    return
+  }
   try {
     const res = await userAPI.getFriends(username)
     friends.value = res.data?.data || []
@@ -662,7 +881,10 @@ async function fetchFriends() {
 // 参加的小组
 async function fetchGroups() {
   const username = currentUsername.value
-  if (!username) { groups.value = []; return }
+  if (!username) {
+    groups.value = []
+    return
+  }
   try {
     const res = await userAPI.getGroups(username)
     groups.value = res.data?.data || []
@@ -731,7 +953,9 @@ const rateDistribution = computed(() => {
   const rated = list.filter(c => c.rate && c.rate >= 1 && c.rate <= 10)
   const totalRated = rated.length
   const counts = {}
-  rated.forEach(c => { counts[c.rate] = (counts[c.rate] || 0) + 1 })
+  rated.forEach(c => {
+    counts[c.rate] = (counts[c.rate] || 0) + 1
+  })
 
   const dist = []
   for (let r = 10; r >= 1; r--) {
@@ -785,7 +1009,10 @@ onMounted(() => {
   fetchAll()
 })
 
-watch(() => route.params.username, () => {
-  fetchAll()
-})
+watch(
+  () => route.params.username,
+  () => {
+    fetchAll()
+  }
+)
 </script>

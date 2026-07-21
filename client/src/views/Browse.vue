@@ -5,10 +5,25 @@
 
       <div class="flex flex-wrap gap-3 items-center mb-4">
         <div class="relative flex-1 min-w-60 max-w-md">
-          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          <svg
+            class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/40"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
           </svg>
-          <input v-model="keyword" @keyup.enter="search" placeholder="搜索番剧..." class="input input-bordered input-sm w-full pl-9" />
+          <input
+            v-model="keyword"
+            placeholder="搜索番剧..."
+            class="input input-bordered input-sm w-full pl-9"
+            @keyup.enter="search"
+          />
         </div>
       </div>
 
@@ -16,21 +31,25 @@
         <button
           v-for="t in typeOptions"
           :key="t.value"
-          @click="filterType = t.value; page = 1; browse()"
-          class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-all"
-          :class="filterType === t.value ? 'bg-primary text-white' : 'bg-base-200 text-base-content/60 hover:bg-base-300'"
+          class="px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300"
+          :class="
+            filterType === t.value
+              ? 'bg-primary text-primary-content shadow-sm'
+              : 'bg-base-200/60 text-base-content/60 hover:bg-base-200'
+          "
+          @click="selectType(t)"
         >
           {{ t.label }}
         </button>
       </div>
 
-      <div class="flex flex-wrap gap-2" v-if="tags.length">
+      <div v-if="tags.length" class="flex flex-wrap gap-2">
         <button
           v-for="tag in tags"
           :key="tag.name"
-          @click="toggleTag(tag.name)"
           class="badge badge-lg cursor-pointer transition-all"
           :class="selectedTags.includes(tag.name) ? 'badge-primary' : 'badge-ghost'"
+          @click="toggleTag(tag.name)"
         >
           {{ tag.name }}
         </button>
@@ -47,19 +66,36 @@
       <div v-else class="anime-grid">
         <AnimeCard v-for="anime in animeList" :key="anime.id" :anime="anime" />
       </div>
-      <div class="join mt-8 flex justify-center" v-if="totalPages > 1">
-        <button @click="goPage(page - 1)" :disabled="page <= 1" class="join-item btn btn-sm">«</button>
-        <button v-for="p in visiblePages" :key="p" @click="goPage(p)" class="join-item btn btn-sm" :class="p === page ? 'btn-active' : ''">{{ p }}</button>
-        <button @click="goPage(page + 1)" :disabled="page >= totalPages" class="join-item btn btn-sm">»</button>
+      <div v-if="totalPages > 1" class="join mt-8 flex justify-center">
+        <button :disabled="page <= 1" class="join-item btn btn-sm" @click="goPage(page - 1)">
+          «
+        </button>
+        <button
+          v-for="p in visiblePages"
+          :key="p"
+          class="join-item btn btn-sm"
+          :class="p === page ? 'btn-active' : ''"
+          @click="goPage(p)"
+        >
+          {{ p }}
+        </button>
+        <button
+          :disabled="page >= totalPages"
+          class="join-item btn btn-sm"
+          @click="goPage(page + 1)"
+        >
+          »
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { animeAPI } from '../api/endpoints'
+import { createCancelToken, isCanceled } from '../api'
 import AnimeCard from '../components/AnimeCard.vue'
 import LoadingState from '../components/LoadingState.vue'
 
@@ -77,13 +113,16 @@ const typeOptions = [
   { label: '动画', value: 2 },
   { label: '书籍', value: 1 },
   { label: '音乐', value: 3 },
-  { label: '游戏', value: 4 },
+  { label: '游戏', value: 4 }
 ]
 const page = ref(Number(route.query.page) || 1)
 const total = ref(0)
 const loading = ref(false)
 const error = ref('')
 const limit = 20
+
+// 当前列表请求的取消令牌，发起新请求前取消上一个未完成请求
+let listCancelToken = null
 
 const totalPages = computed(() => Math.ceil(total.value / limit))
 const visiblePages = computed(() => {
@@ -98,36 +137,104 @@ function toggleTag(tag) {
   const idx = selectedTags.value.indexOf(tag)
   if (idx >= 0) selectedTags.value.splice(idx, 1)
   else selectedTags.value.push(tag)
-  page.value = 1; browse()
+  page.value = 1
+  browse()
 }
 function goPage(p) {
   if (p < 1 || p > totalPages.value) return
-  page.value = p; browse(); window.scrollTo(0, 0)
+  page.value = p
+  browse()
+  window.scrollTo(0, 0)
 }
 async function search() {
-  selectedTags.value = []; page.value = 1
+  selectedTags.value = []
+  page.value = 1
   if (keyword.value.trim()) {
-    loading.value = true; error.value = ''
-    try { const res = await animeAPI.search({ keyword: keyword.value.trim(), page: page.value, limit, type: filterType.value || undefined }); animeList.value = res.data.data || []; total.value = res.data.total || 0 }
-    catch { error.value = '搜索失败' }
-    finally { loading.value = false }
-  } else { browse() }
+    if (listCancelToken) listCancelToken.cancel('用户发起新搜索')
+    listCancelToken = createCancelToken()
+    loading.value = true
+    error.value = ''
+    try {
+      const res = await animeAPI.search(
+        {
+          keyword: keyword.value.trim(),
+          page: page.value,
+          limit,
+          type: filterType.value || undefined
+        },
+        { signal: listCancelToken.signal }
+      )
+      animeList.value = res.data.data || []
+      total.value = res.data.total || 0
+    } catch (err) {
+      if (!isCanceled(err)) error.value = '搜索失败'
+    } finally {
+      loading.value = false
+    }
+  } else {
+    browse()
+  }
+}
+function selectType(t) {
+  filterType.value = t.value
+  page.value = 1
+  browse()
 }
 async function browse() {
-  loading.value = true; error.value = ''
+  if (listCancelToken) listCancelToken.cancel('用户发起新浏览请求')
+  listCancelToken = createCancelToken()
+  loading.value = true
+  error.value = ''
   const params = { sort: sortType.value, type: filterType.value, page: page.value, limit }
   if (selectedTags.value.length) params.tag = selectedTags.value.join(',')
   try {
-    if (keyword.value.trim()) { const res = await animeAPI.search({ keyword: keyword.value.trim(), page: page.value, limit, type: filterType.value || undefined }); animeList.value = res.data.data || []; total.value = res.data.total || 0 }
-    else { const res = await animeAPI.browse(params); animeList.value = res.data.data || []; total.value = res.data.total || 0 }
-  } catch { error.value = '加载失败' }
-  finally { loading.value = false }
-  router.replace({ query: { ...route.query, page: page.value, type: filterType.value, keyword: keyword.value || undefined } })
+    if (keyword.value.trim()) {
+      const res = await animeAPI.search(
+        {
+          keyword: keyword.value.trim(),
+          page: page.value,
+          limit,
+          type: filterType.value || undefined
+        },
+        { signal: listCancelToken.signal }
+      )
+      animeList.value = res.data.data || []
+      total.value = res.data.total || 0
+    } else {
+      const res = await animeAPI.browse(params, { signal: listCancelToken.signal })
+      animeList.value = res.data.data || []
+      total.value = res.data.total || 0
+    }
+  } catch (err) {
+    if (!isCanceled(err)) error.value = '加载失败'
+  } finally {
+    loading.value = false
+  }
+  router.replace({
+    query: {
+      ...route.query,
+      page: page.value,
+      type: filterType.value,
+      keyword: keyword.value || undefined
+    }
+  })
 }
 async function fetchTags() {
-  try { const res = await animeAPI.getTags(); tags.value = ((res.data.data || res.data) || []).slice(0, 20) }
-  catch { /* ignore */ }
+  try {
+    const res = await animeAPI.getTags()
+    tags.value = (res.data.data || res.data || []).slice(0, 20)
+  } catch {
+    /* ignore */
+  }
 }
-onMounted(() => { fetchTags(); browse() })
-watch(keyword, () => { if (!keyword.value.trim()) browse() })
+onMounted(() => {
+  fetchTags()
+  browse()
+})
+onBeforeUnmount(() => {
+  if (listCancelToken) listCancelToken.cancel('组件卸载')
+})
+watch(keyword, () => {
+  if (!keyword.value.trim()) browse()
+})
 </script>

@@ -7,11 +7,11 @@
       <main class="flex-1 w-full px-5 py-6 md:px-8">
         <router-view v-slot="{ Component, route }">
           <transition
+            :css="false"
+            mode="out-in"
             @before-enter="onBeforeEnter"
             @enter="onEnter"
             @leave="onLeave"
-            :css="false"
-            mode="out-in"
           >
             <component :is="Component" :key="route.path" />
           </transition>
@@ -32,9 +32,17 @@ import { useAuthStore } from './stores/auth'
 
 const auth = useAuthStore()
 
-function onBeforeEnter(el) { gsap.set(el, { opacity: 0, y: 12 }) }
-function onEnter(el, done) { gsap.to(el, { opacity: 1, y: 0, duration: 0.3, ease: 'power2.out', onComplete: done }) }
-function onLeave(el, done) { gsap.to(el, { opacity: 0, y: -8, duration: 0.2, ease: 'power2.in', onComplete: done }) }
+function onBeforeEnter(el) {
+  gsap.set(el, { opacity: 0, y: 8 })
+}
+function onEnter(el, done) {
+  gsap.to(el, { opacity: 1, y: 0, duration: 0.25, ease: 'power2.out', onComplete: done })
+}
+function onLeave(el, done) {
+  gsap.to(el, { opacity: 0, y: -6, duration: 0.15, ease: 'power2.in', onComplete: done })
+}
 
-onMounted(() => { auth.checkAuth() })
+onMounted(() => {
+  auth.checkAuth()
+})
 </script>

@@ -1,20 +1,28 @@
 <template>
   <div>
     <div class="flex items-center gap-3 mb-6">
-      <a @click.prevent="$router.back()" class="text-sm text-primary hover-underline-wipe cursor-pointer">← 返回</a>
+      <a
+        class="text-sm text-primary hover-underline-wipe cursor-pointer"
+        @click.prevent="$router.back()"
+        >← 返回</a
+      >
       <h1 class="text-2xl font-semibold text-base-content">新番时间表</h1>
     </div>
 
     <LoadingState :loading="loading" :error="error" @retry="fetchCalendar" />
 
     <div v-if="!loading && !error">
-      <div class="tabs tabs-boxed bg-base-200 mb-6 overflow-x-auto">
+      <div class="flex gap-1.5 mb-6 overflow-x-auto scrollbar-hide pb-1">
         <button
           v-for="(day, idx) in dayLabels"
           :key="idx"
+          class="px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300"
+          :class="
+            activeDay === idx + 1
+              ? 'bg-primary text-primary-content shadow-sm'
+              : 'bg-base-200/60 text-base-content/60 hover:bg-base-200'
+          "
           @click="activeDay = idx + 1"
-          class="tab whitespace-nowrap"
-          :class="activeDay === idx + 1 ? 'tab-active' : ''"
         >
           {{ day }}
         </button>

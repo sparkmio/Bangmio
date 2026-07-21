@@ -1,5 +1,13 @@
+/**
+ * Bangmio 服务端应用入口
+ * 注册所有 API 路由，提供全局错误兜底和 404 处理
+ */
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { logError } from './utils/logger.js'
+import { rateLimit } from './utils/rateLimit.js'
+import { securityHeaders } from './middleware/security.js'
+import { RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_POST, RATE_LIMIT_MAX_GET } from './config.js'
 import userRoutes from './routes/user.js'
 import animeRoutes from './routes/anime.js'
 import collectionRoutes from './routes/collection.js'
@@ -20,6 +28,20 @@ app.use('*', async (c, next) => {
   await next()
 })
 
+// 安全响应头：为所有响应添加安全相关 HTTP 头
+app.use('*', securityHeaders())
+
+// 速率限制：POST/PUT/DELETE 路由 10 次/分钟，GET 路由 60 次/分钟
+// 注意：limiter 实例必须在模块级创建一次，确保 store(Map) 在请求间累积计数
+const postLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_POST)
+const getLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_GET)
+app.use('/api/v1/*', async (c, next) => {
+  const method = c.req.method.toUpperCase()
+  const limiter =
+    method === 'POST' || method === 'PUT' || method === 'DELETE' ? postLimiter : getLimiter
+  return limiter(c, next)
+})
+
 app.route('/api/v1/user', userRoutes)
 app.route('/api/v1/anime', animeRoutes)
 app.route('/api/v1/collection', collectionRoutes)
@@ -29,6 +51,22 @@ app.route('/api/v1/bilibili', bilibiliRoutes)
 app.route('/api/v1/moegirl', moegirlRoutes)
 app.route('/api/v1/groups', groupRoutes)
 
-app.get('/api/health', (c) => c.json({ status: 'ok', country: c.env?.CF_IP_COUNTRY || 'unknown' }))
+app.get('/api/health', c => c.json({ status: 'ok', country: c.env?.CF_IP_COUNTRY || 'unknown' }))
+
+// 404 兜底路由
+app.all('*', c => {
+  return c.json({ data: null, error: 'Not Found', code: 404 }, 404)
+})
+
+// 全局错误兜底中间件
+app.onError((err, c) => {
+  logError('未捕获的服务器异常', {
+    message: err?.message || String(err),
+    stack: err?.stack,
+    path: c.req.path,
+    method: c.req.method
+  })
+  return c.json({ data: null, error: '服务器内部错误', code: 500 }, 500)
+})
 
 export default app

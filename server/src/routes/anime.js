@@ -1,9 +1,19 @@
 import { Hono } from 'hono'
 import {
-  searchAnime, browseAnime, getAnimeDetail, getAnimeEpisodes,
-  getAnimeCharacters, getAnimePersons, getAnimeRelations, getAnimeCalendar, getAnimeTags,
-  getCharacterDetail, getCharacterSubjects, getCharacterPersons,
-  getPersonDetail, getPersonSubjects
+  searchAnime,
+  browseAnime,
+  getAnimeDetail,
+  getAnimeEpisodes,
+  getAnimeCharacters,
+  getAnimePersons,
+  getAnimeRelations,
+  getAnimeCalendar,
+  getAnimeTags,
+  getCharacterDetail,
+  getCharacterSubjects,
+  getCharacterPersons,
+  getPersonDetail,
+  getPersonSubjects
 } from '../controllers/animeController.js'
 
 const app = new Hono()

@@ -46,7 +46,9 @@ export const useAuthStore = defineStore('auth', () => {
           try {
             await doRefresh()
             return
-          } catch { /* refresh failed */ }
+          } catch {
+            /* refresh failed */
+          }
         }
       }
     }

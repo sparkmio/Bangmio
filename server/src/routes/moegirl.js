@@ -1,17 +1,12 @@
 import { Hono } from 'hono'
+import { createCache } from '../utils/cache.js'
+import { CACHE_TTL_MOEGIRL } from '../config.js'
 
 const app = new Hono()
 const MOEGIRL_CN = 'https://zh.moegirl.org.cn/api.php'
 const MOEGIRL_INTL = 'https://zh.moegirl.uk/api.php'
 
-const cache = new Map()
-function getCached(key) {
-  const c = cache.get(key)
-  return (c && Date.now() - c.time < 30 * 60 * 1000) ? c.data : null
-}
-function setCache(key, data) {
-  cache.set(key, { data, time: Date.now() })
-}
+const cache = createCache(CACHE_TTL_MOEGIRL)
 
 function getMoegirlApi(c) {
   const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
@@ -28,7 +23,7 @@ async function fetchMoegirlJSON(apiBase, params) {
   const res = await fetch(url, {
     headers: {
       'User-Agent': 'Bangmio/1.0',
-      'Accept': 'application/json'
+      Accept: 'application/json'
     }
   })
   if (!res.ok) return null
@@ -61,7 +56,7 @@ async function fetchPageExtract(apiBase, title) {
     const res = await fetch(pageUrl, {
       headers: {
         'User-Agent': 'Bangmio/1.0 (Mozilla/5.0; compatible)',
-        'Accept': 'text/html',
+        Accept: 'text/html',
         'Accept-Language': 'zh-CN,zh;q=0.9'
       }
     })
@@ -69,7 +64,9 @@ async function fetchPageExtract(apiBase, title) {
     const html = await res.text()
 
     // 提取 #mw-content-text 的内容
-    const contentMatch = html.match(/<div id="mw-content-text"[^>]*>([\s\S]*?)<\/div>\s*(?:<div class="printfooter|<div id="catlinks|<\/body>)/i)
+    const contentMatch = html.match(
+      /<div id="mw-content-text"[^>]*>([\s\S]*?)<\/div>\s*(?:<div class="printfooter|<div id="catlinks|<\/body>)/i
+    )
     if (!contentMatch) return null
 
     let clean = contentMatch[1]
@@ -92,12 +89,12 @@ async function fetchPageExtract(apiBase, title) {
   }
 }
 
-app.get('/search', async (c) => {
+app.get('/search', async c => {
   try {
     const q = c.req.query('q')
     if (!q) return c.json({ data: { results: [] } })
     const cacheKey = `moesearch_${q}`
-    const cached = getCached(cacheKey)
+    const cached = cache.get(cacheKey)
     if (cached) return c.json({ data: cached })
 
     const apiBase = getMoegirlApi(c)
@@ -124,7 +121,7 @@ app.get('/search', async (c) => {
     }
 
     const data = { results, page }
-    setCache(cacheKey, data)
+    cache.set(cacheKey, data)
     return c.json({ data })
   } catch {
     return c.json({ data: { results: [] } })

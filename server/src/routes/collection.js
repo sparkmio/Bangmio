@@ -22,14 +22,17 @@ function errorResult(status, detail, fallback) {
   return { code: 500, error: detail?.description || detail?.message || fallback }
 }
 
-app.get('/list', async (c) => {
+app.get('/list', async c => {
   try {
     const token = extractToken(c)
     const username = extractUsername(c)
     if (!token) return c.json({ error: '未登录' }, 401)
     if (!username) return c.json({ error: '缺少用户名' }, 400)
     const client = getClient(token, isChina(c))
-    const params = { offset: Number(c.req.query('offset')) || 0, limit: Number(c.req.query('limit')) || 30 }
+    const params = {
+      offset: Number(c.req.query('offset')) || 0,
+      limit: Number(c.req.query('limit')) || 30
+    }
     const st = c.req.query('subject_type')
     const t = c.req.query('type')
     if (st) params.subject_type = Number(st)
@@ -42,32 +45,51 @@ app.get('/list', async (c) => {
   }
 })
 
-app.get('/stats', async (c) => {
+app.get('/stats', async c => {
   try {
     const token = extractToken(c)
     const username = extractUsername(c)
     if (!token) return c.json({ error: '未登录' }, 401)
     if (!username) return c.json({ error: '缺少用户名' }, 400)
     const client = getClient(token, isChina(c))
-    const fetchTotal = (type) => client.get(`/v0/users/${username}/collections`, { type, limit: 1 }).then(r => r.total).catch(() => 0)
+    const fetchTotal = type =>
+      client
+        .get(`/v0/users/${username}/collections`, { type, limit: 1 })
+        .then(r => r.total)
+        .catch(() => 0)
     const [wish, collect, doing, on_hold, dropped] = await Promise.all([
-      fetchTotal(1), fetchTotal(2), fetchTotal(3), fetchTotal(4), fetchTotal(5)
+      fetchTotal(1),
+      fetchTotal(2),
+      fetchTotal(3),
+      fetchTotal(4),
+      fetchTotal(5)
     ])
-    return c.json({ data: { want: wish, completed: collect, watching: doing, on_hold, dropped, total: wish + collect + doing + on_hold + dropped } })
+    return c.json({
+      data: {
+        want: wish,
+        completed: collect,
+        watching: doing,
+        on_hold,
+        dropped,
+        total: wish + collect + doing + on_hold + dropped
+      }
+    })
   } catch (err) {
     const r = errorResult(err.response?.status, err.response?.data, '获取统计失败')
     return c.json({ error: r.error }, r.code)
   }
 })
 
-app.get('/:animeId', async (c) => {
+app.get('/:animeId', async c => {
   try {
     const token = extractToken(c)
     const username = extractUsername(c)
     if (!token) return c.json({ error: '未登录' }, 401)
     if (!username) return c.json({ error: '缺少用户名' }, 400)
     const client = getClient(token, isChina(c))
-    const collection = await client.get(`/v0/users/${username}/collections/${c.req.param('animeId')}`)
+    const collection = await client.get(
+      `/v0/users/${username}/collections/${c.req.param('animeId')}`
+    )
     return c.json({
       data: {
         anime_id: collection.subject_id,
@@ -86,7 +108,7 @@ app.get('/:animeId', async (c) => {
   }
 })
 
-app.post('/:animeId', async (c) => {
+app.post('/:animeId', async c => {
   try {
     const token = extractToken(c)
     const username = extractUsername(c)
@@ -102,29 +124,52 @@ app.post('/:animeId', async (c) => {
     if (!payload.type) {
       try {
         if (username) {
-          const current = await client.get(`/v0/users/${username}/collections/${c.req.param('animeId')}`)
+          const current = await client.get(
+            `/v0/users/${username}/collections/${c.req.param('animeId')}`
+          )
           if (current?.type) payload.type = current.type
         }
-      } catch { payload.type = 3 }
+      } catch {
+        payload.type = 3
+      }
     }
     await client.post(`/v0/users/-/collections/${c.req.param('animeId')}`, payload)
 
     if (username) {
       try {
-        const collection = await client.get(`/v0/users/${username}/collections/${c.req.param('animeId')}`)
+        const collection = await client.get(
+          `/v0/users/${username}/collections/${c.req.param('animeId')}`
+        )
         return c.json({
           data: {
-            anime_id: collection.subject_id, status: collection.type,
-            rating: collection.rate || 0, comment: collection.comment || '',
-            episode: collection.ep_status || 0, subject: collection.subject || null,
+            anime_id: collection.subject_id,
+            status: collection.type,
+            rating: collection.rate || 0,
+            comment: collection.comment || '',
+            episode: collection.ep_status || 0,
+            subject: collection.subject || null,
             updated_at: collection.updated_at
           }
         })
       } catch {
-        return c.json({ data: { status: payload.type, rating: payload.rate || 0, comment: payload.comment || '', updated: true } })
+        return c.json({
+          data: {
+            status: payload.type,
+            rating: payload.rate || 0,
+            comment: payload.comment || '',
+            updated: true
+          }
+        })
       }
     } else {
-      return c.json({ data: { status: payload.type, rating: payload.rate || 0, comment: payload.comment || '', updated: true } })
+      return c.json({
+        data: {
+          status: payload.type,
+          rating: payload.rate || 0,
+          comment: payload.comment || '',
+          updated: true
+        }
+      })
     }
   } catch (err) {
     const r = errorResult(err.response?.status, err.response?.data, '保存收藏失败')
@@ -132,7 +177,7 @@ app.post('/:animeId', async (c) => {
   }
 })
 
-app.delete('/:animeId', async (c) => {
+app.delete('/:animeId', async c => {
   try {
     const token = extractToken(c)
     if (!token) return c.json({ error: '未登录' }, 401)

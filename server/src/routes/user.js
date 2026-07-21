@@ -1,10 +1,11 @@
 import { Hono } from 'hono'
 import { getClient } from '../services/bangumi.js'
+import { fetchHTML, stripTags, unescapeHtml, parseNumber, fixUrl } from '../utils/http.js'
 
 const app = new Hono()
 
-const APP_ID = 'bgm61416a088eff71580'
-const APP_SECRET = '6b8055c0159fcc5e998059536813026f'
+const DEFAULT_APP_ID = 'bgm61416a088eff71580'
+const DEFAULT_APP_SECRET = '6b8055c0159fcc5e998059536813026f'
 
 function isChina(c) {
   return (c.env?.CF_IP_COUNTRY || '') === 'CN'
@@ -16,49 +17,6 @@ function redirectUri(c) {
 
 function oauthBase(c) {
   return isChina(c) ? 'https://bangumi.lol' : 'https://bgm.tv'
-}
-
-const SCRAPE_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-
-async function fetchHTML(url) {
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': SCRAPE_UA,
-      'Accept': 'text/html,application/xhtml+xml',
-      'Accept-Language': 'zh-CN,zh;q=0.9'
-    }
-  })
-  if (!res.ok) return ''
-  return res.text()
-}
-
-function stripTags(s) {
-  return (s || '').replace(/<[^>]+>/g, '').trim()
-}
-
-function unescapeHtml(s) {
-  return (s || '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .trim()
-}
-
-function parseNumber(s) {
-  if (!s) return 0
-  const m = String(s).replace(/[^0-9]/g, '')
-  const n = parseInt(m)
-  return isNaN(n) ? 0 : n
-}
-
-function fixUrl(url, base) {
-  if (!url) return ''
-  if (url.startsWith('//')) return `https:${url}`
-  if (url.startsWith('/')) return `${base}${url}`
-  return url
 }
 
 function escapeRegex(s) {
@@ -83,7 +41,7 @@ const TIMELINE_TYPE_MAP = {
   index: '目录'
 }
 
-app.post('/auth', async (c) => {
+app.post('/auth', async c => {
   try {
     const { token } = await c.req.json()
     if (!token) return c.json({ error: '请输入 Access Token' }, 400)
@@ -96,19 +54,22 @@ app.post('/auth', async (c) => {
   }
 })
 
-app.get('/oauth-url', (c) => {
-  const url = `${oauthBase(c)}/oauth/authorize?client_id=${APP_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}`
+app.get('/oauth-url', c => {
+  const appId = c.env?.BGM_APP_ID || DEFAULT_APP_ID
+  const url = `${oauthBase(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}`
   return c.json({ data: url })
 })
 
-app.post('/oauth-callback', async (c) => {
+app.post('/oauth-callback', async c => {
   try {
     const { code } = await c.req.json()
     if (!code) return c.json({ error: '缺少授权码' }, 400)
+    const appId = c.env?.BGM_APP_ID || DEFAULT_APP_ID
+    const appSecret = c.env?.BGM_APP_SECRET || DEFAULT_APP_SECRET
     const params = new URLSearchParams({
       grant_type: 'authorization_code',
-      client_id: APP_ID,
-      client_secret: APP_SECRET,
+      client_id: appId,
+      client_secret: appSecret,
       code,
       redirect_uri: redirectUri(c)
     })
@@ -129,14 +90,16 @@ app.post('/oauth-callback', async (c) => {
   }
 })
 
-app.post('/refresh-token', async (c) => {
+app.post('/refresh-token', async c => {
   try {
     const { refreshToken } = await c.req.json()
     if (!refreshToken) return c.json({ error: '缺少 refresh token' }, 400)
+    const appId = c.env?.BGM_APP_ID || DEFAULT_APP_ID
+    const appSecret = c.env?.BGM_APP_SECRET || DEFAULT_APP_SECRET
     const params = new URLSearchParams({
       grant_type: 'refresh_token',
-      client_id: APP_ID,
-      client_secret: APP_SECRET,
+      client_id: appId,
+      client_secret: appSecret,
       refresh_token: refreshToken,
       redirect_uri: redirectUri(c)
     })
@@ -157,7 +120,7 @@ app.post('/refresh-token', async (c) => {
   }
 })
 
-app.get('/me', async (c) => {
+app.get('/me', async c => {
   try {
     const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
     if (!token) return c.json({ error: '未登录' }, 401)
@@ -169,7 +132,7 @@ app.get('/me', async (c) => {
   }
 })
 
-app.get('/:username/characters', async (c) => {
+app.get('/:username/characters', async c => {
   try {
     const username = c.req.param('username')
     if (!username) return c.json({ error: '缺少用户名' }, 400)
@@ -182,7 +145,7 @@ app.get('/:username/characters', async (c) => {
   }
 })
 
-app.get('/:username/persons', async (c) => {
+app.get('/:username/persons', async c => {
   try {
     const username = c.req.param('username')
     if (!username) return c.json({ error: '缺少用户名' }, 400)
@@ -195,7 +158,7 @@ app.get('/:username/persons', async (c) => {
   }
 })
 
-app.get('/:username/indexes', async (c) => {
+app.get('/:username/indexes', async c => {
   try {
     const username = c.req.param('username')
     if (!username) return c.json({ error: '缺少用户名' }, 400)
@@ -209,7 +172,7 @@ app.get('/:username/indexes', async (c) => {
   }
 })
 
-app.get('/:username/friends', async (c) => {
+app.get('/:username/friends', async c => {
   try {
     const username = c.req.param('username')
     if (!username) return c.json({ data: [] })
@@ -222,7 +185,7 @@ app.get('/:username/friends', async (c) => {
     // 按 <li 分割，每个好友块含 /user/{username} 链接 + avatar/sign
     const chunks = html.split(/<li\b/i)
     for (const chunk of chunks) {
-      const linkMatch = chunk.match(/href="\/user\/([^"\/?#]+)"/i)
+      const linkMatch = chunk.match(/href="\/user\/([^"/?#]+)"/i)
       if (!linkMatch) continue
       const uname = linkMatch[1]
       if (uname === username || seen.has(uname)) continue
@@ -238,8 +201,9 @@ app.get('/:username/friends', async (c) => {
       const avatar = avatarMatch ? fixUrl(avatarMatch[1], base) : ''
 
       // 签名
-      const signMatch = chunk.match(/<p[^>]*class="[^"]*sign[^"]*"[^>]*>([\s\S]*?)<\/p>/i)
-        || chunk.match(/class="sign"[^>]*>([\s\S]*?)<\//i)
+      const signMatch =
+        chunk.match(/<p[^>]*class="[^"]*sign[^"]*"[^>]*>([\s\S]*?)<\/p>/i) ||
+        chunk.match(/class="sign"[^>]*>([\s\S]*?)<\//i)
       const sign = signMatch ? unescapeHtml(stripTags(signMatch[1])) : ''
 
       friends.push({ username: uname, nickname, avatar, sign })
@@ -252,7 +216,7 @@ app.get('/:username/friends', async (c) => {
   }
 })
 
-app.get('/:username/groups', async (c) => {
+app.get('/:username/groups', async c => {
   try {
     const username = c.req.param('username')
     if (!username) return c.json({ data: [] })
@@ -270,7 +234,7 @@ app.get('/:username/groups', async (c) => {
 
     const groups = []
     const seen = new Set()
-    const linkRegex = /<a href="\/group\/([^"\/]+)"[^>]*>([\s\S]*?)<\/a>/gi
+    const linkRegex = /<a href="\/group\/([^"/]+)"[^>]*>([\s\S]*?)<\/a>/gi
     let m
     while ((m = linkRegex.exec(scope)) !== null) {
       const id = m[1]
@@ -282,10 +246,11 @@ app.get('/:username/groups', async (c) => {
       const idx = m.index
       const context = scope.slice(Math.max(0, idx - 250), Math.min(scope.length, idx + 500))
 
-      const memberMatch = context.match(/([0-9]+)\s*成员/i)
-        || context.match(/<span class="group_member">([0-9]+).*?<\/span>/i)
-        || context.match(/<span class="l">([0-9]+).*?<\/span>/i)
-        || context.match(/<strong>([0-9]+)<\/strong>/i)
+      const memberMatch =
+        context.match(/([0-9]+)\s*成员/i) ||
+        context.match(/<span class="group_member">([0-9]+).*?<\/span>/i) ||
+        context.match(/<span class="l">([0-9]+).*?<\/span>/i) ||
+        context.match(/<strong>([0-9]+)<\/strong>/i)
       const member_count = memberMatch ? parseNumber(memberMatch[1]) : 0
 
       const avatarMatch = context.match(/<img[^>]*src="([^"]+)"[^>]*>/i)
@@ -301,7 +266,7 @@ app.get('/:username/groups', async (c) => {
   }
 })
 
-app.get('/:username/timeline', async (c) => {
+app.get('/:username/timeline', async c => {
   try {
     const username = c.req.param('username')
     if (!username) return c.json({ data: [] })
@@ -316,8 +281,8 @@ app.get('/:username/timeline', async (c) => {
       if (!/tml-item/i.test(chunk)) continue
 
       // 类型：从 tml-xxx class 提取并映射
-      const typeMatch = chunk.match(/class="[^"]*tml-item\s+tml-(\w+)/i)
-        || chunk.match(/class="[^"]*tml-(\w+)/i)
+      const typeMatch =
+        chunk.match(/class="[^"]*tml-item\s+tml-(\w+)/i) || chunk.match(/class="[^"]*tml-(\w+)/i)
       const rawType = typeMatch ? typeMatch[1] : 'unknown'
       const type = TIMELINE_TYPE_MAP[rawType] || rawType
 
@@ -327,9 +292,10 @@ app.get('/:username/timeline', async (c) => {
       const subject_name = subMatch ? unescapeHtml(subMatch[2].trim()) : ''
 
       // 动作文本：提取内容中的纯文本
-      const contentMatch = chunk.match(/<div[^>]*class="[^"]*tml-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i)
-        || chunk.match(/<p[^>]*class="[^"]*tml-content[^"]*"[^>]*>([\s\S]*?)<\/p>/i)
-        || chunk.match(/<p[^>]*>([\s\S]*?)<\/p>/i)
+      const contentMatch =
+        chunk.match(/<div[^>]*class="[^"]*tml-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
+        chunk.match(/<p[^>]*class="[^"]*tml-content[^"]*"[^>]*>([\s\S]*?)<\/p>/i) ||
+        chunk.match(/<p[^>]*>([\s\S]*?)<\/p>/i)
       let action = ''
       if (contentMatch) {
         action = contentMatch[1]
@@ -340,8 +306,9 @@ app.get('/:username/timeline', async (c) => {
       }
 
       // 时间
-      const timeMatch = chunk.match(/class="[^"]*tml-time[^"]*"[^>]*>([^<]+)<\//i)
-        || chunk.match(/class="[^"]*time[^"]*"[^>]*>([^<]+)<\//i)
+      const timeMatch =
+        chunk.match(/class="[^"]*tml-time[^"]*"[^>]*>([^<]+)<\//i) ||
+        chunk.match(/class="[^"]*time[^"]*"[^>]*>([^<]+)<\//i)
       const time = timeMatch ? unescapeHtml(stripTags(timeMatch[1])) : ''
 
       items.push({ type, subject_id, subject_name, action, time })
@@ -354,7 +321,7 @@ app.get('/:username/timeline', async (c) => {
   }
 })
 
-app.get('/:username/stats-yearly', async (c) => {
+app.get('/:username/stats-yearly', async c => {
   try {
     const username = c.req.param('username')
     if (!username) return c.json({ data: [] })
@@ -383,12 +350,15 @@ app.get('/:username/stats-yearly', async (c) => {
             })
           }
         }
-      } catch { /* 忽略 JSON 解析失败 */ }
+      } catch {
+        /* 忽略 JSON 解析失败 */
+      }
     }
 
     // 方法2：查找 data-year 属性
     if (!stats.length) {
-      const dataYearRegex = /data-year="(\d{4})"[^>]*\sdata-(?:want|wish)="(\d*)"[^>]*\sdata-collect="(\d*)"[^>]*\sdata-doing="(\d*)"[^>]*\sdata-on_hold="(\d*)"[^>]*\sdata-dropped="(\d*)"/gi
+      const dataYearRegex =
+        /data-year="(\d{4})"[^>]*\sdata-(?:want|wish)="(\d*)"[^>]*\sdata-collect="(\d*)"[^>]*\sdata-doing="(\d*)"[^>]*\sdata-on_hold="(\d*)"[^>]*\sdata-dropped="(\d*)"/gi
       let dym
       while ((dym = dataYearRegex.exec(html)) !== null) {
         const year = parseInt(dym[1])
@@ -408,7 +378,8 @@ app.get('/:username/stats-yearly', async (c) => {
 
     // 方法3：解析 /user/{username}/list/{year} 链接附近的数字
     if (!stats.length) {
-      const yearRegex = /href="\/user\/[^"]+\/(?:list|anime-list)\/(\d{4})[^"]*"[^>]*>([\s\S]{0,300}?)<\/a>/gi
+      const yearRegex =
+        /href="\/user\/[^"]+\/(?:list|anime-list)\/(\d{4})[^"]*"[^>]*>([\s\S]{0,300}?)<\/a>/gi
       let ym
       while ((ym = yearRegex.exec(html)) !== null) {
         const year = parseInt(ym[1])
@@ -432,7 +403,8 @@ app.get('/:username/stats-yearly', async (c) => {
     // 方法4：查找 chart 元素中年份和数字
     if (!stats.length) {
       // 匹配 <span class="year">2024</span> ... <span class="num">12</span>
-      const chartRegex = /class="[^"]*year[^"]*"[^>]*>\s*(\d{4})\s*<[\s\S]{0,200}?class="[^"]*(?:num|count|rate)[^"]*"[^>]*>\s*(\d+)/gi
+      const chartRegex =
+        /class="[^"]*year[^"]*"[^>]*>\s*(\d{4})\s*<[\s\S]{0,200}?class="[^"]*(?:num|count|rate)[^"]*"[^>]*>\s*(\d+)/gi
       let cm
       while ((cm = chartRegex.exec(html)) !== null) {
         const year = parseInt(cm[1])
@@ -476,7 +448,7 @@ app.get('/:username/stats-yearly', async (c) => {
   }
 })
 
-app.get('/:username', async (c) => {
+app.get('/:username', async c => {
   try {
     const username = c.req.param('username')
     if (!username) return c.json({ error: '缺少用户名' }, 400)

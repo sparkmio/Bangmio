@@ -13,9 +13,15 @@ export const useToastStore = defineStore('toast', () => {
     }, duration)
   }
 
-  function success(msg) { show(msg, 'success') }
-  function error(msg) { show(msg, 'error') }
-  function info(msg) { show(msg, 'info') }
+  function success(msg) {
+    show(msg, 'success')
+  }
+  function error(msg) {
+    show(msg, 'error')
+  }
+  function info(msg) {
+    show(msg, 'info')
+  }
 
   return { toasts, show, success, error, info }
 })

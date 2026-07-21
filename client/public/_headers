@@ -1,0 +1,17 @@
+# 静态资源长效缓存（带 hash 的文件名，可永久缓存）
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML 入口文件不缓存（确保用户获取最新版本）
+/*.html
+  Cache-Control: no-cache
+
+# logo 等根目录静态文件短缓存
+/logo.png
+  Cache-Control: public, max-age=86400
+
+# 安全头（补充 API 之外的安全头）
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin

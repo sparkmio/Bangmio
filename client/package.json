@@ -10,6 +10,7 @@
   "dependencies": {
     "axios": "^1.16.1",
     "daisyui": "^4.12.24",
+    "dompurify": "^3.4.12",
     "gsap": "^3.15.0",
     "pinia": "^2.3.1",
     "vue": "^3.5.34",

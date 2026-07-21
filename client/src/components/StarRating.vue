@@ -11,7 +11,9 @@
       @click="$emit('update:modelValue', i)"
     />
   </div>
-  <span v-if="showValue" class="ml-2 text-sm text-base-content/60">{{ modelValue > 0 ? modelValue : '评分' }}</span>
+  <span v-if="showValue" class="ml-2 text-sm text-base-content/60">{{
+    modelValue > 0 ? modelValue : '评分'
+  }}</span>
 </template>
 
 <script setup>

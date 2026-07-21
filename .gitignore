@@ -25,3 +25,9 @@ bangmio-pc-v6/
 opencode-context.json
 opencode-context.md
 tools/
+
+# 环境变量（含敏感信息，不提交）
+.dev.vars
+client/.env
+client/.env.local
+client/.env.*.local

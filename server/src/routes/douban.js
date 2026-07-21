@@ -1,17 +1,17 @@
 import { Hono } from 'hono'
 import * as bangumiService from '../services/bangumi.js'
-import { searchDouban, getDoubanAbstract, getDoubanComments, getDoubanReviews } from '../services/douban.js'
+import {
+  searchDouban,
+  getDoubanAbstract,
+  getDoubanComments,
+  getDoubanReviews
+} from '../services/douban.js'
+import { createCache } from '../utils/cache.js'
+import { CACHE_TTL_DOUBAN } from '../config.js'
 
 const app = new Hono()
 
-const cache = new Map()
-function getCached(key) {
-  const c = cache.get(key)
-  return (c && Date.now() - c.time < 10 * 60 * 1000) ? c.data : null
-}
-function setCache(key, data) {
-  cache.set(key, { data, time: Date.now() })
-}
+const cache = createCache(CACHE_TTL_DOUBAN)
 
 function isChina(c) {
   return (c.env?.CF_IP_COUNTRY || '') === 'CN'
@@ -24,25 +24,28 @@ async function findDoubanMatch(detail) {
   for (const name of names) {
     const suggestions = await searchDouban(name)
     if (!suggestions.length) continue
-    const match = suggestions.find(s => s.title === name || s.title === detail.name_cn || s.title === detail.name) || suggestions[0]
+    const match =
+      suggestions.find(
+        s => s.title === name || s.title === detail.name_cn || s.title === detail.name
+      ) || suggestions[0]
     if (match) return match
   }
   return null
 }
 
-app.get('/by-name', async (c) => {
+app.get('/by-name', async c => {
   try {
     const name = c.req.query('name')
     if (!name) return c.json({ data: null })
     const cacheKey = `douban_name_${name}`
-    const cached = getCached(cacheKey)
+    const cached = cache.get(cacheKey)
     if (cached) return c.json({ data: cached })
 
     // 直接用番名搜豆瓣，不依赖 Bangumi API（避免镜像/被墙影响）
     const suggestions = await searchDouban(name)
     const match = suggestions?.[0]
     if (!match) {
-      setCache(cacheKey, null)
+      cache.set(cacheKey, null)
       return c.json({ data: null })
     }
     const abstract = await getDoubanAbstract(match.id)
@@ -57,14 +60,14 @@ app.get('/by-name', async (c) => {
       short_comment: abstract?.short_comment || null,
       url: `https://movie.douban.com/subject/${match.id}`
     }
-    setCache(cacheKey, data)
+    cache.set(cacheKey, data)
     return c.json({ data })
   } catch {
     return c.json({ data: null })
   }
 })
 
-app.get('/:id', async (c) => {
+app.get('/:id', async c => {
   try {
     const subjectId = c.req.param('id')
     const cn = isChina(c)
@@ -91,12 +94,12 @@ app.get('/:id', async (c) => {
   }
 })
 
-app.get('/:id/details', async (c) => {
+app.get('/:id/details', async c => {
   try {
     const subjectId = c.req.param('id')
     const cn = isChina(c)
     const cacheKey = `douban_details_${subjectId}_${cn}`
-    const cached = getCached(cacheKey)
+    const cached = cache.get(cacheKey)
     if (cached) return c.json({ data: cached })
 
     const detail = await bangumiService.getAnimeDetail(subjectId, { isChina: cn })
@@ -118,14 +121,14 @@ app.get('/:id/details', async (c) => {
       url: `https://movie.douban.com/subject/${match.id}`
     }
 
-    setCache(cacheKey, data)
+    cache.set(cacheKey, data)
     return c.json({ data })
   } catch {
     return c.json({ data: null })
   }
 })
 
-app.get('/:id/comments', async (c) => {
+app.get('/:id/comments', async c => {
   try {
     const id = c.req.param('id')
     if (!id) return c.json({ error: '缺少ID' }, 400)
@@ -136,7 +139,7 @@ app.get('/:id/comments', async (c) => {
   }
 })
 
-app.get('/:id/reviews', async (c) => {
+app.get('/:id/reviews', async c => {
   try {
     const id = c.req.param('id')
     if (!id) return c.json({ error: '缺少ID' }, 400)

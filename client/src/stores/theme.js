@@ -64,5 +64,18 @@ export const useThemeStore = defineStore('theme', () => {
     localStorage.setItem('density', density.value)
   })
 
-  return { theme, fontSize, density, nameLang, nsfw, toggle, setTheme, setFontSize, setDensity, setNameLang, setNsfw, reset }
+  return {
+    theme,
+    fontSize,
+    density,
+    nameLang,
+    nsfw,
+    toggle,
+    setTheme,
+    setFontSize,
+    setDensity,
+    setNameLang,
+    setNsfw,
+    reset
+  }
 })
