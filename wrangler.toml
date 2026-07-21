@@ -4,7 +4,10 @@ compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "client/dist"
 
 [vars]
-OAUTH_REDIRECT_URI = "https://bangmio.pages.dev/login/callback"
+OAUTH_REDIRECT_URI = "https://bangmio.site/login/callback"
+VITE_TURNSTILE_SITE_KEY = "0x4AAAAAAD6gcShUkr9NZuAJ"
+VITE_REQUIRE_EMAIL_CODE = "true"
+RESEND_FROM = "Bangmio <noreply@bangmio.site>"
 
 [[d1_databases]]
 binding = "DB"
