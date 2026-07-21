@@ -23,9 +23,13 @@ import {
   sendVerificationCode,
   getUserBgmToken,
   createOAuthBindState,
-  bindBangumiByOAuth
+  bindBangumiByOAuth,
+  changeUserPassword,
+  resetUserPassword
 } from '../services/auth.js'
 import { verifyTurnstile } from '../utils/turnstile.js'
+import { userExistsByEmail } from '../db/users.js'
+import { logError } from '../utils/logger.js'
 
 const app = new Hono()
 
@@ -180,15 +184,28 @@ app.post('/register', async c => {
 
 /**
  * POST /login
- * Body: { email, password }
+ * Body: { email, password, captchaToken? }
  * 验证邮箱密码并签发 JWT。
+ *
+ * - 若配置了 Turnstile secret：强制要求人机验证
  */
 app.post('/login', async c => {
   try {
     const body = await c.req.json().catch(() => ({}))
-    const { email, password } = body || {}
+    const { email, password, captchaToken } = body || {}
     if (!email || !password) {
       return c.json({ data: null, error: '邮箱或密码不能为空', code: 400 }, 400)
+    }
+    // 若配置了 Turnstile secret，强制要求人机验证
+    if (c.env?.TURNSTILE_SECRET_KEY) {
+      const turnstile = await verifyTurnstile(
+        captchaToken,
+        c.env.TURNSTILE_SECRET_KEY,
+        c.req.header('CF-Connecting-IP')
+      )
+      if (!turnstile.success) {
+        return c.json({ data: null, error: '人机验证失败，请重试', code: 400 }, 400)
+      }
     }
     const result = await loginUser(c.env.DB, c.env, { email, password })
     return c.json({ data: { token: result.token, user: result.user }, code: 200 })
@@ -339,6 +356,95 @@ app.post('/oauth-bind-callback', jwtAuth(), async c => {
       data: { token: result.token, user: result.user, bgmToken: result.bgmToken },
       code: 200
     })
+  } catch (err) {
+    return errorResponse(err)
+  }
+})
+
+/**
+ * POST /change-password
+ * Header: Authorization: Bearer <jwt>
+ * Body: { currentPassword, newPassword }
+ *
+ * 已登录用户修改密码：验证原密码后用新密码（PBKDF2 + 新 salt）替换旧哈希。
+ */
+app.post('/change-password', jwtAuth(), async c => {
+  try {
+    const body = await c.req.json().catch(() => ({}))
+    const { currentPassword, newPassword } = body || {}
+    if (!currentPassword || !newPassword) {
+      return c.json({ data: null, error: '原密码与新密码不能为空', code: 400 }, 400)
+    }
+    const currentUser = c.get('user')
+    await changeUserPassword(c.env.DB, c.env, currentUser.userId, currentPassword, newPassword)
+    return c.json({ data: { success: true }, code: 200 })
+  } catch (err) {
+    return errorResponse(err)
+  }
+})
+
+/**
+ * POST /forgot-password
+ * Body: { email, captchaToken }
+ *
+ * 忘记密码：发送 purpose='reset' 验证码到邮箱。
+ *
+ * - Turnstile 校验（未配置 secret 时跳过）
+ * - 邮箱不存在时静默返回 200（防探测）
+ * - 邮件服务未配置或发送失败时也静默返回 200（防探测）
+ */
+app.post('/forgot-password', async c => {
+  try {
+    const body = await c.req.json().catch(() => ({}))
+    const { email, captchaToken } = body || {}
+    if (!email || !EMAIL_REGEX.test(String(email))) {
+      return c.json({ data: null, error: '邮箱格式不正确', code: 400 }, 400)
+    }
+    // Turnstile 校验（未配置 secret 时跳过）
+    if (c.env?.TURNSTILE_SECRET_KEY) {
+      const turnstile = await verifyTurnstile(
+        captchaToken,
+        c.env.TURNSTILE_SECRET_KEY,
+        c.req.header('CF-Connecting-IP')
+      )
+      if (!turnstile.success) {
+        return c.json({ data: null, error: '人机验证失败，请重试', code: 400 }, 400)
+      }
+    }
+    // 邮箱不存在时静默返回 200（防探测）
+    const exists = await userExistsByEmail(c.env.DB, email)
+    if (exists) {
+      try {
+        await sendVerificationCode(c.env.DB, c.env, { email, purpose: 'reset' })
+      } catch (err) {
+        // 邮件服务未配置或发送失败时静默返回 200（防探测），仅记录日志
+        logError('forgot-password 发送验证码失败', { email, error: String(err) })
+      }
+    }
+    return c.json({ data: { success: true }, code: 200 })
+  } catch (err) {
+    return errorResponse(err)
+  }
+})
+
+/**
+ * POST /reset-password
+ * Body: { email, code, newPassword }
+ *
+ * 通过邮箱验证码重置密码。
+ */
+app.post('/reset-password', async c => {
+  try {
+    const body = await c.req.json().catch(() => ({}))
+    const { email, code, newPassword } = body || {}
+    if (!email || !EMAIL_REGEX.test(String(email))) {
+      return c.json({ data: null, error: '邮箱格式不正确', code: 400 }, 400)
+    }
+    if (!code || !newPassword) {
+      return c.json({ data: null, error: '验证码与新密码不能为空', code: 400 }, 400)
+    }
+    await resetUserPassword(c.env.DB, c.env, { email, code, newPassword })
+    return c.json({ data: { success: true }, code: 200 })
   } catch (err) {
     return errorResponse(err)
   }

@@ -36,9 +36,9 @@
           <div class="avatar">
             <div class="w-8 h-8 rounded-full ring-2 ring-primary/20">
               <img
-                v-if="auth.user?.avatar?.medium || auth.user?.avatar?.large"
-                :src="auth.user.avatar.medium || auth.user.avatar.large"
-                :alt="auth.user?.nickname || auth.user?.username || ''"
+                v-if="auth.effectiveUser?.avatar?.medium || auth.effectiveUser?.avatar?.large"
+                :src="auth.effectiveUser.avatar.medium || auth.effectiveUser.avatar.large"
+                :alt="auth.effectiveUser?.nickname || auth.effectiveUser?.username || ''"
                 class="rounded-full"
                 decoding="async"
               />
@@ -46,13 +46,16 @@
                 v-else
                 class="w-8 h-8 rounded-full bg-primary text-primary-content flex items-center justify-center text-sm font-bold"
               >
-                {{ auth.user?.nickname?.[0] || auth.user?.username?.[0]?.toUpperCase() }}
+                {{
+                  auth.effectiveUser?.nickname?.[0] ||
+                  auth.effectiveUser?.username?.[0]?.toUpperCase()
+                }}
               </div>
             </div>
           </div>
           <div class="min-w-0 flex-1">
             <p class="text-sm font-medium truncate text-base-content">
-              {{ auth.user?.nickname || auth.user?.username }}
+              {{ auth.effectiveUser?.nickname || auth.effectiveUser?.username }}
             </p>
             <p class="text-xs truncate text-base-content/40">查看主页</p>
           </div>

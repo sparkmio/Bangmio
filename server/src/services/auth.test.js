@@ -8,7 +8,9 @@ vi.mock('../db/users.js', () => ({
   updateUserBgmBinding: vi.fn(),
   clearUserBgmBinding: vi.fn(),
   getUserBgmBinding: vi.fn(),
-  userExistsByEmail: vi.fn()
+  userExistsByEmail: vi.fn(),
+  getUserCredentialsById: vi.fn(),
+  updateUserPassword: vi.fn()
 }))
 
 // Mock emailCodes.js（验证码相关）
@@ -41,7 +43,9 @@ import {
   refreshJwt,
   getCurrentUser,
   getUserBgmToken,
-  sendVerificationCode
+  sendVerificationCode,
+  changeUserPassword,
+  resetUserPassword
 } from './auth.js'
 import {
   createUser,
@@ -49,7 +53,9 @@ import {
   getUserById,
   updateUserBgmBinding,
   getUserBgmBinding,
-  userExistsByEmail
+  userExistsByEmail,
+  getUserCredentialsById,
+  updateUserPassword
 } from '../db/users.js'
 import { verifyCode, createCode, getLatestCode } from '../db/emailCodes.js'
 import { sendEmail } from '../utils/email.js'
@@ -464,5 +470,163 @@ describe('getUserBgmToken', () => {
     })
 
     expect(await getUserBgmToken(DB, ENV, 'u1')).toBeNull()
+  })
+})
+
+describe('changeUserPassword', () => {
+  it('新密码 < 8 位时抛 400 错误', async () => {
+    await expect(changeUserPassword(DB, ENV, 'u1', 'current-pwd', 'short')).rejects.toMatchObject({
+      status: 400,
+      message: '新密码至少 8 位'
+    })
+
+    expect(getUserCredentialsById).not.toHaveBeenCalled()
+    expect(updateUserPassword).not.toHaveBeenCalled()
+  })
+
+  it('原密码错误时抛 400 错误', async () => {
+    const salt = generateSalt()
+    const passwordHash = await hashPassword('correct-pwd', salt)
+    getUserCredentialsById.mockResolvedValue({
+      id: 'u1',
+      email: 'a@b.c',
+      salt,
+      passwordHash,
+      bgmUid: null
+    })
+
+    await expect(
+      changeUserPassword(DB, ENV, 'u1', 'wrong-pwd', 'new-password-123')
+    ).rejects.toMatchObject({ status: 400, message: '原密码错误' })
+
+    expect(updateUserPassword).not.toHaveBeenCalled()
+  })
+
+  it('用户不存在时抛 404 错误', async () => {
+    getUserCredentialsById.mockResolvedValue(null)
+
+    await expect(
+      changeUserPassword(DB, ENV, 'no-such-user', 'any-pwd', 'new-password-123')
+    ).rejects.toMatchObject({ status: 404 })
+
+    expect(updateUserPassword).not.toHaveBeenCalled()
+  })
+
+  it('原密码正确时调用 updateUserPassword，参数为新 hash + salt', async () => {
+    const oldSalt = generateSalt()
+    const oldPasswordHash = await hashPassword('correct-pwd', oldSalt)
+    getUserCredentialsById.mockResolvedValue({
+      id: 'u1',
+      email: 'a@b.c',
+      salt: oldSalt,
+      passwordHash: oldPasswordHash,
+      bgmUid: null
+    })
+    updateUserPassword.mockResolvedValue(undefined)
+
+    const result = await changeUserPassword(DB, ENV, 'u1', 'correct-pwd', 'new-password-123')
+
+    expect(result).toEqual({ success: true })
+
+    // updateUserPassword 被调用一次
+    expect(updateUserPassword).toHaveBeenCalledTimes(1)
+    const [dbArg, idArg, passwordHashArg, saltArg] = updateUserPassword.mock.calls[0]
+    expect(dbArg).toBe(DB)
+    expect(idArg).toBe('u1')
+    // 新 hash 为 64 字符 hex
+    expect(passwordHashArg).toMatch(/^[0-9a-f]{64}$/)
+    // 新 salt 为 32 字符 hex
+    expect(saltArg).toMatch(/^[0-9a-f]{32}$/)
+    // 新 hash/salt 与旧的必须不同
+    expect(passwordHashArg).not.toBe(oldPasswordHash)
+    expect(saltArg).not.toBe(oldSalt)
+    // 新 hash 与新 salt 必须匹配（用新 salt 重新 hash 'new-password-123' 应等于传入的 hash）
+    const recomputed = await hashPassword('new-password-123', saltArg)
+    expect(recomputed).toBe(passwordHashArg)
+  })
+})
+
+describe('resetUserPassword', () => {
+  it('新密码 < 8 位时抛 400 错误', async () => {
+    await expect(
+      resetUserPassword(DB, ENV, {
+        email: 'a@b.c',
+        code: '123456',
+        newPassword: 'short'
+      })
+    ).rejects.toMatchObject({ status: 400, message: '新密码至少 8 位' })
+
+    expect(verifyCode).not.toHaveBeenCalled()
+    expect(updateUserPassword).not.toHaveBeenCalled()
+  })
+
+  it('验证码错误时抛 400 错误', async () => {
+    verifyCode.mockResolvedValue(false)
+
+    await expect(
+      resetUserPassword(DB, ENV, {
+        email: 'a@b.c',
+        code: 'wrong-code',
+        newPassword: 'new-password-123'
+      })
+    ).rejects.toMatchObject({ status: 400, message: '验证码错误或已过期' })
+
+    // 验证码校验使用 purpose='reset'
+    expect(verifyCode).toHaveBeenCalledWith(DB, 'a@b.c', 'wrong-code', 'reset')
+    expect(getUserByEmail).not.toHaveBeenCalled()
+    expect(updateUserPassword).not.toHaveBeenCalled()
+  })
+
+  it('验证码正确但用户不存在时抛 404 错误', async () => {
+    verifyCode.mockResolvedValue(true)
+    getUserByEmail.mockResolvedValue(null)
+
+    await expect(
+      resetUserPassword(DB, ENV, {
+        email: 'a@b.c',
+        code: '123456',
+        newPassword: 'new-password-123'
+      })
+    ).rejects.toMatchObject({ status: 404 })
+
+    expect(updateUserPassword).not.toHaveBeenCalled()
+  })
+
+  it('验证码正确且用户存在时调用 updateUserPassword', async () => {
+    verifyCode.mockResolvedValue(true)
+    const oldSalt = generateSalt()
+    const oldPasswordHash = await hashPassword('old-pwd', oldSalt)
+    getUserByEmail.mockResolvedValue({
+      id: 'u1',
+      email: 'a@b.c',
+      salt: oldSalt,
+      passwordHash: oldPasswordHash,
+      bgmUid: null
+    })
+    updateUserPassword.mockResolvedValue(undefined)
+
+    const result = await resetUserPassword(DB, ENV, {
+      email: 'a@b.c',
+      code: '123456',
+      newPassword: 'new-password-123'
+    })
+
+    expect(result).toEqual({ success: true })
+
+    // 验证码校验使用 purpose='reset'
+    expect(verifyCode).toHaveBeenCalledWith(DB, 'a@b.c', '123456', 'reset')
+
+    // updateUserPassword 被调用，userId 来自 getUserByEmail 返回值
+    expect(updateUserPassword).toHaveBeenCalledTimes(1)
+    const [dbArg, idArg, passwordHashArg, saltArg] = updateUserPassword.mock.calls[0]
+    expect(dbArg).toBe(DB)
+    expect(idArg).toBe('u1')
+    expect(passwordHashArg).toMatch(/^[0-9a-f]{64}$/)
+    expect(saltArg).toMatch(/^[0-9a-f]{32}$/)
+    expect(passwordHashArg).not.toBe(oldPasswordHash)
+    expect(saltArg).not.toBe(oldSalt)
+    // 新 hash 与新 salt 匹配
+    const recomputed = await hashPassword('new-password-123', saltArg)
+    expect(recomputed).toBe(passwordHashArg)
   })
 })

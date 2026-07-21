@@ -216,6 +216,59 @@ export async function getUserBgmBinding(db, id) {
 }
 
 /**
+ * 根据 id 查询用户（含 password_hash 与 salt，用于密码校验）。
+ *
+ * 与 `getUserById` 不同，本函数返回完整字段（含敏感字段），仅用于修改密码等
+ * 需要验证旧密码的场景。
+ *
+ * @param {D1Database} db - D1 binding（`c.env.DB`）。
+ * @param {string} id - 用户 ID。
+ * @returns {Promise<object|null>}
+ *   完整用户记录（含 passwordHash、salt、bgmTokenEncrypted、bgmTokenIv）或 null
+ *   （用户不存在或查询异常）。
+ */
+export async function getUserCredentialsById(db, id) {
+  try {
+    const row = await db
+      .prepare(`SELECT ${USER_COLUMNS_FULL} FROM users WHERE id = ?`)
+      .bind(id)
+      .first()
+    return row || null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 更新用户密码（password_hash + salt）。
+ *
+ * @param {D1Database} db - D1 binding（`c.env.DB`）。
+ * @param {string} id - 用户 ID。
+ * @param {string} passwordHash - 新密码哈希（PBKDF2 hex）。
+ * @param {string} salt - 新 salt（hex）。
+ * @returns {Promise<void>}
+ * @throws {Error} 当 D1 更新失败时抛出。
+ */
+export async function updateUserPassword(db, id, passwordHash, salt) {
+  const now = Date.now()
+  try {
+    const result = await db
+      .prepare(
+        `UPDATE users
+           SET password_hash = ?, salt = ?, updated_at = ?
+         WHERE id = ?`
+      )
+      .bind(passwordHash, salt, now, id)
+      .run()
+    if (!result.success) {
+      throw new Error('D1 run() 返回 success=false')
+    }
+  } catch (err) {
+    throw new Error(`updateUserPassword: 更新失败 (id=${id})`, { cause: err })
+  }
+}
+
+/**
  * 判断指定邮箱是否已注册。
  *
  * @param {D1Database} db - D1 binding（`c.env.DB`）。

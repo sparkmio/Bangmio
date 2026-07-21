@@ -62,7 +62,23 @@
             class="input input-bordered w-full"
             autocomplete="current-password"
           />
-          <button type="submit" :disabled="auth.loading" class="btn btn-primary w-full">
+          <div class="flex justify-end -mt-1">
+            <router-link to="/forgot-password" class="text-xs link link-primary">
+              忘记密码？
+            </router-link>
+          </div>
+
+          <!-- 人机验证（仅当配置了 Turnstile site key 时显示） -->
+          <div v-if="turnstileSiteKey" class="flex flex-col gap-1.5">
+            <div ref="turnstileContainer" class="cf-turnstile min-h-[65px]" />
+            <p v-if="turnstileError" class="text-xs text-error ml-1">{{ turnstileError }}</p>
+          </div>
+
+          <button
+            type="submit"
+            :disabled="auth.loading || (turnstileSiteKey && !captchaToken)"
+            class="btn btn-primary w-full"
+          >
             {{ auth.loading ? '登录中...' : '登录' }}
           </button>
 
@@ -119,7 +135,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { userAPI } from '../api/endpoints'
 
@@ -130,17 +146,85 @@ const password = ref('')
 const token = ref('')
 const oauthWaiting = ref(false)
 
-// 切换 Tab 时清空错误信息
-watch(activeTab, () => {
+// Turnstile 配置：未配置 site key 时跳过人机验证（后端也兼容跳过）
+const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
+const turnstileContainer = ref(null)
+const captchaToken = ref('')
+const turnstileError = ref('')
+let turnstileWidgetId = null
+
+// 切换 Tab 时清空错误信息；切回 Bangmio Tab 时重新渲染 Turnstile widget
+watch(activeTab, newTab => {
   auth.error = ''
+  if (newTab === 'bangmio' && turnstileSiteKey) {
+    // 容器刚被 v-if 重建，旧 widget 已随 DOM 卸载，需重新渲染
+    turnstileWidgetId = null
+    captchaToken.value = ''
+    turnstileError.value = ''
+    nextTick(() => {
+      if (window.turnstile) renderTurnstile()
+    })
+  }
 })
+
+// 动态加载 Turnstile 脚本并渲染 widget（复用自 Register.vue）
+function loadTurnstile() {
+  if (!turnstileSiteKey) return
+  if (window.turnstile) {
+    renderTurnstile()
+    return
+  }
+  const script = document.createElement('script')
+  script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js'
+  script.async = true
+  script.defer = true
+  script.onload = renderTurnstile
+  document.head.appendChild(script)
+}
+
+function renderTurnstile() {
+  if (!window.turnstile || !turnstileContainer.value) return
+  // 切换 Tab 重建容器后旧 ID 失效，先尝试移除避免重复
+  if (turnstileWidgetId !== null) {
+    try {
+      window.turnstile.remove(turnstileWidgetId)
+    } catch {
+      // ignore
+    }
+    turnstileWidgetId = null
+  }
+  turnstileWidgetId = window.turnstile.render(turnstileContainer.value, {
+    sitekey: turnstileSiteKey,
+    callback: token => {
+      captchaToken.value = token
+      turnstileError.value = ''
+    },
+    'expired-callback': () => {
+      captchaToken.value = ''
+      turnstileError.value = '人机验证已过期，请重新完成'
+    },
+    'error-callback': () => {
+      captchaToken.value = ''
+      turnstileError.value = '人机验证失败，请刷新重试'
+    }
+  })
+}
+
+function resetTurnstile() {
+  if (window.turnstile && turnstileWidgetId !== null) {
+    window.turnstile.reset(turnstileWidgetId)
+  }
+  captchaToken.value = ''
+}
 
 async function handleBangmioLogin() {
   if (!email.value || !password.value) return
+  if (turnstileSiteKey && !captchaToken.value) return
   try {
-    await auth.loginWithBangmio(email.value, password.value)
+    await auth.loginWithBangmio(email.value, password.value, captchaToken.value)
   } catch {
-    // 错误已写入 auth.error
+    // 错误已写入 auth.error；Turnstile token 一次性，需重置
+    resetTurnstile()
   }
 }
 
@@ -158,4 +242,16 @@ async function oauthLogin() {
 function handleTokenLogin() {
   if (token.value) auth.loginWithBangumi(token.value)
 }
+
+onMounted(loadTurnstile)
+
+onBeforeUnmount(() => {
+  if (window.turnstile && turnstileWidgetId !== null) {
+    try {
+      window.turnstile.remove(turnstileWidgetId)
+    } catch {
+      // ignore
+    }
+  }
+})
 </script>

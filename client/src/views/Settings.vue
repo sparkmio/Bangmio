@@ -9,6 +9,62 @@
       <h1 class="text-2xl font-semibold text-base-content">设置</h1>
     </div>
 
+    <!-- 账号安全（仅 Bangmio 用户显示） -->
+    <div v-if="auth.isBangmioUser" class="rounded-xl bg-base-200/40 p-5 mb-4">
+      <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+        账号安全
+      </h2>
+
+      <div v-if="passwordSuccess" class="alert alert-success mb-3 py-2">
+        <span class="text-sm">{{ passwordSuccess }}</span>
+      </div>
+      <div v-if="passwordError" class="alert alert-error mb-3 py-2">
+        <span class="text-sm">{{ passwordError }}</span>
+      </div>
+
+      <form class="flex flex-col gap-3" @submit.prevent="handleChangePassword">
+        <div class="flex flex-col gap-1.5">
+          <input
+            v-model="currentPassword"
+            type="password"
+            placeholder="原密码"
+            class="input input-bordered w-full"
+            autocomplete="current-password"
+          />
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          <input
+            v-model="newPassword"
+            type="password"
+            placeholder="新密码（至少 8 位）"
+            class="input input-bordered w-full"
+            autocomplete="new-password"
+          />
+          <p v-if="newPasswordError" class="text-xs text-error ml-1">{{ newPasswordError }}</p>
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          <input
+            v-model="confirmPassword"
+            type="password"
+            placeholder="确认新密码"
+            class="input input-bordered w-full"
+            autocomplete="new-password"
+          />
+          <p v-if="confirmError" class="text-xs text-error ml-1">{{ confirmError }}</p>
+        </div>
+
+        <button
+          type="submit"
+          :disabled="auth.loading || !canChangePassword"
+          class="btn btn-primary w-full"
+        >
+          {{ auth.loading ? '更新中...' : '更新密码' }}
+        </button>
+      </form>
+    </div>
+
     <div class="rounded-xl bg-base-200/40 p-5 mb-4">
       <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">外观</h2>
 
@@ -201,14 +257,58 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useThemeStore } from '../stores/theme'
+import { useAuthStore } from '../stores/auth'
+
 const theme = useThemeStore()
+const auth = useAuthStore()
 
 const mirror = ref(localStorage.getItem('bangmio_mirror') || 'intl')
 
 function setMirror(val) {
   mirror.value = val
   localStorage.setItem('bangmio_mirror', val)
+}
+
+// 账号安全：修改密码表单（仅 Bangmio 用户）
+const currentPassword = ref('')
+const newPassword = ref('')
+const confirmPassword = ref('')
+const passwordSuccess = ref('')
+const passwordError = ref('')
+
+const newPasswordError = computed(() => {
+  if (!newPassword.value) return ''
+  if (newPassword.value.length < 8) return '密码至少 8 位'
+  return ''
+})
+
+const confirmError = computed(() => {
+  if (!confirmPassword.value) return ''
+  if (confirmPassword.value !== newPassword.value) return '两次密码不一致'
+  return ''
+})
+
+const canChangePassword = computed(
+  () =>
+    !!currentPassword.value &&
+    newPassword.value.length >= 8 &&
+    confirmPassword.value === newPassword.value
+)
+
+async function handleChangePassword() {
+  if (!canChangePassword.value) return
+  passwordSuccess.value = ''
+  passwordError.value = ''
+  try {
+    await auth.changePassword(currentPassword.value, newPassword.value)
+    passwordSuccess.value = '密码已更新'
+    currentPassword.value = ''
+    newPassword.value = ''
+    confirmPassword.value = ''
+  } catch (err) {
+    passwordError.value = err.response?.data?.error || auth.error || '密码更新失败'
+  }
 }
 </script>

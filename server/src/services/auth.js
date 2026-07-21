@@ -29,7 +29,9 @@ import {
   updateUserBgmBinding,
   clearUserBgmBinding,
   getUserBgmBinding,
-  userExistsByEmail
+  userExistsByEmail,
+  getUserCredentialsById,
+  updateUserPassword
 } from '../db/users.js'
 import {
   generateNumericCode,
@@ -442,4 +444,76 @@ export async function bindBangumiByOAuth(
     user: { id: updated.id, email: updated.email, bgmUid: updated.bgmUid },
     bgmToken: accessToken
   }
+}
+
+/**
+ * 修改用户密码（需验证原密码）。
+ *
+ * 流程：
+ * 1. 校验新密码长度（≥ 8 位）
+ * 2. 根据 userId 查询用户完整凭证（含 password_hash、salt）
+ * 3. 验证原密码，失败抛 `httpError(400, '原密码错误')`
+ * 4. 生成新 salt + PBKDF2 哈希
+ * 5. 调用 `updateUserPassword` 写入 D1
+ *
+ * @param {D1Database} db - D1 binding（`c.env.DB`）。
+ * @param {object} env - 环境变量（保留参数，便于未来扩展）。
+ * @param {string} userId - 当前用户 ID。
+ * @param {string} currentPassword - 用户输入的原密码。
+ * @param {string} newPassword - 用户输入的新密码（≥ 8 位）。
+ * @returns {Promise<{ success: true }>} 操作结果。
+ * @throws {Error} 当新密码过短、用户不存在、原密码错误或更新失败时抛出 httpError。
+ */
+export async function changeUserPassword(db, env, userId, currentPassword, newPassword) {
+  if (!newPassword || String(newPassword).length < 8) {
+    throw httpError(400, '新密码至少 8 位')
+  }
+  const user = await getUserCredentialsById(db, userId)
+  if (!user) {
+    throw httpError(404, '用户不存在')
+  }
+  const ok = await verifyPassword(currentPassword, user.salt, user.passwordHash)
+  if (!ok) {
+    throw httpError(400, '原密码错误')
+  }
+  const salt = generateSalt()
+  const passwordHash = await hashPassword(newPassword, salt)
+  await updateUserPassword(db, userId, passwordHash, salt)
+  logInfo('用户修改密码成功', { userId })
+  return { success: true }
+}
+
+/**
+ * 重置用户密码（通过邮箱验证码，无需原密码）。
+ *
+ * 流程：
+ * 1. 校验新密码长度（≥ 8 位）
+ * 2. 校验验证码（purpose='reset'），失败抛 `httpError(400, '验证码错误或已过期')`
+ * 3. 根据邮箱查询用户，不存在抛 `httpError(404, '用户不存在')`
+ * 4. 生成新 salt + PBKDF2 哈希
+ * 5. 调用 `updateUserPassword` 写入 D1
+ *
+ * @param {D1Database} db - D1 binding（`c.env.DB`）。
+ * @param {object} env - 环境变量（保留参数，便于未来扩展）。
+ * @param {{ email: string, code: string, newPassword: string }} input - 重置信息。
+ * @returns {Promise<{ success: true }>} 操作结果。
+ * @throws {Error} 当新密码过短、验证码错误、用户不存在或更新失败时抛出 httpError。
+ */
+export async function resetUserPassword(db, env, { email, code, newPassword }) {
+  if (!newPassword || String(newPassword).length < 8) {
+    throw httpError(400, '新密码至少 8 位')
+  }
+  const codeOk = await verifyCode(db, email, String(code), 'reset')
+  if (!codeOk) {
+    throw httpError(400, '验证码错误或已过期')
+  }
+  const user = await getUserByEmail(db, email)
+  if (!user) {
+    throw httpError(404, '用户不存在')
+  }
+  const salt = generateSalt()
+  const passwordHash = await hashPassword(newPassword, salt)
+  await updateUserPassword(db, user.id, passwordHash, salt)
+  logInfo('用户重置密码成功', { userId: user.id, email })
+  return { success: true }
 }

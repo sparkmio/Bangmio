@@ -37,9 +37,9 @@
         <router-link to="/profile" class="btn btn-ghost btn-sm btn-circle avatar">
           <div class="w-7 h-7 rounded-full ring-2 ring-primary/30">
             <img
-              v-if="auth.user?.avatar?.medium || auth.user?.avatar?.large"
-              :src="auth.user.avatar.medium || auth.user.avatar.large"
-              :alt="auth.user?.nickname || auth.user?.username || ''"
+              v-if="auth.effectiveUser?.avatar?.medium || auth.effectiveUser?.avatar?.large"
+              :src="auth.effectiveUser.avatar.medium || auth.effectiveUser.avatar.large"
+              :alt="auth.effectiveUser?.nickname || auth.effectiveUser?.username || ''"
               class="rounded-full"
               decoding="async"
             />
@@ -47,7 +47,10 @@
               v-else
               class="w-7 h-7 rounded-full bg-primary text-primary-content flex items-center justify-center text-xs font-bold"
             >
-              {{ auth.user?.nickname?.[0] || auth.user?.username?.[0]?.toUpperCase() }}
+              {{
+                auth.effectiveUser?.nickname?.[0] ||
+                auth.effectiveUser?.username?.[0]?.toUpperCase()
+              }}
             </div>
           </div>
         </router-link>

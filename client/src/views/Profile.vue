@@ -591,7 +591,7 @@ const route = useRoute()
 const auth = useAuthStore()
 
 // 当前查看的用户名
-const currentUsername = computed(() => route.params.username || auth.user?.username)
+const currentUsername = computed(() => route.params.username || auth.effectiveUser?.username)
 
 // 用户资料
 const profileUser = ref(null)
@@ -776,7 +776,7 @@ async function loadProfile() {
       profileUser.value = null
     }
   } else {
-    profileUser.value = auth.user
+    profileUser.value = auth.effectiveUser
   }
 }
 

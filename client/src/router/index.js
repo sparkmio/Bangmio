@@ -65,6 +65,16 @@ const routes = [
     component: () => import(/* webpackChunkName: "register" */ '../views/Register.vue')
   },
   {
+    path: '/forgot-password',
+    name: 'ForgotPassword',
+    component: () => import(/* webpackChunkName: "forgot-password" */ '../views/ForgotPassword.vue')
+  },
+  {
+    path: '/reset-password',
+    name: 'ResetPassword',
+    component: () => import(/* webpackChunkName: "reset-password" */ '../views/ResetPassword.vue')
+  },
+  {
     path: '/login/callback',
     name: 'LoginCallback',
     component: () => import(/* webpackChunkName: "login-callback" */ '../views/LoginCallback.vue')
