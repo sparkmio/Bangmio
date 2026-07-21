@@ -658,39 +658,49 @@
             </template>
           </div>
         </div>
+      </div>
 
-        <!-- 豆瓣热门短评 -->
-        <div v-if="doubanComments.length" class="mt-6 bg-base-200/40 rounded-xl p-5">
-          <h4 class="text-sm font-semibold text-base-content/70 mb-3">豆瓣热门短评</h4>
-          <div class="space-y-3">
-            <div
-              v-for="(c, i) in doubanComments.slice(0, showAllComments ? 999 : 5)"
-              :key="i"
-              class="text-sm"
-            >
-              <div class="flex items-center gap-2 mb-1">
-                <span class="font-medium text-base-content/80">{{ c.user }}</span>
-                <span v-if="c.rating" class="text-amber-500 text-xs">{{
-                  '★'.repeat(Math.round(c.rating / 2))
-                }}</span>
-                <span class="text-xs text-base-content/40">{{ c.time }}</span>
-                <span v-if="c.useful" class="text-xs text-base-content/40 ml-auto"
-                  >{{ c.useful }} 有用</span
-                >
-              </div>
-              <p class="text-base-content/70 leading-relaxed">
-                {{ c.content }}
-              </p>
-            </div>
-          </div>
-          <button
-            v-if="doubanComments.length > 5"
-            class="btn btn-xs btn-ghost mt-3"
-            @click="showAllComments = !showAllComments"
-          >
-            {{ showAllComments ? '收起' : `查看全部 ${doubanComments.length} 条` }}
-          </button>
+      <!-- 豆瓣 -->
+      <div v-show="activeTab === 'douban'">
+        <div v-if="doubanLoading" class="flex justify-center py-10">
+          <span class="loading loading-spinner loading-lg text-primary" />
         </div>
+        <div v-else-if="doubanDetails" class="space-y-4">
+          <div class="bg-base-200/40 rounded-xl p-5 text-center">
+            <p class="text-4xl font-black text-amber-500">
+              {{ doubanDetails.rate || '-' }}
+            </p>
+            <div class="flex items-center gap-0.5 mt-1 justify-center">
+              <svg
+                v-for="i in 5"
+                :key="i"
+                class="w-4 h-4"
+                :class="
+                  i <= Math.round(parseFloat(doubanDetails.rate) / 2)
+                    ? 'text-amber-400'
+                    : 'text-base-300'
+                "
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
+                />
+              </svg>
+            </div>
+            <p class="text-xs text-base-content/50 mt-1">豆瓣评分</p>
+            <a :href="doubanDetails.url" target="_blank" class="btn btn-xs btn-ghost mt-3 w-full"
+              >查看详情 →</a
+            >
+          </div>
+          <IframeEmbed
+            v-if="doubanDetails.id"
+            :src="`/api/v1/douban/page/${doubanDetails.id}`"
+            title="豆瓣评论"
+            loading-text="正在加载豆瓣评论..."
+          />
+        </div>
+        <div v-else class="py-10 text-center text-base-content/40 text-sm">未找到豆瓣条目</div>
       </div>
 
       <!-- 音乐 -->
@@ -787,34 +797,13 @@
         <div v-if="moegirlLoading" class="flex justify-center py-10">
           <span class="loading loading-spinner loading-lg text-primary" />
         </div>
-        <div v-else-if="moegirlPage && moegirlPage.html" class="space-y-4">
-          <h3 class="text-sm font-semibold text-base-content/60">
-            {{ moegirlPage.title }}
-          </h3>
-          <div
-            v-safe-html="moegirlPage.html"
-            class="bg-base-200/40 rounded-lg p-5 moegirl-content"
-          />
-          <a :href="moegirlPage.url" target="_blank" class="btn btn-sm btn-ghost w-full"
-            >在萌娘百科查看完整页面 →</a
-          >
-        </div>
-        <div v-else-if="moegirlResults.length" class="space-y-2">
-          <p class="text-xs text-base-content/50 mb-2">未找到自动匹配，请选择：</p>
-          <a
-            v-for="r in moegirlResults"
-            :key="r.title"
-            :href="r.url"
-            target="_blank"
-            class="card bg-base-200/40 hover:bg-base-200/60 transition-colors w-full text-left p-4 block"
-          >
-            <h4 class="text-sm font-medium text-base-content">{{ r.title }}</h4>
-            <p class="text-xs text-base-content/50 mt-1 line-clamp-2">{{ r.description }}</p>
-          </a>
-        </div>
-        <div v-else class="py-10 text-center text-base-content/40 text-sm">
-          暂无萌娘百科相关条目
-        </div>
+        <IframeEmbed
+          v-else-if="moegirlPageName"
+          :src="`/api/v1/moegirl/page/${encodeURIComponent(moegirlPageName)}`"
+          title="萌娘百科"
+          loading-text="正在加载萌娘百科..."
+        />
+        <div v-else class="py-10 text-center text-base-content/40 text-sm">未找到萌娘百科条目</div>
       </div>
     </div>
   </div>
@@ -838,6 +827,7 @@ import CollectionButton from '../components/CollectionButton.vue'
 import StarRating from '../components/StarRating.vue'
 import AnimeCard from '../components/AnimeCard.vue'
 import CommentSection from '../components/CommentSection.vue'
+import IframeEmbed from '../components/IframeEmbed.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -853,6 +843,7 @@ const tabs = [
   { key: 'topics', label: '讨论版' },
   { key: 'wiki', label: 'wiki' },
   { key: 'rating', label: '评分' },
+  { key: 'douban', label: '豆瓣' },
   { key: 'music', label: '音乐' },
   { key: 'streaming', label: '在线观看' },
   { key: 'moegirl', label: '萌娘百科' }
@@ -866,14 +857,11 @@ const relations = ref([])
 const episodeList = ref([])
 const doubanDetails = ref(null)
 const doubanLoading = ref(false)
-const doubanComments = ref([])
 const bilibiliDetails = ref(null)
 const bilibiliLoading = ref(false)
-const showAllComments = ref(false)
 const topics = ref([])
 const topicLoading = ref(false)
-const moegirlResults = ref([])
-const moegirlPage = ref(null)
+const moegirlPageName = ref('')
 const moegirlLoading = ref(false)
 const showNewTopicModal = ref(false)
 const newTopicTitle = ref('')
@@ -941,16 +929,6 @@ async function fetchDoubanDetails() {
     const name = anime.value?.name_cn || anime.value?.name
     const res = await doubanAPI.getDetails(id, name)
     doubanDetails.value = res.data?.data || null
-    // 获取豆瓣热门短评
-    if (res.data?.data?.douban_id || res.data?.data?.id) {
-      const did = res.data.data.douban_id || res.data.data.id
-      try {
-        const cRes = await doubanAPI.getComments(did)
-        doubanComments.value = cRes.data?.data || []
-      } catch {
-        doubanComments.value = []
-      }
-    }
   } catch {
     doubanDetails.value = null
   }
@@ -991,28 +969,26 @@ async function fetchMoegirlSearch() {
   moegirlLoading.value = true
   try {
     const names = [anime.value.name_cn, anime.value.name].filter(Boolean)
-    let data = null
+    let results = null
     for (const name of names) {
-      if (!name || data) break
+      if (!name || results?.length) break
       const res = await moegirlAPI.search(name)
       const d = res.data?.data
-      if (d?.results?.length) data = d
+      if (d?.results?.length) results = d.results
     }
-    if (!data && names[0]) {
+    if (!results?.length && names[0]) {
       const clean = names[0]
         .replace(/[（(].+[)）]|第[一二三四五六七八九十\d]+季|OVA|剧场版|特别篇/g, '')
         .trim()
       if (clean && clean !== names[0]) {
         const res = await moegirlAPI.search(clean)
         const d = res.data?.data
-        if (d?.results?.length) data = d
+        if (d?.results?.length) results = d.results
       }
     }
-    moegirlResults.value = data?.results || []
-    moegirlPage.value = data?.page || null
+    moegirlPageName.value = results?.[0]?.title || ''
   } catch {
-    moegirlResults.value = []
-    moegirlPage.value = null
+    moegirlPageName.value = ''
   }
   moegirlLoading.value = false
 }
@@ -1158,13 +1134,8 @@ watch(activeTab, tab => {
     !bilibiliLoading.value
   )
     fetchRatingDetails()
-  if (
-    tab === 'moegirl' &&
-    moegirlResults.value.length === 0 &&
-    !moegirlPage.value &&
-    !moegirlLoading.value
-  )
-    fetchMoegirlSearch()
+  if (tab === 'douban' && !doubanDetails.value && !doubanLoading.value) fetchDoubanDetails()
+  if (tab === 'moegirl' && !moegirlPageName.value && !moegirlLoading.value) fetchMoegirlSearch()
 })
 
 watch(
@@ -1176,10 +1147,8 @@ watch(
       collectionComment.value = ''
       topics.value = []
       doubanDetails.value = null
-      doubanComments.value = []
       bilibiliDetails.value = null
-      moegirlResults.value = []
-      moegirlPage.value = null
+      moegirlPageName.value = ''
       activeTab.value = 'overview'
       fetchDetail()
     }
@@ -1188,69 +1157,3 @@ watch(
 
 onMounted(fetchDetail)
 </script>
-
-<style scoped>
-.moegirl-content :deep(table) {
-  width: 100%;
-  border-collapse: collapse;
-}
-.moegirl-content :deep(td),
-.moegirl-content :deep(th) {
-  border: 1px solid hsl(var(--b3) / 0.3);
-  padding: 0.4rem 0.6rem;
-  font-size: 0.8rem;
-}
-.moegirl-content :deep(th) {
-  background: hsl(var(--b3) / 0.15);
-}
-.moegirl-content :deep(img) {
-  max-width: 100%;
-  height: auto;
-}
-.moegirl-content :deep(a) {
-  color: hsl(var(--p));
-}
-.moegirl-content :deep(h2) {
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin-top: 1rem;
-  margin-bottom: 0.5rem;
-  border-bottom: 1px solid hsl(var(--b3) / 0.2);
-  padding-bottom: 0.25rem;
-}
-.moegirl-content :deep(h3) {
-  font-size: 1rem;
-  font-weight: 600;
-  margin-top: 0.8rem;
-  margin-bottom: 0.4rem;
-}
-.moegirl-content :deep(.mw-headline) {
-  font-weight: 600;
-}
-.moegirl-content :deep(ul),
-.moegirl-content :deep(ol) {
-  padding-left: 1.5rem;
-  margin: 0.5rem 0;
-}
-.moegirl-content :deep(li) {
-  margin: 0.2rem 0;
-}
-.moegirl-content :deep(p) {
-  margin: 0.6rem 0;
-  line-height: 1.7;
-}
-.moegirl-content :deep(b),
-.moegirl-content :deep(strong) {
-  font-weight: 600;
-}
-.moegirl-content :deep(.infobox) {
-  float: right;
-  max-width: 280px;
-  margin: 0 0 0.5rem 0.5rem;
-  font-size: 0.75rem;
-}
-.moegirl-content :deep(.thumb) {
-  max-width: 200px;
-  margin: 0.25rem;
-}
-</style>

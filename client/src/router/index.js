@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 
 const routes = [
   {
@@ -59,6 +60,11 @@ const routes = [
     component: () => import(/* webpackChunkName: "login" */ '../views/Login.vue')
   },
   {
+    path: '/register',
+    name: 'Register',
+    component: () => import(/* webpackChunkName: "register" */ '../views/Register.vue')
+  },
+  {
     path: '/login/callback',
     name: 'LoginCallback',
     component: () => import(/* webpackChunkName: "login-callback" */ '../views/LoginCallback.vue')
@@ -113,8 +119,15 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth) {
-    const token = localStorage.getItem('bangmio_token')
-    if (!token) return next('/login')
+    const auth = useAuthStore()
+    // 未登录：跳转登录页并带 redirect query
+    if (!auth.isAuthenticated) {
+      return next(`/login?redirect=${encodeURIComponent(to.fullPath)}`)
+    }
+    // Bangmio 用户未绑定 Bangumi：不阻止导航，通过 store 状态触发绑定弹窗
+    if (auth.isBangmioUser && !auth.isBound) {
+      auth.setShowBindModal(true)
+    }
   }
   next()
 })

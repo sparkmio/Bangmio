@@ -5,6 +5,13 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['**/*.test.js'],
-    exclude: ['**/node_modules/**', 'client/**', 'functions/**', 'dist/**']
+    // 允许 client/src 下的 .test.js 被执行；仅排除 client 构建产物与 node_modules
+    exclude: [
+      '**/node_modules/**',
+      'functions/**',
+      'dist/**',
+      'client/dist/**',
+      'client/node_modules/**'
+    ]
   }
 })

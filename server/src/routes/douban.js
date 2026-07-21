@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { parseHTML } from 'linkedom'
 import * as bangumiService from '../services/bangumi.js'
 import {
   searchDouban,
@@ -7,11 +8,60 @@ import {
   getDoubanReviews
 } from '../services/douban.js'
 import { createCache } from '../utils/cache.js'
+import { fetchHTML } from '../utils/http.js'
 import { CACHE_TTL_DOUBAN } from '../config.js'
 
 const app = new Hono()
 
 const cache = createCache(CACHE_TTL_DOUBAN)
+
+/** 豆瓣页面代理缓存（5 分钟） */
+const pageCache = createCache(5 * 60 * 1000)
+
+/** 需要从豆瓣页面移除的选择器列表 */
+const DOUBAN_REMOVE_SELECTORS = [
+  '.top-nav-wrapper',
+  '.nav-wrapper',
+  '#dale_movie_subject_top_icon',
+  '.sidebar',
+  '#recommendations',
+  '.extra',
+  'iframe',
+  'script',
+  'style'
+]
+
+/**
+ * 判断元素的 class 是否包含广告类标识（ad/promo/banner）。
+ * 使用边界匹配避免误删含 "ad" 子串的正常类名（如 header、loaded）。
+ * @param {Element} el - DOM 元素。
+ * @returns {boolean} 若 class 含广告标识返回 true，否则 false。
+ */
+function isAdElement(el) {
+  const cls = el.getAttribute('class') || ''
+  if (!cls) return false
+  return /(^|[\s_-])(ad|advert|advertisement|promo|promotion|banner)/i.test(cls)
+}
+
+/**
+ * 清洗豆瓣条目页面 HTML：移除导航、侧栏、推荐、脚本、样式及广告元素。
+ * 保留评分区（#interest_sectl）、短评区（.comment-item）、长评区（.review-item）等核心内容。
+ * @param {string} html - 原始页面 HTML。
+ * @returns {string} 清洗后的 HTML 片段。
+ */
+export function cleanDoubanPage(html) {
+  const { document } = parseHTML(html)
+
+  DOUBAN_REMOVE_SELECTORS.forEach(sel => {
+    document.querySelectorAll(sel).forEach(el => el.remove())
+  })
+
+  document.querySelectorAll('[class]').forEach(el => {
+    if (isAdElement(el)) el.remove()
+  })
+
+  return document.body ? document.body.innerHTML : document.documentElement.innerHTML
+}
 
 function isChina(c) {
   return (c.env?.CF_IP_COUNTRY || '') === 'CN'
@@ -147,6 +197,38 @@ app.get('/:id/reviews', async c => {
     return c.json({ data: reviews })
   } catch {
     return c.json({ data: [] })
+  }
+})
+
+/**
+ * 豆瓣条目页面代理。
+ * 抓取豆瓣条目页面，移除导航/侧栏/推荐/广告等噪声后返回清洗的 HTML 片段。
+ * 保留评分区（#interest_sectl）、短评区（.comment-item）、长评区（.review-item）等核心内容。
+ * 使用 5 分钟内存缓存，抓取失败返回 502。
+ *
+ * @route GET /page/:id
+ * @param {string} id - 豆瓣条目 ID。
+ * @returns {Response} Content-Type 为 text/html; charset=utf-8 的 HTML 片段；失败返回 502 JSON。
+ */
+app.get('/page/:id', async c => {
+  try {
+    const id = c.req.param('id')
+    if (!id) return c.json({ data: null, error: '缺少ID', code: 400 }, 400)
+
+    const cacheKey = `douban_page_${id}`
+    const cached = pageCache.get(cacheKey)
+    if (cached) {
+      return c.html(cached, 200, { 'Content-Type': 'text/html; charset=utf-8' })
+    }
+
+    const url = `https://movie.douban.com/subject/${id}/`
+    const html = await fetchHTML(url)
+    const fragment = cleanDoubanPage(html)
+
+    pageCache.set(cacheKey, fragment)
+    return c.html(fragment, 200, { 'Content-Type': 'text/html; charset=utf-8' })
+  } catch {
+    return c.json({ data: null, error: '上游服务暂不可用', code: 502 }, 502)
   }
 })
 

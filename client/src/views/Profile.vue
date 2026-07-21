@@ -585,6 +585,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { collectionAPI, userAPI } from '../api/endpoints'
+import { getStatusLabels } from '../utils/subjectType'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -618,43 +619,26 @@ const friends = ref([])
 const groups = ref([])
 
 // 媒介类型配置：顺序即左侧主栏展示顺序
+// 状态用语通过 getStatusLabels 动态生成（Task 16）
+// 注意：subjectType.js 中 labels.collect 对应「在看」（进行中），labels.do 对应「看过」（已完成）
+// Bangumi collection type: 3=doing, 2=collected, 1=wish, 4=on_hold, 5=dropped
+function buildStatuses(subjectType, shortList = false) {
+  const labels = getStatusLabels(subjectType)
+  const all = [
+    { type: 3, label: labels.collect },
+    { type: 2, label: labels.do },
+    { type: 1, label: labels.wish },
+    { type: 4, label: labels.on_hold },
+    { type: 5, label: labels.dropped }
+  ]
+  return shortList ? all.slice(0, 3) : all
+}
+
 const TYPE_CONFIG = {
-  2: {
-    label: '动画',
-    statuses: [
-      { type: 3, label: '在看' },
-      { type: 2, label: '看过' },
-      { type: 1, label: '想看' },
-      { type: 4, label: '搁置' },
-      { type: 5, label: '弃番' }
-    ]
-  },
-  4: {
-    label: '游戏',
-    statuses: [
-      { type: 3, label: '在玩' },
-      { type: 2, label: '玩过' },
-      { type: 1, label: '想玩' },
-      { type: 4, label: '搁置' },
-      { type: 5, label: '弃玩' }
-    ]
-  },
-  1: {
-    label: '书籍',
-    statuses: [
-      { type: 3, label: '在读' },
-      { type: 2, label: '读过' },
-      { type: 1, label: '想读' }
-    ]
-  },
-  3: {
-    label: '音乐',
-    statuses: [
-      { type: 3, label: '在听' },
-      { type: 2, label: '听过' },
-      { type: 1, label: '想听' }
-    ]
-  }
+  2: { label: '动画', statuses: buildStatuses(2) },
+  4: { label: '游戏', statuses: buildStatuses(4) },
+  1: { label: '书籍', statuses: buildStatuses(1, true) },
+  3: { label: '音乐', statuses: buildStatuses(3, true) }
 }
 
 // 统计面板 tab
@@ -680,9 +664,18 @@ const navTabs = [
   { label: '天窗', kind: 'link', target: username => `https://bgm.tv/user/${username}/doujin` }
 ]
 
-// 状态标签与样式
-function statusLabel(s) {
-  return { 1: '想看', 2: '看过', 3: '在看', 4: '搁置', 5: '弃番' }[s] || ''
+// 状态标签与样式：根据 subject type 动态生成
+function statusLabel(s, subjectType = 2) {
+  if (!s) return ''
+  const labels = getStatusLabels(subjectType)
+  const map = {
+    1: labels.wish,
+    2: labels.do,
+    3: labels.collect,
+    4: labels.on_hold,
+    5: labels.dropped
+  }
+  return map[s] || ''
 }
 
 function statusBadgeClass(s) {
@@ -700,7 +693,8 @@ function statusBadgeClass(s) {
 // timeline 项类型标签：兼容字符串与数字
 function timelineTypeLabel(item) {
   if (typeof item.type === 'string' && item.type) return item.type
-  return statusLabel(item.type)
+  const subjectType = item.subject?.type || item.subject_type || 2
+  return statusLabel(item.type, subjectType)
 }
 
 // timeline 项 badge 样式

@@ -1613,18 +1613,43 @@ var compose = (middleware, onError, onNotFound) => {
 // server/node_modules/hono/dist/request/constants.js
 var GET_MATCH_RESULT = /* @__PURE__ */ Symbol();
 
+// server/node_modules/hono/dist/utils/buffer.js
+var bufferToFormData = (arrayBuffer, contentType) => {
+  const response = new Response(arrayBuffer, {
+    headers: {
+      // Normalize the media type (case-insensitive) while keeping parameters like the boundary
+      "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase())
+    }
+  });
+  return response.formData();
+};
+
 // server/node_modules/hono/dist/utils/body.js
+var isRawRequest = (request) => "headers" in request;
 var parseBody = async (request, options = /* @__PURE__ */ Object.create(null)) => {
   const { all = false, dot = false } = options;
-  const headers2 = request instanceof HonoRequest ? request.raw.headers : request.headers;
+  const headers2 = isRawRequest(request) ? request.headers : request.raw.headers;
   const contentType = headers2.get("Content-Type");
-  if (contentType?.startsWith("multipart/form-data") || contentType?.startsWith("application/x-www-form-urlencoded")) {
+  const mediaType = contentType?.split(";")[0].trim().toLowerCase();
+  if (mediaType === "multipart/form-data" || mediaType === "application/x-www-form-urlencoded") {
     return parseFormData(request, { all, dot });
   }
   return {};
 };
 async function parseFormData(request, options) {
-  const formData = await request.formData();
+  if (!isRawRequest(request) && request.bodyCache.formData) {
+    return convertFormDataToBodyData(
+      await request.bodyCache.formData,
+      options
+    );
+  }
+  const headers2 = isRawRequest(request) ? request.headers : request.raw.headers;
+  const arrayBuffer = await request.arrayBuffer();
+  const formDataPromise = bufferToFormData(arrayBuffer, headers2.get("Content-Type") || "");
+  if (!isRawRequest(request)) {
+    request.bodyCache.formData = formDataPromise;
+  }
+  const formData = await formDataPromise;
   if (formData) {
     return convertFormDataToBodyData(formData, options);
   }
@@ -2737,14 +2762,14 @@ var Hono = class _Hono {
    * app.route("/api", app2) // GET /api/user
    * ```
    */
-  route(path, app10) {
+  route(path, app11) {
     const subApp = this.basePath(path);
-    app10.routes.map((r) => {
+    app11.routes.map((r) => {
       let handler4;
-      if (app10.errorHandler === errorHandler) {
+      if (app11.errorHandler === errorHandler) {
         handler4 = r.handler;
       } else {
-        handler4 = async (c, next) => (await compose([], app10.errorHandler)(c, () => r.handler(c, next))).res;
+        handler4 = async (c, next) => (await compose([], app11.errorHandler)(c, () => r.handler(c, next))).res;
         handler4[COMPOSED_HANDLER] = r.handler;
       }
       subApp.#addRoute(r.method, r.path, handler4, r.basePath);
@@ -3561,6 +3586,15 @@ var Node2 = class _Node2 {
             if (m) {
               params[name] = m[0];
               this.#pushHandlerSets(handlerSets, child, method, node.#params, params);
+              if (m[0].length === restPathString.length && child.#children["*"]) {
+                this.#pushHandlerSets(
+                  handlerSets,
+                  child.#children["*"],
+                  method,
+                  node.#params,
+                  params
+                );
+              }
               if (hasChildren(child.#children)) {
                 child.#params = params;
                 const componentCount = m[0].match(/\//)?.length ?? 0;
@@ -3731,6 +3765,9 @@ function emit(level, msg, meta) {
   };
   console.log(JSON.stringify(payload));
 }
+function logInfo(msg, meta = {}) {
+  emit("info", msg, meta);
+}
 function logError(msg, meta = {}) {
   emit("error", msg, meta);
 }
@@ -3798,6 +3835,570 @@ var RATE_LIMIT_MAX_POST = 10;
 var RATE_LIMIT_MAX_GET = 60;
 var MAX_CONTENT_LENGTH = 5e3;
 var MAX_TITLE_LENGTH = 200;
+
+// server/src/utils/jwt.js
+var DEFAULT_EXPIRES_IN = 7 * 24 * 3600;
+var JWT_ALG = "HS256";
+function strToBytes(str) {
+  return new TextEncoder().encode(str);
+}
+function base64urlEncode(data) {
+  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function base64urlDecode(str) {
+  const padded = str.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - str.length % 4) % 4);
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+function timingSafeEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+async function hmacSha256(message, secret) {
+  const key2 = await crypto.subtle.importKey(
+    "raw",
+    strToBytes(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  return crypto.subtle.sign("HMAC", key2, strToBytes(message));
+}
+async function signJwt(payload, secret, expiresInSeconds = DEFAULT_EXPIRES_IN) {
+  const header = { alg: JWT_ALG, typ: "JWT" };
+  const now = Math.floor(Date.now() / 1e3);
+  const body = {
+    ...payload,
+    iat: now,
+    exp: now + expiresInSeconds
+  };
+  const encHeader = base64urlEncode(strToBytes(JSON.stringify(header)));
+  const encBody = base64urlEncode(strToBytes(JSON.stringify(body)));
+  const signingInput = `${encHeader}.${encBody}`;
+  const sig = await hmacSha256(signingInput, secret);
+  const encSig = base64urlEncode(sig);
+  return `${signingInput}.${encSig}`;
+}
+async function verifyJwt(token, secret) {
+  if (typeof token !== "string" || token.length === 0) {
+    return { valid: false, error: "token \u4E3A\u7A7A" };
+  }
+  const parts = token.split(".");
+  if (parts.length !== 3) {
+    return { valid: false, error: "token \u683C\u5F0F\u9519\u8BEF" };
+  }
+  const [encHeader, encBody, encSig] = parts;
+  const signingInput = `${encHeader}.${encBody}`;
+  let expectedSig;
+  try {
+    expectedSig = await hmacSha256(signingInput, secret);
+  } catch {
+    return { valid: false, error: "\u7B7E\u540D\u8BA1\u7B97\u5931\u8D25" };
+  }
+  const expectedSigB64 = base64urlEncode(expectedSig);
+  if (!timingSafeEqual(expectedSigB64, encSig)) {
+    return { valid: false, error: "\u7B7E\u540D\u4E0D\u5339\u914D" };
+  }
+  let payload;
+  try {
+    payload = JSON.parse(new TextDecoder().decode(base64urlDecode(encBody)));
+  } catch {
+    return { valid: false, error: "payload \u89E3\u6790\u5931\u8D25" };
+  }
+  const now = Math.floor(Date.now() / 1e3);
+  if (typeof payload.exp !== "number" || now >= payload.exp) {
+    return { valid: false, error: "token \u5DF2\u8FC7\u671F" };
+  }
+  return { valid: true, payload };
+}
+
+// server/src/middleware/jwtAuth.js
+function jwtAuth() {
+  return async (c, next) => {
+    const authHeader = c.req.header("Authorization") || "";
+    const match2 = authHeader.match(/^Bearer\s+(.+)$/i);
+    if (!match2) {
+      return c.json({ data: null, error: "\u672A\u767B\u5F55", code: 401 }, 401);
+    }
+    const token = match2[1];
+    const secret = c.env?.JWT_SECRET;
+    const { valid, payload } = await verifyJwt(token, secret);
+    if (!valid || !payload) {
+      return c.json({ data: null, error: "\u672A\u767B\u5F55", code: 401 }, 401);
+    }
+    c.set("user", {
+      userId: payload.userId,
+      email: payload.email,
+      bgmUid: payload.bgmUid || null
+    });
+    await next();
+  };
+}
+
+// server/src/utils/crypto.js
+var PBKDF2_ITERATIONS = 1e5;
+var PBKDF2_KEY_BITS = 256;
+var AES_GCM_IV_BYTES = 12;
+var HKDF_INFO = "bangmio-token-encryption";
+function bufferToHex(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let hex = "";
+  for (let i = 0; i < bytes.length; i++) {
+    hex += bytes[i].toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+function hexToBuffer(hex) {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return bytes.buffer;
+}
+function generateSalt() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return bufferToHex(bytes.buffer);
+}
+async function hashPassword(password, saltHex) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: hexToBuffer(saltHex),
+      iterations: PBKDF2_ITERATIONS,
+      hash: "SHA-256"
+    },
+    keyMaterial,
+    PBKDF2_KEY_BITS
+  );
+  return bufferToHex(bits);
+}
+function timingSafeEqual2(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+async function verifyPassword(password, saltHex, hashHex) {
+  const computed = await hashPassword(password, saltHex);
+  return timingSafeEqual2(computed, hashHex);
+}
+async function deriveKey(secret, saltHex) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    "HKDF",
+    false,
+    ["deriveKey"]
+  );
+  return crypto.subtle.deriveKey(
+    {
+      name: "HKDF",
+      salt: hexToBuffer(saltHex),
+      info: enc.encode(HKDF_INFO),
+      hash: "SHA-256"
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+async function deriveSaltFromSecret(secret) {
+  const enc = new TextEncoder();
+  const digest = await crypto.subtle.digest("SHA-256", enc.encode(secret));
+  return bufferToHex(digest);
+}
+async function encryptToken(token, secret) {
+  const saltHex = await deriveSaltFromSecret(secret);
+  const key2 = await deriveKey(secret, saltHex);
+  const iv = crypto.getRandomValues(new Uint8Array(AES_GCM_IV_BYTES));
+  const enc = new TextEncoder();
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key2,
+    enc.encode(token)
+  );
+  return { encrypted: bufferToHex(ciphertext), iv: bufferToHex(iv.buffer) };
+}
+
+// server/src/db/users.js
+var USER_COLUMNS_FULL = `
+  id,
+  email,
+  password_hash AS passwordHash,
+  salt,
+  bgm_uid AS bgmUid,
+  bgm_token_encrypted AS bgmTokenEncrypted,
+  bgm_token_iv AS bgmTokenIv,
+  created_at AS createdAt,
+  updated_at AS updatedAt
+`;
+var USER_COLUMNS_PUBLIC = `
+  id,
+  email,
+  bgm_uid AS bgmUid,
+  created_at AS createdAt,
+  updated_at AS updatedAt
+`;
+async function createUser(db, { id, email, passwordHash, salt }) {
+  const now = Date.now();
+  try {
+    const result = await db.prepare(
+      `INSERT INTO users
+           (id, email, password_hash, salt, bgm_uid, bgm_token_encrypted, bgm_token_iv, created_at, updated_at)
+         VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?)`
+    ).bind(id, email, passwordHash, salt, now, now).run();
+    if (!result.success) {
+      throw new Error("D1 run() \u8FD4\u56DE success=false");
+    }
+  } catch (err) {
+    throw new Error(`createUser: \u5199\u5165\u5931\u8D25 (email=${email})`, { cause: err });
+  }
+  const created = await getUserById(db, id);
+  if (!created) {
+    throw new Error(`createUser: \u5199\u5165\u540E\u56DE\u67E5\u5931\u8D25 (id=${id})`);
+  }
+  return created;
+}
+async function getUserByEmail(db, email) {
+  try {
+    const row = await db.prepare(`SELECT ${USER_COLUMNS_FULL} FROM users WHERE email = ?`).bind(email).first();
+    return row || null;
+  } catch {
+    return null;
+  }
+}
+async function getUserById(db, id) {
+  try {
+    const row = await db.prepare(`SELECT ${USER_COLUMNS_PUBLIC} FROM users WHERE id = ?`).bind(id).first();
+    return row || null;
+  } catch {
+    return null;
+  }
+}
+async function updateUserBgmBinding(db, id, bgmUid, bgmTokenEncrypted, bgmTokenIv) {
+  const now = Date.now();
+  try {
+    const result = await db.prepare(
+      `UPDATE users
+           SET bgm_uid = ?, bgm_token_encrypted = ?, bgm_token_iv = ?, updated_at = ?
+         WHERE id = ?`
+    ).bind(bgmUid, bgmTokenEncrypted, bgmTokenIv, now, id).run();
+    if (!result.success) {
+      throw new Error("D1 run() \u8FD4\u56DE success=false");
+    }
+  } catch (err) {
+    throw new Error(`updateUserBgmBinding: \u66F4\u65B0\u5931\u8D25 (id=${id})`, { cause: err });
+  }
+  return getUserById(db, id);
+}
+async function clearUserBgmBinding(db, id) {
+  const now = Date.now();
+  try {
+    const result = await db.prepare(
+      `UPDATE users
+           SET bgm_uid = NULL, bgm_token_encrypted = NULL, bgm_token_iv = NULL, updated_at = ?
+         WHERE id = ?`
+    ).bind(now, id).run();
+    if (!result.success) {
+      throw new Error("D1 run() \u8FD4\u56DE success=false");
+    }
+  } catch (err) {
+    throw new Error(`clearUserBgmBinding: \u66F4\u65B0\u5931\u8D25 (id=${id})`, { cause: err });
+  }
+}
+async function userExistsByEmail(db, email) {
+  try {
+    const row = await db.prepare("SELECT 1 FROM users WHERE email = ? LIMIT 1").bind(email).first();
+    return row !== null;
+  } catch {
+    return false;
+  }
+}
+
+// server/src/utils/http.js
+var SCRAPE_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+async function fetchHTML(url, { timeout = 8e3, headers: headers2 = {} } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": SCRAPE_UA,
+        Accept: "text/html,application/xhtml+xml",
+        "Accept-Language": "zh-CN,zh;q=0.9",
+        ...headers2
+      }
+    });
+    clearTimeout(timer);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.text();
+  } catch (e) {
+    clearTimeout(timer);
+    logError("fetchHTML failed", { url, error: String(e) });
+    throw e;
+  }
+}
+async function fetchHTMLMulti(urls, { timeout = 8e3 } = {}) {
+  let lastErr;
+  for (const url of urls) {
+    try {
+      const html = await fetchHTML(url, { timeout });
+      if (html) return { html, url };
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error("All sources failed");
+}
+function stripTags(str) {
+  return (str || "").replace(/<[^>]+>/g, "").trim();
+}
+function unescapeHtml(str) {
+  return (str || "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+}
+function parseNumber(str) {
+  if (str == null) return 0;
+  const m = String(str).replace(/[^0-9]/g, "");
+  const n = parseInt(m);
+  return isNaN(n) ? 0 : n;
+}
+function fixUrl(url, base = "") {
+  if (!url) return "";
+  if (url.startsWith("//")) return `https:${url}`;
+  if (url.startsWith("/")) return `${base}${url}`;
+  return url;
+}
+
+// server/src/services/auth.js
+var BGM_ME_API = "https://api.bgm.tv/v0/me";
+function httpError(status, message) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+}
+async function registerUser(db, env, { email, password }) {
+  const exists = await userExistsByEmail(db, email);
+  if (exists) {
+    throw httpError(409, "\u90AE\u7BB1\u5DF2\u6CE8\u518C");
+  }
+  const salt = generateSalt();
+  const passwordHash = await hashPassword(password, salt);
+  const userId = crypto.randomUUID();
+  const user = await createUser(db, { id: userId, email, passwordHash, salt });
+  const token = await signJwt({ userId: user.id, email: user.email }, env.JWT_SECRET);
+  logInfo("\u7528\u6237\u6CE8\u518C\u6210\u529F", { userId: user.id, email });
+  return { token, user: { id: user.id, email: user.email, bgmUid: null } };
+}
+async function loginUser(db, env, { email, password }) {
+  const user = await getUserByEmail(db, email);
+  if (!user) {
+    throw httpError(401, "\u90AE\u7BB1\u6216\u5BC6\u7801\u9519\u8BEF");
+  }
+  const ok = await verifyPassword(password, user.salt, user.passwordHash);
+  if (!ok) {
+    throw httpError(401, "\u90AE\u7BB1\u6216\u5BC6\u7801\u9519\u8BEF");
+  }
+  const token = await signJwt(
+    { userId: user.id, email: user.email, bgmUid: user.bgmUid },
+    env.JWT_SECRET
+  );
+  logInfo("\u7528\u6237\u767B\u5F55\u6210\u529F", { userId: user.id, email });
+  return { token, user: { id: user.id, email: user.email, bgmUid: user.bgmUid } };
+}
+async function bindBangumi(db, env, userId, bangumiToken) {
+  let me;
+  try {
+    const text = await fetchHTML(BGM_ME_API, {
+      headers: {
+        Authorization: "Bearer " + bangumiToken,
+        Accept: "application/json"
+      }
+    });
+    me = JSON.parse(text);
+  } catch (err) {
+    logError("Bangumi token \u9A8C\u8BC1\u5931\u8D25", { userId, error: String(err) });
+    throw httpError(401, "Bangumi Token \u65E0\u6548");
+  }
+  const bgmUid = me?.id;
+  if (!bgmUid) {
+    throw httpError(401, "Bangumi Token \u65E0\u6548");
+  }
+  const { encrypted, iv } = await encryptToken(bangumiToken, env.JWT_SECRET);
+  const updated = await updateUserBgmBinding(db, userId, String(bgmUid), encrypted, iv);
+  if (!updated) {
+    throw httpError(404, "\u7528\u6237\u4E0D\u5B58\u5728");
+  }
+  const token = await signJwt(
+    { userId: updated.id, email: updated.email, bgmUid: updated.bgmUid },
+    env.JWT_SECRET
+  );
+  logInfo("Bangumi \u7ED1\u5B9A\u6210\u529F", { userId, bgmUid: String(bgmUid) });
+  return {
+    token,
+    user: { id: updated.id, email: updated.email, bgmUid: updated.bgmUid }
+  };
+}
+async function unbindBangumi(db, env, userId) {
+  await clearUserBgmBinding(db, userId);
+  logInfo("Bangumi \u89E3\u7ED1\u6210\u529F", { userId });
+  return { success: true };
+}
+async function refreshJwt(db, env, oldToken) {
+  const { valid, payload } = await verifyJwt(oldToken, env.JWT_SECRET);
+  if (!valid || !payload) {
+    throw httpError(401, "Token \u65E0\u6548\u6216\u5DF2\u8FC7\u671F");
+  }
+  const userId = payload.userId;
+  if (!userId) {
+    throw httpError(401, "Token \u65E0\u6548\u6216\u5DF2\u8FC7\u671F");
+  }
+  const user = await getUserById(db, userId);
+  if (!user) {
+    throw httpError(404, "\u7528\u6237\u4E0D\u5B58\u5728");
+  }
+  const token = await signJwt(
+    { userId: user.id, email: user.email, bgmUid: user.bgmUid },
+    env.JWT_SECRET
+  );
+  return {
+    token,
+    user: { id: user.id, email: user.email, bgmUid: user.bgmUid }
+  };
+}
+async function getCurrentUser(db, env, userId) {
+  const user = await getUserById(db, userId);
+  if (!user) {
+    throw httpError(404, "\u7528\u6237\u4E0D\u5B58\u5728");
+  }
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      bgmUid: user.bgmUid,
+      isBound: !!user.bgmUid
+    }
+  };
+}
+
+// server/src/routes/auth.js
+var app = new Hono2();
+var EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function isHttpError(err) {
+  return err instanceof Error && typeof err.status === "number";
+}
+function errorResponse(err) {
+  if (isHttpError(err)) {
+    return Response.json(
+      { data: null, error: err.message, code: err.status },
+      { status: err.status }
+    );
+  }
+  return Response.json(
+    { data: null, error: "\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF", code: 500 },
+    { status: 500 }
+  );
+}
+app.post("/register", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { email, password } = body || {};
+    if (!email || !EMAIL_REGEX.test(String(email))) {
+      return c.json({ data: null, error: "\u90AE\u7BB1\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
+    }
+    if (!password || String(password).length < 8) {
+      return c.json({ data: null, error: "\u5BC6\u7801\u81F3\u5C11 8 \u4F4D", code: 400 }, 400);
+    }
+    const result = await registerUser(c.env.DB, c.env, { email, password });
+    return c.json({ data: { token: result.token, user: result.user }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.post("/login", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { email, password } = body || {};
+    if (!email || !password) {
+      return c.json({ data: null, error: "\u90AE\u7BB1\u6216\u5BC6\u7801\u4E0D\u80FD\u4E3A\u7A7A", code: 400 }, 400);
+    }
+    const result = await loginUser(c.env.DB, c.env, { email, password });
+    return c.json({ data: { token: result.token, user: result.user }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.post("/refresh", async (c) => {
+  try {
+    const authHeader = c.req.header("Authorization") || "";
+    const match2 = authHeader.match(/^Bearer\s+(.+)$/i);
+    if (!match2) {
+      return c.json({ data: null, error: "\u672A\u767B\u5F55", code: 401 }, 401);
+    }
+    const result = await refreshJwt(c.env.DB, c.env, match2[1]);
+    return c.json({ data: { token: result.token, user: result.user }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.post("/bind-bangumi", jwtAuth(), async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { bangumiToken } = body || {};
+    if (!bangumiToken) {
+      return c.json({ data: null, error: "Bangumi Token \u4E0D\u80FD\u4E3A\u7A7A", code: 400 }, 400);
+    }
+    const currentUser = c.get("user");
+    const result = await bindBangumi(c.env.DB, c.env, currentUser.userId, bangumiToken);
+    return c.json({ data: { token: result.token, user: result.user }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.delete("/bind-bangumi", jwtAuth(), async (c) => {
+  try {
+    const currentUser = c.get("user");
+    const result = await unbindBangumi(c.env.DB, c.env, currentUser.userId);
+    return c.json({ data: { success: result.success }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.get("/me", jwtAuth(), async (c) => {
+  try {
+    const currentUser = c.get("user");
+    const result = await getCurrentUser(c.env.DB, c.env, currentUser.userId);
+    return c.json({ data: { user: result.user }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+var auth_default = app;
 
 // server/src/services/bangumi.js
 var BGM_API = "https://api.bgm.tv";
@@ -3942,63 +4543,8 @@ async function getPersonSubjects(id, opts) {
   return bgmGet(`/v0/persons/${id}/subjects`, null, null, opts?.isChina);
 }
 
-// server/src/utils/http.js
-var SCRAPE_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-async function fetchHTML(url, { timeout = 8e3, headers: headers2 = {} } = {}) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
-  try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": SCRAPE_UA,
-        Accept: "text/html,application/xhtml+xml",
-        "Accept-Language": "zh-CN,zh;q=0.9",
-        ...headers2
-      }
-    });
-    clearTimeout(timer);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.text();
-  } catch (e) {
-    clearTimeout(timer);
-    logError("fetchHTML failed", { url, error: String(e) });
-    throw e;
-  }
-}
-async function fetchHTMLMulti(urls, { timeout = 8e3 } = {}) {
-  let lastErr;
-  for (const url of urls) {
-    try {
-      const html = await fetchHTML(url, { timeout });
-      if (html) return { html, url };
-    } catch (e) {
-      lastErr = e;
-    }
-  }
-  throw lastErr || new Error("All sources failed");
-}
-function stripTags(str) {
-  return (str || "").replace(/<[^>]+>/g, "").trim();
-}
-function unescapeHtml(str) {
-  return (str || "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
-}
-function parseNumber(str) {
-  if (str == null) return 0;
-  const m = String(str).replace(/[^0-9]/g, "");
-  const n = parseInt(m);
-  return isNaN(n) ? 0 : n;
-}
-function fixUrl(url, base = "") {
-  if (!url) return "";
-  if (url.startsWith("//")) return `https:${url}`;
-  if (url.startsWith("/")) return `${base}${url}`;
-  return url;
-}
-
 // server/src/routes/user.js
-var app = new Hono2();
+var app2 = new Hono2();
 var DEFAULT_APP_ID = "bgm61416a088eff71580";
 var DEFAULT_APP_SECRET = "6b8055c0159fcc5e998059536813026f";
 function isChina(c) {
@@ -4030,7 +4576,7 @@ var TIMELINE_TYPE_MAP = {
   subject: "\u6761\u76EE",
   index: "\u76EE\u5F55"
 };
-app.post("/auth", async (c) => {
+app2.post("/auth", async (c) => {
   try {
     const { token } = await c.req.json();
     if (!token) return c.json({ error: "\u8BF7\u8F93\u5165 Access Token" }, 400);
@@ -4042,12 +4588,12 @@ app.post("/auth", async (c) => {
     return c.json({ error: "\u9A8C\u8BC1\u5931\u8D25" }, 500);
   }
 });
-app.get("/oauth-url", (c) => {
+app2.get("/oauth-url", (c) => {
   const appId = c.env?.BGM_APP_ID || DEFAULT_APP_ID;
   const url = `${oauthBase(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}`;
   return c.json({ data: url });
 });
-app.post("/oauth-callback", async (c) => {
+app2.post("/oauth-callback", async (c) => {
   try {
     const { code } = await c.req.json();
     if (!code) return c.json({ error: "\u7F3A\u5C11\u6388\u6743\u7801" }, 400);
@@ -4076,7 +4622,7 @@ app.post("/oauth-callback", async (c) => {
     return c.json({ error: "\u6388\u6743\u5931\u8D25\uFF0C\u8BF7\u786E\u4FDD\u56DE\u8C03\u5730\u5740\u5DF2\u5728 bgm.tv/dev/app \u8BBE\u7F6E" }, 500);
   }
 });
-app.post("/refresh-token", async (c) => {
+app2.post("/refresh-token", async (c) => {
   try {
     const { refreshToken } = await c.req.json();
     if (!refreshToken) return c.json({ error: "\u7F3A\u5C11 refresh token" }, 400);
@@ -4105,7 +4651,7 @@ app.post("/refresh-token", async (c) => {
     return c.json({ error: "\u5237\u65B0\u5931\u8D25\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55" }, 500);
   }
 });
-app.get("/me", async (c) => {
+app2.get("/me", async (c) => {
   try {
     const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
@@ -4116,7 +4662,7 @@ app.get("/me", async (c) => {
     return c.json({ error: "\u767B\u5F55\u8FC7\u671F" }, 401);
   }
 });
-app.get("/:username/characters", async (c) => {
+app2.get("/:username/characters", async (c) => {
   try {
     const username = c.req.param("username");
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
@@ -4128,7 +4674,7 @@ app.get("/:username/characters", async (c) => {
     return c.json({ data: [] });
   }
 });
-app.get("/:username/persons", async (c) => {
+app2.get("/:username/persons", async (c) => {
   try {
     const username = c.req.param("username");
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
@@ -4140,7 +4686,7 @@ app.get("/:username/persons", async (c) => {
     return c.json({ data: [] });
   }
 });
-app.get("/:username/indexes", async (c) => {
+app2.get("/:username/indexes", async (c) => {
   try {
     const username = c.req.param("username");
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
@@ -4152,7 +4698,7 @@ app.get("/:username/indexes", async (c) => {
     return c.json({ data: [] });
   }
 });
-app.get("/:username/friends", async (c) => {
+app2.get("/:username/friends", async (c) => {
   try {
     const username = c.req.param("username");
     if (!username) return c.json({ data: [] });
@@ -4183,7 +4729,7 @@ app.get("/:username/friends", async (c) => {
     return c.json({ data: [] });
   }
 });
-app.get("/:username/groups", async (c) => {
+app2.get("/:username/groups", async (c) => {
   try {
     const username = c.req.param("username");
     if (!username) return c.json({ data: [] });
@@ -4217,7 +4763,7 @@ app.get("/:username/groups", async (c) => {
     return c.json({ data: [] });
   }
 });
-app.get("/:username/timeline", async (c) => {
+app2.get("/:username/timeline", async (c) => {
   try {
     const username = c.req.param("username");
     if (!username) return c.json({ data: [] });
@@ -4249,7 +4795,7 @@ app.get("/:username/timeline", async (c) => {
     return c.json({ data: [] });
   }
 });
-app.get("/:username/stats-yearly", async (c) => {
+app2.get("/:username/stats-yearly", async (c) => {
   try {
     const username = c.req.param("username");
     if (!username) return c.json({ data: [] });
@@ -4358,7 +4904,7 @@ app.get("/:username/stats-yearly", async (c) => {
     return c.json({ data: [] });
   }
 });
-app.get("/:username", async (c) => {
+app2.get("/:username", async (c) => {
   try {
     const username = c.req.param("username");
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
@@ -4370,7 +4916,7 @@ app.get("/:username", async (c) => {
     return c.json({ data: null });
   }
 });
-var user_default = app;
+var user_default = app2;
 
 // server/src/controllers/animeController.js
 function isChina2(c) {
@@ -4513,25 +5059,25 @@ async function getPersonSubjects2(c) {
 }
 
 // server/src/routes/anime.js
-var app2 = new Hono2();
-app2.get("/search", searchAnime2);
-app2.get("/browse", browseAnime2);
-app2.get("/calendar", getAnimeCalendar2);
-app2.get("/tags", getAnimeTags2);
-app2.get("/character/:id", getCharacterDetail2);
-app2.get("/character/:id/subjects", getCharacterSubjects2);
-app2.get("/character/:id/persons", getCharacterPersons2);
-app2.get("/person/:id", getPersonDetail2);
-app2.get("/person/:id/subjects", getPersonSubjects2);
-app2.get("/:id", getAnimeDetail2);
-app2.get("/:id/episodes", getAnimeEpisodes2);
-app2.get("/:id/characters", getAnimeCharacters2);
-app2.get("/:id/persons", getAnimePersons2);
-app2.get("/:id/relations", getAnimeRelations2);
-var anime_default = app2;
+var app3 = new Hono2();
+app3.get("/search", searchAnime2);
+app3.get("/browse", browseAnime2);
+app3.get("/calendar", getAnimeCalendar2);
+app3.get("/tags", getAnimeTags2);
+app3.get("/character/:id", getCharacterDetail2);
+app3.get("/character/:id/subjects", getCharacterSubjects2);
+app3.get("/character/:id/persons", getCharacterPersons2);
+app3.get("/person/:id", getPersonDetail2);
+app3.get("/person/:id/subjects", getPersonSubjects2);
+app3.get("/:id", getAnimeDetail2);
+app3.get("/:id/episodes", getAnimeEpisodes2);
+app3.get("/:id/characters", getAnimeCharacters2);
+app3.get("/:id/persons", getAnimePersons2);
+app3.get("/:id/relations", getAnimeRelations2);
+var anime_default = app3;
 
 // server/src/routes/collection.js
-var app3 = new Hono2();
+var app4 = new Hono2();
 function isChina3(c) {
   return (c.env?.CF_IP_COUNTRY || "") === "CN";
 }
@@ -4547,7 +5093,7 @@ function errorResult(status, detail, fallback) {
   if (status === 404) return { code: 404, error: null };
   return { code: 500, error: detail?.description || detail?.message || fallback };
 }
-app3.get("/list", async (c) => {
+app4.get("/list", async (c) => {
   try {
     const token = extractToken(c);
     const username = extractUsername(c);
@@ -4569,7 +5115,7 @@ app3.get("/list", async (c) => {
     return c.json({ error: r.error }, r.code);
   }
 });
-app3.get("/stats", async (c) => {
+app4.get("/stats", async (c) => {
   try {
     const token = extractToken(c);
     const username = extractUsername(c);
@@ -4599,7 +5145,7 @@ app3.get("/stats", async (c) => {
     return c.json({ error: r.error }, r.code);
   }
 });
-app3.get("/:animeId", async (c) => {
+app4.get("/:animeId", async (c) => {
   try {
     const token = extractToken(c);
     const username = extractUsername(c);
@@ -4626,7 +5172,7 @@ app3.get("/:animeId", async (c) => {
     return c.json({ error: r.error }, r.code);
   }
 });
-app3.post("/:animeId", async (c) => {
+app4.post("/:animeId", async (c) => {
   try {
     const token = extractToken(c);
     const username = extractUsername(c);
@@ -4691,7 +5237,7 @@ app3.post("/:animeId", async (c) => {
     return c.json({ error: r.error }, r.code);
   }
 });
-app3.delete("/:animeId", async (c) => {
+app4.delete("/:animeId", async (c) => {
   try {
     const token = extractToken(c);
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
@@ -4703,7 +5249,7 @@ app3.delete("/:animeId", async (c) => {
     return c.json({ error: r.error }, r.code);
   }
 });
-var collection_default = app3;
+var collection_default = app4;
 
 // node_modules/linkedom/esm/shared/symbols.js
 var CHANGED = /* @__PURE__ */ Symbol("changed");
@@ -15293,7 +15839,7 @@ function createCache(ttl) {
 }
 
 // server/src/routes/comments.js
-var app4 = new Hono2();
+var app5 = new Hono2();
 var cache = createCache(CACHE_TTL_COMMENTS);
 var BGM_TV = "https://bgm.tv";
 var BGM_PROXY2 = "https://bangumi.lol";
@@ -15459,10 +16005,10 @@ function parseTopicPage(html) {
   });
   return { op, replies };
 }
-app4.get("/test", async (c) => {
+app5.get("/test", async (c) => {
   return c.json({ ok: true, country: c.env?.CF_IP_COUNTRY || "unknown" });
 });
-app4.get("/character/:id", async (c) => {
+app5.get("/character/:id", async (c) => {
   try {
     const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const key2 = `char_${c.req.param("id")}_${isChina6}`;
@@ -15476,7 +16022,7 @@ app4.get("/character/:id", async (c) => {
     return c.json({ error: "\u83B7\u53D6\u8BC4\u8BBA\u5931\u8D25", detail: String(err) }, 500);
   }
 });
-app4.get("/subject/:id", async (c) => {
+app5.get("/subject/:id", async (c) => {
   try {
     const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const key2 = `subj_${c.req.param("id")}_${isChina6}`;
@@ -15490,7 +16036,7 @@ app4.get("/subject/:id", async (c) => {
     return c.json({ error: "\u83B7\u53D6\u8BC4\u8BBA\u5931\u8D25", detail: String(err) }, 500);
   }
 });
-app4.get("/subject/:id/topics", async (c) => {
+app5.get("/subject/:id/topics", async (c) => {
   try {
     const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const key2 = `topics_${c.req.param("id")}_${isChina6}`;
@@ -15504,7 +16050,7 @@ app4.get("/subject/:id/topics", async (c) => {
     return c.json({ error: "\u83B7\u53D6\u8BA8\u8BBA\u7248\u5931\u8D25", detail: String(err) }, 500);
   }
 });
-app4.get("/topic/:topicId", async (c) => {
+app5.get("/topic/:topicId", async (c) => {
   try {
     const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const key2 = `topic_${c.req.param("topicId")}_${isChina6}`;
@@ -15518,7 +16064,7 @@ app4.get("/topic/:topicId", async (c) => {
     return c.json({ error: "\u83B7\u53D6\u5E16\u5B50\u5185\u5BB9\u5931\u8D25", detail: String(err) }, 500);
   }
 });
-app4.get("/person/:id", async (c) => {
+app5.get("/person/:id", async (c) => {
   try {
     const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const key2 = `person_${c.req.param("id")}_${isChina6}`;
@@ -15539,7 +16085,7 @@ function extractFormhash(html) {
 function extractChiiAuth(token) {
   return `chii_auth=${token}; chii_cookietime=2592000`;
 }
-app4.post("/subject/:id/comment", async (c) => {
+app5.post("/subject/:id/comment", async (c) => {
   try {
     const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const base = getBase(isChina6);
@@ -15579,7 +16125,7 @@ app4.post("/subject/:id/comment", async (c) => {
     return c.json({ error: "\u53D1\u9001\u5931\u8D25", detail: String(err) }, 500);
   }
 });
-app4.post("/topic/:topicId/reply", async (c) => {
+app5.post("/topic/:topicId/reply", async (c) => {
   try {
     const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const base = getBase(isChina6);
@@ -15619,7 +16165,7 @@ app4.post("/topic/:topicId/reply", async (c) => {
     return c.json({ error: "\u53D1\u9001\u5931\u8D25", detail: String(err) }, 500);
   }
 });
-app4.post("/subject/:id/talkbox", async (c) => {
+app5.post("/subject/:id/talkbox", async (c) => {
   try {
     const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const base = getBase(isChina6);
@@ -15659,7 +16205,7 @@ app4.post("/subject/:id/talkbox", async (c) => {
     return c.json({ error: "\u53D1\u9001\u5931\u8D25", detail: String(err) }, 500);
   }
 });
-app4.post("/subject/:id/topic", async (c) => {
+app5.post("/subject/:id/topic", async (c) => {
   try {
     const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const base = getBase(isChina6);
@@ -15703,7 +16249,7 @@ app4.post("/subject/:id/topic", async (c) => {
     return c.json({ error: "\u53D1\u9001\u5931\u8D25", detail: String(err) }, 500);
   }
 });
-var comments_default = app4;
+var comments_default = app5;
 
 // server/src/services/douban.js
 var DOUBAN_API = "https://movie.douban.com";
@@ -15804,8 +16350,35 @@ async function getDoubanReviews(subjectId) {
 }
 
 // server/src/routes/douban.js
-var app5 = new Hono2();
+var app6 = new Hono2();
 var cache2 = createCache(CACHE_TTL_DOUBAN);
+var pageCache = createCache(5 * 60 * 1e3);
+var DOUBAN_REMOVE_SELECTORS = [
+  ".top-nav-wrapper",
+  ".nav-wrapper",
+  "#dale_movie_subject_top_icon",
+  ".sidebar",
+  "#recommendations",
+  ".extra",
+  "iframe",
+  "script",
+  "style"
+];
+function isAdElement(el) {
+  const cls = el.getAttribute("class") || "";
+  if (!cls) return false;
+  return /(^|[\s_-])(ad|advert|advertisement|promo|promotion|banner)/i.test(cls);
+}
+function cleanDoubanPage(html) {
+  const { document } = parseHTML(html);
+  DOUBAN_REMOVE_SELECTORS.forEach((sel) => {
+    document.querySelectorAll(sel).forEach((el) => el.remove());
+  });
+  document.querySelectorAll("[class]").forEach((el) => {
+    if (isAdElement(el)) el.remove();
+  });
+  return document.body ? document.body.innerHTML : document.documentElement.innerHTML;
+}
 function isChina4(c) {
   return (c.env?.CF_IP_COUNTRY || "") === "CN";
 }
@@ -15822,7 +16395,7 @@ async function findDoubanMatch(detail) {
   }
   return null;
 }
-app5.get("/by-name", async (c) => {
+app6.get("/by-name", async (c) => {
   try {
     const name = c.req.query("name");
     if (!name) return c.json({ data: null });
@@ -15853,7 +16426,7 @@ app5.get("/by-name", async (c) => {
     return c.json({ data: null });
   }
 });
-app5.get("/:id", async (c) => {
+app6.get("/:id", async (c) => {
   try {
     const subjectId = c.req.param("id");
     const cn = isChina4(c);
@@ -15879,7 +16452,7 @@ app5.get("/:id", async (c) => {
     return c.json({ data: null });
   }
 });
-app5.get("/:id/details", async (c) => {
+app6.get("/:id/details", async (c) => {
   try {
     const subjectId = c.req.param("id");
     const cn = isChina4(c);
@@ -15908,7 +16481,7 @@ app5.get("/:id/details", async (c) => {
     return c.json({ data: null });
   }
 });
-app5.get("/:id/comments", async (c) => {
+app6.get("/:id/comments", async (c) => {
   try {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "\u7F3A\u5C11ID" }, 400);
@@ -15918,7 +16491,7 @@ app5.get("/:id/comments", async (c) => {
     return c.json({ data: [] });
   }
 });
-app5.get("/:id/reviews", async (c) => {
+app6.get("/:id/reviews", async (c) => {
   try {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "\u7F3A\u5C11ID" }, 400);
@@ -15928,10 +16501,28 @@ app5.get("/:id/reviews", async (c) => {
     return c.json({ data: [] });
   }
 });
-var douban_default = app5;
+app6.get("/page/:id", async (c) => {
+  try {
+    const id = c.req.param("id");
+    if (!id) return c.json({ data: null, error: "\u7F3A\u5C11ID", code: 400 }, 400);
+    const cacheKey = `douban_page_${id}`;
+    const cached = pageCache.get(cacheKey);
+    if (cached) {
+      return c.html(cached, 200, { "Content-Type": "text/html; charset=utf-8" });
+    }
+    const url = `https://movie.douban.com/subject/${id}/`;
+    const html = await fetchHTML(url);
+    const fragment = cleanDoubanPage(html);
+    pageCache.set(cacheKey, fragment);
+    return c.html(fragment, 200, { "Content-Type": "text/html; charset=utf-8" });
+  } catch {
+    return c.json({ data: null, error: "\u4E0A\u6E38\u670D\u52A1\u6682\u4E0D\u53EF\u7528", code: 502 }, 502);
+  }
+});
+var douban_default = app6;
 
 // server/src/routes/bilibili.js
-var app6 = new Hono2();
+var app7 = new Hono2();
 function generateBuvid3() {
   const seg = () => Math.floor(Math.random() * 65536).toString(16).padStart(4, "0");
   return `${seg()}${seg()}-${seg()}-${seg()}-${seg()}-${seg()}${seg()}${seg()}infoc`;
@@ -15981,7 +16572,7 @@ async function findBilibiliMatch(detail) {
   }
   return null;
 }
-app6.get("/by-name", async (c) => {
+app7.get("/by-name", async (c) => {
   try {
     const name = c.req.query("name");
     if (!name) return c.json({ data: null });
@@ -15995,7 +16586,7 @@ app6.get("/by-name", async (c) => {
     return c.json({ data: null });
   }
 });
-app6.get("/:id", async (c) => {
+app7.get("/:id", async (c) => {
   try {
     const subjectId = c.req.param("id");
     const cn = isChina5(c);
@@ -16011,16 +16602,43 @@ app6.get("/:id", async (c) => {
     return c.json({ data: null });
   }
 });
-app6.get("/:id/details", async (c) => {
+app7.get("/:id/details", async (c) => {
   return c.redirect(`/api/v1/bilibili/${c.req.param("id")}`, 307);
 });
-var bilibili_default = app6;
+var bilibili_default = app7;
 
 // server/src/routes/moegirl.js
-var app7 = new Hono2();
+var app8 = new Hono2();
 var MOEGIRL_CN = "https://zh.moegirl.org.cn/api.php";
 var MOEGIRL_INTL = "https://zh.moegirl.uk/api.php";
 var cache4 = createCache(CACHE_TTL_MOEGIRL);
+var MOEGIRL_REMOVE_SELECTORS = [
+  ".header",
+  ".footer",
+  "#mw-navigation",
+  ".sidebar",
+  ".mw-editsection",
+  "iframe",
+  "script",
+  "style"
+];
+function isAdElement2(el) {
+  const cls = el.getAttribute("class") || "";
+  if (!cls) return false;
+  return /(^|[\s_-])(ad|advert|advertisement|promo|promotion|banner)/i.test(cls);
+}
+function cleanMoegirlPage(html) {
+  const { document } = parseHTML(html);
+  MOEGIRL_REMOVE_SELECTORS.forEach((sel) => {
+    document.querySelectorAll(sel).forEach((el) => el.remove());
+  });
+  document.querySelectorAll("[class]").forEach((el) => {
+    if (isAdElement2(el)) el.remove();
+  });
+  const parserOutput = document.querySelector(".mw-parser-output");
+  if (parserOutput) return parserOutput.innerHTML;
+  return document.body ? document.body.innerHTML : "";
+}
 function getMoegirlApi(c) {
   const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
   return isChina6 ? MOEGIRL_CN : MOEGIRL_INTL;
@@ -16085,7 +16703,7 @@ async function fetchPageExtract(apiBase, title) {
     return null;
   }
 }
-app7.get("/search", async (c) => {
+app8.get("/search", async (c) => {
   try {
     const q = c.req.query("q");
     if (!q) return c.json({ data: { results: [] } });
@@ -16119,16 +16737,41 @@ app7.get("/search", async (c) => {
     return c.json({ data: { results: [] } });
   }
 });
-var moegirl_default = app7;
+app8.get("/page/:name", async (c) => {
+  try {
+    const rawName = c.req.param("name");
+    let name;
+    try {
+      name = decodeURIComponent(rawName);
+    } catch {
+      name = rawName;
+    }
+    if (!name) return c.json({ data: null, error: "\u7F3A\u5C11\u9875\u9762\u540D", code: 400 }, 400);
+    const cacheKey = `moegirl_page_${name}`;
+    const cached = cache4.get(cacheKey);
+    if (cached) {
+      return c.html(cached, 200, { "Content-Type": "text/html; charset=utf-8" });
+    }
+    const url = `https://zh.moegirl.org.cn/${encodeURIComponent(name)}`;
+    const html = await fetchHTML(url);
+    const fragment = cleanMoegirlPage(html);
+    cache4.set(cacheKey, fragment);
+    return c.html(fragment, 200, { "Content-Type": "text/html; charset=utf-8" });
+  } catch {
+    return c.json({ data: null, error: "\u4E0A\u6E38\u670D\u52A1\u6682\u4E0D\u53EF\u7528", code: 502 }, 502);
+  }
+});
+var moegirl_default = app8;
 
 // server/src/routes/groups.js
-var app8 = new Hono2();
+var app9 = new Hono2();
 var HOSTS = {
   main: "https://bgm.tv",
   mirror1: "https://bangumi.lol",
   mirror2: "https://bangumi.one"
 };
 var cache5 = createCache(CACHE_TTL_GROUPS);
+var lastSuccessStore = /* @__PURE__ */ new Map();
 function getBaseUrls(isChina6) {
   if (isChina6) {
     return [HOSTS.mirror1, HOSTS.mirror2, HOSTS.main];
@@ -16276,7 +16919,7 @@ function parseGroupDetailHTML(html, id, base) {
   }
   return { id, name, description, member_count, avatar, topics, url: `${base}/group/${id}` };
 }
-app8.get("/", async (c) => {
+app9.get("/", async (c) => {
   try {
     const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const cacheKey = `groups_list_${isChina6 ? "cn" : "global"}`;
@@ -16311,9 +16954,9 @@ app8.get("/", async (c) => {
     });
   }
 });
-app8.get("/search", async (c) => {
+app9.get("/search", async (c) => {
   try {
-    const keyword = (c.req.query("keyword") || "").trim();
+    const keyword = (c.req.query("keyword") || c.req.query("q") || "").trim();
     if (!keyword) return c.json({ data: [] });
     const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const cacheKey = `groups_search_${keyword}_${isChina6 ? "cn" : "global"}`;
@@ -16350,7 +16993,7 @@ app8.get("/search", async (c) => {
     return c.json({ data: [] });
   }
 });
-app8.get("/:id", async (c) => {
+app9.get("/:id", async (c) => {
   try {
     const id = c.req.param("id");
     const isChina6 = (c.env?.CF_IP_COUNTRY || "") === "CN";
@@ -16363,9 +17006,15 @@ app8.get("/:id", async (c) => {
       const { html, url } = await fetchHTMLMulti(urls);
       const baseUrl = url.replace(new RegExp(`/group/${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/?$`), "") || bases[0];
       const detail = parseGroupDetailHTML(html, id, baseUrl);
+      lastSuccessStore.set(id, detail);
       cache5.set(cacheKey, detail);
       return c.json({ data: detail });
     } catch {
+      const lastSuccess = lastSuccessStore.get(id);
+      if (lastSuccess) {
+        cache5.set(cacheKey, lastSuccess);
+        return c.json({ data: lastSuccess });
+      }
       const fallback = FALLBACK_GROUPS.find((g) => g.id === id);
       const detail = fallback ? { ...fallback, url: `${bases[0]}/group/${id}`, topics: [] } : {
         id,
@@ -16394,38 +17043,48 @@ app8.get("/:id", async (c) => {
     });
   }
 });
-var groups_default = app8;
+var groups_default = app9;
 
 // server/src/app.js
-var app9 = new Hono2();
-app9.use("*", cors());
-app9.use("*", async (c, next) => {
+var app10 = new Hono2();
+app10.use("*", cors());
+app10.use("*", async (c, next) => {
   const country = c.req.header("cf-ipcountry") || "";
   c.env = c.env || {};
   c.env.CF_IP_COUNTRY = country;
   await next();
 });
-app9.use("*", securityHeaders());
+app10.use("*", securityHeaders());
 var postLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_POST);
 var getLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_GET);
-app9.use("/api/v1/*", async (c, next) => {
+app10.use("/api/v1/*", async (c, next) => {
   const method = c.req.method.toUpperCase();
   const limiter = method === "POST" || method === "PUT" || method === "DELETE" ? postLimiter : getLimiter;
   return limiter(c, next);
 });
-app9.route("/api/v1/user", user_default);
-app9.route("/api/v1/anime", anime_default);
-app9.route("/api/v1/collection", collection_default);
-app9.route("/api/v1/comments", comments_default);
-app9.route("/api/v1/douban", douban_default);
-app9.route("/api/v1/bilibili", bilibili_default);
-app9.route("/api/v1/moegirl", moegirl_default);
-app9.route("/api/v1/groups", groups_default);
-app9.get("/api/health", (c) => c.json({ status: "ok", country: c.env?.CF_IP_COUNTRY || "unknown" }));
-app9.all("*", (c) => {
+var authLimiter = rateLimit(RATE_LIMIT_WINDOW, 5);
+app10.use("/api/v1/auth/*", async (c, next) => {
+  const path = c.req.path;
+  const method = c.req.method.toUpperCase();
+  if (method === "POST" && (path === "/api/v1/auth/register" || path === "/api/v1/auth/login")) {
+    return authLimiter(c, next);
+  }
+  await next();
+});
+app10.route("/api/v1/auth", auth_default);
+app10.route("/api/v1/user", user_default);
+app10.route("/api/v1/anime", anime_default);
+app10.route("/api/v1/collection", collection_default);
+app10.route("/api/v1/comments", comments_default);
+app10.route("/api/v1/douban", douban_default);
+app10.route("/api/v1/bilibili", bilibili_default);
+app10.route("/api/v1/moegirl", moegirl_default);
+app10.route("/api/v1/groups", groups_default);
+app10.get("/api/health", (c) => c.json({ status: "ok", country: c.env?.CF_IP_COUNTRY || "unknown" }));
+app10.all("*", (c) => {
   return c.json({ data: null, error: "Not Found", code: 404 }, 404);
 });
-app9.onError((err, c) => {
+app10.onError((err, c) => {
   logError("\u672A\u6355\u83B7\u7684\u670D\u52A1\u5668\u5F02\u5E38", {
     message: err?.message || String(err),
     stack: err?.stack,
@@ -16434,7 +17093,7 @@ app9.onError((err, c) => {
   });
   return c.json({ data: null, error: "\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF", code: 500 }, 500);
 });
-var app_default = app9;
+var app_default = app10;
 export {
   app_default as default
 };

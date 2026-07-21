@@ -123,18 +123,41 @@
       </div>
     </div>
 
-    <!-- 失败：错误提示 + 重试 -->
+    <!-- 错误状态：分类提示 + 重试 -->
     <div v-else class="py-20 text-center">
-      <p class="text-base-content/60 mb-4">小组不存在或加载失败</p>
-      <div class="flex items-center justify-center gap-3">
-        <button class="btn btn-sm btn-primary" @click="loadGroup">重试</button>
-        <a
-          :href="`https://bgm.tv/group/${route.params.id}`"
-          target="_blank"
-          class="btn btn-sm btn-ghost"
-          >前往 Bangumi 查看</a
-        >
-      </div>
+      <!-- 小组不存在或已被删除 -->
+      <template v-if="errorType === 'notfound'">
+        <p class="text-base-content/60 mb-4">小组不存在或已被删除</p>
+        <div class="flex items-center justify-center gap-3">
+          <button class="btn btn-sm btn-primary" @click="retry">重试</button>
+          <a
+            :href="`https://bgm.tv/group/${route.params.id}`"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn btn-sm btn-ghost"
+            >前往 Bangumi 查看</a
+          >
+        </div>
+      </template>
+      <!-- 网络错误 -->
+      <template v-else-if="errorType === 'network'">
+        <p class="text-base-content/60 mb-4">网络连接失败，请检查网络</p>
+        <button class="btn btn-sm btn-primary" @click="retry">重试</button>
+      </template>
+      <!-- 接口异常 -->
+      <template v-else>
+        <p class="text-base-content/60 mb-4">服务暂不可用，请稍后再试</p>
+        <div class="flex items-center justify-center gap-3">
+          <button class="btn btn-sm btn-primary" @click="retry">重试</button>
+          <a
+            :href="`https://bgm.tv/group/${route.params.id}`"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn btn-sm btn-ghost"
+            >前往 Bangumi 查看</a
+          >
+        </div>
+      </template>
     </div>
   </div>
 </template>
@@ -143,12 +166,31 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { groupAPI } from '../api/endpoints'
-import { useToastStore } from '../stores/toast'
 
 const route = useRoute()
-const toast = useToastStore()
 const group = ref(null)
 const loading = ref(true)
+// 错误分类: null | 'network' | 'server' | 'notfound'
+const errorType = ref(null)
+
+// 根据 axios 错误对象分类错误类型
+function classifyError(err) {
+  if (!err) return 'server'
+  // 404 视为小组不存在
+  if (err.response?.status === 404) return 'notfound'
+  // 网络错误：无 response（请求未送达）或超时/断网
+  if (!err.response) return 'network'
+  if (err.code === 'ECONNABORTED' || err.code === 'ERR_NETWORK') return 'network'
+  // 5xx 及其他视为接口异常
+  return 'server'
+}
+
+// 判断后端返回的数据是否为「空数据/占位」：name === id 表示后端未能解析出真实小组名
+function isEmptyGroup(data) {
+  if (!data) return true
+  if (data.name && data.id && data.name === data.id) return true
+  return false
+}
 
 // 兼容多种字段命名，提取话题作者
 function getAuthor(t) {
@@ -186,14 +228,27 @@ function getLastReply(t) {
 
 async function loadGroup() {
   loading.value = true
+  errorType.value = null
   try {
     const res = await groupAPI.getDetail(route.params.id)
-    group.value = res.data?.data || null
-  } catch {
+    const data = res.data?.data || null
+    // 后端返回占位数据（name === id）视为小组不存在
+    if (isEmptyGroup(data)) {
+      group.value = null
+      errorType.value = 'notfound'
+    } else {
+      group.value = data
+    }
+  } catch (err) {
     group.value = null
-    toast.error('加载小组详情失败')
+    errorType.value = classifyError(err)
   }
   loading.value = false
+}
+
+// 重试按钮：重新发起请求
+function retry() {
+  loadGroup()
 }
 
 onMounted(loadGroup)

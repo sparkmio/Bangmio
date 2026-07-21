@@ -19,18 +19,28 @@
       </main>
     </div>
     <Toast />
+    <BindBangumiModal
+      :visible="auth.showBindModal"
+      :return-url="currentPath"
+      @close="auth.setShowBindModal(false)"
+      @bound="auth.setShowBindModal(false)"
+    />
   </div>
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { gsap } from 'gsap'
 import Navbar from './components/Navbar.vue'
 import Sidebar from './components/Sidebar.vue'
 import Toast from './components/Toast.vue'
+import BindBangumiModal from './components/BindBangumiModal.vue'
 import { useAuthStore } from './stores/auth'
 
 const auth = useAuthStore()
+const currentRoute = useRoute()
+const currentPath = computed(() => currentRoute.fullPath)
 
 function onBeforeEnter(el) {
   gsap.set(el, { opacity: 0, y: 8 })

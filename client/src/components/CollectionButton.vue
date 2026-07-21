@@ -28,7 +28,7 @@
           <button class="flex items-center justify-between" @click="selectStatus(option.value)">
             {{ option.label }}
             <svg
-              v-if="modelValue === option.value"
+              v-if="pendingValue === option.value"
               class="w-4 h-4 text-primary"
               fill="currentColor"
               viewBox="0 0 20 20"
@@ -41,8 +41,8 @@
             </svg>
           </button>
         </li>
-        <div v-if="modelValue" class="divider my-0" />
-        <li v-if="modelValue">
+        <div v-if="pendingValue" class="divider my-0" />
+        <li v-if="pendingValue">
           <button class="text-error" @click="remove">移除收藏</button>
         </li>
       </ul>
@@ -51,29 +51,104 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { getStatusOptions } from '../utils/subjectType'
 
-const props = defineProps({ modelValue: { type: Number, default: 0 } })
+const props = defineProps({
+  modelValue: { type: Number, default: 0 },
+  subjectType: { type: Number, default: 2 },
+  epStatus: { type: Number, default: 0 },
+  comment: { type: String, default: '' },
+  tags: { type: Array, default: () => [] },
+  score: { type: Number, default: 0 }
+})
+
 const emit = defineEmits(['update:modelValue', 'remove'])
 
 const open = ref(false)
 
-const statusOptions = [
-  { label: '想看', value: 1 },
-  { label: '看过', value: 2 },
-  { label: '在追', value: 3 },
-  { label: '搁置', value: 4 },
-  { label: '弃番', value: 5 }
-]
+// 即时 UI 反馈：用户点击后的本地值，无需等待父组件回填 modelValue
+const pendingValue = ref(props.modelValue)
 
-const currentStatusText = computed(() => {
-  return statusOptions.find(o => o.value === props.modelValue)?.label
+// 上次同步到后端的状态快照
+// type: Bangumi collection type (1=wish, 2=collect, 3=do, 4=on_hold, 5=dropped)
+const lastSyncedState = ref({
+  type: props.modelValue,
+  ep_status: props.epStatus,
+  comment: props.comment,
+  tags: [...props.tags],
+  score: props.score
 })
 
-const currentStatus = computed(() => props.modelValue > 0)
+// 状态选项与标签（按 subjectType 动态生成）
+const statusOptions = computed(() => getStatusOptions(props.subjectType))
+
+const currentStatusText = computed(
+  () => statusOptions.value.find(o => o.value === pendingValue.value)?.label
+)
+
+const currentStatus = computed(() => pendingValue.value > 0)
+
+// 自定义 debounce（项目未装 lodash）
+function debounce(fn, wait) {
+  let timer = null
+  function debounced(...args) {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => {
+      timer = null
+      fn.apply(this, args)
+    }, wait)
+  }
+  debounced.cancel = () => {
+    if (timer) {
+      clearTimeout(timer)
+      timer = null
+    }
+  }
+  return debounced
+}
+
+function arrayEqual(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false
+  if (a.length !== b.length) return false
+  return a.every((v, i) => v === b[i])
+}
+
+// 当前状态快照（pendingValue + 其他 props）
+function currentState() {
+  return {
+    type: pendingValue.value,
+    ep_status: props.epStatus,
+    comment: props.comment,
+    tags: [...props.tags],
+    score: props.score
+  }
+}
+
+// 对比当前状态与 lastSyncedState
+function hasStateChanged() {
+  const cur = currentState()
+  const last = lastSyncedState.value
+  return (
+    cur.type !== last.type ||
+    cur.ep_status !== last.ep_status ||
+    cur.comment !== last.comment ||
+    cur.score !== last.score ||
+    !arrayEqual(cur.tags, last.tags)
+  )
+}
+
+// 防抖同步：500ms 内若有新变更则重置，结束后只在 hasStateChanged 时 emit
+const scheduleSync = debounce(() => {
+  if (!hasStateChanged()) return
+  emit('update:modelValue', pendingValue.value)
+  // 乐观更新 type（其他字段由各自 watcher 维护）
+  lastSyncedState.value = { ...lastSyncedState.value, type: pendingValue.value }
+}, 500)
 
 function selectStatus(value) {
-  emit('update:modelValue', value)
+  pendingValue.value = value
+  scheduleSync()
   open.value = false
 }
 
@@ -81,4 +156,42 @@ function remove() {
   emit('remove')
   open.value = false
 }
+
+// 父组件回填 modelValue（初次加载 / 外部重置 / 本组件 emit 回流）
+watch(
+  () => props.modelValue,
+  val => {
+    pendingValue.value = val
+    lastSyncedState.value = { ...lastSyncedState.value, type: val }
+  }
+)
+
+// 其他字段由父组件维护，变更时同步到 lastSyncedState
+watch(
+  () => [props.epStatus, props.comment, props.score, props.tags],
+  ([ep, cmt, sc, tags]) => {
+    lastSyncedState.value = {
+      ...lastSyncedState.value,
+      ep_status: ep,
+      comment: cmt,
+      score: sc,
+      tags: [...tags]
+    }
+  }
+)
+
+onBeforeUnmount(() => {
+  // 卸载前若有未同步变更，立即 flush（避免丢失用户最后操作）
+  scheduleSync.cancel()
+  if (hasStateChanged()) {
+    emit('update:modelValue', pendingValue.value)
+  }
+})
+
+defineExpose({
+  lastSyncedState,
+  hasStateChanged,
+  scheduleSync,
+  pendingValue
+})
 </script>

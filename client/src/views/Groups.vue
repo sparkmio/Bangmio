@@ -34,6 +34,18 @@
       </div>
     </div>
 
+    <!-- 网络错误 -->
+    <div v-else-if="errorType === 'network'" class="py-20 text-center">
+      <p class="text-base-content/60 mb-4">网络连接失败，请检查网络</p>
+      <button class="btn btn-sm btn-primary" @click="retry">重试</button>
+    </div>
+
+    <!-- 接口异常 -->
+    <div v-else-if="errorType === 'server'" class="py-20 text-center">
+      <p class="text-base-content/60 mb-4">服务暂不可用，请稍后再试</p>
+      <button class="btn btn-sm btn-primary" @click="retry">重试</button>
+    </div>
+
     <!-- 列表展示（至少 50 个，后端返回的全部展示，前端无需分页） -->
     <div v-else-if="groups.length" class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <router-link
@@ -97,7 +109,32 @@
 
     <!-- 空状态 -->
     <div v-else class="py-20 text-center text-base-content/40">
-      <template v-if="searchQuery.trim()">
+      <!-- 数据为空：展示兜底推荐小组 -->
+      <template v-if="errorType === 'empty'">
+        <p class="text-base-content/60">暂无小组数据</p>
+        <p class="text-sm mt-2 mb-6">以下为您推荐的 Bangumi 热门小组</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto px-4 text-left">
+          <router-link
+            v-for="g in RECOMMENDED_GROUPS"
+            :key="g.id"
+            :to="`/group/${g.id}`"
+            class="card bg-base-100 rounded-xl hover:shadow-hover transition-shadow duration-300 border border-base-300"
+          >
+            <div class="card-body p-4">
+              <div class="flex items-center gap-2 flex-wrap">
+                <h3 class="font-semibold text-base-content truncate">{{ g.name }}</h3>
+                <span v-if="g.member_count != null" class="badge badge-sm badge-ghost">
+                  {{ g.member_count }} 成员
+                </span>
+              </div>
+              <p class="text-sm text-base-content/60 line-clamp-2 mt-1">
+                {{ g.description || '暂无简介' }}
+              </p>
+            </div>
+          </router-link>
+        </div>
+      </template>
+      <template v-else-if="searchQuery.trim()">
         <p>未找到匹配的小组</p>
         <a
           href="https://bgm.tv/group"
@@ -126,8 +163,46 @@ const allGroups = ref([])
 const groups = ref([])
 const loading = ref(true)
 const searchQuery = ref('')
+// 错误分类: null | 'network' | 'server' | 'empty'
+const errorType = ref(null)
 // 防抖句柄
 let debounceTimer = null
+
+// 前端兜底推荐小组（Bangumi 官方活跃小组）
+const RECOMMENDED_GROUPS = [
+  {
+    id: 'bgm38',
+    name: 'Bangumi 新番组',
+    description: '新番讨论、资讯与推荐',
+    member_count: 3800
+  },
+  {
+    id: 'acg',
+    name: 'ACG 综合讨论',
+    description: '动画、漫画、游戏综合交流',
+    member_count: 5600
+  },
+  { id: 'a', name: '动画', description: '动画讨论小组', member_count: 4200 },
+  { id: 'c', name: '漫画', description: '漫画讨论小组', member_count: 3100 },
+  { id: 'g', name: '游戏', description: '游戏讨论小组', member_count: 2800 },
+  {
+    id: 'touhou',
+    name: '东方 Project',
+    description: '东方 Project 讨论小组',
+    member_count: 1700
+  }
+].map(g => ({ ...g, url: `https://bgm.tv/group/${g.id}` }))
+
+// 根据 axios 错误对象分类错误类型
+function classifyError(err) {
+  if (!err) return 'server'
+  // 网络错误：无 response（请求未送达）或超时/断网
+  if (!err.response) return 'network'
+  if (err.code === 'ECONNABORTED' || err.code === 'ERR_NETWORK') return 'network'
+  // 5xx 服务端错误视为接口异常
+  if (err.response.status >= 500) return 'server'
+  return 'server'
+}
 
 // 头像加载失败时隐藏 img，避免破图
 function onAvatarError(e) {
@@ -149,14 +224,20 @@ function applyFilter() {
 // 加载全量小组列表
 async function loadGroups() {
   loading.value = true
+  errorType.value = null
   try {
     const res = await groupAPI.getList()
     allGroups.value = res.data?.data || []
-    applyFilter()
-  } catch {
-    toast.error('加载小组失败')
+    if (allGroups.value.length === 0) {
+      errorType.value = 'empty'
+      groups.value = []
+    } else {
+      applyFilter()
+    }
+  } catch (err) {
     allGroups.value = []
     groups.value = []
+    errorType.value = classifyError(err)
   }
   loading.value = false
 }
@@ -177,6 +258,11 @@ async function searchGroups() {
   } finally {
     loading.value = false
   }
+}
+
+// 重试按钮：重新发起请求
+function retry() {
+  loadGroups()
 }
 
 // 输入框防抖（300ms），空值立即清空

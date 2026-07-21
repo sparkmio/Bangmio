@@ -8,6 +8,7 @@ import { logError } from './utils/logger.js'
 import { rateLimit } from './utils/rateLimit.js'
 import { securityHeaders } from './middleware/security.js'
 import { RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_POST, RATE_LIMIT_MAX_GET } from './config.js'
+import authRoutes from './routes/auth.js'
 import userRoutes from './routes/user.js'
 import animeRoutes from './routes/anime.js'
 import collectionRoutes from './routes/collection.js'
@@ -42,6 +43,18 @@ app.use('/api/v1/*', async (c, next) => {
   return limiter(c, next)
 })
 
+// 认证路由速率限制：register/login 5 次/分钟（比通用 POST 限制更严格，防止暴力破解）
+const authLimiter = rateLimit(RATE_LIMIT_WINDOW, 5)
+app.use('/api/v1/auth/*', async (c, next) => {
+  const path = c.req.path
+  const method = c.req.method.toUpperCase()
+  if (method === 'POST' && (path === '/api/v1/auth/register' || path === '/api/v1/auth/login')) {
+    return authLimiter(c, next)
+  }
+  await next()
+})
+
+app.route('/api/v1/auth', authRoutes)
 app.route('/api/v1/user', userRoutes)
 app.route('/api/v1/anime', animeRoutes)
 app.route('/api/v1/collection', collectionRoutes)

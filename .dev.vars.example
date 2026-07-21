@@ -5,3 +5,9 @@
 # Bangumi OAuth 凭据（从 https://bgm.tv/dev/app 获取）
 BGM_APP_ID=your_bangumi_app_id
 BGM_APP_SECRET=your_bangumi_app_secret
+
+# JWT 签名密钥（至少 32 字符，生产环境请使用随机长字符串）
+JWT_SECRET=change-me-to-a-random-secret-at-least-32-chars
+
+# 全局加密 salt（用于派生密钥等，生产环境请使用随机字符串）
+BGMIO_SALT=change-me-to-a-random-salt

@@ -11,20 +11,36 @@
       "imports": [],
       "format": "esm"
     },
-    "server/node_modules/hono/dist/utils/body.js": {
-      "bytes": 2246,
+    "server/node_modules/hono/dist/utils/crypto.js": {
+      "bytes": 1144,
+      "imports": [],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/utils/buffer.js": {
+      "bytes": 2199,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/request.js",
+          "path": "server/node_modules/hono/dist/utils/crypto.js",
           "kind": "import-statement",
-          "original": "../request.js"
+          "original": "./crypto.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/node_modules/hono/dist/utils/body.js": {
+      "bytes": 2813,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/utils/buffer.js",
+          "kind": "import-statement",
+          "original": "./buffer.js"
         }
       ],
       "format": "esm"
     },
     "server/node_modules/hono/dist/utils/url.js": { "bytes": 6458, "imports": [], "format": "esm" },
     "server/node_modules/hono/dist/request.js": {
-      "bytes": 8054,
+      "bytes": 8161,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/http-exception.js",
@@ -225,7 +241,7 @@
       "format": "esm"
     },
     "server/node_modules/hono/dist/router/trie-router/node.js": {
-      "bytes": 6145,
+      "bytes": 6456,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/router.js",
@@ -328,7 +344,20 @@
     },
     "server/src/middleware/security.js": { "bytes": 909, "imports": [], "format": "esm" },
     "server/src/config.js": { "bytes": 1739, "imports": [], "format": "esm" },
-    "server/src/services/bangumi.js": { "bytes": 10766, "imports": [], "format": "esm" },
+    "server/src/utils/jwt.js": { "bytes": 5255, "imports": [], "format": "esm" },
+    "server/src/middleware/jwtAuth.js": {
+      "bytes": 1612,
+      "imports": [
+        {
+          "path": "server/src/utils/jwt.js",
+          "kind": "import-statement",
+          "original": "../utils/jwt.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/src/utils/crypto.js": { "bytes": 6908, "imports": [], "format": "esm" },
+    "server/src/db/users.js": { "bytes": 7850, "imports": [], "format": "esm" },
     "server/src/utils/http.js": {
       "bytes": 4625,
       "imports": [
@@ -340,6 +369,59 @@
       ],
       "format": "esm"
     },
+    "server/src/services/auth.js": {
+      "bytes": 9389,
+      "imports": [
+        {
+          "path": "server/src/utils/crypto.js",
+          "kind": "import-statement",
+          "original": "../utils/crypto.js"
+        },
+        {
+          "path": "server/src/utils/jwt.js",
+          "kind": "import-statement",
+          "original": "../utils/jwt.js"
+        },
+        {
+          "path": "server/src/db/users.js",
+          "kind": "import-statement",
+          "original": "../db/users.js"
+        },
+        {
+          "path": "server/src/utils/http.js",
+          "kind": "import-statement",
+          "original": "../utils/http.js"
+        },
+        {
+          "path": "server/src/utils/logger.js",
+          "kind": "import-statement",
+          "original": "../utils/logger.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/src/routes/auth.js": {
+      "bytes": 4919,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/index.js",
+          "kind": "import-statement",
+          "original": "hono"
+        },
+        {
+          "path": "server/src/middleware/jwtAuth.js",
+          "kind": "import-statement",
+          "original": "../middleware/jwtAuth.js"
+        },
+        {
+          "path": "server/src/services/auth.js",
+          "kind": "import-statement",
+          "original": "../services/auth.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/src/services/bangumi.js": { "bytes": 10766, "imports": [], "format": "esm" },
     "server/src/routes/user.js": {
       "bytes": 16082,
       "imports": [
@@ -4740,12 +4822,17 @@
     },
     "server/src/services/douban.js": { "bytes": 6739, "imports": [], "format": "esm" },
     "server/src/routes/douban.js": {
-      "bytes": 4512,
+      "bytes": 7318,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
           "kind": "import-statement",
           "original": "hono"
+        },
+        {
+          "path": "node_modules/linkedom/esm/index.js",
+          "kind": "import-statement",
+          "original": "linkedom"
         },
         {
           "path": "server/src/services/bangumi.js",
@@ -4761,6 +4848,11 @@
           "path": "server/src/utils/cache.js",
           "kind": "import-statement",
           "original": "../utils/cache.js"
+        },
+        {
+          "path": "server/src/utils/http.js",
+          "kind": "import-statement",
+          "original": "../utils/http.js"
         },
         { "path": "server/src/config.js", "kind": "import-statement", "original": "../config.js" }
       ],
@@ -4794,7 +4886,7 @@
       "format": "esm"
     },
     "server/src/routes/moegirl.js": {
-      "bytes": 3733,
+      "bytes": 6621,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -4802,16 +4894,26 @@
           "original": "hono"
         },
         {
+          "path": "node_modules/linkedom/esm/index.js",
+          "kind": "import-statement",
+          "original": "linkedom"
+        },
+        {
           "path": "server/src/utils/cache.js",
           "kind": "import-statement",
           "original": "../utils/cache.js"
+        },
+        {
+          "path": "server/src/utils/http.js",
+          "kind": "import-statement",
+          "original": "../utils/http.js"
         },
         { "path": "server/src/config.js", "kind": "import-statement", "original": "../config.js" }
       ],
       "format": "esm"
     },
     "server/src/routes/groups.js": {
-      "bytes": 10962,
+      "bytes": 11631,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -4833,7 +4935,7 @@
       "format": "esm"
     },
     "server/src/app.js": {
-      "bytes": 2535,
+      "bytes": 3052,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -4861,6 +4963,11 @@
           "original": "./middleware/security.js"
         },
         { "path": "server/src/config.js", "kind": "import-statement", "original": "./config.js" },
+        {
+          "path": "server/src/routes/auth.js",
+          "kind": "import-statement",
+          "original": "./routes/auth.js"
+        },
         {
           "path": "server/src/routes/user.js",
           "kind": "import-statement",
@@ -4937,7 +5044,8 @@
         "node_modules/linkedom/commonjs/canvas.cjs": { "bytesInOutput": 238 },
         "server/node_modules/hono/dist/compose.js": { "bytesInOutput": 1129 },
         "server/node_modules/hono/dist/request/constants.js": { "bytesInOutput": 49 },
-        "server/node_modules/hono/dist/utils/body.js": { "bytesInOutput": 2189 },
+        "server/node_modules/hono/dist/utils/buffer.js": { "bytesInOutput": 350 },
+        "server/node_modules/hono/dist/utils/body.js": { "bytesInOutput": 2755 },
         "server/node_modules/hono/dist/utils/url.js": { "bytesInOutput": 6085 },
         "server/node_modules/hono/dist/request.js": { "bytesInOutput": 6919 },
         "server/node_modules/hono/dist/utils/html.js": { "bytesInOutput": 1060 },
@@ -4950,17 +5058,23 @@
         "server/node_modules/hono/dist/router/reg-exp-router/trie.js": { "bytesInOutput": 1599 },
         "server/node_modules/hono/dist/router/reg-exp-router/router.js": { "bytesInOutput": 6148 },
         "server/node_modules/hono/dist/router/smart-router/router.js": { "bytesInOutput": 1345 },
-        "server/node_modules/hono/dist/router/trie-router/node.js": { "bytesInOutput": 6013 },
+        "server/node_modules/hono/dist/router/trie-router/node.js": { "bytesInOutput": 6324 },
         "server/node_modules/hono/dist/router/trie-router/router.js": { "bytesInOutput": 481 },
         "server/node_modules/hono/dist/hono.js": { "bytesInOutput": 343 },
         "server/node_modules/hono/dist/middleware/cors/index.js": { "bytesInOutput": 2570 },
-        "server/src/utils/logger.js": { "bytesInOutput": 319 },
+        "server/src/utils/logger.js": { "bytesInOutput": 383 },
         "server/src/utils/rateLimit.js": { "bytesInOutput": 965 },
         "server/src/middleware/security.js": { "bytesInOutput": 685 },
         "server/src/config.js": { "bytesInOutput": 383 },
-        "server/src/services/bangumi.js": { "bytesInOutput": 5574 },
+        "server/src/utils/jwt.js": { "bytesInOutput": 2942 },
+        "server/src/middleware/jwtAuth.js": { "bytesInOutput": 671 },
+        "server/src/utils/crypto.js": { "bytesInOutput": 2601 },
+        "server/src/db/users.js": { "bytesInOutput": 2874 },
         "server/src/utils/http.js": { "bytesInOutput": 1749 },
-        "server/src/routes/user.js": { "bytesInOutput": 15362 },
+        "server/src/services/auth.js": { "bytesInOutput": 3724 },
+        "server/src/routes/auth.js": { "bytesInOutput": 3323 },
+        "server/src/services/bangumi.js": { "bytesInOutput": 5574 },
+        "server/src/routes/user.js": { "bytesInOutput": 15377 },
         "server/src/controllers/animeController.js": { "bytesInOutput": 4411 },
         "server/src/routes/anime.js": { "bytesInOutput": 683 },
         "server/src/routes/collection.js": { "bytesInOutput": 6365 },
@@ -5190,13 +5304,13 @@
         "server/src/utils/cache.js": { "bytesInOutput": 906 },
         "server/src/routes/comments.js": { "bytesInOutput": 17997 },
         "server/src/services/douban.js": { "bytesInOutput": 4613 },
-        "server/src/routes/douban.js": { "bytesInOutput": 4198 },
+        "server/src/routes/douban.js": { "bytesInOutput": 5743 },
         "server/src/routes/bilibili.js": { "bytesInOutput": 3024 },
-        "server/src/routes/moegirl.js": { "bytesInOutput": 3479 },
-        "server/src/routes/groups.js": { "bytesInOutput": 10163 },
-        "server/src/app.js": { "bytesInOutput": 1532 }
+        "server/src/routes/moegirl.js": { "bytesInOutput": 5179 },
+        "server/src/routes/groups.js": { "bytesInOutput": 10447 },
+        "server/src/app.js": { "bytesInOutput": 1919 }
       },
-      "bytes": 624866
+      "bytes": 646458
     }
   }
 }

@@ -264,6 +264,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { collectionAPI, animeAPI } from '../api/endpoints'
 import LoadingState from '../components/LoadingState.vue'
+import { getStatusLabels } from '../utils/subjectType'
 
 const route = useRoute()
 
@@ -274,14 +275,21 @@ const typeTabs = [
   { label: '书籍', value: 1 }
 ]
 
-const statusOptions = [
-  { label: '想看', value: 1 },
-  { label: '看过', value: 2 },
-  { label: '看到', value: 3 },
-  { label: '抛弃', value: 5 }
-]
-
 const activeType = ref(route.query.type ? Number(route.query.type) : 0)
+
+// 状态选项：根据当前类型 tab 动态生成
+// activeType=0（全部）默认使用动画用语
+// 注意：subjectType.js 中 labels.do 对应「看过」（type 2），labels.collect 对应「在看」（type 3）
+const statusOptions = computed(() => {
+  const labels = getStatusLabels(activeType.value || 2)
+  return [
+    { label: labels.wish, value: 1 },
+    { label: labels.do, value: 2 },
+    { label: labels.collect, value: 3 },
+    { label: labels.dropped, value: 5 }
+  ]
+})
+
 const collections = ref([])
 const selected = ref(null)
 const loading = ref(false)

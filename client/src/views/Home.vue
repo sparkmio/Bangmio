@@ -241,12 +241,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { animeAPI, collectionAPI } from '../api/endpoints'
 import { createCancelToken, isCanceled } from '../api'
 import { useAuthStore } from '../stores/auth'
 import AnimeCard from '../components/AnimeCard.vue'
 import LoadingState from '../components/LoadingState.vue'
+import { getStatusLabels } from '../utils/subjectType'
 import { gsap } from 'gsap'
 
 const auth = useAuthStore()
@@ -258,14 +259,21 @@ const typeTabs = [
   { label: '书籍', value: 1 }
 ]
 
-const epStatusOptions = [
-  { label: '想看', value: 1 },
-  { label: '看过', value: 2 },
-  { label: '看到', value: 3 },
-  { label: '抛弃', value: 5 }
-]
-
 const watchingType = ref(0)
+
+// 状态选项：根据当前类型 tab 动态生成
+// watchingType=0（全部）默认使用动画用语
+// 注意：subjectType.js 中 labels.do 对应「看过」（type 2），labels.collect 对应「在看」（type 3）
+const epStatusOptions = computed(() => {
+  const labels = getStatusLabels(watchingType.value || 2)
+  return [
+    { label: labels.wish, value: 1 },
+    { label: labels.do, value: 2 },
+    { label: labels.collect, value: 3 },
+    { label: labels.dropped, value: 5 }
+  ]
+})
+
 const watchingList = ref([])
 const selectedWatching = ref(null)
 const watchingLoading = ref(false)

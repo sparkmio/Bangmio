@@ -13,6 +13,9 @@ const HOSTS = {
 
 const cache = createCache(CACHE_TTL_GROUPS)
 
+// 永不过期的「最近一次成功」缓存，仅在抓取失败时回退使用
+const lastSuccessStore = new Map()
+
 function getBaseUrls(isChina) {
   // 国内节点优先走代理镜像，海外节点优先走官方
   if (isChina) {
@@ -258,7 +261,8 @@ app.get('/', async c => {
 // GET /groups/search - 服务端搜索小组
 app.get('/search', async c => {
   try {
-    const keyword = (c.req.query('keyword') || '').trim()
+    // 兼容 spec 的 q 参数与前端使用的 keyword 参数
+    const keyword = (c.req.query('keyword') || c.req.query('q') || '').trim()
     if (!keyword) return c.json({ data: [] })
 
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
@@ -321,10 +325,19 @@ app.get('/:id', async c => {
         url.replace(new RegExp(`/group/${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/?$`), '') ||
         bases[0]
       const detail = parseGroupDetailHTML(html, id, baseUrl)
+      // 抓取成功：同时写入 TTL 缓存与「最近一次成功」长期缓存
+      lastSuccessStore.set(id, detail)
       cache.set(cacheKey, detail)
       return c.json({ data: detail })
     } catch {
-      // 兜底：至少返回小组名称和原站链接
+      // 抓取失败：优先返回最近一次成功数据（如有）
+      const lastSuccess = lastSuccessStore.get(id)
+      if (lastSuccess) {
+        // 命中最近成功缓存时，仍写入 TTL 缓存以减少上游压力
+        cache.set(cacheKey, lastSuccess)
+        return c.json({ data: lastSuccess })
+      }
+      // 否则回退到 FALLBACK_GROUPS 中匹配项或基本占位
       const fallback = FALLBACK_GROUPS.find(g => g.id === id)
       const detail = fallback
         ? { ...fallback, url: `${bases[0]}/group/${id}`, topics: [] }

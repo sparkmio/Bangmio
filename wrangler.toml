@@ -5,3 +5,8 @@ pages_build_output_dir = "client/dist"
 
 [vars]
 OAUTH_REDIRECT_URI = "https://bangmio.pages.dev/login/callback"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bangmio-users"
+database_id = "PLACEHOLDER_REPLACE_WITH_ACTUAL_ID"
