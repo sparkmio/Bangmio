@@ -2,11 +2,26 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // vi.mock 必须在 import 之前；将 fetchHTML 替换为 vi.fn 以便测试路由时不发起真实请求
 vi.mock('../utils/http.js', () => ({
-  fetchHTML: vi.fn()
+  fetchHTML: vi.fn(),
+  fixUrl: vi.fn((url, base) => {
+    if (!url) return ''
+    if (url.startsWith('//')) return `https:${url}`
+    if (url.startsWith('/')) return `${base}${url}`
+    return url
+  })
+}))
+
+vi.mock('../services/douban.js', () => ({
+  searchDouban: vi.fn(),
+  getDoubanAbstract: vi.fn(),
+  getDoubanComments: vi.fn(),
+  getDoubanReviews: vi.fn(),
+  getDoubanSummary: vi.fn()
 }))
 
 import app, { cleanDoubanPage } from './douban.js'
 import { fetchHTML } from '../utils/http.js'
+import { getDoubanSummary } from '../services/douban.js'
 
 /**
  * 模拟豆瓣条目页 HTML 片段。
@@ -18,8 +33,10 @@ const sampleDoubanHTML = `
 <html>
 <head>
   <title>示例条目</title>
+  <link rel="stylesheet" href="/css/movie.css">
   <style>.x { color: red; }</style>
   <script>console.log('tracker')</script>
+  <noscript><p>需要 JavaScript</p></noscript>
 </head>
 <body>
   <div class="top-nav-wrapper">顶部导航</div>
@@ -52,6 +69,8 @@ const sampleDoubanHTML = `
     <div class="review-item">
       <h3>长评标题 1</h3>
       <div class="review-content">长评正文 1</div>
+      <a href="/review/123">查看长评</a>
+      <img src="/pics/review.jpg" alt="长评配图">
     </div>
   </div>
 
@@ -85,7 +104,9 @@ describe('cleanDoubanPage', () => {
     const result = cleanDoubanPage(sampleDoubanHTML)
     expect(result).not.toMatch(/<iframe[\s>]/i)
     expect(result).not.toMatch(/<script[\s>]/i)
-    expect(result).not.toMatch(/<style[\s>]/i)
+    // 原页面中的 style 标签已移除；注入的基础 CSS 中不应包含原页面样式
+    expect(result).not.toContain('.x { color: red; }')
+    expect(result).not.toContain('body { margin: 0; }')
     expect(result).not.toContain('tracker')
   })
 
@@ -124,6 +145,27 @@ describe('cleanDoubanPage', () => {
     expect(result).toContain('header-loaded')
     expect(result).toContain('含 ad 子串但非广告类')
   })
+
+  it('移除 noscript 与 link[rel="stylesheet"]', () => {
+    const result = cleanDoubanPage(sampleDoubanHTML)
+    expect(result).not.toMatch(/<noscript[\s>]/i)
+    expect(result).not.toMatch(/<link[^>]*rel=["']?stylesheet["']?/i)
+    expect(result).not.toContain('/css/movie.css')
+    expect(result).not.toContain('需要 JavaScript')
+  })
+
+  it('将相对 href/src 转换为豆瓣绝对链接', () => {
+    const result = cleanDoubanPage(sampleDoubanHTML)
+    expect(result).toContain('https://movie.douban.com/review/123')
+    expect(result).toContain('https://movie.douban.com/pics/review.jpg')
+  })
+
+  it('注入 viewport meta 与响应式 CSS', () => {
+    const result = cleanDoubanPage(sampleDoubanHTML)
+    expect(result).toContain('<meta name="viewport" content="width=device-width,initial-scale=1">')
+    expect(result).toContain('max-width: 100%')
+    expect(result).toContain('box-sizing: border-box')
+  })
 })
 
 describe('GET /page/:id', () => {
@@ -156,7 +198,7 @@ describe('GET /page/:id', () => {
       expect.objectContaining({
         headers: expect.objectContaining({
           Referer: 'https://movie.douban.com/',
-          Cookie: 'bid='
+          Cookie: expect.stringMatching(/bid=[A-Za-z0-9]{8}; ll="108288"/)
         })
       })
     )
@@ -204,5 +246,45 @@ describe('GET /page/:id', () => {
 
     await app.request('/page/different-id-B', { method: 'GET' })
     expect(fetchHTML).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('GET /:id/summary', () => {
+  beforeEach(() => {
+    getDoubanSummary.mockReset()
+  })
+
+  it('返回结构化摘要 JSON', async () => {
+    getDoubanSummary.mockResolvedValue({
+      title: '测试条目',
+      rate: '9.0',
+      star: 90,
+      url: 'https://movie.douban.com/subject/12345/',
+      intro: '测试简介',
+      keyInfo: { 导演: '测试导演', 类型: '动画' }
+    })
+
+    const res = await app.request('/12345/summary', { method: 'GET' })
+    expect(res.status).toBe(200)
+
+    const json = await res.json()
+    expect(json.data).toMatchObject({
+      title: '测试条目',
+      rate: '9.0',
+      star: 90,
+      url: 'https://movie.douban.com/subject/12345/',
+      intro: '测试简介',
+      keyInfo: { 导演: '测试导演', 类型: '动画' }
+    })
+    expect(getDoubanSummary).toHaveBeenCalledWith('12345')
+  })
+
+  it('服务异常时不抛 500，返回 data: null', async () => {
+    getDoubanSummary.mockRejectedValue(new Error('boom'))
+
+    const res = await app.request('/99999/summary', { method: 'GET' })
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.data).toBeNull()
   })
 })

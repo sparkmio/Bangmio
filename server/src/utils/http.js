@@ -20,7 +20,40 @@ import { logError } from './logger.js'
  * @type {string}
  */
 export const SCRAPE_UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+
+/**
+ * 显式按 UTF-8 解码响应体；若出现替换字符或解码失败，则回退到 GBK/GB18030。
+ * 解决部分上游站点（如萌娘百科）在 Cloudflare Workers 中被错误按 Latin1 解码导致中文乱码的问题。
+ *
+ * @param {Response} res - fetch 返回的 Response 对象。
+ * @returns {Promise<string>} 解码后的字符串。
+ */
+async function decodeResponseBody(res) {
+  const buffer = await res.arrayBuffer()
+
+  // 优先尝试 UTF-8；若包含 U+FFFD 替换字符，说明编码不对，继续尝试其他编码
+  let text = ''
+  try {
+    text = new TextDecoder('utf-8', { fatal: false }).decode(buffer)
+    if (!text.includes('\uFFFD')) return text
+  } catch {
+    // UTF-8 解码异常时继续回退
+  }
+
+  // 回退到 GB18030 / GBK（CF Workers 的 TextDecoder 通常支持这些 label）
+  for (const label of ['gb18030', 'gbk']) {
+    try {
+      const decoder = new TextDecoder(label, { fatal: true })
+      return decoder.decode(buffer)
+    } catch {
+      // 当前 label 不支持或解码失败，继续下一个
+    }
+  }
+
+  // 最终回退：按 UTF-8 非致命解码返回
+  return new TextDecoder('utf-8').decode(buffer)
+}
 
 /**
  * 抓取指定 URL 的 HTML 内容。
@@ -41,14 +74,14 @@ export async function fetchHTML(url, { timeout = 8000, headers = {} } = {}) {
       signal: controller.signal,
       headers: {
         'User-Agent': SCRAPE_UA,
-        Accept: 'text/html,application/xhtml+xml',
-        'Accept-Language': 'zh-CN,zh;q=0.9',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
         ...headers
       }
     })
     clearTimeout(timer)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return await res.text()
+    return await decodeResponseBody(res)
   } catch (e) {
     clearTimeout(timer)
     logError('fetchHTML failed', { url, error: String(e) })

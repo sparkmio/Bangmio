@@ -1,9 +1,16 @@
+import { parseHTML } from 'linkedom'
+import { fetchHTML } from '../utils/http.js'
+
 const DOUBAN_API = 'https://movie.douban.com'
 const UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
 
 function stripTags(s) {
   return (s || '').replace(/<[^>]+>/g, '').trim()
+}
+
+function collapseSpace(s) {
+  return (s || '').replace(/\s+/g, ' ').trim()
 }
 
 /**
@@ -175,4 +182,99 @@ export async function getDoubanReviews(subjectId) {
   }
 
   return reviews
+}
+
+/**
+ * 解析豆瓣条目页 #info 区块，提取导演、编剧、类型、首播等键值对。
+ * @param {Document} document - linkedom 解析后的 document。
+ * @returns {Record<string, string>}
+ */
+function parseDoubanInfo(document) {
+  const infoEl = document.querySelector('#info')
+  if (!infoEl) return {}
+
+  const result = {}
+  const pls = Array.from(infoEl.querySelectorAll('.pl'))
+  pls.forEach((pl, i) => {
+    const key = collapseSpace(pl.textContent).replace(/[:：\s]/g, '')
+    const nextPl = pls[i + 1]
+    let value = ''
+    let node = pl.nextSibling
+    while (node && node !== nextPl) {
+      if (node.nodeType === 1 && node.classList?.contains('pl')) break
+      value += node.textContent || ''
+      node = node.nextSibling
+    }
+    value = collapseSpace(value).replace(/^[:：]\s*/, '')
+    if (key && value) result[key] = value
+  })
+
+  return result
+}
+
+/**
+ * 获取豆瓣条目的结构化摘要。
+ * 优先复用 getDoubanAbstract 的 title/rate/star，再从条目页 HTML 中抽取 intro 与 keyInfo。
+ * 任一环节失败时返回已获取的可用字段，不抛错误。
+ *
+ * @param {string|number} id - 豆瓣条目 ID。
+ * @returns {Promise<{ title: string, rate: string, star: number, url: string, intro: string, keyInfo: Record<string, string> }>}
+ */
+export async function getDoubanSummary(id) {
+  const url = `${DOUBAN_API}/subject/${id}/`
+  let abstract = null
+  try {
+    abstract = await getDoubanAbstract(id)
+  } catch {
+    abstract = null
+  }
+
+  const result = {
+    title: abstract?.title || '',
+    rate: abstract?.rate || '0',
+    star: abstract?.star || 0,
+    url,
+    intro: '',
+    keyInfo: {}
+  }
+
+  try {
+    const html = await fetchHTML(url, {
+      headers: {
+        'User-Agent': UA,
+        Referer: `${DOUBAN_API}/`,
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
+      }
+    })
+    if (!html || html.length < 500) return result
+
+    const { document } = parseHTML(html)
+
+    // 简介：优先展开版 .all，其次 #link-report，最后 property="v:summary"
+    const introEl =
+      document.querySelector('#link-report .all') ||
+      document.querySelector('#link-report') ||
+      document.querySelector('[property="v:summary"]')
+    if (introEl) {
+      result.intro = collapseSpace(stripTags(introEl.innerHTML))
+    }
+
+    result.keyInfo = parseDoubanInfo(document)
+
+    // 若 abstract 未拿到 title，尝试从页面 title/h1 补充
+    if (!result.title) {
+      const titleEl = document.querySelector('h1 span') || document.querySelector('title')
+      if (titleEl) {
+        result.title = collapseSpace(stripTags(titleEl.innerHTML)).replace(
+          /\s*\(\s*豆瓣\s*\)$/i,
+          ''
+        )
+      }
+    }
+  } catch {
+    // 静默忽略，返回已有字段
+  }
+
+  return result
 }

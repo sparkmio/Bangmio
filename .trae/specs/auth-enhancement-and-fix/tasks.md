@@ -106,9 +106,9 @@
   - [x] 23.1 `npx vitest run` 全部通过（174 passed, 6 skipped）
   - [x] 23.2 `npx eslint` 0 错误 0 警告
   - [x] 23.3 `npx vite build` 成功
-- [ ] Task 24: 提交并推送
-  - [ ] 24.1 git commit 描述本次改动
-  - [ ] 24.2 git push origin master 触发 CF Pages 部署
+- [x] Task 24: 提交并推送
+  - [x] 24.1 git commit 描述本次改动（commit 78590b1）
+  - [x] 24.2 git push origin master 触发 CF Pages 部署（fb9d538..78590b1）
 
 # Task Dependencies
 

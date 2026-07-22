@@ -9,6 +9,16 @@ import {
   fixUrl
 } from './http.js'
 
+function toArrayBuffer(str, encoding = 'utf-8') {
+  const encoder = new TextEncoder()
+  if (encoding === 'utf-8') {
+    return encoder.encode(str).buffer
+  }
+  // 非 UTF-8 编码先用 TextDecoder 验证，测试里统一用 TextEncoder 只能生成 UTF-8，
+  // 因此 GBK 场景通过传入已编码的字节数组来构造。
+  return new Uint8Array(str.split('').map(c => c.charCodeAt(0))).buffer
+}
+
 describe('SCRAPE_UA', () => {
   it('是字符串', () => {
     expect(typeof SCRAPE_UA).toBe('string')
@@ -84,7 +94,7 @@ describe('fetchHTMLMulti', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      text: () => Promise.resolve('<html>first</html>')
+      arrayBuffer: () => Promise.resolve(toArrayBuffer('<html>first</html>'))
     })
 
     const result = await fetchHTMLMulti(['https://a.test', 'https://b.test'])
@@ -100,12 +110,12 @@ describe('fetchHTMLMulti', () => {
       .mockResolvedValueOnce({
         ok: false,
         status: 500,
-        text: () => Promise.resolve('server error')
+        arrayBuffer: () => Promise.resolve(toArrayBuffer('server error'))
       })
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
-        text: () => Promise.resolve('<html>second</html>')
+        arrayBuffer: () => Promise.resolve(toArrayBuffer('<html>second</html>'))
       })
 
     const result = await fetchHTMLMulti(['https://a.test', 'https://b.test'])
@@ -122,12 +132,12 @@ describe('fetchHTMLMulti', () => {
       .mockResolvedValueOnce({
         ok: false,
         status: 500,
-        text: () => Promise.resolve('e1')
+        arrayBuffer: () => Promise.resolve(toArrayBuffer('e1'))
       })
       .mockResolvedValueOnce({
         ok: false,
         status: 503,
-        text: () => Promise.resolve('e2')
+        arrayBuffer: () => Promise.resolve(toArrayBuffer('e2'))
       })
 
     await expect(fetchHTMLMulti(['https://a.test', 'https://b.test'])).rejects.toThrow(/HTTP 503/)
@@ -148,11 +158,23 @@ describe('fetchHTMLMulti', () => {
       return Promise.resolve({
         ok: true,
         status: 200,
-        text: () => Promise.resolve('<html></html>')
+        arrayBuffer: () => Promise.resolve(toArrayBuffer('<html></html>'))
       })
     })
 
     await fetchHTMLMulti(['https://a.test'], { timeout: 500 })
     expect(global.fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('GBK 编码响应体能正确解码为中文', async () => {
+    const gbkBytes = new Uint8Array([0xbd, 0xf8, 0xbb, 0xf7, 0xb5, 0xc4, 0xbe, 0xde, 0xc8, 0xcb])
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      arrayBuffer: () => Promise.resolve(gbkBytes.buffer)
+    })
+
+    const html = await fetchHTML('https://a.test')
+    expect(html).toBe('进击的巨人')
   })
 })

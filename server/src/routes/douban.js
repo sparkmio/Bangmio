@@ -5,10 +5,11 @@ import {
   searchDouban,
   getDoubanAbstract,
   getDoubanComments,
-  getDoubanReviews
+  getDoubanReviews,
+  getDoubanSummary
 } from '../services/douban.js'
 import { createCache } from '../utils/cache.js'
-import { fetchHTML } from '../utils/http.js'
+import { fetchHTML, fixUrl } from '../utils/http.js'
 import { CACHE_TTL_DOUBAN } from '../config.js'
 
 const app = new Hono()
@@ -17,6 +18,26 @@ const cache = createCache(CACHE_TTL_DOUBAN)
 
 /** 豆瓣页面代理缓存（5 分钟） */
 const pageCache = createCache(5 * 60 * 1000)
+
+const DOUBAN_BASE_URL = 'https://movie.douban.com'
+
+/** 注入豆瓣清洗后页面的响应式基础 CSS */
+const DOUBAN_BASE_CSS = `
+* { box-sizing: border-box; }
+html { font-size: 16px; }
+body {
+  margin: 0;
+  padding: 1rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.6;
+  color: #111;
+  background: #fff;
+}
+img, video { max-width: 100%; height: auto; }
+a { color: #0066cc; text-decoration: none; }
+#interest_sectl { margin-bottom: 1.5rem; }
+.comment-item, .review-item { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #eee; }
+`
 
 /** 需要从豆瓣页面移除的选择器列表 */
 const DOUBAN_REMOVE_SELECTORS = [
@@ -30,6 +51,25 @@ const DOUBAN_REMOVE_SELECTORS = [
   'script',
   'style'
 ]
+
+/**
+ * 将清洗后的 HTML 片段包装为包含 viewport 与基础样式的完整文档。
+ * @param {string} fragment - 清洗后的 body 片段。
+ * @returns {string} 完整 HTML 文档字符串。
+ */
+function wrapDocument(fragment) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>${DOUBAN_BASE_CSS}</style>
+</head>
+<body>
+${fragment}
+</body>
+</html>`
+}
 
 /**
  * 判断元素的 class 是否包含广告类标识（ad/promo/banner）。
@@ -52,6 +92,9 @@ function isAdElement(el) {
 export function cleanDoubanPage(html) {
   const { document } = parseHTML(html)
 
+  // 移除 noscript 与外部样式表
+  document.querySelectorAll('noscript, link[rel="stylesheet"]').forEach(el => el.remove())
+
   DOUBAN_REMOVE_SELECTORS.forEach(sel => {
     document.querySelectorAll(sel).forEach(el => el.remove())
   })
@@ -60,11 +103,32 @@ export function cleanDoubanPage(html) {
     if (isAdElement(el)) el.remove()
   })
 
-  return document.body ? document.body.innerHTML : document.documentElement.innerHTML
+  // 相对链接绝对化
+  document.querySelectorAll('[href], [src]').forEach(el => {
+    const href = el.getAttribute('href')
+    if (href) el.setAttribute('href', fixUrl(href, DOUBAN_BASE_URL))
+    const src = el.getAttribute('src')
+    if (src) el.setAttribute('src', fixUrl(src, DOUBAN_BASE_URL))
+  })
+
+  const fragment = document.body ? document.body.innerHTML : document.documentElement.innerHTML
+  return wrapDocument(fragment)
 }
 
 function isChina(c) {
   return (c.env?.CF_IP_COUNTRY || '') === 'CN'
+}
+
+/**
+ * 生成一个随机的豆瓣 bid Cookie 值（8 位字母数字）。
+ * @returns {string}
+ */
+function makeDoubanBid() {
+  return Array.from({ length: 8 }, () =>
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'.charAt(
+      Math.floor(Math.random() * 62)
+    )
+  ).join('')
 }
 
 async function findDoubanMatch(detail) {
@@ -201,6 +265,25 @@ app.get('/:id/reviews', async c => {
 })
 
 /**
+ * 豆瓣条目结构化摘要接口。
+ * 返回 title、rate、star、url、intro、keyInfo 等字段；任一环节失败时静默返回可用字段，不抛 500。
+ *
+ * @route GET /:id/summary
+ * @param {string} id - 豆瓣条目 ID。
+ * @returns {Response} JSON 摘要对象。
+ */
+app.get('/:id/summary', async c => {
+  try {
+    const id = c.req.param('id')
+    if (!id) return c.json({ error: '缺少ID' }, 400)
+    const summary = await getDoubanSummary(id)
+    return c.json({ data: summary })
+  } catch {
+    return c.json({ data: null })
+  }
+})
+
+/**
  * 生成豆瓣降级 HTML：当上游抓取失败时返回，包含直达链接与提示。
  * @param {string} id - 豆瓣条目 ID。
  * @returns {string} HTML 片段。
@@ -242,7 +325,7 @@ app.get('/page/:id', async c => {
     const html = await fetchHTML(url, {
       headers: {
         Referer: 'https://movie.douban.com/',
-        Cookie: 'bid='
+        Cookie: `bid=${makeDoubanBid()}; ll="108288"`
       }
     })
     // 检测是否被反爬拦截（登录页/验证页通常很短或包含特定关键词）

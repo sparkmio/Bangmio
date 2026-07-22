@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { parseHTML } from 'linkedom'
 import { createCache } from '../utils/cache.js'
-import { fetchHTML } from '../utils/http.js'
+import { fetchHTML, fixUrl } from '../utils/http.js'
+import { getMoegirlSummary } from '../services/moegirl.js'
 import { CACHE_TTL_MOEGIRL } from '../config.js'
 
 const app = new Hono()
@@ -9,6 +10,27 @@ const MOEGIRL_CN = 'https://zh.moegirl.org.cn/api.php'
 const MOEGIRL_INTL = 'https://zh.moegirl.uk/api.php'
 
 const cache = createCache(CACHE_TTL_MOEGIRL)
+
+const MOEGIRL_CN_BASE = 'https://zh.moegirl.org.cn'
+
+/** 注入萌娘百科清洗后页面的响应式基础 CSS（含表格与图片适配） */
+const MOEGIRL_BASE_CSS = `
+* { box-sizing: border-box; }
+html { font-size: 16px; }
+body {
+  margin: 0;
+  padding: 1rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  line-height: 1.7;
+  color: #222;
+  background: #fff;
+}
+img, video { max-width: 100%; height: auto; display: block; }
+table { display: block; width: 100%; overflow-x: auto; border-collapse: collapse; }
+td, th { border: 1px solid #ddd; padding: 0.5rem; }
+a { color: #0066cc; text-decoration: none; word-break: break-word; }
+.mw-parser-output > * { max-width: 100%; }
+`
 
 /** 需要从萌娘百科页面移除的选择器列表 */
 const MOEGIRL_REMOVE_SELECTORS = [
@@ -21,6 +43,25 @@ const MOEGIRL_REMOVE_SELECTORS = [
   'script',
   'style'
 ]
+
+/**
+ * 将清洗后的 HTML 片段包装为包含 viewport 与基础样式的完整文档。
+ * @param {string} fragment - 清洗后的 body 片段。
+ * @returns {string} 完整 HTML 文档字符串。
+ */
+function wrapDocument(fragment) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>${MOEGIRL_BASE_CSS}</style>
+</head>
+<body>
+${fragment}
+</body>
+</html>`
+}
 
 /**
  * 判断元素的 class 是否包含广告类标识（ad/promo/banner）。
@@ -40,8 +81,25 @@ function isAdElement(el) {
  * @param {string} html - 原始页面 HTML。
  * @returns {string} 清洗后的 HTML 片段。
  */
-export function cleanMoegirlPage(html) {
+export function cleanMoegirlPage(html, base = MOEGIRL_CN_BASE) {
   const { document } = parseHTML(html)
+
+  // 萌娘百科新皮肤将正文放在 <template id="MOE_SKIN_TEMPLATE_BODYCONTENT"> 中，
+  // linkedom 不会自动展开 template 内容，需要先解包到 body，否则 .mw-parser-output 无法被选中。
+  document.querySelectorAll('template').forEach(tmpl => {
+    const content = tmpl.innerHTML
+    if (content) {
+      const wrapper = document.createElement('div')
+      wrapper.innerHTML = content
+      while (wrapper.firstChild) {
+        document.body.appendChild(wrapper.firstChild)
+      }
+    }
+    tmpl.remove()
+  })
+
+  // 移除 noscript 残留
+  document.querySelectorAll('noscript').forEach(el => el.remove())
 
   MOEGIRL_REMOVE_SELECTORS.forEach(sel => {
     document.querySelectorAll(sel).forEach(el => el.remove())
@@ -51,9 +109,27 @@ export function cleanMoegirlPage(html) {
     if (isAdElement(el)) el.remove()
   })
 
+  // 处理图片懒加载
+  document.querySelectorAll('img[data-src]').forEach(img => {
+    img.setAttribute('src', img.getAttribute('data-src'))
+    img.removeAttribute('data-src')
+  })
+
+  // 相对链接绝对化
+  document.querySelectorAll('[href], [src]').forEach(el => {
+    const href = el.getAttribute('href')
+    if (href) el.setAttribute('href', fixUrl(href, base))
+    const src = el.getAttribute('src')
+    if (src) el.setAttribute('src', fixUrl(src, base))
+  })
+
   const parserOutput = document.querySelector('.mw-parser-output')
-  if (parserOutput) return parserOutput.innerHTML
-  return document.body ? document.body.innerHTML : ''
+  const fragment = parserOutput
+    ? parserOutput.innerHTML
+    : document.body
+      ? document.body.innerHTML
+      : ''
+  return wrapDocument(fragment)
 }
 
 function getMoegirlApi(c) {
@@ -101,15 +177,13 @@ async function fetchPageExtract(apiBase, title) {
   const pageUrl = `${base}/${encodeURIComponent(title)}`
 
   try {
-    const res = await fetch(pageUrl, {
+    const html = await fetchHTML(pageUrl, {
       headers: {
         'User-Agent': 'Bangmio/1.0 (Mozilla/5.0; compatible)',
         Accept: 'text/html',
         'Accept-Language': 'zh-CN,zh;q=0.9'
       }
     })
-    if (!res.ok) return null
-    const html = await res.text()
 
     // 提取 #mw-content-text 的内容
     const contentMatch = html.match(
@@ -218,6 +292,32 @@ function buildMoegirlFallbackHTML(name) {
 }
 
 /**
+ * 萌娘百科结构化摘要接口。
+ * 返回 title、extract、url 等字段；失败时静默返回可用字段，不抛 500。
+ *
+ * @route GET /:name/summary
+ * @param {string} name - 萌娘百科页面名（URL 编码，会自动解码）。
+ * @returns {Response} JSON 摘要对象。
+ */
+app.get('/:name/summary', async c => {
+  try {
+    const rawName = c.req.param('name')
+    let name
+    try {
+      name = decodeURIComponent(rawName)
+    } catch {
+      name = rawName
+    }
+    if (!name) return c.json({ error: '缺少页面名' }, 400)
+    const base = getMoegirlBase(c)
+    const summary = await getMoegirlSummary(name, base)
+    return c.json({ data: summary })
+  } catch {
+    return c.json({ data: null })
+  }
+})
+
+/**
  * 萌娘百科页面代理。
  * 抓取指定页面名的萌娘百科页面，仅保留 .mw-parser-output 内容（不存在则保留整个 body），
  * 移除导航/页脚/侧栏/编辑按钮/脚本/样式/广告后返回清洗的 HTML 片段。
@@ -246,7 +346,12 @@ app.get('/page/:name', async c => {
   }
 
   const encoded = encodeURIComponent(name)
-  const candidates = [`https://zh.moegirl.org.cn/${encoded}`, `https://zh.moegirl.uk/${encoded}`]
+  const candidates = [
+    `https://zh.moegirl.org.cn/${encoded}?useskin=vector`,
+    `https://zh.moegirl.org.cn/${encoded}`,
+    `https://zh.moegirl.uk/${encoded}?useskin=vector`,
+    `https://zh.moegirl.uk/${encoded}`
+  ]
 
   for (const url of candidates) {
     try {
@@ -256,8 +361,9 @@ app.get('/page/:name', async c => {
           'Cache-Control': 'no-cache'
         }
       })
+      const base = url.slice(0, url.indexOf('/', 8))
       if (isMoegirlBlockPage(html)) continue
-      const fragment = cleanMoegirlPage(html)
+      const fragment = cleanMoegirlPage(html, base)
       if (!fragment || fragment.trim().length < 100) continue
       cache.set(cacheKey, fragment)
       return c.html(fragment, 200, { 'Content-Type': 'text/html; charset=utf-8' })

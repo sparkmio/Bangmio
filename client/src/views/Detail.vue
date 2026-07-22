@@ -666,7 +666,7 @@
           <span class="loading loading-spinner loading-lg text-primary" />
         </div>
         <div v-else-if="doubanDetails" class="space-y-4">
-          <div class="bg-base-200/40 rounded-xl p-5 text-center">
+          <div v-if="!doubanFallback" class="bg-base-200/40 rounded-xl p-5 text-center">
             <p class="text-4xl font-black text-amber-500">
               {{ doubanDetails.rate || '-' }}
             </p>
@@ -693,11 +693,23 @@
               >查看详情 →</a
             >
           </div>
+          <ExternalEmbedFallback
+            v-if="doubanFallback"
+            source="douban"
+            :title="doubanSummary?.title || doubanDetails.title || '豆瓣条目'"
+            :content="doubanSummary?.intro || ''"
+            :url="doubanSummary?.url || doubanDetails.url"
+            :meta="doubanSummary || doubanDetails"
+            @retry="retryDoubanIframe"
+          />
           <IframeEmbed
-            v-if="doubanDetails.id"
+            v-else-if="doubanDetails.id"
+            ref="doubanIframeRef"
             :src="`/api/v1/douban/page/${doubanDetails.id}`"
+            :mode="embedMode"
             title="豆瓣评论"
             loading-text="正在加载豆瓣评论..."
+            @fallback="onDoubanFallback"
           />
         </div>
         <div v-else class="py-10 text-center text-base-content/40 text-sm">未找到豆瓣条目</div>
@@ -797,11 +809,25 @@
         <div v-if="moegirlLoading" class="flex justify-center py-10">
           <span class="loading loading-spinner loading-lg text-primary" />
         </div>
+        <ExternalEmbedFallback
+          v-else-if="moegirlFallback"
+          source="moegirl"
+          :title="moegirlSummary?.title || moegirlPageName"
+          :content="moegirlSummary?.extract || ''"
+          :url="
+            moegirlSummary?.url ||
+            `https://zh.moegirl.org.cn/${encodeURIComponent(moegirlPageName)}`
+          "
+          @retry="retryMoegirlIframe"
+        />
         <IframeEmbed
           v-else-if="moegirlPageName"
+          ref="moegirlIframeRef"
           :src="`/api/v1/moegirl/page/${encodeURIComponent(moegirlPageName)}`"
+          :mode="embedMode"
           title="萌娘百科"
           loading-text="正在加载萌娘百科..."
+          @fallback="onMoegirlFallback"
         />
         <div v-else class="py-10 text-center text-base-content/40 text-sm">未找到萌娘百科条目</div>
       </div>
@@ -828,6 +854,7 @@ import StarRating from '../components/StarRating.vue'
 import AnimeCard from '../components/AnimeCard.vue'
 import CommentSection from '../components/CommentSection.vue'
 import IframeEmbed from '../components/IframeEmbed.vue'
+import ExternalEmbedFallback from '../components/ExternalEmbedFallback.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -863,6 +890,12 @@ const topics = ref([])
 const topicLoading = ref(false)
 const moegirlPageName = ref('')
 const moegirlLoading = ref(false)
+const doubanFallback = ref(false)
+const doubanSummary = ref(null)
+const doubanIframeRef = ref(null)
+const moegirlFallback = ref(false)
+const moegirlSummary = ref(null)
+const moegirlIframeRef = ref(null)
 const showNewTopicModal = ref(false)
 const newTopicTitle = ref('')
 const newTopicContent = ref('')
@@ -878,6 +911,7 @@ const heroRef = ref(null)
 const typeLabel = computed(
   () => ({ 1: '书籍', 2: '动画', 3: '音乐', 4: '游戏', 6: '三次元' })[anime.value.type] || '其他'
 )
+const embedMode = computed(() => (route.query.embed === 'src' ? 'src' : 'srcdoc'))
 const musicItems = computed(() => relations.value.filter(r => r.type === 3))
 const musicGroups = computed(() => {
   const groups = {}
@@ -991,6 +1025,44 @@ async function fetchMoegirlSearch() {
     moegirlPageName.value = ''
   }
   moegirlLoading.value = false
+}
+
+async function onDoubanFallback() {
+  doubanFallback.value = true
+  const id = doubanDetails.value?.id
+  if (!id) return
+  try {
+    const res = await doubanAPI.getSummary(id)
+    doubanSummary.value = res.data?.data || null
+  } catch {
+    doubanSummary.value = null
+  }
+}
+
+async function onMoegirlFallback() {
+  moegirlFallback.value = true
+  const name = moegirlPageName.value
+  if (!name) return
+  try {
+    const res = await moegirlAPI.getSummary(name)
+    moegirlSummary.value = res.data?.data || null
+  } catch {
+    moegirlSummary.value = null
+  }
+}
+
+function retryDoubanIframe() {
+  doubanFallback.value = false
+  nextTick(() => {
+    doubanIframeRef.value?.retry()
+  })
+}
+
+function retryMoegirlIframe() {
+  moegirlFallback.value = false
+  nextTick(() => {
+    moegirlIframeRef.value?.retry()
+  })
 }
 
 async function postNewTopic() {
@@ -1147,8 +1219,12 @@ watch(
       collectionComment.value = ''
       topics.value = []
       doubanDetails.value = null
+      doubanFallback.value = false
+      doubanSummary.value = null
       bilibiliDetails.value = null
       moegirlPageName.value = ''
+      moegirlFallback.value = false
+      moegirlSummary.value = null
       activeTab.value = 'overview'
       fetchDetail()
     }

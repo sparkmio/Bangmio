@@ -142,6 +142,9 @@ export const doubanAPI = {
     }
     return api.get(`/douban/${id}/details`, config)
   },
+  getSummary(id, config = {}) {
+    return api.get(`/douban/${id}/summary`, config)
+  },
   getComments(id, config = {}) {
     return api.get(`/douban/${id}/comments`, config)
   },
@@ -162,6 +165,9 @@ export const bilibiliAPI = {
 export const moegirlAPI = {
   search(q, config = {}) {
     return api.get('/moegirl/search', { params: { q }, ...config })
+  },
+  getSummary(name, config = {}) {
+    return api.get(`/moegirl/${encodeURIComponent(name)}/summary`, config)
   }
 }
 

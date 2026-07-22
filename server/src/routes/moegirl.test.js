@@ -1,12 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-
 // vi.mock 必须在 import 之前；将 fetchHTML 替换为 vi.fn 以便测试路由时不发起真实请求
 vi.mock('../utils/http.js', () => ({
-  fetchHTML: vi.fn()
+  fetchHTML: vi.fn(),
+  fixUrl: vi.fn((url, base) => {
+    if (!url) return ''
+    if (url.startsWith('//')) return `https:${url}`
+    if (url.startsWith('/')) return `${base}${url}`
+    return url
+  })
+}))
+
+vi.mock('../services/moegirl.js', () => ({
+  getMoegirlSummary: vi.fn()
 }))
 
 import app, { cleanMoegirlPage } from './moegirl.js'
 import { fetchHTML } from '../utils/http.js'
+import { getMoegirlSummary } from '../services/moegirl.js'
 
 /**
  * 模拟萌娘百科页面 HTML 片段。
@@ -22,6 +32,7 @@ const sampleMoegirlHTML = `
   <title>示例词条</title>
   <style>.x { color: red; }</style>
   <script>console.log('tracker')</script>
+  <noscript id="MOE_SKIN_NOSCRIPT">需要启用 JavaScript</noscript>
 </head>
 <body>
   <div class="header">站点头部</div>
@@ -38,6 +49,9 @@ const sampleMoegirlHTML = `
     <div class="mw-parser-output">
       <p>词条正文段落 1。这里是一段较长的概述文字，用于介绍该词条的基本信息与背景设定。</p>
       <p>词条正文段落 2。这里是第二段正文，继续展开词条主题的相关内容与详细描述。</p>
+      <p><img data-src="/images/thumb/a/b/sample.jpg" alt="示例图片" src="/img/placeholder.png"></p>
+      <p><a href="/wiki/%E8%BF%9B%E5%87%BB%E7%9A%84%E5%B7%A8%E4%BA%BA">相关条目</a></p>
+      <template id="some-template"><span>模板内容</span></template>
       <h2>二级标题<span class="mw-editsection">[<a href="/edit">编辑</a>]</span></h2>
       <p>二级标题下正文。这里是对应二级标题下的详细说明，包含若干细节描述与补充信息。</p>
       <h2>另一个二级标题<span class="mw-editsection">[<a href="/edit">编辑</a>]</span></h2>
@@ -80,7 +94,9 @@ describe('cleanMoegirlPage', () => {
     const result = cleanMoegirlPage(sampleMoegirlHTML)
     expect(result).not.toMatch(/<iframe[\s>]/i)
     expect(result).not.toMatch(/<script[\s>]/i)
-    expect(result).not.toMatch(/<style[\s>]/i)
+    // 原页面中的 style 标签已移除；注入的基础 CSS 中不应包含原页面样式
+    expect(result).not.toContain('.x { color: red; }')
+    expect(result).not.toContain('body { margin: 0; }')
     expect(result).not.toContain('tracker')
   })
 
@@ -128,6 +144,34 @@ describe('cleanMoegirlPage', () => {
     const result = cleanMoegirlPage(html)
     expect(result).toContain('无 parser-output 的正文')
   })
+
+  it('移除 noscript 与 template 残留', () => {
+    const result = cleanMoegirlPage(sampleMoegirlHTML)
+    expect(result).not.toMatch(/<noscript[\s>]/i)
+    expect(result).not.toMatch(/<template[\s>]/i)
+    expect(result).not.toContain('MOE_SKIN_NOSCRIPT')
+    expect(result).not.toContain('模板内容')
+  })
+
+  it('处理图片懒加载（data-src -> src）', () => {
+    const result = cleanMoegirlPage(sampleMoegirlHTML)
+    expect(result).toContain('src="https://zh.moegirl.org.cn/images/thumb/a/b/sample.jpg"')
+    expect(result).not.toContain('data-src=')
+  })
+
+  it('将相对链接转换为萌娘域名绝对链接', () => {
+    const result = cleanMoegirlPage(sampleMoegirlHTML)
+    expect(result).toContain(
+      'https://zh.moegirl.org.cn/wiki/%E8%BF%9B%E5%87%BB%E7%9A%84%E5%B7%A8%E4%BA%BA'
+    )
+  })
+
+  it('注入 viewport meta 与表格/图片响应式 CSS', () => {
+    const result = cleanMoegirlPage(sampleMoegirlHTML)
+    expect(result).toContain('<meta name="viewport" content="width=device-width,initial-scale=1">')
+    expect(result).toContain('max-width: 100%')
+    expect(result).toContain('overflow-x: auto')
+  })
 })
 
 describe('GET /page/:name', () => {
@@ -154,8 +198,9 @@ describe('GET /page/:name', () => {
     expect(html).not.toMatch(/class="mw-editsection"/)
 
     expect(fetchHTML).toHaveBeenCalledTimes(1)
+    // 实现优先使用带 ?useskin=vector 的皮肤参数
     expect(fetchHTML).toHaveBeenCalledWith(
-      'https://zh.moegirl.org.cn/TestPage',
+      'https://zh.moegirl.org.cn/TestPage?useskin=vector',
       expect.objectContaining({
         headers: expect.objectContaining({
           Referer: 'https://zh.moegirl.org.cn/',
@@ -165,7 +210,7 @@ describe('GET /page/:name', () => {
     )
   })
 
-  it('上游抓取失败返回 200 与降级 HTML（直达链接，双源尝试）', async () => {
+  it('上游抓取失败返回 200 与降级 HTML（直达链接，四源尝试）', async () => {
     fetchHTML.mockRejectedValue(new Error('upstream unavailable'))
 
     const res = await app.request('/page/FailPage', { method: 'GET' })
@@ -179,15 +224,25 @@ describe('GET /page/:name', () => {
     expect(html).toContain('https://zh.moegirl.org.cn/FailPage')
     expect(html).toContain('https://zh.moegirl.uk/FailPage')
 
-    // 双源尝试：fetchHTML 应被调用 2 次
-    expect(fetchHTML).toHaveBeenCalledTimes(2)
+    // 四源尝试：vector 皮肤 + 默认皮肤，国内 + 海外
+    expect(fetchHTML).toHaveBeenCalledTimes(4)
     expect(fetchHTML).toHaveBeenNthCalledWith(
       1,
-      'https://zh.moegirl.org.cn/FailPage',
+      'https://zh.moegirl.org.cn/FailPage?useskin=vector',
       expect.objectContaining({ headers: expect.any(Object) })
     )
     expect(fetchHTML).toHaveBeenNthCalledWith(
       2,
+      'https://zh.moegirl.org.cn/FailPage',
+      expect.objectContaining({ headers: expect.any(Object) })
+    )
+    expect(fetchHTML).toHaveBeenNthCalledWith(
+      3,
+      'https://zh.moegirl.uk/FailPage?useskin=vector',
+      expect.objectContaining({ headers: expect.any(Object) })
+    )
+    expect(fetchHTML).toHaveBeenNthCalledWith(
+      4,
       'https://zh.moegirl.uk/FailPage',
       expect.objectContaining({ headers: expect.any(Object) })
     )
@@ -203,7 +258,7 @@ describe('GET /page/:name', () => {
     expect(fetchHTML).toHaveBeenCalledTimes(1)
     // 路由内部应解码 name 后再调用 fetchHTML，URL 应包含解码后的中文名（再次 encodeURIComponent）
     expect(fetchHTML).toHaveBeenCalledWith(
-      `https://zh.moegirl.org.cn/${encodeURIComponent('中文词条名')}`,
+      `https://zh.moegirl.org.cn/${encodeURIComponent('中文词条名')}?useskin=vector`,
       expect.objectContaining({
         headers: expect.any(Object)
       })
@@ -236,5 +291,40 @@ describe('GET /page/:name', () => {
 
     await app.request('/page/DifferentNameB', { method: 'GET' })
     expect(fetchHTML).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('GET /:name/summary', () => {
+  beforeEach(() => {
+    getMoegirlSummary.mockReset()
+  })
+
+  it('返回结构化摘要 JSON', async () => {
+    getMoegirlSummary.mockResolvedValue({
+      title: '进击的巨人',
+      extract: '第一段\n\n第二段',
+      url: 'https://zh.moegirl.org.cn/%E8%BF%9B%E5%87%BB%E7%9A%84%E5%B7%A8%E4%BA%BA'
+    })
+
+    const encoded = encodeURIComponent('进击的巨人')
+    const res = await app.request(`/${encoded}/summary`, { method: 'GET' }, { CF_IP_COUNTRY: 'CN' })
+    expect(res.status).toBe(200)
+
+    const json = await res.json()
+    expect(json.data).toMatchObject({
+      title: '进击的巨人',
+      extract: '第一段\n\n第二段',
+      url: 'https://zh.moegirl.org.cn/%E8%BF%9B%E5%87%BB%E7%9A%84%E5%B7%A8%E4%BA%BA'
+    })
+    expect(getMoegirlSummary).toHaveBeenCalledWith('进击的巨人', 'https://zh.moegirl.org.cn')
+  })
+
+  it('服务异常时不抛 500，返回 data: null', async () => {
+    getMoegirlSummary.mockRejectedValue(new Error('boom'))
+
+    const res = await app.request('/FailPage/summary', { method: 'GET' })
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.data).toBeNull()
   })
 })
