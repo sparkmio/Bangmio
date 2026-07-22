@@ -2762,14 +2762,14 @@ var Hono = class _Hono {
    * app.route("/api", app2) // GET /api/user
    * ```
    */
-  route(path, app11) {
+  route(path, app12) {
     const subApp = this.basePath(path);
-    app11.routes.map((r) => {
+    app12.routes.map((r) => {
       let handler4;
-      if (app11.errorHandler === errorHandler) {
+      if (app12.errorHandler === errorHandler) {
         handler4 = r.handler;
       } else {
-        handler4 = async (c, next) => (await compose([], app11.errorHandler)(c, () => r.handler(c, next))).res;
+        handler4 = async (c, next) => (await compose([], app12.errorHandler)(c, () => r.handler(c, next))).res;
         handler4[COMPOSED_HANDLER] = r.handler;
       }
       subApp.#addRoute(r.method, r.path, handler4, r.basePath);
@@ -4149,6 +4149,29 @@ async function getUserBgmBinding(db, id) {
     return null;
   }
 }
+async function getUserCredentialsById(db, id) {
+  try {
+    const row = await db.prepare(`SELECT ${USER_COLUMNS_FULL} FROM users WHERE id = ?`).bind(id).first();
+    return row || null;
+  } catch {
+    return null;
+  }
+}
+async function updateUserPassword(db, id, passwordHash, salt) {
+  const now = Date.now();
+  try {
+    const result = await db.prepare(
+      `UPDATE users
+           SET password_hash = ?, salt = ?, updated_at = ?
+         WHERE id = ?`
+    ).bind(passwordHash, salt, now, id).run();
+    if (!result.success) {
+      throw new Error("D1 run() \u8FD4\u56DE success=false");
+    }
+  } catch (err) {
+    throw new Error(`updateUserPassword: \u66F4\u65B0\u5931\u8D25 (id=${id})`, { cause: err });
+  }
+}
 async function userExistsByEmail(db, email) {
   try {
     const row = await db.prepare("SELECT 1 FROM users WHERE email = ? LIMIT 1").bind(email).first();
@@ -4279,7 +4302,24 @@ function buildVerificationEmailHTML(code) {
 }
 
 // server/src/utils/http.js
-var SCRAPE_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+var SCRAPE_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+async function decodeResponseBody(res) {
+  const buffer = await res.arrayBuffer();
+  let text = "";
+  try {
+    text = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
+    if (!text.includes("\uFFFD")) return text;
+  } catch {
+  }
+  for (const label of ["gb18030", "gbk"]) {
+    try {
+      const decoder = new TextDecoder(label, { fatal: true });
+      return decoder.decode(buffer);
+    } catch {
+    }
+  }
+  return new TextDecoder("utf-8").decode(buffer);
+}
 async function fetchHTML(url, { timeout = 8e3, headers: headers2 = {} } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
@@ -4288,31 +4328,46 @@ async function fetchHTML(url, { timeout = 8e3, headers: headers2 = {} } = {}) {
       signal: controller.signal,
       headers: {
         "User-Agent": SCRAPE_UA,
-        Accept: "text/html,application/xhtml+xml",
-        "Accept-Language": "zh-CN,zh;q=0.9",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
         ...headers2
       }
     });
     clearTimeout(timer);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.text();
+    return await decodeResponseBody(res);
   } catch (e) {
     clearTimeout(timer);
     logError("fetchHTML failed", { url, error: String(e) });
     throw e;
   }
 }
-async function fetchHTMLMulti(urls, { timeout = 8e3 } = {}) {
-  let lastErr;
-  for (const url of urls) {
-    try {
-      const html = await fetchHTML(url, { timeout });
-      if (html) return { html, url };
-    } catch (e) {
-      lastErr = e;
-    }
+async function fetchHTMLMulti(urls, { timeout = 8e3, overallTimeout = 12e3, retries = 1 } = {}) {
+  if (!urls || urls.length === 0) {
+    throw new Error("All sources failed");
   }
-  throw lastErr || new Error("All sources failed");
+  let lastErr;
+  const fetchOneWithRetry = async (url) => {
+    for (let i = 0; i <= retries; i++) {
+      try {
+        const html = await fetchHTML(url, { timeout });
+        if (html) return { html, url };
+      } catch (e) {
+        lastErr = e;
+        if (i === retries) throw e;
+      }
+    }
+    throw new Error("unreachable");
+  };
+  const promises = urls.map((url) => fetchOneWithRetry(url));
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(`Overall timeout ${overallTimeout}ms`)), overallTimeout);
+  });
+  try {
+    return await Promise.race([Promise.any(promises), timeoutPromise]);
+  } catch (e) {
+    throw lastErr || e || new Error("All sources failed");
+  }
 }
 function stripTags(str) {
   return (str || "").replace(/<[^>]+>/g, "").trim();
@@ -4369,12 +4424,14 @@ async function registerUser(db, env, { email, password, code }) {
   if (exists) {
     throw httpError(409, "\u90AE\u7BB1\u5DF2\u6CE8\u518C");
   }
-  if (!code) {
-    throw httpError(400, "\u8BF7\u8F93\u5165\u90AE\u7BB1\u9A8C\u8BC1\u7801");
-  }
-  const codeOk = await verifyCode(db, email, String(code), "register");
-  if (!codeOk) {
-    throw httpError(400, "\u9A8C\u8BC1\u7801\u9519\u8BEF\u6216\u5DF2\u8FC7\u671F");
+  if (env.RESEND_API_KEY) {
+    if (!code) {
+      throw httpError(400, "\u8BF7\u8F93\u5165\u90AE\u7BB1\u9A8C\u8BC1\u7801");
+    }
+    const codeOk = await verifyCode(db, email, String(code), "register");
+    if (!codeOk) {
+      throw httpError(400, "\u9A8C\u8BC1\u7801\u9519\u8BEF\u6216\u5DF2\u8FC7\u671F");
+    }
   }
   const salt = generateSalt();
   const passwordHash = await hashPassword(password, salt);
@@ -4555,6 +4612,42 @@ async function bindBangumiByOAuth(db, env, { code, state, oauthBase: oauthBase3,
     bgmToken: accessToken
   };
 }
+async function changeUserPassword(db, env, userId, currentPassword, newPassword) {
+  if (!newPassword || String(newPassword).length < 8) {
+    throw httpError(400, "\u65B0\u5BC6\u7801\u81F3\u5C11 8 \u4F4D");
+  }
+  const user = await getUserCredentialsById(db, userId);
+  if (!user) {
+    throw httpError(404, "\u7528\u6237\u4E0D\u5B58\u5728");
+  }
+  const ok = await verifyPassword(currentPassword, user.salt, user.passwordHash);
+  if (!ok) {
+    throw httpError(400, "\u539F\u5BC6\u7801\u9519\u8BEF");
+  }
+  const salt = generateSalt();
+  const passwordHash = await hashPassword(newPassword, salt);
+  await updateUserPassword(db, userId, passwordHash, salt);
+  logInfo("\u7528\u6237\u4FEE\u6539\u5BC6\u7801\u6210\u529F", { userId });
+  return { success: true };
+}
+async function resetUserPassword(db, env, { email, code, newPassword }) {
+  if (!newPassword || String(newPassword).length < 8) {
+    throw httpError(400, "\u65B0\u5BC6\u7801\u81F3\u5C11 8 \u4F4D");
+  }
+  const codeOk = await verifyCode(db, email, String(code), "reset");
+  if (!codeOk) {
+    throw httpError(400, "\u9A8C\u8BC1\u7801\u9519\u8BEF\u6216\u5DF2\u8FC7\u671F");
+  }
+  const user = await getUserByEmail(db, email);
+  if (!user) {
+    throw httpError(404, "\u7528\u6237\u4E0D\u5B58\u5728");
+  }
+  const salt = generateSalt();
+  const passwordHash = await hashPassword(newPassword, salt);
+  await updateUserPassword(db, user.id, passwordHash, salt);
+  logInfo("\u7528\u6237\u91CD\u7F6E\u5BC6\u7801\u6210\u529F", { userId: user.id, email });
+  return { success: true };
+}
 
 // server/src/utils/turnstile.js
 var TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
@@ -4677,9 +4770,19 @@ app.post("/register", async (c) => {
 app.post("/login", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
-    const { email, password } = body || {};
+    const { email, password, captchaToken } = body || {};
     if (!email || !password) {
       return c.json({ data: null, error: "\u90AE\u7BB1\u6216\u5BC6\u7801\u4E0D\u80FD\u4E3A\u7A7A", code: 400 }, 400);
+    }
+    if (c.env?.TURNSTILE_SECRET_KEY) {
+      const turnstile = await verifyTurnstile(
+        captchaToken,
+        c.env.TURNSTILE_SECRET_KEY,
+        c.req.header("CF-Connecting-IP")
+      );
+      if (!turnstile.success) {
+        return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
+      }
     }
     const result = await loginUser(c.env.DB, c.env, { email, password });
     return c.json({ data: { token: result.token, user: result.user }, code: 200 });
@@ -4737,10 +4840,7 @@ app.get("/bgm-token", jwtAuth(), async (c) => {
     const currentUser = c.get("user");
     const bgmToken = await getUserBgmToken(c.env.DB, c.env, currentUser.userId);
     if (!bgmToken) {
-      return c.json(
-        { data: null, error: "\u672A\u7ED1\u5B9A Bangumi \u8D26\u53F7", code: 404 },
-        404
-      );
+      return c.json({ data: null, error: "\u672A\u7ED1\u5B9A Bangumi \u8D26\u53F7", code: 404 }, 404);
     }
     return c.json({ data: { bgmToken }, code: 200 });
   } catch (err) {
@@ -4775,9 +4875,70 @@ app.post("/oauth-bind-callback", jwtAuth(), async (c) => {
       appSecret,
       redirectUri: redirectUri(c)
     });
-    return c.json(
-      { data: { token: result.token, user: result.user, bgmToken: result.bgmToken }, code: 200 }
-    );
+    return c.json({
+      data: { token: result.token, user: result.user, bgmToken: result.bgmToken },
+      code: 200
+    });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.post("/change-password", jwtAuth(), async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { currentPassword, newPassword } = body || {};
+    if (!currentPassword || !newPassword) {
+      return c.json({ data: null, error: "\u539F\u5BC6\u7801\u4E0E\u65B0\u5BC6\u7801\u4E0D\u80FD\u4E3A\u7A7A", code: 400 }, 400);
+    }
+    const currentUser = c.get("user");
+    await changeUserPassword(c.env.DB, c.env, currentUser.userId, currentPassword, newPassword);
+    return c.json({ data: { success: true }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.post("/forgot-password", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { email, captchaToken } = body || {};
+    if (!email || !EMAIL_REGEX.test(String(email))) {
+      return c.json({ data: null, error: "\u90AE\u7BB1\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
+    }
+    if (c.env?.TURNSTILE_SECRET_KEY) {
+      const turnstile = await verifyTurnstile(
+        captchaToken,
+        c.env.TURNSTILE_SECRET_KEY,
+        c.req.header("CF-Connecting-IP")
+      );
+      if (!turnstile.success) {
+        return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
+      }
+    }
+    const exists = await userExistsByEmail(c.env.DB, email);
+    if (exists) {
+      try {
+        await sendVerificationCode(c.env.DB, c.env, { email, purpose: "reset" });
+      } catch (err) {
+        logError("forgot-password \u53D1\u9001\u9A8C\u8BC1\u7801\u5931\u8D25", { email, error: String(err) });
+      }
+    }
+    return c.json({ data: { success: true }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.post("/reset-password", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { email, code, newPassword } = body || {};
+    if (!email || !EMAIL_REGEX.test(String(email))) {
+      return c.json({ data: null, error: "\u90AE\u7BB1\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
+    }
+    if (!code || !newPassword) {
+      return c.json({ data: null, error: "\u9A8C\u8BC1\u7801\u4E0E\u65B0\u5BC6\u7801\u4E0D\u80FD\u4E3A\u7A7A", code: 400 }, 400);
+    }
+    await resetUserPassword(c.env.DB, c.env, { email, code, newPassword });
+    return c.json({ data: { success: true }, code: 200 });
   } catch (err) {
     return errorResponse(err);
   }
@@ -16637,9 +16798,12 @@ var comments_default = app5;
 
 // server/src/services/douban.js
 var DOUBAN_API = "https://movie.douban.com";
-var UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+var UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 function stripTags2(s) {
   return (s || "").replace(/<[^>]+>/g, "").trim();
+}
+function collapseSpace(s) {
+  return (s || "").replace(/\s+/g, " ").trim();
 }
 async function searchDouban(name) {
   const url = `${DOUBAN_API}/j/subject_suggest?q=${encodeURIComponent(name)}`;
@@ -16732,11 +16896,93 @@ async function getDoubanReviews(subjectId) {
   }
   return reviews;
 }
+function parseDoubanInfo(document) {
+  const infoEl = document.querySelector("#info");
+  if (!infoEl) return {};
+  const result = {};
+  const pls = Array.from(infoEl.querySelectorAll(".pl"));
+  pls.forEach((pl, i) => {
+    const key2 = collapseSpace(pl.textContent).replace(/[:：\s]/g, "");
+    const nextPl = pls[i + 1];
+    let value = "";
+    let node = pl.nextSibling;
+    while (node && node !== nextPl) {
+      if (node.nodeType === 1 && node.classList?.contains("pl")) break;
+      value += node.textContent || "";
+      node = node.nextSibling;
+    }
+    value = collapseSpace(value).replace(/^[:：]\s*/, "");
+    if (key2 && value) result[key2] = value;
+  });
+  return result;
+}
+async function getDoubanSummary(id) {
+  const url = `${DOUBAN_API}/subject/${id}/`;
+  let abstract = null;
+  try {
+    abstract = await getDoubanAbstract(id);
+  } catch {
+    abstract = null;
+  }
+  const result = {
+    title: abstract?.title || "",
+    rate: abstract?.rate || "0",
+    star: abstract?.star || 0,
+    url,
+    intro: "",
+    keyInfo: {}
+  };
+  try {
+    const html = await fetchHTML(url, {
+      headers: {
+        "User-Agent": UA,
+        Referer: `${DOUBAN_API}/`,
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
+      }
+    });
+    if (!html || html.length < 500) return result;
+    const { document } = parseHTML(html);
+    const introEl = document.querySelector("#link-report .all") || document.querySelector("#link-report") || document.querySelector('[property="v:summary"]');
+    if (introEl) {
+      result.intro = collapseSpace(stripTags2(introEl.innerHTML));
+    }
+    result.keyInfo = parseDoubanInfo(document);
+    if (!result.title) {
+      const titleEl = document.querySelector("h1 span") || document.querySelector("title");
+      if (titleEl) {
+        result.title = collapseSpace(stripTags2(titleEl.innerHTML)).replace(
+          /\s*\(\s*豆瓣\s*\)$/i,
+          ""
+        );
+      }
+    }
+  } catch {
+  }
+  return result;
+}
 
 // server/src/routes/douban.js
 var app6 = new Hono2();
 var cache2 = createCache(CACHE_TTL_DOUBAN);
 var pageCache = createCache(5 * 60 * 1e3);
+var DOUBAN_BASE_URL = "https://movie.douban.com";
+var DOUBAN_BASE_CSS = `
+* { box-sizing: border-box; }
+html { font-size: 16px; }
+body {
+  margin: 0;
+  padding: 1rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.6;
+  color: #111;
+  background: #fff;
+}
+img, video { max-width: 100%; height: auto; }
+a { color: #0066cc; text-decoration: none; }
+#interest_sectl { margin-bottom: 1.5rem; }
+.comment-item, .review-item { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #eee; }
+`;
 var DOUBAN_REMOVE_SELECTORS = [
   ".top-nav-wrapper",
   ".nav-wrapper",
@@ -16748,6 +16994,19 @@ var DOUBAN_REMOVE_SELECTORS = [
   "script",
   "style"
 ];
+function wrapDocument(fragment) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>${DOUBAN_BASE_CSS}</style>
+</head>
+<body>
+${fragment}
+</body>
+</html>`;
+}
 function isAdElement(el) {
   const cls = el.getAttribute("class") || "";
   if (!cls) return false;
@@ -16755,16 +17014,32 @@ function isAdElement(el) {
 }
 function cleanDoubanPage(html) {
   const { document } = parseHTML(html);
+  document.querySelectorAll('noscript, link[rel="stylesheet"]').forEach((el) => el.remove());
   DOUBAN_REMOVE_SELECTORS.forEach((sel) => {
     document.querySelectorAll(sel).forEach((el) => el.remove());
   });
   document.querySelectorAll("[class]").forEach((el) => {
     if (isAdElement(el)) el.remove();
   });
-  return document.body ? document.body.innerHTML : document.documentElement.innerHTML;
+  document.querySelectorAll("[href], [src]").forEach((el) => {
+    const href = el.getAttribute("href");
+    if (href) el.setAttribute("href", fixUrl(href, DOUBAN_BASE_URL));
+    const src = el.getAttribute("src");
+    if (src) el.setAttribute("src", fixUrl(src, DOUBAN_BASE_URL));
+  });
+  const fragment = document.body ? document.body.innerHTML : document.documentElement.innerHTML;
+  return wrapDocument(fragment);
 }
 function isChina5(c) {
   return (c.env?.CF_IP_COUNTRY || "") === "CN";
+}
+function makeDoubanBid() {
+  return Array.from(
+    { length: 8 },
+    () => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".charAt(
+      Math.floor(Math.random() * 62)
+    )
+  ).join("");
 }
 async function findDoubanMatch(detail) {
   const names = [...new Set([detail.name, detail.name_cn].filter(Boolean))];
@@ -16885,6 +17160,16 @@ app6.get("/:id/reviews", async (c) => {
     return c.json({ data: [] });
   }
 });
+app6.get("/:id/summary", async (c) => {
+  try {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "\u7F3A\u5C11ID" }, 400);
+    const summary = await getDoubanSummary(id);
+    return c.json({ data: summary });
+  } catch {
+    return c.json({ data: null });
+  }
+});
 function buildDoubanFallbackHTML(id) {
   const url = `https://movie.douban.com/subject/${id}/`;
   return `<div style="text-align:center;padding:2.5rem 1rem;font-family:system-ui,-apple-system,'Segoe UI',sans-serif">
@@ -16906,9 +17191,10 @@ app6.get("/page/:id", async (c) => {
   const url = `https://movie.douban.com/subject/${id}/`;
   try {
     const html = await fetchHTML(url, {
+      timeout: 6e3,
       headers: {
         Referer: "https://movie.douban.com/",
-        Cookie: "bid="
+        Cookie: `bid=${makeDoubanBid()}; ll="108288"`
       }
     });
     if (!html || html.length < 1e3 || /login|验证|请输入|forbidden|访问受限/i.test(html)) {
@@ -17015,11 +17301,90 @@ app7.get("/:id/details", async (c) => {
 });
 var bilibili_default = app7;
 
+// server/src/services/moegirl.js
+var DEFAULT_BASE = "https://zh.moegirl.org.cn";
+function stripTags4(s) {
+  return (s || "").replace(/<[^>]+>/g, "").trim();
+}
+function collapseSpace2(s) {
+  return (s || "").replace(/\s+/g, " ").trim();
+}
+async function getMoegirlSummary(name, base = DEFAULT_BASE) {
+  const encoded = encodeURIComponent(name);
+  const result = { title: name, extract: "", url: `${base}/${encoded}` };
+  const candidates = [
+    `${DEFAULT_BASE}/${encoded}?useskin=vector`,
+    `${DEFAULT_BASE}/${encoded}`,
+    `https://zh.moegirl.uk/${encoded}?useskin=vector`,
+    `https://zh.moegirl.uk/${encoded}`
+  ];
+  let html = "";
+  for (const url of candidates) {
+    try {
+      html = await fetchHTML(url, {
+        headers: {
+          Referer: `${base}/`,
+          "Accept-Language": "zh-CN,zh;q=0.9"
+        }
+      });
+      if (html && html.length >= 500) break;
+    } catch {
+    }
+  }
+  if (!html || html.length < 500) return result;
+  try {
+    const { document } = parseHTML(html);
+    document.querySelectorAll("template").forEach((tmpl) => {
+      const content = tmpl.innerHTML;
+      if (content) {
+        const wrapper = document.createElement("div");
+        wrapper.innerHTML = content;
+        while (wrapper.firstChild) {
+          document.body.appendChild(wrapper.firstChild);
+        }
+      }
+      tmpl.remove();
+    });
+    const parserOutput = document.querySelector(".mw-parser-output");
+    if (!parserOutput) return result;
+    const clone = parserOutput.cloneNode(true);
+    clone.querySelectorAll(
+      "style, script, noscript, template, .mw-editsection, .hatnote, .dablink, .navbox, .infobox, .mbox, .noprint"
+    ).forEach((el) => el.remove());
+    let paragraphs = Array.from(clone.querySelectorAll("p"));
+    if (!paragraphs.length) {
+      paragraphs = Array.from(clone.querySelectorAll("div, section, li"));
+    }
+    const extract = paragraphs.slice(0, 3).map((p) => collapseSpace2(stripTags4(p.innerHTML))).filter(Boolean).join("\n\n");
+    result.extract = extract;
+  } catch {
+  }
+  return result;
+}
+
 // server/src/routes/moegirl.js
 var app8 = new Hono2();
 var MOEGIRL_CN = "https://zh.moegirl.org.cn/api.php";
 var MOEGIRL_INTL = "https://zh.moegirl.uk/api.php";
 var cache4 = createCache(CACHE_TTL_MOEGIRL);
+var MOEGIRL_CN_BASE = "https://zh.moegirl.org.cn";
+var MOEGIRL_BASE_CSS = `
+* { box-sizing: border-box; }
+html { font-size: 16px; }
+body {
+  margin: 0;
+  padding: 1rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  line-height: 1.7;
+  color: #222;
+  background: #fff;
+}
+img, video { max-width: 100%; height: auto; display: block; }
+table { display: block; width: 100%; overflow-x: auto; border-collapse: collapse; }
+td, th { border: 1px solid #ddd; padding: 0.5rem; }
+a { color: #0066cc; text-decoration: none; word-break: break-word; }
+.mw-parser-output > * { max-width: 100%; }
+`;
 var MOEGIRL_REMOVE_SELECTORS = [
   ".header",
   ".footer",
@@ -17030,22 +17395,57 @@ var MOEGIRL_REMOVE_SELECTORS = [
   "script",
   "style"
 ];
+function wrapDocument2(fragment) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>${MOEGIRL_BASE_CSS}</style>
+</head>
+<body>
+${fragment}
+</body>
+</html>`;
+}
 function isAdElement2(el) {
   const cls = el.getAttribute("class") || "";
   if (!cls) return false;
   return /(^|[\s_-])(ad|advert|advertisement|promo|promotion|banner)/i.test(cls);
 }
-function cleanMoegirlPage(html) {
+function cleanMoegirlPage(html, base = MOEGIRL_CN_BASE) {
   const { document } = parseHTML(html);
+  document.querySelectorAll("template").forEach((tmpl) => {
+    const content = tmpl.innerHTML;
+    if (content) {
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = content;
+      while (wrapper.firstChild) {
+        document.body.appendChild(wrapper.firstChild);
+      }
+    }
+    tmpl.remove();
+  });
+  document.querySelectorAll("noscript").forEach((el) => el.remove());
   MOEGIRL_REMOVE_SELECTORS.forEach((sel) => {
     document.querySelectorAll(sel).forEach((el) => el.remove());
   });
   document.querySelectorAll("[class]").forEach((el) => {
     if (isAdElement2(el)) el.remove();
   });
+  document.querySelectorAll("img[data-src]").forEach((img) => {
+    img.setAttribute("src", img.getAttribute("data-src"));
+    img.removeAttribute("data-src");
+  });
+  document.querySelectorAll("[href], [src]").forEach((el) => {
+    const href = el.getAttribute("href");
+    if (href) el.setAttribute("href", fixUrl(href, base));
+    const src = el.getAttribute("src");
+    if (src) el.setAttribute("src", fixUrl(src, base));
+  });
   const parserOutput = document.querySelector(".mw-parser-output");
-  if (parserOutput) return parserOutput.innerHTML;
-  return document.body ? document.body.innerHTML : "";
+  const fragment = parserOutput ? parserOutput.innerHTML : document.body ? document.body.innerHTML : "";
+  return wrapDocument2(fragment);
 }
 function getMoegirlApi(c) {
   const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
@@ -17086,15 +17486,14 @@ async function fetchPageExtract(apiBase, title) {
   const base = apiBase.replace("/api.php", "");
   const pageUrl = `${base}/${encodeURIComponent(title)}`;
   try {
-    const res = await fetch(pageUrl, {
+    const html = await fetchHTML(pageUrl, {
+      timeout: 6e3,
       headers: {
         "User-Agent": "Bangmio/1.0 (Mozilla/5.0; compatible)",
         Accept: "text/html",
         "Accept-Language": "zh-CN,zh;q=0.9"
       }
     });
-    if (!res.ok) return null;
-    const html = await res.text();
     const contentMatch = html.match(
       /<div id="mw-content-text"[^>]*>([\s\S]*?)<\/div>\s*(?:<div class="printfooter|<div id="catlinks|<\/body>)/i
     );
@@ -17172,6 +17571,23 @@ function buildMoegirlFallbackHTML(name) {
   </div>
 </div>`;
 }
+app8.get("/:name/summary", async (c) => {
+  try {
+    const rawName = c.req.param("name");
+    let name;
+    try {
+      name = decodeURIComponent(rawName);
+    } catch {
+      name = rawName;
+    }
+    if (!name) return c.json({ error: "\u7F3A\u5C11\u9875\u9762\u540D" }, 400);
+    const base = getMoegirlBase(c);
+    const summary = await getMoegirlSummary(name, base);
+    return c.json({ data: summary });
+  } catch {
+    return c.json({ data: null });
+  }
+});
 app8.get("/page/:name", async (c) => {
   const rawName = c.req.param("name");
   let name;
@@ -17187,22 +17603,31 @@ app8.get("/page/:name", async (c) => {
     return c.html(cached, 200, { "Content-Type": "text/html; charset=utf-8" });
   }
   const encoded = encodeURIComponent(name);
-  const candidates = [`https://zh.moegirl.org.cn/${encoded}`, `https://zh.moegirl.uk/${encoded}`];
-  for (const url of candidates) {
-    try {
-      const html = await fetchHTML(url, {
-        headers: {
-          Referer: "https://zh.moegirl.org.cn/",
-          "Cache-Control": "no-cache"
-        }
-      });
-      if (isMoegirlBlockPage(html)) continue;
-      const fragment = cleanMoegirlPage(html);
-      if (!fragment || fragment.trim().length < 100) continue;
-      cache4.set(cacheKey, fragment);
-      return c.html(fragment, 200, { "Content-Type": "text/html; charset=utf-8" });
-    } catch {
+  const candidates = [
+    `https://zh.moegirl.org.cn/${encoded}?useskin=vector`,
+    `https://zh.moegirl.org.cn/${encoded}`,
+    `https://zh.moegirl.uk/${encoded}?useskin=vector`,
+    `https://zh.moegirl.uk/${encoded}`
+  ];
+  try {
+    const { html, url } = await fetchHTMLMulti(candidates, {
+      timeout: 6e3,
+      overallTimeout: 12e3,
+      retries: 1,
+      headers: {
+        Referer: "https://zh.moegirl.org.cn/",
+        "Cache-Control": "no-cache"
+      }
+    });
+    const base = url.slice(0, url.indexOf("/", 8));
+    if (!isMoegirlBlockPage(html)) {
+      const fragment = cleanMoegirlPage(html, base);
+      if (fragment && fragment.trim().length >= 100) {
+        cache4.set(cacheKey, fragment);
+        return c.html(fragment, 200, { "Content-Type": "text/html; charset=utf-8" });
+      }
     }
+  } catch {
   }
   const fallback = buildMoegirlFallbackHTML(name);
   return c.html(fallback, 200, { "Content-Type": "text/html; charset=utf-8" });
@@ -17385,7 +17810,11 @@ app9.get("/", async (c) => {
     try {
       const { html, url } = await fetchHTMLMulti(urls);
       baseUrl = url.replace(/\/group\/all\/?$/, "") || bases[0];
-      groups = parseGroupListHTML(html, baseUrl);
+      try {
+        groups = parseGroupListHTML(html, baseUrl);
+      } catch {
+        groups = [];
+      }
     } catch {
       groups = [];
     }
@@ -17422,7 +17851,11 @@ app9.get("/search", async (c) => {
     try {
       const { html, url } = await fetchHTMLMulti(urls);
       baseUrl = url.replace(/\/group\/all\/?$/, "") || bases[0];
-      groups = parseGroupListHTML(html, baseUrl);
+      try {
+        groups = parseGroupListHTML(html, baseUrl);
+      } catch {
+        groups = [];
+      }
     } catch {
       groups = [];
     }
@@ -17458,7 +17891,21 @@ app9.get("/:id", async (c) => {
     try {
       const { html, url } = await fetchHTMLMulti(urls);
       const baseUrl = url.replace(new RegExp(`/group/${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/?$`), "") || bases[0];
-      const detail = parseGroupDetailHTML(html, id, baseUrl);
+      let detail;
+      try {
+        detail = parseGroupDetailHTML(html, id, baseUrl);
+      } catch {
+        const fallback = FALLBACK_GROUPS.find((g) => g.id === id);
+        detail = fallback ? { ...fallback, url: `${bases[0]}/group/${id}`, topics: [] } : {
+          id,
+          name: id,
+          description: "",
+          member_count: 0,
+          avatar: "",
+          url: `${bases[0]}/group/${id}`,
+          topics: []
+        };
+      }
       lastSuccessStore.set(id, detail);
       cache5.set(cacheKey, detail);
       return c.json({ data: detail });
@@ -17498,46 +17945,172 @@ app9.get("/:id", async (c) => {
 });
 var groups_default = app9;
 
-// server/src/app.js
+// server/src/services/music.js
+var NETEASE_BASE = "https://music.163.com";
+var NETEASE_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+function normalizeSong(song) {
+  const artists = Array.isArray(song.artists) ? song.artists.map((a) => a.name).join(" / ") : Array.isArray(song.ar) ? song.ar.map((a) => a.name).join(" / ") : song.artist || "\u672A\u77E5\u6B4C\u624B";
+  const cover = song.album?.picUrl || song.al?.picUrl || song.picUrl || "";
+  return {
+    id: Number(song.id),
+    name: String(song.name || ""),
+    artists,
+    cover
+  };
+}
+async function searchNetEaseOnce(keyword, limit = 10) {
+  const params = new URLSearchParams({
+    s: keyword,
+    type: "1",
+    offset: "0",
+    total: "true",
+    limit: String(limit)
+  });
+  const url = `${NETEASE_BASE}/api/search/get/web?${params.toString()}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8e3);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": NETEASE_UA,
+        Referer: `${NETEASE_BASE}/`,
+        Accept: "application/json, text/plain, */*",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
+      }
+    });
+    clearTimeout(timer);
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    const text = await res.text();
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      throw new Error("\u54CD\u5E94\u4E0D\u662F\u6709\u6548 JSON");
+    }
+    if (json.code !== 200) {
+      throw new Error(`\u7F51\u6613\u4E91\u8FD4\u56DE code=${json.code}`);
+    }
+    const songs = json.result?.songs || [];
+    return songs.map(normalizeSong);
+  } catch (e) {
+    clearTimeout(timer);
+    throw e;
+  }
+}
+async function enrichSongsWithCovers(songs) {
+  if (!songs.length) return songs;
+  const ids = songs.map((s) => s.id).join(",");
+  const url = `${NETEASE_BASE}/api/song/detail?ids=[${ids}]`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8e3);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": NETEASE_UA,
+        Referer: `${NETEASE_BASE}/`,
+        Accept: "application/json, text/plain, */*",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
+      }
+    });
+    clearTimeout(timer);
+    if (!res.ok) return songs;
+    const json = await res.json();
+    const details = json.songs || [];
+    const coverMap = /* @__PURE__ */ new Map();
+    for (const d of details) {
+      const cover = d.album?.picUrl || d.al?.picUrl || "";
+      if (cover) coverMap.set(Number(d.id), cover);
+    }
+    return songs.map((s) => ({
+      ...s,
+      cover: coverMap.get(s.id) || s.cover
+    }));
+  } catch {
+    clearTimeout(timer);
+    return songs;
+  }
+}
+async function searchNetEase(keyword, limit = 10) {
+  if (!keyword || typeof keyword !== "string") return [];
+  const q = keyword.trim();
+  if (!q) return [];
+  try {
+    const results = await searchNetEaseOnce(q, limit);
+    if (results.length) {
+      return await enrichSongsWithCovers(results);
+    }
+  } catch (e) {
+    logError("\u7F51\u6613\u4E91\u641C\u7D22\u5931\u8D25", { keyword: q, error: String(e) });
+  }
+  return [];
+}
+
+// server/src/routes/music.js
 var app10 = new Hono2();
-app10.use("*", cors());
-app10.use("*", async (c, next) => {
+var cache6 = createCache(CACHE_TTL_DEFAULT);
+app10.get("/search", async (c) => {
+  try {
+    const q = c.req.query("q");
+    if (!q || !q.trim()) {
+      return c.json({ data: { results: [] } });
+    }
+    const cacheKey = `music_search_${q.trim()}`;
+    const cached = cache6.get(cacheKey);
+    if (cached) return c.json({ data: { results: cached } });
+    const results = await searchNetEase(q.trim(), 10);
+    cache6.set(cacheKey, results);
+    return c.json({ data: { results } });
+  } catch {
+    return c.json({ data: { results: [] } });
+  }
+});
+var music_default = app10;
+
+// server/src/app.js
+var app11 = new Hono2();
+app11.use("*", cors());
+app11.use("*", async (c, next) => {
   const country = c.req.header("cf-ipcountry") || "";
   c.env = c.env || {};
   c.env.CF_IP_COUNTRY = country;
   await next();
 });
-app10.use("*", securityHeaders());
+app11.use("*", securityHeaders());
 var postLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_POST);
 var getLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_GET);
-app10.use("/api/v1/*", async (c, next) => {
+app11.use("/api/v1/*", async (c, next) => {
   const method = c.req.method.toUpperCase();
   const limiter = method === "POST" || method === "PUT" || method === "DELETE" ? postLimiter : getLimiter;
   return limiter(c, next);
 });
 var authLimiter = rateLimit(RATE_LIMIT_WINDOW, 5);
-app10.use("/api/v1/auth/*", async (c, next) => {
+app11.use("/api/v1/auth/*", async (c, next) => {
   const path = c.req.path;
   const method = c.req.method.toUpperCase();
-  if (method === "POST" && (path === "/api/v1/auth/register" || path === "/api/v1/auth/login" || path === "/api/v1/auth/send-code")) {
+  if (method === "POST" && (path === "/api/v1/auth/register" || path === "/api/v1/auth/login" || path === "/api/v1/auth/send-code" || path === "/api/v1/auth/change-password" || path === "/api/v1/auth/forgot-password")) {
     return authLimiter(c, next);
   }
   await next();
 });
-app10.route("/api/v1/auth", auth_default);
-app10.route("/api/v1/user", user_default);
-app10.route("/api/v1/anime", anime_default);
-app10.route("/api/v1/collection", collection_default);
-app10.route("/api/v1/comments", comments_default);
-app10.route("/api/v1/douban", douban_default);
-app10.route("/api/v1/bilibili", bilibili_default);
-app10.route("/api/v1/moegirl", moegirl_default);
-app10.route("/api/v1/groups", groups_default);
-app10.get("/api/health", (c) => c.json({ status: "ok", country: c.env?.CF_IP_COUNTRY || "unknown" }));
-app10.all("*", (c) => {
+app11.route("/api/v1/auth", auth_default);
+app11.route("/api/v1/user", user_default);
+app11.route("/api/v1/anime", anime_default);
+app11.route("/api/v1/collection", collection_default);
+app11.route("/api/v1/comments", comments_default);
+app11.route("/api/v1/douban", douban_default);
+app11.route("/api/v1/bilibili", bilibili_default);
+app11.route("/api/v1/moegirl", moegirl_default);
+app11.route("/api/v1/groups", groups_default);
+app11.route("/api/v1/music", music_default);
+app11.get("/api/health", (c) => c.json({ status: "ok", country: c.env?.CF_IP_COUNTRY || "unknown" }));
+app11.all("*", (c) => {
   return c.json({ data: null, error: "Not Found", code: 404 }, 404);
 });
-app10.onError((err, c) => {
+app11.onError((err, c) => {
   logError("\u672A\u6355\u83B7\u7684\u670D\u52A1\u5668\u5F02\u5E38", {
     message: err?.message || String(err),
     stack: err?.stack,
@@ -17546,7 +18119,7 @@ app10.onError((err, c) => {
   });
   return c.json({ data: null, error: "\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF", code: 500 }, 500);
 });
-var app_default = app10;
+var app_default = app11;
 export {
   app_default as default
 };

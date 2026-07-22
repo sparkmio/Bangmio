@@ -139,6 +139,23 @@
           >
         </div>
       </template>
+      <!-- 占位数据：上游暂不可用 -->
+      <template v-else-if="errorType === 'placeholder'">
+        <p class="text-base-content/60 mb-2">小组信息暂不可用</p>
+        <p class="text-sm text-base-content/50 mb-4">
+          Bangumi 上游数据暂时无法获取，请稍后重试或前往原站查看。
+        </p>
+        <div class="flex items-center justify-center gap-3">
+          <button class="btn btn-sm btn-primary" @click="retry">重试</button>
+          <a
+            :href="`https://bgm.tv/group/${route.params.id}`"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn btn-sm btn-ghost"
+            >前往 Bangumi 查看</a
+          >
+        </div>
+      </template>
       <!-- 网络错误 -->
       <template v-else-if="errorType === 'network'">
         <p class="text-base-content/60 mb-4">网络连接失败，请检查网络</p>
@@ -170,7 +187,7 @@ import { groupAPI } from '../api/endpoints'
 const route = useRoute()
 const group = ref(null)
 const loading = ref(true)
-// 错误分类: null | 'network' | 'server' | 'notfound'
+// 错误分类: null | 'network' | 'server' | 'notfound' | 'placeholder'
 const errorType = ref(null)
 
 // 根据 axios 错误对象分类错误类型
@@ -232,10 +249,13 @@ async function loadGroup() {
   try {
     const res = await groupAPI.getDetail(route.params.id)
     const data = res.data?.data || null
-    // 后端返回占位数据（name === id）视为小组不存在
-    if (isEmptyGroup(data)) {
+    if (!data) {
       group.value = null
       errorType.value = 'notfound'
+    } else if (isEmptyGroup(data)) {
+      // 后端返回占位数据（name === id），说明上游暂不可用
+      group.value = null
+      errorType.value = 'placeholder'
     } else {
       group.value = data
     }

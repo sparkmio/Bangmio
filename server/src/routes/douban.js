@@ -323,6 +323,7 @@ app.get('/page/:id', async c => {
   const url = `https://movie.douban.com/subject/${id}/`
   try {
     const html = await fetchHTML(url, {
+      timeout: 6000,
       headers: {
         Referer: 'https://movie.douban.com/',
         Cookie: `bid=${makeDoubanBid()}; ll="108288"`

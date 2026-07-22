@@ -34,11 +34,14 @@
       >
         <!-- Left: anime list -->
         <div class="lg:col-span-3">
-          <div class="space-y-0.5 overflow-y-auto pr-1 scrollbar-hide" style="max-height: 420px">
+          <div
+            class="space-y-1 overflow-y-auto pr-1 scrollbar-hide -mx-1 px-1"
+            style="max-height: min(420px, 45vh)"
+          >
             <button
               v-for="item in watchingList"
               :key="item.id"
-              class="w-full flex items-center gap-3 p-2 rounded-lg text-left transition-all duration-200"
+              class="w-full flex items-center gap-3 p-2 sm:p-2.5 rounded-lg text-left transition-all duration-200 min-h-[48px]"
               :class="
                 selectedWatching?.id === item.id
                   ? 'bg-primary/10 border-l-2 border-primary pl-3'
@@ -50,13 +53,13 @@
                 v-if="item.images?.common || item.images?.large"
                 :src="item.images.common || item.images.large"
                 :alt="item.name_cn || item.name"
-                class="w-10 h-14 rounded object-cover flex-shrink-0"
+                class="w-10 h-14 sm:w-11 sm:h-[60px] rounded object-cover flex-shrink-0"
                 loading="lazy"
                 decoding="async"
               />
               <div class="min-w-0 flex-1">
                 <p
-                  class="text-[13px] font-medium text-base-content line-clamp-1 hover:text-primary transition-colors cursor-pointer"
+                  class="text-[13px] sm:text-sm font-medium text-base-content line-clamp-1 hover:text-primary transition-colors cursor-pointer"
                 >
                   {{ item.name_cn || item.name }}
                 </p>
@@ -120,7 +123,7 @@
                 <button
                   v-for="ep in Math.min(selectedWatching.total_episodes, 24)"
                   :key="ep"
-                  class="w-9 h-8 rounded-lg text-xs font-bold flex items-center justify-center transition-all hover:scale-110 cursor-pointer"
+                  class="min-w-10 min-h-9 px-1 rounded-lg text-xs font-bold flex items-center justify-center transition-all hover:scale-110 cursor-pointer"
                   :class="
                     ep <= (selectedWatching.ep_status || 0)
                       ? 'bg-primary text-white'

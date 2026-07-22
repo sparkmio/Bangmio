@@ -32,8 +32,11 @@
           @click.prevent="$router.back()"
           >← 返回</a
         >
-        <div ref="heroRef" class="flex flex-col md:flex-row gap-8 items-start">
-          <div class="flex-shrink-0 w-48 md:w-60 mx-auto md:mx-0">
+        <div
+          ref="heroRef"
+          class="flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-start"
+        >
+          <div class="flex-shrink-0 w-40 sm:w-48 md:w-60 mx-auto md:mx-0">
             <img
               v-if="anime.images?.large || anime.images?.common"
               :src="anime.images.large || anime.images.common"
@@ -43,16 +46,16 @@
               class="w-full rounded-2xl shadow-2xl ring-1 ring-white/10"
             />
           </div>
-          <div class="flex-1 min-w-0">
+          <div class="flex-1 min-w-0 text-center md:text-left">
             <h1
-              class="text-3xl md:text-4xl font-bold mb-2 text-base-content break-words line-clamp-2"
+              class="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 text-base-content break-words line-clamp-2"
             >
               {{ anime.name_cn || anime.name }}
             </h1>
             <p v-if="anime.name_cn && anime.name" class="text-base text-base-content/50 mb-4">
               {{ anime.name }}
             </p>
-            <div class="flex flex-wrap items-center gap-2 mb-6">
+            <div class="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-6">
               <span
                 v-if="anime.rating?.score"
                 class="badge badge-lg gap-1.5 font-bold border-0 bg-amber-500/15 text-amber-400"
@@ -109,7 +112,7 @@
         <button
           v-for="tab in tabs"
           :key="tab.key"
-          class="px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors"
+          class="px-4 py-3 min-h-[44px] text-sm font-medium whitespace-nowrap border-b-2 transition-colors"
           :class="
             activeTab === tab.key
               ? 'border-primary text-primary'
@@ -304,7 +307,7 @@
           <div
             v-for="ep in episodeList"
             :key="ep.id"
-            class="flex items-center gap-4 p-3 rounded-xl bg-base-200/40 hover:bg-base-200/60 transition-colors"
+            class="flex flex-wrap sm:flex-nowrap items-center gap-3 sm:gap-4 p-3 min-h-[48px] rounded-xl bg-base-200/40 hover:bg-base-200/60 transition-colors"
           >
             <span
               class="w-10 h-8 rounded bg-primary/10 text-primary text-xs font-bold flex items-center justify-center flex-shrink-0"
@@ -700,6 +703,7 @@
             :content="doubanSummary?.intro || ''"
             :url="doubanSummary?.url || doubanDetails.url"
             :meta="doubanSummary || doubanDetails"
+            :reason="doubanFallbackReason"
             @retry="retryDoubanIframe"
           />
           <IframeEmbed
@@ -717,59 +721,40 @@
 
       <!-- 音乐 -->
       <div v-show="activeTab === 'music'">
-        <div v-if="musicItems.length" class="space-y-4">
+        <div v-if="musicItems.length" class="space-y-6">
           <div v-for="(group, relation) in musicGroups" :key="relation">
             <h3 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-3">
               {{ relation }}
             </h3>
-            <div class="space-y-2">
-              <div
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <MusicCard
                 v-for="item in group"
                 :key="item.id"
-                class="flex items-center gap-4 p-3 rounded-xl bg-base-200/40"
-              >
-                <div class="avatar shrink-0">
-                  <div class="w-12 h-12 rounded-lg">
-                    <img
-                      v-if="item.images?.common"
-                      :src="item.images.common"
-                      :alt="item.name_cn || item.name"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                    <div
-                      v-else
-                      class="w-full h-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold"
-                    >
-                      ♪
-                    </div>
-                  </div>
-                </div>
-                <div class="min-w-0 flex-1">
-                  <p class="text-sm font-medium text-base-content line-clamp-1">
-                    {{ item.name_cn || item.name }}
-                  </p>
-                  <p class="text-xs text-base-content/50">
-                    {{ item.relation || '相关音乐' }}
-                  </p>
-                </div>
-                <a
-                  :href="`https://music.163.com/#/search/m/?s=${encodeURIComponent(item.name)}`"
-                  target="_blank"
-                  class="btn btn-ghost btn-xs text-xs"
-                  >网易云</a
-                >
-                <a
-                  :href="`https://search.bilibili.com/all?keyword=${encodeURIComponent(item.name)}`"
-                  target="_blank"
-                  class="btn btn-ghost btn-xs text-xs"
-                  >B站</a
-                >
-              </div>
+                :name="item.name"
+                :name-cn="item.name_cn"
+                :relation="item.relation"
+                :image="item.images?.common"
+              />
             </div>
           </div>
         </div>
-        <div v-else class="py-10 text-center text-base-content/40 text-sm">暂无相关音乐</div>
+        <div v-else class="py-10 text-center">
+          <p class="text-base-content/40 text-sm mb-4">暂无相关音乐</p>
+          <div class="flex flex-wrap justify-center gap-2">
+            <a
+              :href="`https://music.163.com/#/search/m/?s=${encodeURIComponent(anime.name_cn || anime.name)}`"
+              target="_blank"
+              class="btn btn-sm btn-ghost"
+              >网易云搜索</a
+            >
+            <a
+              :href="`https://search.bilibili.com/all?keyword=${encodeURIComponent(anime.name_cn || anime.name)}`"
+              target="_blank"
+              class="btn btn-sm btn-ghost"
+              >B站搜索</a
+            >
+          </div>
+        </div>
       </div>
 
       <!-- 在线观看 -->
@@ -818,6 +803,7 @@
             moegirlSummary?.url ||
             `https://zh.moegirl.org.cn/${encodeURIComponent(moegirlPageName)}`
           "
+          :reason="moegirlFallbackReason"
           @retry="retryMoegirlIframe"
         />
         <IframeEmbed
@@ -855,6 +841,7 @@ import AnimeCard from '../components/AnimeCard.vue'
 import CommentSection from '../components/CommentSection.vue'
 import IframeEmbed from '../components/IframeEmbed.vue'
 import ExternalEmbedFallback from '../components/ExternalEmbedFallback.vue'
+import MusicCard from '../components/MusicCard.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -891,9 +878,11 @@ const topicLoading = ref(false)
 const moegirlPageName = ref('')
 const moegirlLoading = ref(false)
 const doubanFallback = ref(false)
+const doubanFallbackReason = ref('error')
 const doubanSummary = ref(null)
 const doubanIframeRef = ref(null)
 const moegirlFallback = ref(false)
+const moegirlFallbackReason = ref('error')
 const moegirlSummary = ref(null)
 const moegirlIframeRef = ref(null)
 const showNewTopicModal = ref(false)
@@ -1027,8 +1016,9 @@ async function fetchMoegirlSearch() {
   moegirlLoading.value = false
 }
 
-async function onDoubanFallback() {
+async function onDoubanFallback(reason = 'error') {
   doubanFallback.value = true
+  doubanFallbackReason.value = reason || 'error'
   const id = doubanDetails.value?.id
   if (!id) return
   try {
@@ -1039,8 +1029,9 @@ async function onDoubanFallback() {
   }
 }
 
-async function onMoegirlFallback() {
+async function onMoegirlFallback(reason = 'error') {
   moegirlFallback.value = true
+  moegirlFallbackReason.value = reason || 'error'
   const name = moegirlPageName.value
   if (!name) return
   try {
@@ -1053,6 +1044,7 @@ async function onMoegirlFallback() {
 
 function retryDoubanIframe() {
   doubanFallback.value = false
+  doubanFallbackReason.value = 'error'
   nextTick(() => {
     doubanIframeRef.value?.retry()
   })
@@ -1060,6 +1052,7 @@ function retryDoubanIframe() {
 
 function retryMoegirlIframe() {
   moegirlFallback.value = false
+  moegirlFallbackReason.value = 'error'
   nextTick(() => {
     moegirlIframeRef.value?.retry()
   })
@@ -1220,10 +1213,12 @@ watch(
       topics.value = []
       doubanDetails.value = null
       doubanFallback.value = false
+      doubanFallbackReason.value = 'error'
       doubanSummary.value = null
       bilibiliDetails.value = null
       moegirlPageName.value = ''
       moegirlFallback.value = false
+      moegirlFallbackReason.value = 'error'
       moegirlSummary.value = null
       activeTab.value = 'overview'
       fetchDetail()

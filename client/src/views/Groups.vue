@@ -46,8 +46,30 @@
       <button class="btn btn-sm btn-primary" @click="retry">重试</button>
     </div>
 
+    <!-- 占位数据提示：与列表同时展示 -->
+    <div
+      v-if="errorType === 'placeholder'"
+      class="mb-4 p-4 rounded-xl bg-warning/10 border border-warning/20 text-sm text-base-content/80"
+    >
+      <p class="font-medium">小组信息暂不可用</p>
+      <p class="mt-1">
+        Bangumi 上游数据暂时无法获取，当前展示兜底小组。你可以稍后再试或前往 Bangumi 查看。
+      </p>
+      <div class="flex items-center gap-3 mt-3">
+        <button class="btn btn-xs btn-primary" @click="retry">重试</button>
+        <a
+          href="https://bgm.tv/group"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-1 text-primary hover:underline"
+        >
+          前往 Bangumi 小组首页 →
+        </a>
+      </div>
+    </div>
+
     <!-- 列表展示（至少 50 个，后端返回的全部展示，前端无需分页） -->
-    <div v-else-if="groups.length" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div v-if="groups.length" class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <router-link
         v-for="g in groups"
         :key="g.id"
@@ -163,7 +185,7 @@ const allGroups = ref([])
 const groups = ref([])
 const loading = ref(true)
 const searchQuery = ref('')
-// 错误分类: null | 'network' | 'server' | 'empty'
+// 错误分类: null | 'network' | 'server' | 'empty' | 'placeholder'
 const errorType = ref(null)
 // 防抖句柄
 let debounceTimer = null
@@ -227,11 +249,17 @@ async function loadGroups() {
   errorType.value = null
   try {
     const res = await groupAPI.getList()
-    allGroups.value = res.data?.data || []
-    if (allGroups.value.length === 0) {
+    const list = res.data?.data || []
+    allGroups.value = list
+    if (list.length === 0) {
       errorType.value = 'empty'
       groups.value = []
+    } else if (list.every(g => g.id && g.name === g.id)) {
+      // 后端返回占位数据（name === id），提示用户上游不可用
+      errorType.value = 'placeholder'
+      groups.value = list
     } else {
+      errorType.value = null
       applyFilter()
     }
   } catch (err) {

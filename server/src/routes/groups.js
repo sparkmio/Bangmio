@@ -239,7 +239,12 @@ app.get('/', async c => {
     try {
       const { html, url } = await fetchHTMLMulti(urls)
       baseUrl = url.replace(/\/group\/all\/?$/, '') || bases[0]
-      groups = parseGroupListHTML(html, baseUrl)
+      try {
+        groups = parseGroupListHTML(html, baseUrl)
+      } catch {
+        // 解析异常立即使用兜底数据
+        groups = []
+      }
     } catch {
       groups = []
     }
@@ -285,7 +290,12 @@ app.get('/search', async c => {
     try {
       const { html, url } = await fetchHTMLMulti(urls)
       baseUrl = url.replace(/\/group\/all\/?$/, '') || bases[0]
-      groups = parseGroupListHTML(html, baseUrl)
+      try {
+        groups = parseGroupListHTML(html, baseUrl)
+      } catch {
+        // 解析异常立即使用兜底数据
+        groups = []
+      }
     } catch {
       groups = []
     }
@@ -331,7 +341,24 @@ app.get('/:id', async c => {
       const baseUrl =
         url.replace(new RegExp(`/group/${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/?$`), '') ||
         bases[0]
-      const detail = parseGroupDetailHTML(html, id, baseUrl)
+      let detail
+      try {
+        detail = parseGroupDetailHTML(html, id, baseUrl)
+      } catch {
+        // 解析异常：构造带原站链接的兜底数据，避免 500
+        const fallback = FALLBACK_GROUPS.find(g => g.id === id)
+        detail = fallback
+          ? { ...fallback, url: `${bases[0]}/group/${id}`, topics: [] }
+          : {
+              id,
+              name: id,
+              description: '',
+              member_count: 0,
+              avatar: '',
+              url: `${bases[0]}/group/${id}`,
+              topics: []
+            }
+      }
       // 抓取成功：同时写入 TTL 缓存与「最近一次成功」长期缓存
       lastSuccessStore.set(id, detail)
       cache.set(cacheKey, detail)

@@ -153,15 +153,20 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = ''
     try {
       const res = await api.post('/auth/login', { email, password })
-      saveBangmioAuth(res.data.data.token, res.data.data.user)
+      const data = res.data?.data
+      if (!data?.token || !data?.user) {
+        throw new Error('登录响应异常，缺少必要信息')
+      }
+      saveBangmioAuth(data.token, data.user)
       // 已绑定用户登录后拉取 bgm token 与用户资料到本地缓存
-      if (res.data.data.user?.bgmUid) {
+      if (data.user?.bgmUid) {
         await fetchBgmToken()
         await fetchBgmUserProfile()
       }
+      error.value = ''
       redirectAfterAuth()
     } catch (err) {
-      error.value = err.response?.data?.error || '登录失败'
+      error.value = err.response?.data?.error || err.message || '登录失败'
       throw err
     } finally {
       loading.value = false
@@ -265,10 +270,15 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = ''
     try {
       const res = await api.post('/user/auth', { token: accessToken })
-      saveBangumiAuth(accessToken, res.data.data.user)
+      const data = res.data?.data
+      if (!data?.user) {
+        throw new Error('Token 验证响应异常，缺少用户信息')
+      }
+      saveBangumiAuth(accessToken, data.user)
+      error.value = ''
       redirectAfterAuth()
     } catch (err) {
-      error.value = err.response?.data?.error || 'Token 验证失败'
+      error.value = err.response?.data?.error || err.message || 'Token 验证失败'
       throw err
     } finally {
       loading.value = false
@@ -281,10 +291,15 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = ''
     try {
       const res = await api.post('/user/oauth-callback', { code })
-      saveBangumiAuth(res.data.data.token, res.data.data.user)
+      const data = res.data?.data
+      if (!data?.token || !data?.user) {
+        throw new Error('授权响应异常，缺少必要信息')
+      }
+      saveBangumiAuth(data.token, data.user)
+      error.value = ''
       redirectAfterAuth()
     } catch (err) {
-      error.value = err.response?.data?.error || '授权失败'
+      error.value = err.response?.data?.error || err.message || '授权失败'
       throw err
     } finally {
       loading.value = false

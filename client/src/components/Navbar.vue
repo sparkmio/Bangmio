@@ -62,11 +62,13 @@
   </div>
 
   <div
-    class="md:hidden fixed bottom-0 left-0 right-0 z-50 btm-nav bg-base-100/60 backdrop-blur-xl border-t border-base-300/50"
+    class="md:hidden fixed bottom-0 left-0 right-0 z-50 btm-nav bg-base-100/60 backdrop-blur-xl border-t border-base-300/50 min-h-[3.5rem]"
+    :style="{ paddingBottom: 'env(safe-area-inset-bottom)' }"
   >
     <router-link
       to="/"
       :class="$route.path === '/' ? 'active text-primary' : 'text-base-content/40'"
+      class="min-h-[44px]"
     >
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
@@ -81,6 +83,7 @@
     <router-link
       to="/anime"
       :class="$route.path === '/anime' ? 'active text-primary' : 'text-base-content/40'"
+      class="min-h-[44px]"
     >
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
@@ -93,8 +96,24 @@
       <span class="btm-nav-label text-xs">搜索</span>
     </router-link>
     <router-link
+      to="/groups"
+      :class="$route.path === '/groups' ? 'active text-primary' : 'text-base-content/40'"
+      class="min-h-[44px]"
+    >
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+        />
+      </svg>
+      <span class="btm-nav-label text-xs">小组</span>
+    </router-link>
+    <router-link
       to="/settings"
       :class="$route.path === '/settings' ? 'active text-primary' : 'text-base-content/40'"
+      class="min-h-[44px]"
     >
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
@@ -115,6 +134,7 @@
     <router-link
       to="/profile"
       :class="$route.path === '/profile' ? 'active text-primary' : 'text-base-content/40'"
+      class="min-h-[44px]"
     >
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path

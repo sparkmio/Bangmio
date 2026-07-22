@@ -36,11 +36,13 @@
       <div v-else class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5">
         <!-- Left: anime list -->
         <div class="lg:col-span-3">
-          <div class="space-y-0.5 max-h-[calc(100vh-180px)] overflow-y-auto pr-1 scrollbar-hide">
+          <div
+            class="space-y-1 max-h-[calc(100vh-180px)] overflow-y-auto pr-1 scrollbar-hide -mx-1 px-1"
+          >
             <button
               v-for="col in collections"
               :key="col.subject?.id || col.anime_id"
-              class="w-full flex items-center gap-3 p-2 rounded-lg text-left transition-all duration-200"
+              class="w-full flex items-center gap-3 p-2 sm:p-2.5 rounded-lg text-left transition-all duration-200 min-h-[48px]"
               :class="
                 selectedId === (col.subject?.id || col.anime_id)
                   ? 'bg-primary/10 border-l-2 border-primary'
@@ -52,7 +54,7 @@
                 v-if="col.subject?.images?.common || col.subject?.images?.grid"
                 :src="col.subject.images.common || col.subject.images.grid"
                 :alt="col.subject?.name_cn || col.subject?.name"
-                class="w-10 h-14 rounded object-cover flex-shrink-0"
+                class="w-10 h-14 sm:w-11 sm:h-[60px] rounded object-cover flex-shrink-0"
                 loading="lazy"
                 decoding="async"
               />
@@ -148,7 +150,7 @@
                     24
                   )"
                   :key="ep"
-                  class="w-8 h-7 rounded text-xs font-bold flex items-center justify-center transition-all hover:scale-110 cursor-pointer"
+                  class="min-w-9 min-h-8 px-1 rounded text-xs font-bold flex items-center justify-center transition-all hover:scale-110 cursor-pointer"
                   :class="
                     ep <= (selected.ep_status || 0)
                       ? 'bg-primary text-white'

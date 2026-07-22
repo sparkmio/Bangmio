@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { parseHTML } from 'linkedom'
 import { createCache } from '../utils/cache.js'
-import { fetchHTML, fixUrl } from '../utils/http.js'
+import { fetchHTML, fetchHTMLMulti, fixUrl } from '../utils/http.js'
 import { getMoegirlSummary } from '../services/moegirl.js'
 import { CACHE_TTL_MOEGIRL } from '../config.js'
 
@@ -178,6 +178,7 @@ async function fetchPageExtract(apiBase, title) {
 
   try {
     const html = await fetchHTML(pageUrl, {
+      timeout: 6000,
       headers: {
         'User-Agent': 'Bangmio/1.0 (Mozilla/5.0; compatible)',
         Accept: 'text/html',
@@ -353,23 +354,26 @@ app.get('/page/:name', async c => {
     `https://zh.moegirl.uk/${encoded}`
   ]
 
-  for (const url of candidates) {
-    try {
-      const html = await fetchHTML(url, {
-        headers: {
-          Referer: 'https://zh.moegirl.org.cn/',
-          'Cache-Control': 'no-cache'
-        }
-      })
-      const base = url.slice(0, url.indexOf('/', 8))
-      if (isMoegirlBlockPage(html)) continue
+  try {
+    const { html, url } = await fetchHTMLMulti(candidates, {
+      timeout: 6000,
+      overallTimeout: 12000,
+      retries: 1,
+      headers: {
+        Referer: 'https://zh.moegirl.org.cn/',
+        'Cache-Control': 'no-cache'
+      }
+    })
+    const base = url.slice(0, url.indexOf('/', 8))
+    if (!isMoegirlBlockPage(html)) {
       const fragment = cleanMoegirlPage(html, base)
-      if (!fragment || fragment.trim().length < 100) continue
-      cache.set(cacheKey, fragment)
-      return c.html(fragment, 200, { 'Content-Type': 'text/html; charset=utf-8' })
-    } catch {
-      // 当前源失败，尝试下一个
+      if (fragment && fragment.trim().length >= 100) {
+        cache.set(cacheKey, fragment)
+        return c.html(fragment, 200, { 'Content-Type': 'text/html; charset=utf-8' })
+      }
     }
+  } catch {
+    // 全部候选源失败，继续返回降级 HTML
   }
 
   // 所有源均失败，返回降级 HTML

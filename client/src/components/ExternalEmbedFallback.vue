@@ -34,9 +34,18 @@
       </template>
     </div>
 
+    <!-- 超时提示 -->
+    <div
+      v-if="reason === 'timeout'"
+      class="text-sm text-base-content/70 leading-relaxed break-words"
+    >
+      <p class="font-medium text-base-content">加载超时</p>
+      <p class="mt-1">外部页面响应较慢，已为你准备直达链接，可点击前往原站查看完整内容。</p>
+    </div>
+
     <!-- 摘要内容 -->
     <div
-      v-if="content"
+      v-else-if="content"
       v-safe-html="content"
       class="text-sm text-base-content/70 leading-relaxed break-words"
     />
@@ -52,7 +61,7 @@
       >
         查看原站 →
       </a>
-      <button class="btn btn-sm btn-ghost" @click="$emit('retry')">重试</button>
+      <button class="btn btn-sm btn-ghost" @click="$emit('retry')">重新加载</button>
     </div>
   </div>
 </template>
@@ -70,7 +79,8 @@ const props = defineProps({
   title: { type: String, default: '' },
   content: { type: String, default: '' },
   url: { type: String, default: '' },
-  meta: { type: Object, default: () => ({}) }
+  meta: { type: Object, default: () => ({}) },
+  reason: { type: String, default: 'error', validator: v => ['error', 'timeout'].includes(v) }
 })
 
 defineEmits(['retry'])

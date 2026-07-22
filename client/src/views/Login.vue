@@ -153,9 +153,13 @@ const captchaToken = ref('')
 const turnstileError = ref('')
 let turnstileWidgetId = null
 
-// 切换 Tab 时清空错误信息；切回 Bangmio Tab 时重新渲染 Turnstile widget
-watch(activeTab, newTab => {
+function clearLoginError() {
   auth.error = ''
+}
+
+// 切换 Tab 或输入变化时清空错误信息
+watch(activeTab, newTab => {
+  clearLoginError()
   if (newTab === 'bangmio' && turnstileSiteKey) {
     // 容器刚被 v-if 重建，旧 widget 已随 DOM 卸载，需重新渲染
     turnstileWidgetId = null
@@ -165,6 +169,10 @@ watch(activeTab, newTab => {
       if (window.turnstile) renderTurnstile()
     })
   }
+})
+
+watch([email, password, token], () => {
+  clearLoginError()
 })
 
 // 动态加载 Turnstile 脚本并渲染 widget（复用自 Register.vue）
@@ -218,6 +226,7 @@ function resetTurnstile() {
 }
 
 async function handleBangmioLogin() {
+  clearLoginError()
   if (!email.value || !password.value) return
   if (turnstileSiteKey && !captchaToken.value) return
   try {
@@ -229,10 +238,15 @@ async function handleBangmioLogin() {
 }
 
 async function oauthLogin() {
+  clearLoginError()
   try {
     oauthWaiting.value = true
     const res = await userAPI.getOAuthUrl()
-    window.location.href = res.data.data
+    const url = res.data?.data
+    if (!url || typeof url !== 'string') {
+      throw new Error('获取授权链接失败')
+    }
+    window.location.href = url
   } catch {
     oauthWaiting.value = false
     auth.error = '获取授权链接失败'
@@ -240,6 +254,7 @@ async function oauthLogin() {
 }
 
 function handleTokenLogin() {
+  clearLoginError()
   if (token.value) auth.loginWithBangumi(token.value)
 }
 

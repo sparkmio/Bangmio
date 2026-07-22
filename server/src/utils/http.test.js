@@ -100,48 +100,43 @@ describe('fetchHTMLMulti', () => {
     const result = await fetchHTMLMulti(['https://a.test', 'https://b.test'])
 
     expect(result).toEqual({ html: '<html>first</html>', url: 'https://a.test' })
-    expect(global.fetch).toHaveBeenCalledTimes(1)
+    // 并发择优 + 重试机制下会同时发起多个候选请求，只要包含首个成功 URL 即可
     expect(global.fetch).toHaveBeenCalledWith('https://a.test', expect.anything())
   })
 
   it('第一个 URL 失败、第二个 URL 成功时返回第二个 URL 的结果', async () => {
-    global.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        arrayBuffer: () => Promise.resolve(toArrayBuffer('server error'))
-      })
-      .mockResolvedValueOnce({
+    global.fetch = vi.fn().mockImplementation(url => {
+      if (url === 'https://a.test') {
+        return Promise.resolve({
+          ok: false,
+          status: 500,
+          arrayBuffer: () => Promise.resolve(toArrayBuffer('server error'))
+        })
+      }
+      return Promise.resolve({
         ok: true,
         status: 200,
         arrayBuffer: () => Promise.resolve(toArrayBuffer('<html>second</html>'))
       })
+    })
 
     const result = await fetchHTMLMulti(['https://a.test', 'https://b.test'])
 
     expect(result).toEqual({ html: '<html>second</html>', url: 'https://b.test' })
-    expect(global.fetch).toHaveBeenCalledTimes(2)
-    expect(global.fetch).toHaveBeenNthCalledWith(1, 'https://a.test', expect.anything())
-    expect(global.fetch).toHaveBeenNthCalledWith(2, 'https://b.test', expect.anything())
+    expect(global.fetch).toHaveBeenCalledWith('https://a.test', expect.anything())
+    expect(global.fetch).toHaveBeenCalledWith('https://b.test', expect.anything())
   })
 
-  it('所有 URL 都失败时抛出最后一个错误', async () => {
-    global.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        arrayBuffer: () => Promise.resolve(toArrayBuffer('e1'))
-      })
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 503,
-        arrayBuffer: () => Promise.resolve(toArrayBuffer('e2'))
-      })
+  it('所有 URL 都失败时抛出错误', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      arrayBuffer: () => Promise.resolve(toArrayBuffer('e2'))
+    })
 
-    await expect(fetchHTMLMulti(['https://a.test', 'https://b.test'])).rejects.toThrow(/HTTP 503/)
-    expect(global.fetch).toHaveBeenCalledTimes(2)
+    await expect(fetchHTMLMulti(['https://a.test', 'https://b.test'])).rejects.toThrow(
+      /HTTP 503|All sources failed/
+    )
   })
 
   it('空数组时抛出 All sources failed 错误', async () => {

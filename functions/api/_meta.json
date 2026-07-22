@@ -357,11 +357,11 @@
       "format": "esm"
     },
     "server/src/utils/crypto.js": { "bytes": 6860, "imports": [], "format": "esm" },
-    "server/src/db/users.js": { "bytes": 7829, "imports": [], "format": "esm" },
+    "server/src/db/users.js": { "bytes": 9446, "imports": [], "format": "esm" },
     "server/src/db/emailCodes.js": { "bytes": 4928, "imports": [], "format": "esm" },
     "server/src/utils/email.js": { "bytes": 3916, "imports": [], "format": "esm" },
     "server/src/utils/http.js": {
-      "bytes": 4625,
+      "bytes": 7150,
       "imports": [
         {
           "path": "server/src/utils/logger.js",
@@ -372,7 +372,7 @@
       "format": "esm"
     },
     "server/src/services/auth.js": {
-      "bytes": 15782,
+      "bytes": 19125,
       "imports": [
         {
           "path": "server/src/utils/crypto.js",
@@ -414,7 +414,7 @@
     },
     "server/src/utils/turnstile.js": { "bytes": 2147, "imports": [], "format": "esm" },
     "server/src/routes/auth.js": {
-      "bytes": 10926,
+      "bytes": 14636,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -435,6 +435,16 @@
           "path": "server/src/utils/turnstile.js",
           "kind": "import-statement",
           "original": "../utils/turnstile.js"
+        },
+        {
+          "path": "server/src/db/users.js",
+          "kind": "import-statement",
+          "original": "../db/users.js"
+        },
+        {
+          "path": "server/src/utils/logger.js",
+          "kind": "import-statement",
+          "original": "../utils/logger.js"
         }
       ],
       "format": "esm"
@@ -4838,9 +4848,24 @@
       ],
       "format": "esm"
     },
-    "server/src/services/douban.js": { "bytes": 6739, "imports": [], "format": "esm" },
+    "server/src/services/douban.js": {
+      "bytes": 10055,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/index.js",
+          "kind": "import-statement",
+          "original": "linkedom"
+        },
+        {
+          "path": "server/src/utils/http.js",
+          "kind": "import-statement",
+          "original": "../utils/http.js"
+        }
+      ],
+      "format": "esm"
+    },
     "server/src/routes/douban.js": {
-      "bytes": 9080,
+      "bytes": 11950,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -4903,8 +4928,24 @@
       ],
       "format": "esm"
     },
+    "server/src/services/moegirl.js": {
+      "bytes": 3131,
+      "imports": [
+        {
+          "path": "node_modules/linkedom/esm/index.js",
+          "kind": "import-statement",
+          "original": "linkedom"
+        },
+        {
+          "path": "server/src/utils/http.js",
+          "kind": "import-statement",
+          "original": "../utils/http.js"
+        }
+      ],
+      "format": "esm"
+    },
     "server/src/routes/moegirl.js": {
-      "bytes": 9512,
+      "bytes": 13354,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -4926,12 +4967,17 @@
           "kind": "import-statement",
           "original": "../utils/http.js"
         },
+        {
+          "path": "server/src/services/moegirl.js",
+          "kind": "import-statement",
+          "original": "../services/moegirl.js"
+        },
         { "path": "server/src/config.js", "kind": "import-statement", "original": "../config.js" }
       ],
       "format": "esm"
     },
     "server/src/routes/groups.js": {
-      "bytes": 12007,
+      "bytes": 12735,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -4952,8 +4998,41 @@
       ],
       "format": "esm"
     },
+    "server/src/services/music.js": {
+      "bytes": 4513,
+      "imports": [
+        {
+          "path": "server/src/utils/logger.js",
+          "kind": "import-statement",
+          "original": "../utils/logger.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "server/src/routes/music.js": {
+      "bytes": 987,
+      "imports": [
+        {
+          "path": "server/node_modules/hono/dist/index.js",
+          "kind": "import-statement",
+          "original": "hono"
+        },
+        {
+          "path": "server/src/services/music.js",
+          "kind": "import-statement",
+          "original": "../services/music.js"
+        },
+        {
+          "path": "server/src/utils/cache.js",
+          "kind": "import-statement",
+          "original": "../utils/cache.js"
+        },
+        { "path": "server/src/config.js", "kind": "import-statement", "original": "../config.js" }
+      ],
+      "format": "esm"
+    },
     "server/src/app.js": {
-      "bytes": 3126,
+      "bytes": 3344,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -5025,6 +5104,11 @@
           "path": "server/src/routes/groups.js",
           "kind": "import-statement",
           "original": "./routes/groups.js"
+        },
+        {
+          "path": "server/src/routes/music.js",
+          "kind": "import-statement",
+          "original": "./routes/music.js"
         }
       ],
       "format": "esm"
@@ -5087,13 +5171,13 @@
         "server/src/utils/jwt.js": { "bytesInOutput": 2942 },
         "server/src/middleware/jwtAuth.js": { "bytesInOutput": 671 },
         "server/src/utils/crypto.js": { "bytesInOutput": 2925 },
-        "server/src/db/users.js": { "bytesInOutput": 3352 },
+        "server/src/db/users.js": { "bytesInOutput": 4072 },
         "server/src/db/emailCodes.js": { "bytesInOutput": 2239 },
         "server/src/utils/email.js": { "bytesInOutput": 2723 },
-        "server/src/utils/http.js": { "bytesInOutput": 1749 },
-        "server/src/services/auth.js": { "bytesInOutput": 8258 },
+        "server/src/utils/http.js": { "bytesInOutput": 2878 },
+        "server/src/services/auth.js": { "bytesInOutput": 9848 },
         "server/src/utils/turnstile.js": { "bytesInOutput": 767 },
-        "server/src/routes/auth.js": { "bytesInOutput": 7219 },
+        "server/src/routes/auth.js": { "bytesInOutput": 9995 },
         "server/src/services/bangumi.js": { "bytesInOutput": 5574 },
         "server/src/routes/user.js": { "bytesInOutput": 15403 },
         "server/src/controllers/animeController.js": { "bytesInOutput": 4411 },
@@ -5324,14 +5408,17 @@
         "node_modules/linkedom/esm/index.js": { "bytesInOutput": 242 },
         "server/src/utils/cache.js": { "bytesInOutput": 906 },
         "server/src/routes/comments.js": { "bytesInOutput": 17997 },
-        "server/src/services/douban.js": { "bytesInOutput": 4613 },
-        "server/src/routes/douban.js": { "bytesInOutput": 7280 },
+        "server/src/services/douban.js": { "bytesInOutput": 6743 },
+        "server/src/routes/douban.js": { "bytesInOutput": 9070 },
         "server/src/routes/bilibili.js": { "bytesInOutput": 3024 },
-        "server/src/routes/moegirl.js": { "bytesInOutput": 7382 },
-        "server/src/routes/groups.js": { "bytesInOutput": 10721 },
-        "server/src/app.js": { "bytesInOutput": 1956 }
+        "server/src/services/moegirl.js": { "bytesInOutput": 2023 },
+        "server/src/routes/moegirl.js": { "bytesInOutput": 9862 },
+        "server/src/routes/groups.js": { "bytesInOutput": 11232 },
+        "server/src/services/music.js": { "bytesInOutput": 3261 },
+        "server/src/routes/music.js": { "bytesInOutput": 604 },
+        "server/src/app.js": { "bytesInOutput": 2087 }
       },
-      "bytes": 665592
+      "bytes": 684836
     }
   }
 }

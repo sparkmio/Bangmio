@@ -4,6 +4,13 @@ export default {
   content: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      screens: {
+        xs: '480px'
+      },
+      spacing: {
+        18: '4.5rem',
+        22: '5.5rem'
+      },
       borderRadius: {
         card: '0.75rem',
         pill: '9999px'

@@ -1,21 +1,40 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-// vi.mock 必须在 import 之前；将 fetchHTML 替换为 vi.fn 以便测试路由时不发起真实请求
-vi.mock('../utils/http.js', () => ({
-  fetchHTML: vi.fn(),
-  fixUrl: vi.fn((url, base) => {
-    if (!url) return ''
-    if (url.startsWith('//')) return `https:${url}`
-    if (url.startsWith('/')) return `${base}${url}`
-    return url
+// vi.mock 必须在 import 之前；将 fetchHTML / fetchHTMLMulti 替换为 vi.fn 以便测试路由时不发起真实请求
+vi.mock('../utils/http.js', () => {
+  const fetchHTML = vi.fn()
+  const fetchHTMLMulti = vi.fn().mockImplementation(async (urls, opts) => {
+    let lastErr
+    for (const url of urls) {
+      try {
+        const html = await fetchHTML(url, {
+          timeout: opts?.timeout,
+          headers: opts?.headers
+        })
+        if (html) return { html, url }
+      } catch (e) {
+        lastErr = e
+      }
+    }
+    throw lastErr || new Error('All sources failed')
   })
-}))
+  return {
+    fetchHTML,
+    fetchHTMLMulti,
+    fixUrl: vi.fn((url, base) => {
+      if (!url) return ''
+      if (url.startsWith('//')) return `https:${url}`
+      if (url.startsWith('/')) return `${base}${url}`
+      return url
+    })
+  }
+})
 
 vi.mock('../services/moegirl.js', () => ({
   getMoegirlSummary: vi.fn()
 }))
 
 import app, { cleanMoegirlPage } from './moegirl.js'
-import { fetchHTML } from '../utils/http.js'
+import { fetchHTML, fetchHTMLMulti } from '../utils/http.js'
 import { getMoegirlSummary } from '../services/moegirl.js'
 
 /**
@@ -177,6 +196,22 @@ describe('cleanMoegirlPage', () => {
 describe('GET /page/:name', () => {
   beforeEach(() => {
     fetchHTML.mockReset()
+    fetchHTMLMulti.mockReset()
+    fetchHTMLMulti.mockImplementation(async (urls, opts) => {
+      let lastErr
+      for (const url of urls) {
+        try {
+          const html = await fetchHTML(url, {
+            timeout: opts?.timeout,
+            headers: opts?.headers
+          })
+          if (html) return { html, url }
+        } catch (e) {
+          lastErr = e
+        }
+      }
+      throw lastErr || new Error('All sources failed')
+    })
   })
 
   afterEach(() => {

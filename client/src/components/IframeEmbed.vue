@@ -30,6 +30,8 @@
 <script setup>
 import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 
+const RETRY_EXTRA_MS = 5000
+
 /**
  * IframeEmbed - 通用 HTML 片段嵌入组件。
  *
@@ -59,8 +61,8 @@ const props = defineProps({
     default: 'srcdoc',
     validator: value => ['srcdoc', 'src'].includes(value)
   },
-  /** 加载超时时间（毫秒） */
-  timeoutMs: { type: Number, default: 8000 }
+  /** 加载超时时间（毫秒），首次加载 10s，重试时额外增加 5s */
+  timeoutMs: { type: Number, default: 10000 }
 })
 
 const emit = defineEmits(['fallback'])
@@ -71,8 +73,14 @@ const htmlContent = ref('')
 const iframeSrc = ref('')
 const iframeRef = ref(null)
 const consecutiveFailures = ref(0)
+const attempt = ref(0)
 
 const iframeKey = computed(() => `${props.mode}:${props.src}`)
+
+/** 当前加载尝试的有效超时时间：首次 timeoutMs，重试额外增加 5s */
+const effectiveTimeout = computed(() => {
+  return attempt.value <= 1 ? props.timeoutMs : props.timeoutMs + RETRY_EXTRA_MS
+})
 
 /** 注入到 iframe 的基础样式与文档骨架，保证外部 HTML 片段可读 */
 const BASE_DOC =
@@ -192,11 +200,14 @@ function setSrcHtml(html) {
   iframeSrc.value = blobUrl
 }
 
-async function load() {
+async function load({ isRetry = false } = {}) {
   if (!props.src) {
     handleError('缺少加载地址')
     return
   }
+
+  // 新 src / 首次加载重置尝试计数；手动重试时递增
+  attempt.value = isRetry ? attempt.value + 1 : 1
 
   loading.value = true
   error.value = ''
@@ -306,14 +317,14 @@ function cleanupHeightSync() {
   }
 }
 
-/** 统一错误处理：显示错误、增加失败计数，连续 2 次失败后触发 fallback */
-function handleError(message) {
+/** 统一错误处理：显示错误、增加失败计数；超时或连续 2 次失败后触发 fallback */
+function handleError(message, isTimeout = false) {
   clearTimeout(timeoutTimer)
   loading.value = false
   error.value = message
   consecutiveFailures.value += 1
-  if (consecutiveFailures.value >= 2) {
-    emit('fallback')
+  if (isTimeout || consecutiveFailures.value >= 2) {
+    emit('fallback', isTimeout ? 'timeout' : 'error')
   }
 }
 
@@ -321,13 +332,13 @@ function handleError(message) {
 function startTimeout() {
   clearTimeout(timeoutTimer)
   timeoutTimer = setTimeout(() => {
-    handleError('加载超时，请重试')
-  }, props.timeoutMs)
+    handleError('加载超时，请重试', true)
+  }, effectiveTimeout.value)
 }
 
 /** 触发重试，可通过 ref 暴露给父组件 */
 function retry() {
-  load()
+  load({ isRetry: true })
 }
 
 watch(

@@ -3,8 +3,10 @@
     <Sidebar />
     <Navbar />
 
-    <div class="md:ml-56 pb-14 md:pb-0 min-h-screen flex flex-col">
-      <main class="flex-1 w-full px-5 py-6 md:px-8">
+    <div
+      class="md:ml-56 pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0 min-h-screen flex flex-col"
+    >
+      <main class="flex-1 w-full px-4 py-4 sm:px-5 sm:py-6 md:px-8">
         <router-view v-slot="{ Component, route }">
           <transition
             :css="false"

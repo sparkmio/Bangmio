@@ -17,6 +17,7 @@ import doubanRoutes from './routes/douban.js'
 import bilibiliRoutes from './routes/bilibili.js'
 import moegirlRoutes from './routes/moegirl.js'
 import groupRoutes from './routes/groups.js'
+import musicRoutes from './routes/music.js'
 
 const app = new Hono()
 
@@ -71,6 +72,7 @@ app.route('/api/v1/douban', doubanRoutes)
 app.route('/api/v1/bilibili', bilibiliRoutes)
 app.route('/api/v1/moegirl', moegirlRoutes)
 app.route('/api/v1/groups', groupRoutes)
+app.route('/api/v1/music', musicRoutes)
 
 app.get('/api/health', c => c.json({ status: 'ok', country: c.env?.CF_IP_COUNTRY || 'unknown' }))
 

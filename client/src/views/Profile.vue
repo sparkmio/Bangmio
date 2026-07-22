@@ -1,5 +1,5 @@
 <template>
-  <div class="max-w-[900px] mx-auto lg:ml-[240px] lg:mr-auto">
+  <div class="max-w-none lg:max-w-[900px] lg:ml-[240px] lg:mr-auto">
     <!-- 未登录且未指定用户名时提示 -->
     <div v-if="!auth.isLoggedIn && !route.params.username" class="py-20 text-center">
       <p class="text-base-content/50 mb-3">请先登录</p>
@@ -134,7 +134,7 @@
                 </div>
                 <div
                   v-if="groupedCollections[subjectType]?.[s.type]?.length"
-                  class="flex gap-2 overflow-x-auto pb-1"
+                  class="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1"
                 >
                   <router-link
                     v-for="col in groupedCollections[subjectType][s.type]"
@@ -144,7 +144,7 @@
                     :title="col.subject?.name_cn || col.subject?.name"
                   >
                     <div
-                      class="w-[72px] h-[100px] rounded-md overflow-hidden bg-base-200 shadow-sm relative"
+                      class="w-16 h-[90px] sm:w-[72px] sm:h-[100px] rounded-md overflow-hidden bg-base-200 shadow-sm relative"
                     >
                       <img
                         v-if="
@@ -164,7 +164,7 @@
                       />
                       <div
                         v-else
-                        class="w-full h-full flex items-center justify-center text-xs text-base-content/40 p-2 text-center"
+                        class="w-full h-full flex items-center justify-center text-[10px] text-base-content/40 p-1 text-center"
                       >
                         {{ col.subject?.name_cn || col.subject?.name || '无封面' }}
                       </div>
@@ -182,7 +182,7 @@
                       </div>
                     </div>
                     <p
-                      class="text-[10px] text-center mt-1 text-base-content/60 line-clamp-1 w-[72px] group-hover:text-primary transition-colors"
+                      class="text-[10px] text-center mt-1 text-base-content/60 line-clamp-1 w-16 sm:w-[72px] group-hover:text-primary transition-colors"
                     >
                       {{ col.subject?.name_cn || col.subject?.name }}
                     </p>
@@ -345,7 +345,7 @@
                   >...more</a
                 >
               </div>
-              <div class="grid grid-cols-6 gap-2">
+              <div class="grid grid-cols-4 sm:grid-cols-6 gap-2">
                 <router-link
                   v-for="f in friends.slice(0, 12)"
                   :key="f.username"
@@ -474,7 +474,7 @@
                   >...more</a
                 >
               </div>
-              <div class="grid grid-cols-6 gap-2">
+              <div class="grid grid-cols-4 sm:grid-cols-6 gap-2">
                 <router-link
                   v-for="char in characters.slice(0, 10)"
                   :key="'c-' + char.id"

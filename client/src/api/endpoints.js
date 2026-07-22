@@ -171,6 +171,12 @@ export const moegirlAPI = {
   }
 }
 
+export const musicAPI = {
+  search(q, config = {}) {
+    return api.get('/music/search', { params: { q }, ...config })
+  }
+}
+
 export const groupAPI = {
   getList(config = {}) {
     return api.get('/groups/', config)
