@@ -414,7 +414,7 @@
     },
     "server/src/utils/turnstile.js": { "bytes": 2375, "imports": [], "format": "esm" },
     "server/src/routes/auth.js": {
-      "bytes": 14636,
+      "bytes": 14761,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -5177,7 +5177,7 @@
         "server/src/utils/http.js": { "bytesInOutput": 2878 },
         "server/src/services/auth.js": { "bytesInOutput": 9837 },
         "server/src/utils/turnstile.js": { "bytesInOutput": 867 },
-        "server/src/routes/auth.js": { "bytesInOutput": 9995 },
+        "server/src/routes/auth.js": { "bytesInOutput": 9990 },
         "server/src/services/bangumi.js": { "bytesInOutput": 5574 },
         "server/src/routes/user.js": { "bytesInOutput": 15403 },
         "server/src/controllers/animeController.js": { "bytesInOutput": 4411 },
@@ -5418,7 +5418,7 @@
         "server/src/routes/music.js": { "bytesInOutput": 604 },
         "server/src/app.js": { "bytesInOutput": 2087 }
       },
-      "bytes": 686040
+      "bytes": 686035
     }
   }
 }

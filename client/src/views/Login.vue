@@ -82,11 +82,7 @@
             </button>
           </div>
 
-          <button
-            type="submit"
-            :disabled="auth.loading || (turnstileSiteKey && !captchaToken)"
-            class="btn btn-primary w-full"
-          >
+          <button type="submit" :disabled="auth.loading" class="btn btn-primary w-full">
             {{ auth.loading ? '登录中...' : '登录' }}
           </button>
 
@@ -240,7 +236,7 @@ function refreshPage() {
 async function handleBangmioLogin() {
   clearLoginError()
   if (!email.value || !password.value) return
-  if (turnstileSiteKey && !captchaToken.value) return
+  // Turnstile token 可能为空（widget 未渲染或失败），后端会降级处理
   try {
     await auth.loginWithBangmio(email.value, password.value, captchaToken.value)
   } catch (err) {

@@ -196,7 +196,8 @@ app.post('/login', async c => {
     if (!email || !password) {
       return c.json({ data: null, error: '邮箱或密码不能为空', code: 400 }, 400)
     }
-    // 若配置了 Turnstile secret，强制要求人机验证
+    // 若配置了 Turnstile secret，进行人机验证
+    // 登录已有邮箱+密码作为主认证，Turnstile 失败时降级放行并记录日志，避免因配置问题锁死用户
     if (c.env?.TURNSTILE_SECRET_KEY) {
       const turnstile = await verifyTurnstile(
         captchaToken,
@@ -204,7 +205,7 @@ app.post('/login', async c => {
         c.req.header('CF-Connecting-IP')
       )
       if (!turnstile.success) {
-        return c.json({ data: null, error: '人机验证失败，请重试', code: 400 }, 400)
+        console.warn('[Login] Turnstile 验证失败，降级放行:', turnstile.errorCodes)
       }
     }
     const result = await loginUser(c.env.DB, c.env, { email, password })

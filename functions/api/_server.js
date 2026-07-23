@@ -4782,7 +4782,7 @@ app.post("/login", async (c) => {
         c.req.header("CF-Connecting-IP")
       );
       if (!turnstile.success) {
-        return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
+        console.warn("[Login] Turnstile \u9A8C\u8BC1\u5931\u8D25\uFF0C\u964D\u7EA7\u653E\u884C:", turnstile.errorCodes);
       }
     }
     const result = await loginUser(c.env.DB, c.env, { email, password });
