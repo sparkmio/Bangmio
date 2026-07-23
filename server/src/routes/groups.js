@@ -229,13 +229,14 @@ app.get('/', async c => {
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
     const cacheKey = `groups_list_${isChina ? 'cn' : 'global'}`
     const cached = cache.get(cacheKey)
-    if (cached) return c.json({ data: cached })
+    if (cached) return c.json({ data: cached.data, degraded: cached.degraded === true })
 
     const bases = getBaseUrls(isChina)
     const urls = bases.map(base => `${base}/group/all`)
 
     let groups = []
     let baseUrl = bases[0]
+    let degraded = false
     try {
       const { html, url } = await fetchHTMLMulti(urls)
       baseUrl = url.replace(/\/group\/all\/?$/, '') || bases[0]
@@ -259,13 +260,15 @@ app.get('/', async c => {
           groups.push(g)
         }
       }
+      degraded = true
     }
 
-    cache.set(cacheKey, groups)
-    return c.json({ data: groups })
+    cache.set(cacheKey, { data: groups, degraded })
+    return c.json({ data: groups, degraded })
   } catch {
     return c.json({
-      data: FALLBACK_GROUPS.map(g => ({ ...g, url: `${HOSTS.main}/group/${g.id}` }))
+      data: FALLBACK_GROUPS.map(g => ({ ...g, url: `${HOSTS.main}/group/${g.id}` })),
+      degraded: true
     })
   }
 })
@@ -275,18 +278,19 @@ app.get('/search', async c => {
   try {
     // 兼容 spec 的 q 参数与前端使用的 keyword 参数
     const keyword = (c.req.query('keyword') || c.req.query('q') || '').trim()
-    if (!keyword) return c.json({ data: [] })
+    if (!keyword) return c.json({ data: [], degraded: false })
 
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
     const cacheKey = `groups_search_${keyword}_${isChina ? 'cn' : 'global'}`
     const cached = cache.get(cacheKey)
-    if (cached) return c.json({ data: cached })
+    if (cached) return c.json({ data: cached.data, degraded: cached.degraded === true })
 
     const bases = getBaseUrls(isChina)
     const urls = bases.map(base => `${base}/group/all`)
 
     let groups = []
     let baseUrl = bases[0]
+    let degraded = false
     try {
       const { html, url } = await fetchHTMLMulti(urls)
       baseUrl = url.replace(/\/group\/all\/?$/, '') || bases[0]
@@ -309,6 +313,7 @@ app.get('/search', async c => {
           groups.push(g)
         }
       }
+      degraded = true
     }
 
     const q = keyword.toLowerCase()
@@ -317,10 +322,10 @@ app.get('/search', async c => {
         (g.name || '').toLowerCase().includes(q) || (g.description || '').toLowerCase().includes(q)
     )
 
-    cache.set(cacheKey, result)
-    return c.json({ data: result })
+    cache.set(cacheKey, { data: result, degraded })
+    return c.json({ data: result, degraded })
   } catch {
-    return c.json({ data: [] })
+    return c.json({ data: [], degraded: true })
   }
 })
 
@@ -331,7 +336,7 @@ app.get('/:id', async c => {
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
     const cacheKey = `groups_detail_${id}_${isChina ? 'cn' : 'global'}`
     const cached = cache.get(cacheKey)
-    if (cached) return c.json({ data: cached })
+    if (cached) return c.json({ data: cached.data, degraded: cached.degraded === true })
 
     const bases = getBaseUrls(isChina)
     const urls = bases.map(base => `${base}/group/${id}`)
@@ -342,8 +347,11 @@ app.get('/:id', async c => {
         url.replace(new RegExp(`/group/${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/?$`), '') ||
         bases[0]
       let detail
+      let degraded = false
       try {
         detail = parseGroupDetailHTML(html, id, baseUrl)
+        // 占位数据：parseGroupDetailHTML 未能解析出真实小组名
+        if (detail.name === id) degraded = true
       } catch {
         // 解析异常：构造带原站链接的兜底数据，避免 500
         const fallback = FALLBACK_GROUPS.find(g => g.id === id)
@@ -358,18 +366,19 @@ app.get('/:id', async c => {
               url: `${bases[0]}/group/${id}`,
               topics: []
             }
+        degraded = true
       }
       // 抓取成功：同时写入 TTL 缓存与「最近一次成功」长期缓存
       lastSuccessStore.set(id, detail)
-      cache.set(cacheKey, detail)
-      return c.json({ data: detail })
+      cache.set(cacheKey, { data: detail, degraded })
+      return c.json({ data: detail, degraded })
     } catch {
       // 抓取失败：优先返回最近一次成功数据（如有）
       const lastSuccess = lastSuccessStore.get(id)
       if (lastSuccess) {
         // 命中最近成功缓存时，仍写入 TTL 缓存以减少上游压力
-        cache.set(cacheKey, lastSuccess)
-        return c.json({ data: lastSuccess })
+        cache.set(cacheKey, { data: lastSuccess, degraded: false })
+        return c.json({ data: lastSuccess, degraded: false })
       }
       // 否则回退到 FALLBACK_GROUPS 中匹配项或基本占位
       const fallback = FALLBACK_GROUPS.find(g => g.id === id)
@@ -384,8 +393,8 @@ app.get('/:id', async c => {
             url: `${bases[0]}/group/${id}`,
             topics: []
           }
-      cache.set(cacheKey, detail)
-      return c.json({ data: detail })
+      cache.set(cacheKey, { data: detail, degraded: true })
+      return c.json({ data: detail, degraded: true })
     }
   } catch {
     const id = c.req.param('id')
@@ -398,7 +407,8 @@ app.get('/:id', async c => {
         avatar: '',
         url: `${HOSTS.main}/group/${id}`,
         topics: []
-      }
+      },
+      degraded: true
     })
   }
 })

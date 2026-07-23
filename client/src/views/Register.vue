@@ -12,6 +12,25 @@
           <h1 class="text-2xl font-bold text-base-content">注册 Bangmio</h1>
         </div>
 
+        <div class="alert alert-info mb-4 py-2.5">
+          <div class="flex items-center gap-2 text-sm">
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <span
+              >Bangmio 账户处在测试阶段，推荐使用
+              <router-link to="/login" class="link link-primary font-medium"
+                >Bangumi 直登</router-link
+              ></span
+            >
+          </div>
+        </div>
+
         <div v-if="auth.error" class="alert alert-error mb-4">
           <span>{{ auth.error }}</span>
         </div>

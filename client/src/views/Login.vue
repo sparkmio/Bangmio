@@ -72,6 +72,14 @@
           <div v-if="turnstileSiteKey" class="flex flex-col gap-1.5">
             <div ref="turnstileContainer" class="cf-turnstile min-h-[65px]" />
             <p v-if="turnstileError" class="text-xs text-error ml-1">{{ turnstileError }}</p>
+            <button
+              v-if="turnstileError"
+              type="button"
+              class="text-xs link link-primary ml-1 self-start"
+              @click="refreshPage"
+            >
+              刷新重试
+            </button>
           </div>
 
           <button
@@ -225,15 +233,24 @@ function resetTurnstile() {
   captchaToken.value = ''
 }
 
+function refreshPage() {
+  window.location.reload()
+}
+
 async function handleBangmioLogin() {
   clearLoginError()
   if (!email.value || !password.value) return
   if (turnstileSiteKey && !captchaToken.value) return
   try {
     await auth.loginWithBangmio(email.value, password.value, captchaToken.value)
-  } catch {
+  } catch (err) {
     // 错误已写入 auth.error；Turnstile token 一次性，需重置
     resetTurnstile()
+    // 后端返回“人机验证”相关错误时，在 widget 下方同步展示，便于用户定位
+    const serverError = err?.response?.data?.error || err?.message || auth.error || ''
+    if (turnstileSiteKey && typeof serverError === 'string' && serverError.includes('人机验证')) {
+      turnstileError.value = serverError
+    }
   }
 }
 

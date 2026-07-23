@@ -187,6 +187,8 @@ import { groupAPI } from '../api/endpoints'
 const route = useRoute()
 const group = ref(null)
 const loading = ref(true)
+// 是否为兜底降级数据（后端返回 degraded: true 时置位）
+const degraded = ref(false)
 // 错误分类: null | 'network' | 'server' | 'notfound' | 'placeholder'
 const errorType = ref(null)
 
@@ -246,14 +248,16 @@ function getLastReply(t) {
 async function loadGroup() {
   loading.value = true
   errorType.value = null
+  degraded.value = false
   try {
     const res = await groupAPI.getDetail(route.params.id)
     const data = res.data?.data || null
+    degraded.value = res.data?.degraded === true
     if (!data) {
       group.value = null
       errorType.value = 'notfound'
-    } else if (isEmptyGroup(data)) {
-      // 后端返回占位数据（name === id），说明上游暂不可用
+    } else if (degraded.value || isEmptyGroup(data)) {
+      // 后端返回降级标识或占位数据（name === id），说明上游暂不可用
       group.value = null
       errorType.value = 'placeholder'
     } else {
@@ -261,6 +265,7 @@ async function loadGroup() {
     }
   } catch (err) {
     group.value = null
+    degraded.value = false
     errorType.value = classifyError(err)
   }
   loading.value = false

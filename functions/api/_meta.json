@@ -359,9 +359,9 @@
     "server/src/utils/crypto.js": { "bytes": 6860, "imports": [], "format": "esm" },
     "server/src/db/users.js": { "bytes": 9446, "imports": [], "format": "esm" },
     "server/src/db/emailCodes.js": { "bytes": 4928, "imports": [], "format": "esm" },
-    "server/src/utils/email.js": { "bytes": 3916, "imports": [], "format": "esm" },
+    "server/src/utils/email.js": { "bytes": 3818, "imports": [], "format": "esm" },
     "server/src/utils/http.js": {
-      "bytes": 7150,
+      "bytes": 6945,
       "imports": [
         {
           "path": "server/src/utils/logger.js",
@@ -372,7 +372,7 @@
       "format": "esm"
     },
     "server/src/services/auth.js": {
-      "bytes": 19125,
+      "bytes": 19123,
       "imports": [
         {
           "path": "server/src/utils/crypto.js",
@@ -412,7 +412,7 @@
       ],
       "format": "esm"
     },
-    "server/src/utils/turnstile.js": { "bytes": 2147, "imports": [], "format": "esm" },
+    "server/src/utils/turnstile.js": { "bytes": 2375, "imports": [], "format": "esm" },
     "server/src/routes/auth.js": {
       "bytes": 14636,
       "imports": [
@@ -499,7 +499,7 @@
       "format": "esm"
     },
     "server/src/routes/collection.js": {
-      "bytes": 6141,
+      "bytes": 6888,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -4865,7 +4865,7 @@
       "format": "esm"
     },
     "server/src/routes/douban.js": {
-      "bytes": 11950,
+      "bytes": 11600,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -4945,7 +4945,7 @@
       "format": "esm"
     },
     "server/src/routes/moegirl.js": {
-      "bytes": 13354,
+      "bytes": 12970,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -4977,7 +4977,7 @@
       "format": "esm"
     },
     "server/src/routes/groups.js": {
-      "bytes": 12735,
+      "bytes": 13382,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -4999,7 +4999,7 @@
       "format": "esm"
     },
     "server/src/services/music.js": {
-      "bytes": 4513,
+      "bytes": 4497,
       "imports": [
         {
           "path": "server/src/utils/logger.js",
@@ -5173,16 +5173,16 @@
         "server/src/utils/crypto.js": { "bytesInOutput": 2925 },
         "server/src/db/users.js": { "bytesInOutput": 4072 },
         "server/src/db/emailCodes.js": { "bytesInOutput": 2239 },
-        "server/src/utils/email.js": { "bytesInOutput": 2723 },
+        "server/src/utils/email.js": { "bytesInOutput": 2721 },
         "server/src/utils/http.js": { "bytesInOutput": 2878 },
-        "server/src/services/auth.js": { "bytesInOutput": 9848 },
-        "server/src/utils/turnstile.js": { "bytesInOutput": 767 },
+        "server/src/services/auth.js": { "bytesInOutput": 9837 },
+        "server/src/utils/turnstile.js": { "bytesInOutput": 867 },
         "server/src/routes/auth.js": { "bytesInOutput": 9995 },
         "server/src/services/bangumi.js": { "bytesInOutput": 5574 },
         "server/src/routes/user.js": { "bytesInOutput": 15403 },
         "server/src/controllers/animeController.js": { "bytesInOutput": 4411 },
         "server/src/routes/anime.js": { "bytesInOutput": 683 },
-        "server/src/routes/collection.js": { "bytesInOutput": 6365 },
+        "server/src/routes/collection.js": { "bytesInOutput": 6906 },
         "node_modules/linkedom/esm/shared/symbols.js": { "bytesInOutput": 1096 },
         "node_modules/htmlparser2/dist/esm/index.js": { "bytesInOutput": 1277 },
         "node_modules/htmlparser2/node_modules/entities/dist/esm/decode-codepoint.js": {
@@ -5413,12 +5413,12 @@
         "server/src/routes/bilibili.js": { "bytesInOutput": 3024 },
         "server/src/services/moegirl.js": { "bytesInOutput": 2023 },
         "server/src/routes/moegirl.js": { "bytesInOutput": 9862 },
-        "server/src/routes/groups.js": { "bytesInOutput": 11232 },
+        "server/src/routes/groups.js": { "bytesInOutput": 11808 },
         "server/src/services/music.js": { "bytesInOutput": 3261 },
         "server/src/routes/music.js": { "bytesInOutput": 604 },
         "server/src/app.js": { "bytesInOutput": 2087 }
       },
-      "bytes": 684836
+      "bytes": 686040
     }
   }
 }

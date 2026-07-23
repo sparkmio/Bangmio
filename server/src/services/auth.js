@@ -90,7 +90,7 @@ export async function sendVerificationCode(db, env, { email, purpose = 'register
   await createCode(db, { email, code, purpose })
   try {
     await sendEmail(
-      { to: email, subject: '【Bangmio】注册验证码', html: buildVerificationEmailHTML(code) },
+      { to: email, subject: `Bangmio验证码是${code}`, html: buildVerificationEmailHTML(code) },
       env.RESEND_API_KEY,
       env.RESEND_FROM
     )

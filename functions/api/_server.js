@@ -4251,7 +4251,7 @@ function resendCooldownSeconds(latest) {
 
 // server/src/utils/email.js
 var RESEND_API = "https://api.resend.com/emails";
-var DEFAULT_FROM = "Bangmio <onboarding@resend.dev>";
+var DEFAULT_FROM = "Bangmio <signup@bangmio.site>";
 async function sendEmail({ to, subject, html }, apiKey, from) {
   if (!apiKey) throw new Error("RESEND_API_KEY \u672A\u914D\u7F6E");
   if (!to) throw new Error("\u6536\u4EF6\u4EBA\u4E0D\u80FD\u4E3A\u7A7A");
@@ -4408,7 +4408,7 @@ async function sendVerificationCode(db, env, { email, purpose = "register" }) {
   await createCode(db, { email, code, purpose });
   try {
     await sendEmail(
-      { to: email, subject: "\u3010Bangmio\u3011\u6CE8\u518C\u9A8C\u8BC1\u7801", html: buildVerificationEmailHTML(code) },
+      { to: email, subject: `Bangmio\u9A8C\u8BC1\u7801\u662F${code}`, html: buildVerificationEmailHTML(code) },
       env.RESEND_API_KEY,
       env.RESEND_FROM
     );
@@ -4674,7 +4674,8 @@ async function verifyTurnstile(token, secret, remoteip) {
       errorCodes: data["error-codes"] || []
     };
   } catch (err) {
-    return { success: false, errorCodes: ["verify-error"], message: String(err) };
+    console.warn("[Turnstile] siteverify \u7F51\u7EDC\u5F02\u5E38\uFF0C\u964D\u7EA7\u653E\u884C:", String(err));
+    return { success: true, skipped: true, reason: "network-error" };
   }
 }
 
@@ -5729,15 +5730,24 @@ app4.post("/:animeId", async (c) => {
     if (body.rating !== void 0) payload.rate = Number(body.rating);
     if (body.comment !== void 0 && body.comment !== null) payload.comment = String(body.comment);
     if (!payload.type) {
-      try {
-        if (username) {
+      if (username) {
+        try {
           const current = await client.get(
             `/v0/users/${username}/collections/${c.req.param("animeId")}`
           );
-          if (current?.type) payload.type = current.type;
+          if (current?.type) {
+            payload.type = current.type;
+          } else {
+            return c.json({ error: "\u8BF7\u5148\u9009\u62E9\u6536\u85CF\u72B6\u6001" }, 400);
+          }
+        } catch (err) {
+          if (err?.response?.status === 404) {
+            return c.json({ error: "\u8BF7\u5148\u9009\u62E9\u6536\u85CF\u72B6\u6001" }, 400);
+          }
+          return c.json({ error: "\u65E0\u6CD5\u786E\u8BA4\u5F53\u524D\u6536\u85CF\u72B6\u6001\uFF0C\u8BF7\u5148\u9009\u62E9\u6536\u85CF\u72B6\u6001" }, 400);
         }
-      } catch {
-        payload.type = 3;
+      } else {
+        return c.json({ error: "\u8BF7\u5148\u9009\u62E9\u6536\u85CF\u72B6\u6001" }, 400);
       }
     }
     await client.post(`/v0/users/-/collections/${c.req.param("animeId")}`, payload);
@@ -17802,11 +17812,12 @@ app9.get("/", async (c) => {
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const cacheKey = `groups_list_${isChina7 ? "cn" : "global"}`;
     const cached = cache5.get(cacheKey);
-    if (cached) return c.json({ data: cached });
+    if (cached) return c.json({ data: cached.data, degraded: cached.degraded === true });
     const bases = getBaseUrls(isChina7);
     const urls = bases.map((base) => `${base}/group/all`);
     let groups = [];
     let baseUrl = bases[0];
+    let degraded = false;
     try {
       const { html, url } = await fetchHTMLMulti(urls);
       baseUrl = url.replace(/\/group\/all\/?$/, "") || bases[0];
@@ -17827,27 +17838,30 @@ app9.get("/", async (c) => {
           groups.push(g);
         }
       }
+      degraded = true;
     }
-    cache5.set(cacheKey, groups);
-    return c.json({ data: groups });
+    cache5.set(cacheKey, { data: groups, degraded });
+    return c.json({ data: groups, degraded });
   } catch {
     return c.json({
-      data: FALLBACK_GROUPS.map((g) => ({ ...g, url: `${HOSTS.main}/group/${g.id}` }))
+      data: FALLBACK_GROUPS.map((g) => ({ ...g, url: `${HOSTS.main}/group/${g.id}` })),
+      degraded: true
     });
   }
 });
 app9.get("/search", async (c) => {
   try {
     const keyword = (c.req.query("keyword") || c.req.query("q") || "").trim();
-    if (!keyword) return c.json({ data: [] });
+    if (!keyword) return c.json({ data: [], degraded: false });
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const cacheKey = `groups_search_${keyword}_${isChina7 ? "cn" : "global"}`;
     const cached = cache5.get(cacheKey);
-    if (cached) return c.json({ data: cached });
+    if (cached) return c.json({ data: cached.data, degraded: cached.degraded === true });
     const bases = getBaseUrls(isChina7);
     const urls = bases.map((base) => `${base}/group/all`);
     let groups = [];
     let baseUrl = bases[0];
+    let degraded = false;
     try {
       const { html, url } = await fetchHTMLMulti(urls);
       baseUrl = url.replace(/\/group\/all\/?$/, "") || bases[0];
@@ -17868,15 +17882,16 @@ app9.get("/search", async (c) => {
           groups.push(g);
         }
       }
+      degraded = true;
     }
     const q = keyword.toLowerCase();
     const result = groups.filter(
       (g) => (g.name || "").toLowerCase().includes(q) || (g.description || "").toLowerCase().includes(q)
     );
-    cache5.set(cacheKey, result);
-    return c.json({ data: result });
+    cache5.set(cacheKey, { data: result, degraded });
+    return c.json({ data: result, degraded });
   } catch {
-    return c.json({ data: [] });
+    return c.json({ data: [], degraded: true });
   }
 });
 app9.get("/:id", async (c) => {
@@ -17885,15 +17900,17 @@ app9.get("/:id", async (c) => {
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const cacheKey = `groups_detail_${id}_${isChina7 ? "cn" : "global"}`;
     const cached = cache5.get(cacheKey);
-    if (cached) return c.json({ data: cached });
+    if (cached) return c.json({ data: cached.data, degraded: cached.degraded === true });
     const bases = getBaseUrls(isChina7);
     const urls = bases.map((base) => `${base}/group/${id}`);
     try {
       const { html, url } = await fetchHTMLMulti(urls);
       const baseUrl = url.replace(new RegExp(`/group/${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/?$`), "") || bases[0];
       let detail;
+      let degraded = false;
       try {
         detail = parseGroupDetailHTML(html, id, baseUrl);
+        if (detail.name === id) degraded = true;
       } catch {
         const fallback = FALLBACK_GROUPS.find((g) => g.id === id);
         detail = fallback ? { ...fallback, url: `${bases[0]}/group/${id}`, topics: [] } : {
@@ -17905,15 +17922,16 @@ app9.get("/:id", async (c) => {
           url: `${bases[0]}/group/${id}`,
           topics: []
         };
+        degraded = true;
       }
       lastSuccessStore.set(id, detail);
-      cache5.set(cacheKey, detail);
-      return c.json({ data: detail });
+      cache5.set(cacheKey, { data: detail, degraded });
+      return c.json({ data: detail, degraded });
     } catch {
       const lastSuccess = lastSuccessStore.get(id);
       if (lastSuccess) {
-        cache5.set(cacheKey, lastSuccess);
-        return c.json({ data: lastSuccess });
+        cache5.set(cacheKey, { data: lastSuccess, degraded: false });
+        return c.json({ data: lastSuccess, degraded: false });
       }
       const fallback = FALLBACK_GROUPS.find((g) => g.id === id);
       const detail = fallback ? { ...fallback, url: `${bases[0]}/group/${id}`, topics: [] } : {
@@ -17925,8 +17943,8 @@ app9.get("/:id", async (c) => {
         url: `${bases[0]}/group/${id}`,
         topics: []
       };
-      cache5.set(cacheKey, detail);
-      return c.json({ data: detail });
+      cache5.set(cacheKey, { data: detail, degraded: true });
+      return c.json({ data: detail, degraded: true });
     }
   } catch {
     const id = c.req.param("id");
@@ -17939,7 +17957,8 @@ app9.get("/:id", async (c) => {
         avatar: "",
         url: `${HOSTS.main}/group/${id}`,
         topics: []
-      }
+      },
+      degraded: true
     });
   }
 });

@@ -122,15 +122,29 @@ app.post('/:animeId', async c => {
     if (body.comment !== undefined && body.comment !== null) payload.comment = String(body.comment)
 
     if (!payload.type) {
-      try {
-        if (username) {
+      // status 未显式提供：尝试获取当前状态以保留原值
+      if (username) {
+        try {
           const current = await client.get(
             `/v0/users/${username}/collections/${c.req.param('animeId')}`
           )
-          if (current?.type) payload.type = current.type
+          if (current?.type) {
+            payload.type = current.type
+          } else {
+            // 当前无收藏记录，且用户未指定 status，拒绝创建默认状态
+            return c.json({ error: '请先选择收藏状态' }, 400)
+          }
+        } catch (err) {
+          // 查询失败（多为 404 未收藏），且用户未指定 status
+          if (err?.response?.status === 404) {
+            return c.json({ error: '请先选择收藏状态' }, 400)
+          }
+          // 其他查询错误也拒绝盲写
+          return c.json({ error: '无法确认当前收藏状态，请先选择收藏状态' }, 400)
         }
-      } catch {
-        payload.type = 3
+      } else {
+        // 无 username，无法确认状态
+        return c.json({ error: '请先选择收藏状态' }, 400)
       }
     }
     await client.post(`/v0/users/-/collections/${c.req.param('animeId')}`, payload)

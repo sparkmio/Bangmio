@@ -7,7 +7,7 @@ pages_build_output_dir = "client/dist"
 OAUTH_REDIRECT_URI = "https://bangmio.site/login/callback"
 VITE_TURNSTILE_SITE_KEY = "0x4AAAAAAD6gcShUkr9NZuAJ"
 VITE_REQUIRE_EMAIL_CODE = "true"
-RESEND_FROM = "Bangmio <noreply@bangmio.site>"
+RESEND_FROM = "Bangmio <signup@bangmio.site>"
 
 [[d1_databases]]
 binding = "DB"

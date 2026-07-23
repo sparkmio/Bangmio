@@ -68,6 +68,28 @@
       </div>
     </div>
 
+    <!-- 兜底降级数据提示：后端返回 degraded: true 时与列表同时展示 -->
+    <div
+      v-if="degraded && !loading && errorType !== 'network' && errorType !== 'server'"
+      class="mb-4 p-4 rounded-xl bg-warning/10 border border-warning/20 text-sm text-base-content/80"
+    >
+      <p class="font-medium">部分小组数据为兜底展示，可能不是最新信息</p>
+      <p class="mt-1">
+        Bangumi 上游数据暂时无法获取，你可以稍后再试或前往 Bangumi 查看最新小组信息。
+      </p>
+      <div class="flex items-center gap-3 mt-3">
+        <button class="btn btn-xs btn-primary" @click="retry">重试</button>
+        <a
+          href="https://bgm.tv/group"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-1 text-primary hover:underline"
+        >
+          前往 Bangumi 小组首页 →
+        </a>
+      </div>
+    </div>
+
     <!-- 列表展示（至少 50 个，后端返回的全部展示，前端无需分页） -->
     <div v-if="groups.length" class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <router-link
@@ -185,6 +207,8 @@ const allGroups = ref([])
 const groups = ref([])
 const loading = ref(true)
 const searchQuery = ref('')
+// 是否为兜底降级数据（后端返回 degraded: true 时置位）
+const degraded = ref(false)
 // 错误分类: null | 'network' | 'server' | 'empty' | 'placeholder'
 const errorType = ref(null)
 // 防抖句柄
@@ -247,15 +271,21 @@ function applyFilter() {
 async function loadGroups() {
   loading.value = true
   errorType.value = null
+  degraded.value = false
   try {
     const res = await groupAPI.getList()
     const list = res.data?.data || []
+    degraded.value = res.data?.degraded === true
     allGroups.value = list
     if (list.length === 0) {
       errorType.value = 'empty'
       groups.value = []
+    } else if (degraded.value) {
+      // 后端返回降级标识：兜底数据与列表同时展示，并通过提示条告知用户
+      errorType.value = null
+      applyFilter()
     } else if (list.every(g => g.id && g.name === g.id)) {
-      // 后端返回占位数据（name === id），提示用户上游不可用
+      // 后端未返回 degraded 但数据为占位（name === id），提示用户上游不可用
       errorType.value = 'placeholder'
       groups.value = list
     } else {
@@ -265,6 +295,7 @@ async function loadGroups() {
   } catch (err) {
     allGroups.value = []
     groups.value = []
+    degraded.value = false
     errorType.value = classifyError(err)
   }
   loading.value = false
@@ -278,9 +309,11 @@ async function searchGroups() {
     return
   }
   loading.value = true
+  degraded.value = false
   try {
     const res = await groupAPI.search(searchQuery.value)
     groups.value = res.data?.data || []
+    degraded.value = res.data?.degraded === true
   } catch {
     toast.error('搜索小组失败')
   } finally {

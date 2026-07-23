@@ -2,11 +2,10 @@
  * 邮件发送工具（基于 Resend HTTP API）。
  *
  * Cloudflare Pages 不支持传统 SMTP，使用 Resend REST API 发送验证码邮件。
- * 需要 `RESEND_API_KEY` 环境变量；`RESEND_FROM` 可选，默认使用 Resend onboarding 发件人。
+ * 需要 `RESEND_API_KEY` 环境变量；`RESEND_FROM` 可选，默认使用 signup@bangmio.site 发件人。
  *
- * 注意：Resend 免费账号使用 onboarding@resend.dev 时只能发送到账号所有者邮箱；
- *      生产环境需在 Resend 控制台验证自有域名后将 RESEND_FROM 设为
- *      `Bangmio <noreply@your-domain.com>`。
+ * 注意：发件人地址 `signup@bangmio.site` 需在 Resend 控制台完成域名 bangmio.site 的验证；
+ *      未验证时仅能发送到 Resend 账号所有者邮箱。
  *
  * 用法：
  *   import { sendEmail } from '../utils/email.js'
@@ -15,8 +14,8 @@
 
 const RESEND_API = 'https://api.resend.com/emails'
 
-/** 未配置 RESEND_FROM 时使用的默认发件人（仅 Resend 账号所有者可收到） */
-const DEFAULT_FROM = 'Bangmio <onboarding@resend.dev>'
+/** 未配置 RESEND_FROM 时使用的默认发件人 */
+const DEFAULT_FROM = 'Bangmio <signup@bangmio.site>'
 
 /**
  * 通过 Resend 发送邮件。

@@ -225,7 +225,7 @@ describe('sendVerificationCode', () => {
     expect(sendEmail).toHaveBeenCalledTimes(1)
     const [emailArg] = sendEmail.mock.calls[0]
     expect(emailArg.to).toBe('a@b.c')
-    expect(emailArg.subject).toContain('注册验证码')
+    expect(emailArg.subject).toContain('Bangmio验证码是')
   })
 })
 
