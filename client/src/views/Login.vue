@@ -82,11 +82,7 @@
             </button>
           </div>
 
-          <button
-            type="submit"
-            :disabled="auth.loading"
-            class="btn btn-primary w-full"
-          >
+          <button type="submit" :disabled="auth.loading" class="btn btn-primary w-full">
             {{ auth.loading ? '登录中...' : '登录' }}
           </button>
 
@@ -144,10 +140,14 @@
 
 <script setup>
 import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useToastStore } from '../stores/toast'
 import { userAPI } from '../api/endpoints'
 
+const route = useRoute()
 const auth = useAuthStore()
+const toast = useToastStore()
 const activeTab = ref('bangmio')
 const email = ref('')
 const password = ref('')
@@ -275,7 +275,13 @@ function handleTokenLogin() {
   if (token.value) auth.loginWithBangumi(token.value)
 }
 
-onMounted(loadTurnstile)
+onMounted(() => {
+  loadTurnstile()
+  // Bangumi 直登 401 被拦截器带 reason=expired 跳回时，给用户明确提示（PROJECT_ISSUES 7.1）
+  if (route.query.reason === 'expired') {
+    toast.info('登录已失效，请重新登录')
+  }
+})
 
 onBeforeUnmount(() => {
   if (window.turnstile && turnstileWidgetId !== null) {

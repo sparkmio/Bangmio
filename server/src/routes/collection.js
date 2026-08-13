@@ -1,5 +1,7 @@
 import { Hono } from 'hono'
 import { getClient } from '../services/bangumi.js'
+import { verifyBangumiUsername } from '../services/userVerify.js'
+import { upstreamError } from '../utils/errors.js'
 
 const app = new Hono()
 
@@ -15,11 +17,15 @@ function extractUsername(c) {
   return c.req.header('X-Bangumi-Username') || ''
 }
 
-function errorResult(status, detail, fallback) {
-  if (status === 401) return { code: 401, error: '登录已过期，请重新登录' }
-  if (status === 403) return { code: 403, error: '无权限访问' }
-  if (status === 404) return { code: 404, error: null }
-  return { code: 500, error: detail?.description || detail?.message || fallback }
+/**
+ * 验证直登请求 username 与 token 的绑定关系（PROJECT_ISSUES 7.2，
+ * 防止伪造 X-Bangumi-Username 头读取他人收藏）。
+ * @returns {Promise<Response | null>} null = 通过；Response = 拒绝响应（调用方直接返回）。
+ */
+async function guardUsername(c, token, username) {
+  const ok = await verifyBangumiUsername(token, username, isChina(c))
+  if (!ok) return c.json({ error: '用户名与令牌不匹配' }, 403)
+  return null
 }
 
 app.get('/list', async c => {
@@ -28,6 +34,8 @@ app.get('/list', async c => {
     const username = extractUsername(c)
     if (!token) return c.json({ error: '未登录' }, 401)
     if (!username) return c.json({ error: '缺少用户名' }, 400)
+    const guard = await guardUsername(c, token, username)
+    if (guard) return guard
     const client = getClient(token, isChina(c))
     const params = {
       offset: Number(c.req.query('offset')) || 0,
@@ -40,7 +48,7 @@ app.get('/list', async c => {
     const data = await client.get(`/v0/users/${username}/collections`, params)
     return c.json({ data: data.data || [], total: data.total || 0 })
   } catch (err) {
-    const r = errorResult(err.response?.status, err.response?.data, '获取收藏列表失败')
+    const r = upstreamError(err.response?.status, err.response?.data, '获取收藏列表失败')
     return c.json({ error: r.error }, r.code)
   }
 })
@@ -51,6 +59,8 @@ app.get('/stats', async c => {
     const username = extractUsername(c)
     if (!token) return c.json({ error: '未登录' }, 401)
     if (!username) return c.json({ error: '缺少用户名' }, 400)
+    const guard = await guardUsername(c, token, username)
+    if (guard) return guard
     const client = getClient(token, isChina(c))
     const fetchTotal = type =>
       client
@@ -75,7 +85,7 @@ app.get('/stats', async c => {
       }
     })
   } catch (err) {
-    const r = errorResult(err.response?.status, err.response?.data, '获取统计失败')
+    const r = upstreamError(err.response?.status, err.response?.data, '获取统计失败')
     return c.json({ error: r.error }, r.code)
   }
 })
@@ -86,6 +96,8 @@ app.get('/:animeId', async c => {
     const username = extractUsername(c)
     if (!token) return c.json({ error: '未登录' }, 401)
     if (!username) return c.json({ error: '缺少用户名' }, 400)
+    const guard = await guardUsername(c, token, username)
+    if (guard) return guard
     const client = getClient(token, isChina(c))
     const collection = await client.get(
       `/v0/users/${username}/collections/${c.req.param('animeId')}`
@@ -102,7 +114,7 @@ app.get('/:animeId', async c => {
       }
     })
   } catch (err) {
-    const r = errorResult(err.response?.status, err.response?.data, '获取收藏状态失败')
+    const r = upstreamError(err.response?.status, err.response?.data, '获取收藏状态失败')
     if (r.code === 404) return c.json({ data: null })
     return c.json({ error: r.error }, r.code)
   }
@@ -113,6 +125,10 @@ app.post('/:animeId', async c => {
     const token = extractToken(c)
     const username = extractUsername(c)
     if (!token) return c.json({ error: '未登录' }, 401)
+    if (username) {
+      const guard = await guardUsername(c, token, username)
+      if (guard) return guard
+    }
     const client = getClient(token, isChina(c))
     const body = await c.req.json()
 
@@ -186,7 +202,7 @@ app.post('/:animeId', async c => {
       })
     }
   } catch (err) {
-    const r = errorResult(err.response?.status, err.response?.data, '保存收藏失败')
+    const r = upstreamError(err.response?.status, err.response?.data, '保存收藏失败')
     return c.json({ error: r.error }, r.code)
   }
 })
@@ -199,7 +215,7 @@ app.delete('/:animeId', async c => {
     await client.delete(`/v0/users/-/collections/${c.req.param('animeId')}`)
     return c.json({ message: '已删除' })
   } catch (err) {
-    const r = errorResult(err.response?.status, err.response?.data, '删除收藏失败')
+    const r = upstreamError(err.response?.status, err.response?.data, '删除收藏失败')
     return c.json({ error: r.error }, r.code)
   }
 })

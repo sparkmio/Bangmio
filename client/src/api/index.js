@@ -171,13 +171,14 @@ api.interceptors.response.use(
       }
     }
 
-    // Bangumi 直登用户：直接跳转登录
+    // Bangumi 直登用户：无 refresh 机制（token 长期有效，401 多为被吊销），
+    // 携带 reason 跳登录页做友好提示而非静默清空
     if (auth?.isBangumiDirectUser) {
       auth.token = ''
       auth.user = null
       authStorage.clearBangumi()
       if (router.currentRoute.value?.path !== '/login') {
-        router.push('/login')
+        router.push({ path: '/login', query: { reason: 'expired' } })
       }
     }
 

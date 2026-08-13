@@ -613,7 +613,7 @@
             <template v-else>
               <p class="text-sm text-base-content/40 py-6">
                 <span v-if="doubanLoading" class="loading loading-spinner loading-sm" />
-                <span v-else>暂无豆瓣评分</span>
+                <span v-else>豆瓣评分暂不可用（接口被限制）</span>
               </p>
             </template>
           </div>
@@ -656,7 +656,7 @@
             <template v-else>
               <p class="text-sm text-base-content/40 py-6">
                 <span v-if="bilibiliLoading" class="loading loading-spinner loading-sm" />
-                <span v-else>暂无 B 站评分</span>
+                <span v-else>B站评分暂不可用（接口被限制）</span>
               </p>
             </template>
           </div>

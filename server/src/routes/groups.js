@@ -25,6 +25,58 @@ function getBaseUrls(isChina) {
   return [HOSTS.main, HOSTS.mirror1, HOSTS.mirror2]
 }
 
+/** 上游 WAF 拦截页特征（命中则不写入边缘缓存，避免缓存降级内容） */
+function looksBlocked(html) {
+  return /Just a moment|Attention Required|403 Forbidden|Access denied|请求过于频繁/i.test(
+    (html || '').slice(0, 2000)
+  )
+}
+
+/**
+ * 抓取小组页面 HTML，优先 Cloudflare Cache API（PROJECT_ISSUES 6.3）。
+ *
+ * - Cache API 在 CF 边缘跨实例共享，解决了原内存 Map 缓存命中率低的问题；
+ * - 按 URL 逐个查缓存（命中即返回），未命中再走多源并发抓取并回写缓存（1 小时 TTL）；
+ * - WAF 拦截页不写入缓存；非 CF 环境（本地 node）自动降级为直接抓取。
+ *
+ * @param {string[]} urls 候选源 URL 列表（按优先级排序）
+ * @returns {Promise<{ html: string, url: string, fromCache: boolean }>}
+ */
+async function fetchGroupHTMLCached(urls) {
+  const cache = typeof caches !== 'undefined' ? caches.default : null
+
+  if (cache) {
+    for (const url of urls) {
+      try {
+        const cached = await cache.match(url)
+        if (cached) {
+          const html = await cached.text()
+          if (html && html.length >= 500) return { html, url, fromCache: true }
+        }
+      } catch {
+        // 单个源缓存读取失败，继续尝试下一个源
+      }
+    }
+  }
+
+  const { html, url } = await fetchHTMLMulti(urls)
+
+  if (cache && html && html.length >= 500 && !looksBlocked(html)) {
+    try {
+      await cache.put(
+        url,
+        new Response(html, {
+          headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'max-age=3600' }
+        })
+      )
+    } catch {
+      // 缓存写入失败不影响主流程
+    }
+  }
+
+  return { html, url, fromCache: false }
+}
+
 // 8 个高活跃真实小组兜底
 const FALLBACK_GROUPS = [
   {
@@ -308,7 +360,7 @@ app.get('/', async c => {
     let baseUrl = bases[0]
     let degraded = false
     try {
-      const { html, url } = await fetchHTMLMulti(urls)
+      const { html, url } = await fetchGroupHTMLCached(urls)
       baseUrl = url.replace(/\/group\/all\/?$/, '') || bases[0]
       try {
         groups = parseGroupListHTML(html, baseUrl)
@@ -362,7 +414,7 @@ app.get('/search', async c => {
     let baseUrl = bases[0]
     let degraded = false
     try {
-      const { html, url } = await fetchHTMLMulti(urls)
+      const { html, url } = await fetchGroupHTMLCached(urls)
       baseUrl = url.replace(/\/group\/all\/?$/, '') || bases[0]
       try {
         groups = parseGroupListHTML(html, baseUrl)
@@ -412,7 +464,7 @@ app.get('/:id', async c => {
     const urls = bases.map(base => `${base}/group/${id}`)
 
     try {
-      const { html, url } = await fetchHTMLMulti(urls)
+      const { html, url } = await fetchGroupHTMLCached(urls)
       const baseUrl =
         url.replace(new RegExp(`/group/${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/?$`), '') ||
         bases[0]

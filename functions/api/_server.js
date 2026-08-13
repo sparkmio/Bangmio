@@ -4708,6 +4708,26 @@ function getOAuthCredentials(env, logPath = "oauth") {
   return { appId, appSecret };
 }
 
+// server/src/utils/errors.js
+function isHttpError(err) {
+  return err instanceof Error && typeof err.status === "number";
+}
+function errorResponse(err, fallbackMessage = "\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF") {
+  if (isHttpError(err)) {
+    return Response.json(
+      { data: null, error: err.message, code: err.status },
+      { status: err.status }
+    );
+  }
+  return Response.json({ data: null, error: fallbackMessage, code: 500 }, { status: 500 });
+}
+function upstreamError(status, detail, fallback) {
+  if (status === 401) return { code: 401, error: "\u767B\u5F55\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55" };
+  if (status === 403) return { code: 403, error: "\u65E0\u6743\u9650\u8BBF\u95EE" };
+  if (status === 404) return { code: 404, error: null };
+  return { code: 500, error: detail?.description || detail?.message || fallback };
+}
+
 // server/src/routes/auth.js
 var app = new Hono2();
 function isChina(c) {
@@ -4736,18 +4756,6 @@ app.use("*", async (c, next) => {
   await next();
 });
 var EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function isHttpError(err) {
-  return err instanceof Error && typeof err.status === "number";
-}
-function errorResponse(err) {
-  if (isHttpError(err)) {
-    return Response.json(
-      { data: null, error: err.message, code: err.status },
-      { status: err.status }
-    );
-  }
-  return Response.json({ data: null, error: "\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF", code: 500 }, { status: 500 });
-}
 app.post("/send-code", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
@@ -4761,7 +4769,7 @@ app.post("/send-code", async (c) => {
       c.req.header("CF-Connecting-IP")
     );
     if (!turnstile.success) {
-      return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
+      console.warn("[send-code] Turnstile \u9A8C\u8BC1\u5931\u8D25\uFF0C\u964D\u7EA7\u653E\u884C:", turnstile.errorCodes);
     }
     const result = await sendVerificationCode(c.env.DB, c.env, { email, purpose });
     return c.json({ data: result, code: 200 });
@@ -4786,7 +4794,7 @@ app.post("/register", async (c) => {
         c.req.header("CF-Connecting-IP")
       );
       if (!turnstile.success) {
-        return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
+        console.warn("[register] Turnstile \u9A8C\u8BC1\u5931\u8D25\uFF0C\u964D\u7EA7\u653E\u884C:", turnstile.errorCodes);
       }
     }
     const result = await registerUser(c.env.DB, c.env, { email, password, code });
@@ -4948,7 +4956,7 @@ app.post("/forgot-password", async (c) => {
         c.req.header("CF-Connecting-IP")
       );
       if (!turnstile.success) {
-        return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
+        console.warn("[forgot-password] Turnstile \u9A8C\u8BC1\u5931\u8D25\uFF0C\u964D\u7EA7\u653E\u884C:", turnstile.errorCodes);
       }
     }
     const exists = await userExistsByEmail(c.env.DB, email);
@@ -5129,7 +5137,9 @@ async function getPersonSubjects(id, opts) {
 var app2 = new Hono2();
 function oauthNotConfigured(c) {
   return c.json(
-    { error: "OAuth \u670D\u52A1\u672A\u914D\u7F6E\uFF08\u7F3A\u5C11 BGM_APP_SECRET \u73AF\u5883\u53D8\u91CF\uFF09\uFF0C\u8BF7\u4F7F\u7528 Bangumi \u76F4\u767B\uFF08\u7C98\u8D34 Access Token\uFF09" },
+    {
+      error: "OAuth \u670D\u52A1\u672A\u914D\u7F6E\uFF08\u7F3A\u5C11 BGM_APP_SECRET \u73AF\u5883\u53D8\u91CF\uFF09\uFF0C\u8BF7\u4F7F\u7528 Bangumi \u76F4\u767B\uFF08\u7C98\u8D34 Access Token\uFF09"
+    },
     503
   );
 }
@@ -5662,6 +5672,29 @@ app3.get("/:id/persons", getAnimePersons2);
 app3.get("/:id/relations", getAnimeRelations2);
 var anime_default = app3;
 
+// server/src/services/userVerify.js
+var verifiedStore = /* @__PURE__ */ new Map();
+var USERNAME_VERIFY_TTL = 10 * 60 * 1e3;
+async function verifyBangumiUsername(token, username, isChina7 = false) {
+  if (!token || !username) return false;
+  const now = Date.now();
+  const expiresAt = verifiedStore.get(username);
+  if (expiresAt && expiresAt > now) return true;
+  try {
+    const client = getClient(token, isChina7);
+    const me = await client.get("/v0/me");
+    const match2 = me && (me.username === username || me.nickname === username || String(me.id) === username);
+    if (match2) {
+      verifiedStore.set(username, now + USERNAME_VERIFY_TTL);
+      return true;
+    }
+    logError("Bangumi \u76F4\u767B username \u4E0E token \u4E0D\u5339\u914D", { username });
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 // server/src/routes/collection.js
 var app4 = new Hono2();
 function isChina4(c) {
@@ -5673,11 +5706,10 @@ function extractToken(c) {
 function extractUsername(c) {
   return c.req.header("X-Bangumi-Username") || "";
 }
-function errorResult(status, detail, fallback) {
-  if (status === 401) return { code: 401, error: "\u767B\u5F55\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55" };
-  if (status === 403) return { code: 403, error: "\u65E0\u6743\u9650\u8BBF\u95EE" };
-  if (status === 404) return { code: 404, error: null };
-  return { code: 500, error: detail?.description || detail?.message || fallback };
+async function guardUsername(c, token, username) {
+  const ok = await verifyBangumiUsername(token, username, isChina4(c));
+  if (!ok) return c.json({ error: "\u7528\u6237\u540D\u4E0E\u4EE4\u724C\u4E0D\u5339\u914D" }, 403);
+  return null;
 }
 app4.get("/list", async (c) => {
   try {
@@ -5685,6 +5717,8 @@ app4.get("/list", async (c) => {
     const username = extractUsername(c);
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
+    const guard = await guardUsername(c, token, username);
+    if (guard) return guard;
     const client = getClient(token, isChina4(c));
     const params = {
       offset: Number(c.req.query("offset")) || 0,
@@ -5697,7 +5731,7 @@ app4.get("/list", async (c) => {
     const data = await client.get(`/v0/users/${username}/collections`, params);
     return c.json({ data: data.data || [], total: data.total || 0 });
   } catch (err) {
-    const r = errorResult(err.response?.status, err.response?.data, "\u83B7\u53D6\u6536\u85CF\u5217\u8868\u5931\u8D25");
+    const r = upstreamError(err.response?.status, err.response?.data, "\u83B7\u53D6\u6536\u85CF\u5217\u8868\u5931\u8D25");
     return c.json({ error: r.error }, r.code);
   }
 });
@@ -5707,6 +5741,8 @@ app4.get("/stats", async (c) => {
     const username = extractUsername(c);
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
+    const guard = await guardUsername(c, token, username);
+    if (guard) return guard;
     const client = getClient(token, isChina4(c));
     const fetchTotal = (type) => client.get(`/v0/users/${username}/collections`, { type, limit: 1 }).then((r) => r.total).catch(() => 0);
     const [wish, collect, doing, on_hold, dropped] = await Promise.all([
@@ -5727,7 +5763,7 @@ app4.get("/stats", async (c) => {
       }
     });
   } catch (err) {
-    const r = errorResult(err.response?.status, err.response?.data, "\u83B7\u53D6\u7EDF\u8BA1\u5931\u8D25");
+    const r = upstreamError(err.response?.status, err.response?.data, "\u83B7\u53D6\u7EDF\u8BA1\u5931\u8D25");
     return c.json({ error: r.error }, r.code);
   }
 });
@@ -5737,6 +5773,8 @@ app4.get("/:animeId", async (c) => {
     const username = extractUsername(c);
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
+    const guard = await guardUsername(c, token, username);
+    if (guard) return guard;
     const client = getClient(token, isChina4(c));
     const collection = await client.get(
       `/v0/users/${username}/collections/${c.req.param("animeId")}`
@@ -5753,7 +5791,7 @@ app4.get("/:animeId", async (c) => {
       }
     });
   } catch (err) {
-    const r = errorResult(err.response?.status, err.response?.data, "\u83B7\u53D6\u6536\u85CF\u72B6\u6001\u5931\u8D25");
+    const r = upstreamError(err.response?.status, err.response?.data, "\u83B7\u53D6\u6536\u85CF\u72B6\u6001\u5931\u8D25");
     if (r.code === 404) return c.json({ data: null });
     return c.json({ error: r.error }, r.code);
   }
@@ -5763,6 +5801,10 @@ app4.post("/:animeId", async (c) => {
     const token = extractToken(c);
     const username = extractUsername(c);
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
+    if (username) {
+      const guard = await guardUsername(c, token, username);
+      if (guard) return guard;
+    }
     const client = getClient(token, isChina4(c));
     const body = await c.req.json();
     const payload = {};
@@ -5828,7 +5870,7 @@ app4.post("/:animeId", async (c) => {
       });
     }
   } catch (err) {
-    const r = errorResult(err.response?.status, err.response?.data, "\u4FDD\u5B58\u6536\u85CF\u5931\u8D25");
+    const r = upstreamError(err.response?.status, err.response?.data, "\u4FDD\u5B58\u6536\u85CF\u5931\u8D25");
     return c.json({ error: r.error }, r.code);
   }
 });
@@ -5840,7 +5882,7 @@ app4.delete("/:animeId", async (c) => {
     await client.delete(`/v0/users/-/collections/${c.req.param("animeId")}`);
     return c.json({ message: "\u5DF2\u5220\u9664" });
   } catch (err) {
-    const r = errorResult(err.response?.status, err.response?.data, "\u5220\u9664\u6536\u85CF\u5931\u8D25");
+    const r = upstreamError(err.response?.status, err.response?.data, "\u5220\u9664\u6536\u85CF\u5931\u8D25");
     return c.json({ error: r.error }, r.code);
   }
 });
@@ -17699,6 +17741,39 @@ function getBaseUrls(isChina7) {
   }
   return [HOSTS.main, HOSTS.mirror1, HOSTS.mirror2];
 }
+function looksBlocked(html) {
+  return /Just a moment|Attention Required|403 Forbidden|Access denied|请求过于频繁/i.test(
+    (html || "").slice(0, 2e3)
+  );
+}
+async function fetchGroupHTMLCached(urls) {
+  const cache7 = typeof caches !== "undefined" ? caches.default : null;
+  if (cache7) {
+    for (const url2 of urls) {
+      try {
+        const cached = await cache7.match(url2);
+        if (cached) {
+          const html2 = await cached.text();
+          if (html2 && html2.length >= 500) return { html: html2, url: url2, fromCache: true };
+        }
+      } catch {
+      }
+    }
+  }
+  const { html, url } = await fetchHTMLMulti(urls);
+  if (cache7 && html && html.length >= 500 && !looksBlocked(html)) {
+    try {
+      await cache7.put(
+        url,
+        new Response(html, {
+          headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "max-age=3600" }
+        })
+      );
+    } catch {
+    }
+  }
+  return { html, url, fromCache: false };
+}
 var FALLBACK_GROUPS = [
   {
     id: "bgm38",
@@ -17891,7 +17966,15 @@ function parseGroupDetailHTML(html, id, base) {
       if (topics.length >= 20) break;
     }
   }
-  return { id, name: finalName, description, member_count, avatar, topics, url: `${base}/group/${id}` };
+  return {
+    id,
+    name: finalName,
+    description,
+    member_count,
+    avatar,
+    topics,
+    url: `${base}/group/${id}`
+  };
 }
 app9.get("/", async (c) => {
   try {
@@ -17905,7 +17988,7 @@ app9.get("/", async (c) => {
     let baseUrl = bases[0];
     let degraded = false;
     try {
-      const { html, url } = await fetchHTMLMulti(urls);
+      const { html, url } = await fetchGroupHTMLCached(urls);
       baseUrl = url.replace(/\/group\/all\/?$/, "") || bases[0];
       try {
         groups = parseGroupListHTML(html, baseUrl);
@@ -17949,7 +18032,7 @@ app9.get("/search", async (c) => {
     let baseUrl = bases[0];
     let degraded = false;
     try {
-      const { html, url } = await fetchHTMLMulti(urls);
+      const { html, url } = await fetchGroupHTMLCached(urls);
       baseUrl = url.replace(/\/group\/all\/?$/, "") || bases[0];
       try {
         groups = parseGroupListHTML(html, baseUrl);
@@ -17990,7 +18073,7 @@ app9.get("/:id", async (c) => {
     const bases = getBaseUrls(isChina7);
     const urls = bases.map((base) => `${base}/group/${id}`);
     try {
-      const { html, url } = await fetchHTMLMulti(urls);
+      const { html, url } = await fetchGroupHTMLCached(urls);
       const baseUrl = url.replace(new RegExp(`/group/${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/?$`), "") || bases[0];
       let detail;
       let degraded = false;

@@ -31,6 +31,7 @@ import { verifyTurnstile } from '../utils/turnstile.js'
 import { userExistsByEmail } from '../db/users.js'
 import { logError } from '../utils/logger.js'
 import { getOAuthCredentials } from '../utils/oauthConfig.js'
+import { errorResponse } from '../utils/errors.js'
 
 const app = new Hono()
 
@@ -88,30 +89,6 @@ app.use('*', async (c, next) => {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /**
- * 判断错误是否为业务 httpError（带 status 属性）。
- * @param {unknown} err - 捕获的错误。
- * @returns {err is Error & { status: number }}
- */
-function isHttpError(err) {
-  return err instanceof Error && typeof err.status === 'number'
-}
-
-/**
- * 统一错误响应：httpError 返回对应 status，其他返回 500。
- * @param {unknown} err - 捕获的错误。
- * @returns {Response} Hono JSON 响应。
- */
-function errorResponse(err) {
-  if (isHttpError(err)) {
-    return Response.json(
-      { data: null, error: err.message, code: err.status },
-      { status: err.status }
-    )
-  }
-  return Response.json({ data: null, error: '服务器内部错误', code: 500 }, { status: 500 })
-}
-
-/**
  * POST /send-code
  * Body: { email, captchaToken, purpose? }
  * 发送邮箱验证码（用于注册）。
@@ -127,14 +104,15 @@ app.post('/send-code', async c => {
     if (!email || !EMAIL_REGEX.test(String(email))) {
       return c.json({ data: null, error: '邮箱格式不正确', code: 400 }, 400)
     }
-    // Turnstile 校验（未配置 secret 时跳过）
+    // Turnstile 校验：失败时降级放行（记录日志）。
+    // 发码有「同邮箱 1 分钟冷却 + 路由 5 次/分钟限流」兜底，避免 widget 域名配置问题锁死流程
     const turnstile = await verifyTurnstile(
       captchaToken,
       c.env?.TURNSTILE_SECRET_KEY,
       c.req.header('CF-Connecting-IP')
     )
     if (!turnstile.success) {
-      return c.json({ data: null, error: '人机验证失败，请重试', code: 400 }, 400)
+      console.warn('[send-code] Turnstile 验证失败，降级放行:', turnstile.errorCodes)
     }
     const result = await sendVerificationCode(c.env.DB, c.env, { email, purpose })
     return c.json({ data: result, code: 200 })
@@ -161,7 +139,8 @@ app.post('/register', async c => {
     if (!password || String(password).length < 8) {
       return c.json({ data: null, error: '密码至少 8 位', code: 400 }, 400)
     }
-    // 若配置了 Turnstile secret，强制要求人机验证
+    // 若配置了 Turnstile secret 进行人机验证；失败时降级放行（记录日志）。
+    // 注册主防线是邮箱验证码 + 路由 5 次/分钟限流，避免 widget 配置问题锁死注册流程
     if (c.env?.TURNSTILE_SECRET_KEY) {
       const turnstile = await verifyTurnstile(
         captchaToken,
@@ -169,7 +148,7 @@ app.post('/register', async c => {
         c.req.header('CF-Connecting-IP')
       )
       if (!turnstile.success) {
-        return c.json({ data: null, error: '人机验证失败，请重试', code: 400 }, 400)
+        console.warn('[register] Turnstile 验证失败，降级放行:', turnstile.errorCodes)
       }
     }
     const result = await registerUser(c.env.DB, c.env, { email, password, code })
@@ -407,7 +386,8 @@ app.post('/forgot-password', async c => {
     if (!email || !EMAIL_REGEX.test(String(email))) {
       return c.json({ data: null, error: '邮箱格式不正确', code: 400 }, 400)
     }
-    // Turnstile 校验（未配置 secret 时跳过）
+    // Turnstile 校验：失败时降级放行（记录日志）。
+    // 忘记密码对未注册邮箱静默返回 200，且有发码冷却 + 5 次/分钟限流兜底
     if (c.env?.TURNSTILE_SECRET_KEY) {
       const turnstile = await verifyTurnstile(
         captchaToken,
@@ -415,7 +395,7 @@ app.post('/forgot-password', async c => {
         c.req.header('CF-Connecting-IP')
       )
       if (!turnstile.success) {
-        return c.json({ data: null, error: '人机验证失败，请重试', code: 400 }, 400)
+        console.warn('[forgot-password] Turnstile 验证失败，降级放行:', turnstile.errorCodes)
       }
     }
     // 邮箱不存在时静默返回 200（防探测）
