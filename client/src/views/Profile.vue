@@ -7,8 +7,16 @@
     </div>
 
     <div v-else>
+      <!-- effectiveUser 为空时的重试提示 -->
+      <div v-if="!profileUser && !route.params.username" class="py-20 text-center">
+        <p class="text-base-content/50 mb-3">用户资料加载失败</p>
+        <button class="btn btn-primary btn-sm" @click="retryLoadProfile">重试</button>
+      </div>
       <!-- 用户卡 -->
-      <div class="card bg-base-100 border border-base-300 mb-4 overflow-hidden">
+      <div
+        v-if="profileUser || route.params.username"
+        class="card bg-base-100 border border-base-300 mb-4 overflow-hidden"
+      >
         <div class="h-16 bg-gradient-to-r from-primary/30 via-secondary/20 to-accent/30" />
         <div class="card-body p-4 pt-0">
           <div class="flex flex-col sm:flex-row sm:items-end gap-3 -mt-8">
@@ -777,7 +785,16 @@ async function loadProfile() {
     }
   } else {
     profileUser.value = auth.effectiveUser
+    // Bangmio 用户绑定后 effectiveUser 可能为空（bgmUserProfile 拉取失败），尝试重新拉取
+    if (!profileUser.value && auth.isBangmioUser && auth.isBound) {
+      await auth.fetchBgmUserProfile()
+      profileUser.value = auth.effectiveUser
+    }
   }
+}
+
+function retryLoadProfile() {
+  loadProfile()
 }
 
 // 时间胶囊：优先使用新 timeline API，空时回退到 collectionAPI 排序

@@ -44,13 +44,27 @@ const auth = useAuthStore()
 const currentRoute = useRoute()
 const currentPath = computed(() => currentRoute.fullPath)
 
+const prefersReducedMotion =
+  typeof window !== 'undefined' &&
+  window.matchMedia &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
 function onBeforeEnter(el) {
+  if (prefersReducedMotion) return
   gsap.set(el, { opacity: 0, y: 8 })
 }
 function onEnter(el, done) {
+  if (prefersReducedMotion) {
+    done()
+    return
+  }
   gsap.to(el, { opacity: 1, y: 0, duration: 0.25, ease: 'power2.out', onComplete: done })
 }
 function onLeave(el, done) {
+  if (prefersReducedMotion) {
+    done()
+    return
+  }
   gsap.to(el, { opacity: 0, y: -6, duration: 0.15, ease: 'power2.in', onComplete: done })
 }
 

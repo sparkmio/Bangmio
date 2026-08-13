@@ -935,15 +935,6 @@ function cvtCareer(c) {
   return map[c] || c || ''
 }
 
-async function fetchEpisodes(id) {
-  try {
-    const res = await animeAPI.getEpisodes(id)
-    episodeList.value = res.data?.data || res.data || []
-  } catch {
-    episodeList.value = []
-  }
-}
-
 async function fetchDoubanDetails() {
   if (doubanDetails.value || doubanLoading.value) return
   doubanLoading.value = true
@@ -1092,9 +1083,12 @@ async function fetchDetail() {
       animeAPI.getDetail(id),
       animeAPI.getCharacters(id),
       animeAPI.getPersons(id),
-      animeAPI.getRelations(id)
+      animeAPI.getRelations(id),
+      animeAPI.getEpisodes(id)
     ])
-    const [dRes, cRes, pRes, rRes] = results.map(r => (r.status === 'fulfilled' ? r.value : null))
+    const [dRes, cRes, pRes, rRes, eRes] = results.map(r =>
+      r.status === 'fulfilled' ? r.value : null
+    )
     anime.value = dRes?.data?.data || dRes?.data || {}
     characters.value = (cRes?.data?.data || cRes?.data || []).sort((a, b) => {
       const order = { 主角: 0, 配角: 1, 客串: 2 }
@@ -1102,7 +1096,7 @@ async function fetchDetail() {
     })
     persons.value = pRes?.data?.data || pRes?.data || []
     relations.value = rRes?.data?.data || rRes?.data || []
-    fetchEpisodes(id)
+    episodeList.value = eRes?.data?.data || eRes?.data || []
   } catch {
     error.value = '加载失败'
   } finally {
@@ -1172,9 +1166,13 @@ async function updateComment() {
   await saveCollectionBody({ comment: collectionComment.value })
 }
 
-watch(collectionRating, async val => {
+let ratingDebounceTimer = null
+watch(collectionRating, val => {
   if (!auth.isLoggedIn || !collectionLoaded) return
-  await saveCollectionBody({ rating: val })
+  clearTimeout(ratingDebounceTimer)
+  ratingDebounceTimer = setTimeout(async () => {
+    await saveCollectionBody({ rating: val })
+  }, 500)
 })
 
 async function removeCollection() {
