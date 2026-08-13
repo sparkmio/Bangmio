@@ -148,11 +148,11 @@ export const useAuthStore = defineStore('auth', () => {
   // ===== Actions =====
 
   // Bangmio 邮箱密码登录
-  async function loginWithBangmio(email, password) {
+  async function loginWithBangmio(email, password, captchaToken) {
     loading.value = true
     error.value = ''
     try {
-      const res = await api.post('/auth/login', { email, password })
+      const res = await api.post('/auth/login', { email, password, captchaToken })
       const data = res.data?.data
       if (!data?.token || !data?.user) {
         throw new Error('登录响应异常，缺少必要信息')
