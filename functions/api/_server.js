@@ -4320,7 +4320,7 @@ async function decodeResponseBody(res) {
   }
   return new TextDecoder("utf-8").decode(buffer);
 }
-async function fetchHTML(url, { timeout = 8e3, headers: headers2 = {} } = {}) {
+async function fetchHTML(url, { timeout = 12e3, headers: headers2 = {} } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
   try {
@@ -4342,7 +4342,7 @@ async function fetchHTML(url, { timeout = 8e3, headers: headers2 = {} } = {}) {
     throw e;
   }
 }
-async function fetchHTMLMulti(urls, { timeout = 8e3, overallTimeout = 12e3, retries = 1 } = {}) {
+async function fetchHTMLMulti(urls, { timeout = 8e3, overallTimeout = 18e3, retries = 1 } = {}) {
   if (!urls || urls.length === 0) {
     throw new Error("All sources failed");
   }
@@ -17201,7 +17201,7 @@ app6.get("/page/:id", async (c) => {
   const url = `https://movie.douban.com/subject/${id}/`;
   try {
     const html = await fetchHTML(url, {
-      timeout: 6e3,
+      timeout: 1e4,
       headers: {
         Referer: "https://movie.douban.com/",
         Cookie: `bid=${makeDoubanBid()}; ll="108288"`

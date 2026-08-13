@@ -13,6 +13,8 @@ export const useAuthStore = defineStore('auth', () => {
   // Bangmio 用户绑定后的 Bangumi 用户资料（username/avatar/sign 等）
   // Bangumi 直登用户使用下方 `user`，不写入此字段
   const bgmUserProfile = ref(JSON.parse(localStorage.getItem('bgm_user_profile') || 'null'))
+  const bgmProfileError = ref(false)
+  const bgmProfileLoading = ref(false)
 
   // Bangumi 直登模式（保留，从旧 key 迁移）
   const token = ref(localStorage.getItem('bangumi_token') || '')
@@ -229,11 +231,16 @@ export const useAuthStore = defineStore('auth', () => {
   // 失败时静默，不影响主流程
   async function fetchBgmUserProfile() {
     if (!bangmioToken.value) return
+    bgmProfileLoading.value = true
+    bgmProfileError.value = false
     try {
       const res = await api.get('/user/me')
       saveBgmUserProfile(res.data?.data || null)
+      bgmProfileError.value = false
     } catch {
-      // 静默失败：不抛错、不写 error，避免阻断绑定/登录主流程
+      bgmProfileError.value = true
+    } finally {
+      bgmProfileLoading.value = false
     }
   }
 
@@ -395,7 +402,11 @@ export const useAuthStore = defineStore('auth', () => {
       }
       // 已绑定但本地无 bgmUserProfile（如换设备登录）时，拉取 Bangumi 用户资料
       if (bangmioUser.value?.bgmUid && !bgmUserProfile.value) {
-        await fetchBgmUserProfile()
+        for (let i = 0; i < 2; i++) {
+          await fetchBgmUserProfile()
+          if (bgmUserProfile.value) break
+          if (i === 0) await new Promise(r => setTimeout(r, 1000))
+        }
       }
     } else if (token.value) {
       fetchMe()
@@ -464,6 +475,8 @@ export const useAuthStore = defineStore('auth', () => {
     bangmioUser,
     bgmToken,
     bgmUserProfile,
+    bgmProfileError,
+    bgmProfileLoading,
     loading,
     error,
     showBindModal,

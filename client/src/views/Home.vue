@@ -1,5 +1,23 @@
 <template>
   <div>
+    <!-- 未登录欢迎区块 -->
+    <section v-if="!auth.isLoggedIn" class="mb-10">
+      <div
+        class="rounded-2xl bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 border border-primary/20 p-8 sm:p-12 text-center"
+      >
+        <h1 class="text-3xl sm:text-4xl font-black text-primary mb-3">Bangmio</h1>
+        <p class="text-base-content/60 text-sm sm:text-base mb-6 max-w-md mx-auto">
+          发现、记录、分享你的番剧世界
+        </p>
+        <div class="flex items-center justify-center gap-3">
+          <router-link to="/login" class="btn btn-primary rounded-full px-6"
+            >登录 Bangmio</router-link
+          >
+          <router-link to="/register" class="btn btn-outline rounded-full px-6">注册</router-link>
+        </div>
+      </div>
+    </section>
+
     <!-- Watching panel: Bangumi-style split layout -->
     <section v-if="auth.isLoggedIn" class="mb-10">
       <div class="flex items-center justify-between mb-4">
@@ -170,6 +188,26 @@
       <LoadingState :loading="trendingLoading" :error="trendingError" @retry="fetchTrending" />
       <div v-if="!trendingLoading && !trendingError" class="anime-grid">
         <AnimeCard v-for="anime in trendingList.slice(0, 8)" :key="anime.id" :anime="anime" />
+      </div>
+    </section>
+
+    <!-- 未登录探索引导 -->
+    <section v-if="!auth.isLoggedIn" class="mb-10">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <router-link
+          to="/trending"
+          class="card bg-base-100 border border-base-300 hover:shadow-card transition-all p-5 rounded-xl"
+        >
+          <h3 class="text-base font-bold text-base-content mb-1">新番时间表</h3>
+          <p class="text-sm text-base-content/50">查看本季所有新番播放时间</p>
+        </router-link>
+        <router-link
+          to="/anime"
+          class="card bg-base-100 border border-base-300 hover:shadow-card transition-all p-5 rounded-xl"
+        >
+          <h3 class="text-base font-bold text-base-content mb-1">搜索番剧</h3>
+          <p class="text-sm text-base-content/50">探索更多动画、书籍、音乐</p>
+        </router-link>
       </div>
     </section>
 

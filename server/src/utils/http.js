@@ -61,12 +61,12 @@ async function decodeResponseBody(res) {
  *
  * @param {string} url - 要抓取的 URL。
  * @param {{ timeout?: number, headers?: Record<string, string> }} [opts]
- *   - timeout: 超时时间（毫秒），默认 8000。
+ *   - timeout: 超时时间（毫秒），默认 12000。
  *   - headers: 自定义请求头，会与默认请求头合并（传入的优先）。
  * @returns {Promise<string>} HTML 文本内容。
  * @throws {Error} 当请求失败、超时或 HTTP 状态非 2xx 时抛出错误。
  */
-export async function fetchHTML(url, { timeout = 8000, headers = {} } = {}) {
+export async function fetchHTML(url, { timeout = 12000, headers = {} } = {}) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeout)
   try {
@@ -101,14 +101,14 @@ export async function fetchHTML(url, { timeout = 8000, headers = {} } = {}) {
  * @param {string[]} urls - 候选 URL 数组。
  * @param {{ timeout?: number, overallTimeout?: number, retries?: number }} [opts]
  *   - timeout: 单次请求超时时间（毫秒），默认 8000。
- *   - overallTimeout: 整体超时时间（毫秒），默认 12000。
+ *   - overallTimeout: 整体超时时间（毫秒），默认 18000。
  *   - retries: 单个源失败后的重试次数，默认 1。
  * @returns {Promise<{ html: string, url: string }>} 成功的 HTML 及对应 URL。
  * @throws {Error} 当所有 URL 均失败或整体超时时抛出错误。
  */
 export async function fetchHTMLMulti(
   urls,
-  { timeout = 8000, overallTimeout = 12000, retries = 1 } = {}
+  { timeout = 8000, overallTimeout = 18000, retries = 1 } = {}
 ) {
   if (!urls || urls.length === 0) {
     throw new Error('All sources failed')

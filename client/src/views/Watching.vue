@@ -26,9 +26,26 @@
       </button>
     </div>
 
-    <LoadingState :loading="loading" :error="error" @retry="fetchCollections" />
+    <!-- currentUsername 为空时的加载/重试提示 -->
+    <div v-if="!currentUsername" class="py-20 text-center">
+      <div v-if="auth.bgmProfileLoading" class="flex flex-col items-center gap-3">
+        <span class="loading loading-spinner loading-lg text-primary"></span>
+        <p class="text-base-content/50">正在获取 Bangumi 资料...</p>
+      </div>
+      <div v-else>
+        <p class="text-base-content/50 mb-3">用户资料加载失败</p>
+        <button class="btn btn-primary btn-sm" @click="retryFetchProfile">重试</button>
+      </div>
+    </div>
 
-    <div v-if="!loading && !error">
+    <LoadingState
+      v-if="currentUsername"
+      :loading="loading"
+      :error="error"
+      @retry="fetchCollections"
+    />
+
+    <div v-if="currentUsername && !loading && !error">
       <div v-if="!collections.length" class="py-16 text-center text-base-content/40">
         <p>暂无在追内容</p>
       </div>
@@ -267,8 +284,18 @@ import { useRoute } from 'vue-router'
 import { collectionAPI, animeAPI } from '../api/endpoints'
 import LoadingState from '../components/LoadingState.vue'
 import { getStatusLabels } from '../utils/subjectType'
+import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
+const auth = useAuthStore()
+
+// 当前用户名：优先使用 effectiveUser.username，回退到 bangmioUser.bgmUid
+const currentUsername = computed(() => {
+  return (
+    auth.effectiveUser?.username ||
+    (auth.bangmioUser?.bgmUid ? String(auth.bangmioUser.bgmUid) : null)
+  )
+})
 
 const typeTabs = [
   { label: '全部', value: 0 },
@@ -376,6 +403,7 @@ async function updateEpStatus(status) {
 }
 
 async function fetchCollections() {
+  if (!currentUsername.value) return
   loading.value = true
   error.value = ''
   try {
@@ -405,6 +433,13 @@ async function fetchCollections() {
 
 function loadMore() {
   fetchCollections()
+}
+
+async function retryFetchProfile() {
+  await auth.fetchBgmUserProfile()
+  if (currentUsername.value) {
+    fetchCollections()
+  }
 }
 
 onMounted(fetchCollections)

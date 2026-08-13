@@ -34,14 +34,14 @@
       </div>
     </div>
 
-    <!-- 网络错误 -->
-    <div v-else-if="errorType === 'network'" class="py-20 text-center">
+    <!-- 网络错误（仅在非降级时显示，降级数据仍可展示） -->
+    <div v-else-if="errorType === 'network' && !degraded" class="py-20 text-center">
       <p class="text-base-content/60 mb-4">网络连接失败，请检查网络</p>
       <button class="btn btn-sm btn-primary" @click="retry">重试</button>
     </div>
 
-    <!-- 接口异常 -->
-    <div v-else-if="errorType === 'server'" class="py-20 text-center">
+    <!-- 接口异常（仅在非降级时显示：真正无法获取数据才提示服务不可用） -->
+    <div v-else-if="errorType === 'server' && !degraded" class="py-20 text-center">
       <p class="text-base-content/60 mb-4">服务暂不可用，请稍后再试</p>
       <button class="btn btn-sm btn-primary" @click="retry">重试</button>
     </div>
@@ -68,26 +68,13 @@
       </div>
     </div>
 
-    <!-- 兜底降级数据提示：后端返回 degraded: true 时与列表同时展示 -->
+    <!-- 降级数据温和提示：后端返回 degraded: true 时与列表同时展示 -->
     <div
-      v-if="degraded && !loading && errorType !== 'network' && errorType !== 'server'"
-      class="mb-4 p-4 rounded-xl bg-warning/10 border border-warning/20 text-sm text-base-content/80"
+      v-if="degraded && !loading"
+      class="mb-4 p-3 rounded-xl bg-warning/10 border border-warning/20 text-sm text-base-content/70 flex items-center justify-between gap-3 flex-wrap"
     >
-      <p class="font-medium">部分小组数据为兜底展示，可能不是最新信息</p>
-      <p class="mt-1">
-        Bangumi 上游数据暂时无法获取，你可以稍后再试或前往 Bangumi 查看最新小组信息。
-      </p>
-      <div class="flex items-center gap-3 mt-3">
-        <button class="btn btn-xs btn-primary" @click="retry">重试</button>
-        <a
-          href="https://bgm.tv/group"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="inline-flex items-center gap-1 text-primary hover:underline"
-        >
-          前往 Bangumi 小组首页 →
-        </a>
-      </div>
+      <span>部分小组数据为缓存展示，可能非最新</span>
+      <button class="btn btn-xs btn-ghost" @click="retry">刷新</button>
     </div>
 
     <!-- 列表展示（至少 50 个，后端返回的全部展示，前端无需分页） -->

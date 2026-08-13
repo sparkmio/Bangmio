@@ -7,10 +7,16 @@
     </div>
 
     <div v-else>
-      <!-- effectiveUser 为空时的重试提示 -->
+      <!-- effectiveUser 为空时的加载/重试提示 -->
       <div v-if="!profileUser && !route.params.username" class="py-20 text-center">
-        <p class="text-base-content/50 mb-3">用户资料加载失败</p>
-        <button class="btn btn-primary btn-sm" @click="retryLoadProfile">重试</button>
+        <div v-if="auth.bgmProfileLoading" class="flex flex-col items-center gap-3">
+          <span class="loading loading-spinner loading-lg text-primary"></span>
+          <p class="text-base-content/50">正在获取 Bangumi 资料...</p>
+        </div>
+        <div v-else>
+          <p class="text-base-content/50 mb-3">用户资料加载失败</p>
+          <button class="btn btn-primary btn-sm" @click="retryLoadProfile">重试</button>
+        </div>
       </div>
       <!-- 用户卡 -->
       <div
@@ -793,7 +799,8 @@ async function loadProfile() {
   }
 }
 
-function retryLoadProfile() {
+async function retryLoadProfile() {
+  await auth.fetchBgmUserProfile()
   loadProfile()
 }
 
