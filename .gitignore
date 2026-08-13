@@ -31,3 +31,6 @@ tools/
 client/.env
 client/.env.local
 client/.env.*.local
+
+# 含硬编码 API Key 的本地脚本，禁止提交
+send_email.js
