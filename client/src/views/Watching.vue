@@ -38,12 +38,7 @@
       </div>
     </div>
 
-    <LoadingState
-      v-if="currentUsername"
-      :loading="loading"
-      :error="error"
-      @retry="fetchCollections"
-    />
+    <LoadingState v-if="currentUsername" :loading="loading" :error="error" @retry="fetchCollections" />
 
     <div v-if="currentUsername && !loading && !error">
       <div v-if="!collections.length" class="py-16 text-center text-base-content/40">

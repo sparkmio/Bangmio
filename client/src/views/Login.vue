@@ -82,7 +82,11 @@
             </button>
           </div>
 
-          <button type="submit" :disabled="auth.loading" class="btn btn-primary w-full">
+          <button
+            type="submit"
+            :disabled="auth.loading"
+            class="btn btn-primary w-full"
+          >
             {{ auth.loading ? '登录中...' : '登录' }}
           </button>
 
