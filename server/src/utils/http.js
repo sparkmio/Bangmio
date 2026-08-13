@@ -23,6 +23,26 @@ export const SCRAPE_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
 
 /**
+ * 编码支持检测（模块级执行一次，PROJECT_ISSUES 5.2）。
+ * CF Workers 的 TextDecoder 对 GBK/GB18030 等 label 的支持因环境而异，
+ * 预先检测并缓存结果，解码回退时跳过不支持的编码并记录日志。
+ */
+const ENCODING_SUPPORT = (() => {
+  const support = {}
+  for (const label of ['gb18030', 'gbk', 'big5']) {
+    try {
+      const decoder = new TextDecoder(label)
+      decoder.decode(new Uint8Array(0))
+      support[label] = true
+    } catch {
+      support[label] = false
+      logError('TextDecoder 不支持编码 label', { label })
+    }
+  }
+  return support
+})()
+
+/**
  * 显式按 UTF-8 解码响应体；若出现替换字符或解码失败，则回退到 GBK/GB18030。
  * 解决部分上游站点（如萌娘百科）在 Cloudflare Workers 中被错误按 Latin1 解码导致中文乱码的问题。
  *
@@ -41,13 +61,17 @@ async function decodeResponseBody(res) {
     // UTF-8 解码异常时继续回退
   }
 
-  // 回退到 GB18030 / GBK（CF Workers 的 TextDecoder 通常支持这些 label）
+  // 回退到 GB18030 / GBK；先检查编码支持，不支持则记录日志并跳过
   for (const label of ['gb18030', 'gbk']) {
+    if (!ENCODING_SUPPORT[label]) {
+      logError('解码回退跳过不支持的编码', { label })
+      continue
+    }
     try {
       const decoder = new TextDecoder(label, { fatal: true })
       return decoder.decode(buffer)
     } catch {
-      // 当前 label 不支持或解码失败，继续下一个
+      // 当前 label 解码失败（非编码问题），继续下一个
     }
   }
 

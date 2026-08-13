@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
+import { authStorage } from '../utils/authStorage'
 import router from '../router'
 
 const baseURL = import.meta.env.VITE_API_BASE || '/api/v1'
@@ -91,20 +92,13 @@ api.interceptors.request.use(config => {
     }
   } else {
     // Pinia 未激活时回退到 localStorage
-    const bangumiToken =
-      localStorage.getItem('bangumi_token') || localStorage.getItem('bangmio_token')
+    const bangumiToken = authStorage.getBangumiToken() || authStorage.getBangmioToken()
     if (bangumiToken) {
       config.headers.Authorization = `Bearer ${bangumiToken}`
     }
-    try {
-      const cachedUser = JSON.parse(
-        localStorage.getItem('bangumi_user') || localStorage.getItem('bangmio_user') || 'null'
-      )
-      if (cachedUser?.username) {
-        config.headers['X-Bangumi-Username'] = cachedUser.username
-      }
-    } catch {
-      // ignore
+    const cachedUser = authStorage.getBangumiUser() || authStorage.getBangmioUser()
+    if (cachedUser?.username) {
+      config.headers['X-Bangumi-Username'] = cachedUser.username
     }
   }
 
@@ -143,8 +137,8 @@ api.interceptors.response.use(
           // 同步更新 store 与 localStorage
           auth.bangmioToken = newToken
           auth.bangmioUser = newUser
-          localStorage.setItem('bangmio_token', newToken)
-          localStorage.setItem('bangmio_user', JSON.stringify(newUser))
+          authStorage.setBangmioToken(newToken)
+          authStorage.setBangmioUser(newUser)
           onRefreshed(newToken)
           originalRequest.headers.Authorization = `Bearer ${newToken}`
           return api(originalRequest)
@@ -154,9 +148,7 @@ api.interceptors.response.use(
           auth.bangmioToken = ''
           auth.bangmioUser = null
           auth.bgmToken = ''
-          localStorage.removeItem('bangmio_token')
-          localStorage.removeItem('bangmio_user')
-          localStorage.removeItem('bgm_token_cached')
+          authStorage.clearBangmio()
           if (router.currentRoute.value?.path !== '/login') {
             router.push('/login')
           }
@@ -183,8 +175,7 @@ api.interceptors.response.use(
     if (auth?.isBangumiDirectUser) {
       auth.token = ''
       auth.user = null
-      localStorage.removeItem('bangumi_token')
-      localStorage.removeItem('bangumi_user')
+      authStorage.clearBangumi()
       if (router.currentRoute.value?.path !== '/login') {
         router.push('/login')
       }

@@ -30,12 +30,9 @@ import {
 import { verifyTurnstile } from '../utils/turnstile.js'
 import { userExistsByEmail } from '../db/users.js'
 import { logError } from '../utils/logger.js'
+import { getOAuthCredentials } from '../utils/oauthConfig.js'
 
 const app = new Hono()
-
-/** Bangumi OAuth 应用默认配置（与 routes/user.js 保持一致，可通过环境变量覆盖） */
-const DEFAULT_BGM_APP_ID = 'bgm61416a088eff71580'
-const DEFAULT_BGM_APP_SECRET = '6b8055c0159fcc5e998059536813026f'
 
 /**
  * 判断请求是否来自国内节点（决定走 bgm.tv 还是 bangumi.lol 镜像）。
@@ -320,7 +317,7 @@ app.get('/oauth-bind-url', jwtAuth(), async c => {
   try {
     const currentUser = c.get('user')
     const state = await createOAuthBindState(c.env, currentUser.userId)
-    const appId = c.env?.BGM_APP_ID || DEFAULT_BGM_APP_ID
+    const { appId } = getOAuthCredentials(c.env, '/auth/oauth-bind-url')
     const url = `${oauthBase(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}&state=${encodeURIComponent(state)}`
     return c.json({ data: { url }, code: 200 })
   } catch (err) {
@@ -343,8 +340,17 @@ app.post('/oauth-bind-callback', jwtAuth(), async c => {
     if (!code || !state) {
       return c.json({ data: null, error: '缺少授权码或 state', code: 400 }, 400)
     }
-    const appId = c.env?.BGM_APP_ID || DEFAULT_BGM_APP_ID
-    const appSecret = c.env?.BGM_APP_SECRET || DEFAULT_BGM_APP_SECRET
+    const { appId, appSecret } = getOAuthCredentials(c.env, '/auth/oauth-bind-callback')
+    if (!appSecret) {
+      return c.json(
+        {
+          data: null,
+          error: 'OAuth 服务未配置（缺少 BGM_APP_SECRET 环境变量），请使用 Bangumi 直登',
+          code: 503
+        },
+        503
+      )
+    }
     const result = await bindBangumiByOAuth(c.env.DB, c.env, {
       code,
       state,

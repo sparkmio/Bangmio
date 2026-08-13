@@ -2,61 +2,31 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import router from '../router'
 import api from '../api/index'
+import { authStorage, migrateOldAuthKeys } from '../utils/authStorage'
 
 export const useAuthStore = defineStore('auth', () => {
+  // 旧 key 迁移需在读取 state 之前完成（迁移逻辑集中见 authStorage.js）
+  migrateOldAuthKeys()
+
   // ===== State =====
   // Bangmio JWT 体系（新）
-  const bangmioToken = ref(localStorage.getItem('bangmio_token') || '')
-  const bangmioUser = ref(JSON.parse(localStorage.getItem('bangmio_user') || 'null'))
-  const bgmToken = ref(localStorage.getItem('bgm_token_cached') || '')
+  const bangmioToken = ref(authStorage.getBangmioToken())
+  const bangmioUser = ref(authStorage.getBangmioUser())
+  const bgmToken = ref(authStorage.getBgmTokenCached())
 
   // Bangmio 用户绑定后的 Bangumi 用户资料（username/avatar/sign 等）
   // Bangumi 直登用户使用下方 `user`，不写入此字段
-  const bgmUserProfile = ref(JSON.parse(localStorage.getItem('bgm_user_profile') || 'null'))
+  const bgmUserProfile = ref(authStorage.getBgmUserProfile())
   const bgmProfileError = ref(false)
   const bgmProfileLoading = ref(false)
 
-  // Bangumi 直登模式（保留，从旧 key 迁移）
-  const token = ref(localStorage.getItem('bangumi_token') || '')
-  const user = ref(JSON.parse(localStorage.getItem('bangumi_user') || 'null'))
+  // Bangumi 直登模式
+  const token = ref(authStorage.getBangumiToken())
+  const user = ref(authStorage.getBangumiUser())
 
   const loading = ref(false)
   const error = ref('')
   const showBindModal = ref(false)
-
-  // ===== 旧 localStorage key 迁移 =====
-  // 旧代码把 Bangumi token/user 存在 'bangmio_token'/'bangmio_user'
-  // 旧值若不是 JWT，则迁移到 'bangumi_token'/'bangumi_user'
-  ;(function migrateOldKeys() {
-    const oldToken = localStorage.getItem('bangmio_token')
-    const oldUser = localStorage.getItem('bangmio_user')
-    // JWT 格式：三段 base64 以点分隔
-    const isJwt = oldToken && oldToken.split('.').length === 3
-    if (oldToken && !isJwt) {
-      if (!localStorage.getItem('bangumi_token')) {
-        localStorage.setItem('bangumi_token', oldToken)
-        token.value = oldToken
-      }
-      localStorage.removeItem('bangmio_token')
-      bangmioToken.value = ''
-    }
-    if (oldUser) {
-      try {
-        const parsed = JSON.parse(oldUser)
-        // 旧 Bangumi user 有 username 字段，新 Bangmio user 有 email 字段
-        if (parsed && !parsed.email) {
-          if (!localStorage.getItem('bangumi_user')) {
-            localStorage.setItem('bangumi_user', oldUser)
-            user.value = parsed
-          }
-          localStorage.removeItem('bangmio_user')
-          bangmioUser.value = null
-        }
-      } catch {
-        // ignore
-      }
-    }
-  })()
 
   // ===== Computed =====
   const isBangmioUser = computed(() => !!bangmioToken.value)
@@ -85,38 +55,30 @@ export const useAuthStore = defineStore('auth', () => {
   function saveBangmioAuth(t, u) {
     bangmioToken.value = t
     bangmioUser.value = u
-    localStorage.setItem('bangmio_token', t)
-    localStorage.setItem('bangmio_user', JSON.stringify(u))
+    authStorage.setBangmioToken(t)
+    authStorage.setBangmioUser(u)
   }
 
   function saveBangumiAuth(t, u) {
     token.value = t
     user.value = u
-    localStorage.setItem('bangumi_token', t)
-    localStorage.setItem('bangumi_user', JSON.stringify(u))
+    authStorage.setBangumiToken(t)
+    authStorage.setBangumiUser(u)
   }
 
   function saveBgmTokenCached(t) {
     bgmToken.value = t || ''
-    if (t) {
-      localStorage.setItem('bgm_token_cached', t)
-    } else {
-      localStorage.removeItem('bgm_token_cached')
-    }
+    authStorage.setBgmTokenCached(t)
   }
 
   function saveBgmUserProfile(profile) {
     bgmUserProfile.value = profile || null
-    if (profile) {
-      localStorage.setItem('bgm_user_profile', JSON.stringify(profile))
-    } else {
-      localStorage.removeItem('bgm_user_profile')
-    }
+    authStorage.setBgmUserProfile(profile || null)
   }
 
   function clearBgmUserProfile() {
     bgmUserProfile.value = null
-    localStorage.removeItem('bgm_user_profile')
+    authStorage.setBgmUserProfile(null)
   }
 
   function clearBangmioAuth() {
@@ -124,17 +86,13 @@ export const useAuthStore = defineStore('auth', () => {
     bangmioUser.value = null
     bgmToken.value = ''
     bgmUserProfile.value = null
-    localStorage.removeItem('bangmio_token')
-    localStorage.removeItem('bangmio_user')
-    localStorage.removeItem('bgm_token_cached')
-    localStorage.removeItem('bgm_user_profile')
+    authStorage.clearBangmio()
   }
 
   function clearBangumiAuth() {
     token.value = ''
     user.value = null
-    localStorage.removeItem('bangumi_token')
-    localStorage.removeItem('bangumi_user')
+    authStorage.clearBangumi()
   }
 
   // 登录/注册成功后根据 redirect query 跳转
@@ -340,7 +298,7 @@ export const useAuthStore = defineStore('auth', () => {
       await api.delete('/auth/bind-bangumi')
       if (bangmioUser.value) {
         bangmioUser.value = { ...bangmioUser.value, bgmUid: null }
-        localStorage.setItem('bangmio_user', JSON.stringify(bangmioUser.value))
+        authStorage.setBangmioUser(bangmioUser.value)
       }
       saveBgmTokenCached('')
       // 解绑后清空缓存的 Bangumi 用户资料
@@ -374,7 +332,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const res = await api.get('/auth/me')
       bangmioUser.value = res.data.data.user
-      localStorage.setItem('bangmio_user', JSON.stringify(res.data.data.user))
+      authStorage.setBangmioUser(res.data.data.user)
     } catch {
       // 401 由拦截器处理
     }
@@ -386,7 +344,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const res = await api.get('/user/me')
       user.value = res.data.data
-      localStorage.setItem('bangumi_user', JSON.stringify(res.data.data))
+      authStorage.setBangumiUser(res.data.data)
     } catch {
       // ignore
     }

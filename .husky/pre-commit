@@ -1,1 +1,9 @@
+# 若 server 源码有变更，自动重建后端 bundle 并纳入本次提交，
+# 避免线上部署使用过期的 functions/api/_server.js
+if git diff --cached --name-only --diff-filter=ACMR | grep -qE '^server/src/'; then
+  echo "→ 检测到 server/src 变更，重建 functions/api/_server.js ..."
+  npm run server:build
+  git add functions/api/_server.js functions/api/_meta.json
+fi
+
 npx lint-staged

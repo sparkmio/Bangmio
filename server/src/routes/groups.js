@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
+import { parseHTML } from 'linkedom'
 import { createCache } from '../utils/cache.js'
-import { fetchHTMLMulti, stripTags, unescapeHtml, parseNumber, fixUrl } from '../utils/http.js'
+import { fetchHTMLMulti, parseNumber, fixUrl } from '../utils/http.js'
 import { CACHE_TTL_GROUPS } from '../config.js'
 
 const app = new Hono()
@@ -54,50 +55,72 @@ const FALLBACK_GROUPS = [
   { id: 'tech', name: '技术', description: '技术交流小组', member_count: 1800, avatar: '' }
 ]
 
+/**
+ * 从锚点 href 中提取小组 id。
+ * 兼容相对路径（/group/xxx）、绝对路径（https://bgm.tv/group/xxx）与带查询串的链接。
+ * @param {string} href
+ * @returns {string | null}
+ */
+function groupIdFromHref(href) {
+  const m = String(href || '').match(/(?:^|[/])group\/([^/?#]+)/)
+  if (!m) return null
+  try {
+    return decodeURIComponent(m[1])
+  } catch {
+    return m[1]
+  }
+}
+
+/**
+ * 折叠空白并去除首尾空格（等价于原 unescapeHtml 的空白折叠，DOM textContent 已解码实体）。
+ * @param {string} str
+ * @returns {string}
+ */
+function collapseText(str) {
+  return (str || '').replace(/\s+/g, ' ').trim()
+}
+
 function parseGroupListHTML(html, base) {
   const groups = []
   const seen = new Set()
 
-  // Bangumi /group/all 页面格式：
-  // * **[ ![](icon) name](/group/id)** X 位成员
-  // 按每个 <li> 或 <a href="/group/xxx"> 解析
-  const regex = /<a[^>]+href="\/group\/([^"/]+)"[^>]*>([\s\S]*?)<\/a>/gi
-  let m
-  while ((m = regex.exec(html)) !== null) {
-    const id = unescapeHtml(m[1]).trim()
-    const rawAnchor = m[0]
-    const rawName = m[2]
+  const { document } = parseHTML(html)
+
+  for (const anchor of document.querySelectorAll('a[href]')) {
+    const id = collapseText(groupIdFromHref(anchor.getAttribute('href')))
+    if (!id) continue
 
     // 过滤非小组链接
-    if (/\.(jpg|png|gif)$/i.test(id)) continue
+    if (/\.(jpg|png|gif|jpeg|webp)$/i.test(id)) continue
     if (/^\d+$/.test(id)) continue
     if (id === 'new_topic' || id.startsWith('topic')) continue
     if (id === 'discover' || id === 'all' || id === 'category') continue
 
-    // 提取名称：去掉 img，保留文字
-    const name = unescapeHtml(stripTags(rawName).replace(/\s+/g, ' ')).trim()
+    // 名称：锚点的纯文本（img 的 alt 等不参与）
+    const name = collapseText(anchor.textContent)
     if (!name || /^\d+$/.test(name)) continue
 
-    // 上下文：从 </a> 后开始到下一个 "位成员" 或行尾
-    const afterAnchor = html.slice(
-      m.index + rawAnchor.length,
-      Math.min(html.length, m.index + rawAnchor.length + 120)
-    )
-
-    // 成员数
+    // 成员数：在锚点所在容器（通常是 li/行）内查找 "NNN 位成员"；
+    // 孤儿节点回退到锚点后的兄弟元素文本
     let member_count = 0
-    const memberMatch = afterAnchor.match(/([0-9]+)\s*(?:位成员|成员|members?)/i)
+    let containerText = anchor.parentElement?.textContent || ''
+    if (!containerText) {
+      let sib = anchor.nextElementSibling
+      while (sib && containerText.length < 200) {
+        containerText += ' ' + (sib.textContent || '')
+        sib = sib.nextElementSibling
+      }
+    }
+    const memberMatch = containerText.match(/([0-9][0-9,]*)\s*(?:位成员|成员|members?)/i)
     if (memberMatch) {
       member_count = parseNumber(memberMatch[1])
     }
 
-    // 头像：在当前 anchor 内或前一个 img 找
+    // 头像：锚点内 img 优先，其次容器内 img
     let avatar = ''
-    const imgMatch =
-      rawAnchor.match(/<img[^>]+src="([^"]+)"[^>]*>/i) ||
-      html.slice(Math.max(0, m.index - 200), m.index).match(/<img[^>]+src="([^"]+)"[^>]*>$/i)
-    if (imgMatch) {
-      avatar = fixUrl(imgMatch[1], base)
+    const img = anchor.querySelector('img[src]') || anchor.parentElement?.querySelector('img[src]')
+    if (img) {
+      avatar = fixUrl(img.getAttribute('src'), base)
     }
 
     if (!seen.has(id)) {
@@ -118,98 +141,134 @@ function parseGroupListHTML(html, base) {
   return groups
 }
 
-function parseGroupDetailHTML(html, id, base) {
-  const nameMatch = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
-  const name = nameMatch ? unescapeHtml(stripTags(nameMatch[1])) : id
+/**
+ * 查找 class 名包含指定子串的第一个元素。
+ * @param {Document} document
+ * @param {string} substr
+ * @returns {Element | null}
+ */
+function firstByClassSubstring(document, substr) {
+  for (const el of document.querySelectorAll('[class]')) {
+    if ((el.getAttribute('class') || '').includes(substr)) return el
+  }
+  return null
+}
 
-  // 简介：新版 Bangumi 小组详情页
+function parseGroupDetailHTML(html, id, base) {
+  const { document } = parseHTML(html)
+
+  // 名称：第一个 h1 的纯文本，缺失时回退为 id
+  const h1 = document.querySelector('h1')
+  const name = h1 ? collapseText(h1.textContent) : ''
+  const finalName = name || id
+
+  // 简介：class 含 group_desc / text / intro 的 div，或 class 含 tip 的 p（保持原顺序）
   let description = ''
-  const descPatterns = [
-    /<div[^>]*class="[^"]*group_desc[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-    /<div[^>]*class="[^"]*text[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-    /<div[^>]*class="[^"]*intro[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-    /<p[^>]*class="[^"]*tip[^"]*"[^>]*>([\s\S]*?)<\/p>/i
-  ]
-  for (const re of descPatterns) {
-    const m = html.match(re)
-    if (m) {
-      const text = unescapeHtml(stripTags(m[1]))
-      if (text) {
-        description = text
+  for (const pattern of ['group_desc', 'text', 'intro', 'tip']) {
+    const el = firstByClassSubstring(document, pattern)
+    const text = el ? collapseText(el.textContent) : ''
+    if (text) {
+      description = el.textContent.trim()
+      break
+    }
+  }
+
+  // 成员数：1) 全文 "NNN 位成员"；2) class 含 group_member/member/sub 的元素；
+  //         3) <strong>NNN</strong> 后跟成员关键字
+  let member_count = 0
+  const bodyText = document.body?.textContent || ''
+  const memberMatch = bodyText.match(/([0-9,]+)\s*(?:位成员|成员|members?)/i)
+  if (memberMatch) {
+    member_count = parseNumber(memberMatch[1])
+  } else {
+    const memberEl =
+      firstByClassSubstring(document, 'group_member') ||
+      firstByClassSubstring(document, 'member') ||
+      firstByClassSubstring(document, 'sub')
+    if (memberEl) {
+      member_count = parseNumber(memberEl.textContent)
+    }
+  }
+  if (!member_count) {
+    for (const strong of document.querySelectorAll('strong')) {
+      const strongText = collapseText(strong.textContent)
+      if (!/^\d[\d,]*$/.test(strongText)) continue
+      const parentText = strong.parentElement?.textContent || ''
+      if (/(?:位成员|成员|members?)/i.test(parentText)) {
+        member_count = parseNumber(strongText)
         break
       }
     }
   }
 
-  // 成员数
-  let member_count = 0
-  const memberMatch =
-    html.match(/([0-9,]+)\s*(?:位成员|成员|members?)/i) ||
-    html.match(
-      /<span[^>]*class="[^"]*(?:group_member|member|sub)[^"]*"[^>]*>([\s\S]*?)<\/span>/i
-    ) ||
-    html.match(/<strong>([0-9,]+)<\/strong>\s*(?:位成员|成员|members?)/i)
-  if (memberMatch) {
-    member_count = parseNumber(memberMatch[1])
-  }
-
-  // 头像
+  // 头像：h1 附近（向上最多 4 层容器内）第一个 img
   let avatar = ''
-  const h1Idx = html.search(/<h1\b/i)
-  if (h1Idx !== -1) {
-    const headContext = html.slice(Math.max(0, h1Idx - 500), h1Idx + 500)
-    const avatarMatch = headContext.match(/<img[^>]+src="([^"]+)"[^>]*>/i)
-    avatar = avatarMatch ? fixUrl(avatarMatch[1], base) : ''
+  let node = h1?.parentElement || null
+  for (let i = 0; i < 4 && node; i++) {
+    const img = node.querySelector('img[src]')
+    if (img) {
+      avatar = fixUrl(img.getAttribute('src'), base)
+      break
+    }
+    node = node.parentElement
   }
 
-  // 话题：仅在 .topic_list 表格内解析，避免导航栏的 Mobile 链接被误匹配
+  // 话题：仅在 .topic_list 表格内解析（无该表格时回退到含 /group/topic/ 链接的表格）
   const topics = []
   const seenTopics = new Set()
-  const tableMatch = html.match(/<table[^>]*class="[^"]*topic_list[^"]*"[^>]*>([\s\S]*?)<\/table>/i)
-  const topicContext = tableMatch ? tableMatch[1] : ''
-  if (topicContext) {
-    const topicRegex = /<a[^>]+href="\/group\/topic\/(\d+)"[^>]*>([\s\S]*?)<\/a>/gi
-    let tm
-    while ((tm = topicRegex.exec(topicContext)) !== null) {
-      const topicId = tm[1]
+  let table = null
+  for (const t of document.querySelectorAll('table')) {
+    if ((t.getAttribute('class') || '').includes('topic_list')) {
+      table = t
+      break
+    }
+  }
+  if (!table) {
+    for (const t of document.querySelectorAll('table')) {
+      if (t.querySelector('a[href*="/group/topic/"]')) {
+        table = t
+        break
+      }
+    }
+  }
+  if (table) {
+    for (const anchor of table.querySelectorAll('a[href]')) {
+      const topicMatch = (anchor.getAttribute('href') || '').match(/\/group\/topic\/(\d+)/)
+      if (!topicMatch) continue
+      const topicId = topicMatch[1]
       if (seenTopics.has(topicId)) continue
       seenTopics.add(topicId)
 
-      const title = unescapeHtml(stripTags(tm[2]).replace(/\s+/g, ' '))
+      const title = collapseText(anchor.textContent)
       if (!title) continue
 
-      const idx = tm.index
-      const context = topicContext.slice(
-        Math.max(0, idx - 400),
-        Math.min(topicContext.length, idx + 600)
-      )
+      const row = anchor.closest('tr') || anchor.parentElement
+      const rowText = row?.textContent || ''
 
-      // 作者
+      // 作者：行内 /user/ 链接
       let author = ''
-      const authorMatch = context.match(/<a[^>]+href="\/user\/[^"]+"[^>]*>([\s\S]*?)<\/a>/i)
-      if (authorMatch) {
-        author = unescapeHtml(stripTags(authorMatch[1]))
+      const userLink = row?.querySelector('a[href*="/user/"]')
+      if (userLink) {
+        author = collapseText(userLink.textContent)
       }
 
-      // 回复数
+      // 回复数：td.posts / class 含 posts 的元素，回退 "(N 回复)" / "N 回复"
       let reply_count = 0
-      const replyMatch =
-        context.match(/<td[^>]*class="[^"]*posts[^"]*"[^>]*>([\s\S]*?)<\/td>/i) ||
-        context.match(/\((\d+)\s*(?:回复|reply|条)/i) ||
-        context.match(/(\d+)\s*(?:回复|reply)/i)
-      if (replyMatch) {
-        reply_count = parseNumber(replyMatch[1])
+      const postsEl = row?.querySelector('td.posts, [class*="posts"]')
+      if (postsEl) {
+        reply_count = parseNumber(postsEl.textContent)
+      }
+      if (!reply_count) {
+        const replyMatch =
+          rowText.match(/\((\d+)\s*(?:回复|reply|条)/i) || rowText.match(/(\d+)\s*(?:回复|reply)/i)
+        if (replyMatch) reply_count = parseNumber(replyMatch[1])
       }
 
-      // 最后回复时间
+      // 最后回复时间：small.time / span.date / span.time / small，排除成员数类文本
       let last_reply_time = ''
-      const timeMatch =
-        context.match(/<small[^>]*class="[^"]*time[^"]*"[^>]*>([\s\S]*?)<\/small>/i) ||
-        context.match(/<span[^>]*class="[^"]*date[^"]*"[^>]*>([\s\S]*?)<\/span>/i) ||
-        context.match(/<span[^>]*class="[^"]*time[^"]*"[^>]*>([\s\S]*?)<\/span>/i) ||
-        context.match(/<small[^>]*>([\s\S]*?)<\/small>/i)
-      if (timeMatch) {
-        const timeText = unescapeHtml(stripTags(timeMatch[1]))
+      const timeEl = row?.querySelector('small.time, span.date, span.time, small')
+      if (timeEl) {
+        const timeText = collapseText(timeEl.textContent)
         if (!/^\d+\s*(?:位成员|成员|members?)$/.test(timeText)) {
           last_reply_time = timeText
         }
@@ -220,8 +279,19 @@ function parseGroupDetailHTML(html, id, base) {
     }
   }
 
-  return { id, name, description, member_count, avatar, topics, url: `${base}/group/${id}` }
+  return {
+    id,
+    name: finalName,
+    description,
+    member_count,
+    avatar,
+    topics,
+    url: `${base}/group/${id}`
+  }
 }
+
+// 导出解析函数供单元测试使用（fixture 驱动，不依赖上游网络）
+export { parseGroupListHTML, parseGroupDetailHTML }
 
 // GET /groups - 小组列表
 app.get('/', async c => {

@@ -822,7 +822,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { gsap } from 'gsap'
 import {
@@ -835,6 +835,7 @@ import {
 } from '../api/endpoints'
 import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toast'
+import { setPageMeta, resetPageMeta } from '../composables/useSeo'
 import CollectionButton from '../components/CollectionButton.vue'
 import StarRating from '../components/StarRating.vue'
 import AnimeCard from '../components/AnimeCard.vue'
@@ -967,6 +968,24 @@ async function fetchRatingDetails() {
   await Promise.all([fetchDoubanDetails(), fetchBilibiliDetails()])
 }
 
+/**
+ * 空闲时预取评分/豆瓣 Tab 数据（PROJECT_ISSUES 6.2），
+ * 减少用户点击 Tab 后的等待；各 fetch 自带防重入，重复调用无害。
+ */
+function scheduleIdlePrefetch() {
+  const idleCb =
+    typeof window.requestIdleCallback === 'function'
+      ? window.requestIdleCallback.bind(window)
+      : fn => setTimeout(fn, 2000)
+  idleCb(
+    () => {
+      fetchRatingDetails()
+      fetchDoubanDetails()
+    },
+    { timeout: 5000 }
+  )
+}
+
 async function fetchTopics() {
   if (topicLoading.value) return
   topicLoading.value = true
@@ -1097,6 +1116,19 @@ async function fetchDetail() {
     persons.value = pRes?.data?.data || pRes?.data || []
     relations.value = rRes?.data?.data || rRes?.data || []
     episodeList.value = eRes?.data?.data || eRes?.data || []
+
+    // 动态 SEO / 社交分享 meta（PROJECT_ISSUES 4.4）
+    const name = anime.value?.name_cn || anime.value?.name || ''
+    const summary = (anime.value?.summary || '').slice(0, 200)
+    const image = anime.value?.images?.large || anime.value?.images?.common || ''
+    if (name) {
+      setPageMeta({
+        title: name,
+        description: summary,
+        image,
+        url: `${window.location.origin}/anime/${id}`
+      })
+    }
   } catch {
     error.value = '加载失败'
   } finally {
@@ -1104,6 +1136,9 @@ async function fetchDetail() {
   }
 
   if (auth.isLoggedIn) loadCollection()
+
+  // 主数据加载完成后，空闲预取评分/豆瓣数据
+  scheduleIdlePrefetch()
 
   nextTick(() => {
     if (heroRef.value) {
@@ -1138,14 +1173,11 @@ async function loadCollection() {
   }
 }
 
-async function saveCollectionBody(extra = {}) {
+async function saveCollectionBody(fields = {}) {
   try {
-    await collectionAPI.save(route.params.id, {
-      status: collectionStatus.value,
-      rating: collectionRating.value,
-      comment: collectionComment.value,
-      ...extra
-    })
+    // 仅发送实际变更的字段：updateStatus 只发 status、updateRating 只发 rating、
+    // updateComment 只发 comment。后端对未提供的 status 会保留当前收藏状态。
+    await collectionAPI.save(route.params.id, fields)
     return true
   } catch (err) {
     const msg = err.response?.data?.error || '保存失败'
@@ -1225,4 +1257,6 @@ watch(
 )
 
 onMounted(fetchDetail)
+
+onBeforeUnmount(resetPageMeta)
 </script>

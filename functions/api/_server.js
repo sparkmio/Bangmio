@@ -4303,6 +4303,20 @@ function buildVerificationEmailHTML(code) {
 
 // server/src/utils/http.js
 var SCRAPE_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+var ENCODING_SUPPORT = (() => {
+  const support = {};
+  for (const label of ["gb18030", "gbk", "big5"]) {
+    try {
+      const decoder = new TextDecoder(label);
+      decoder.decode(new Uint8Array(0));
+      support[label] = true;
+    } catch {
+      support[label] = false;
+      logError("TextDecoder \u4E0D\u652F\u6301\u7F16\u7801 label", { label });
+    }
+  }
+  return support;
+})();
 async function decodeResponseBody(res) {
   const buffer = await res.arrayBuffer();
   let text = "";
@@ -4312,6 +4326,10 @@ async function decodeResponseBody(res) {
   } catch {
   }
   for (const label of ["gb18030", "gbk"]) {
+    if (!ENCODING_SUPPORT[label]) {
+      logError("\u89E3\u7801\u56DE\u9000\u8DF3\u8FC7\u4E0D\u652F\u6301\u7684\u7F16\u7801", { label });
+      continue;
+    }
     try {
       const decoder = new TextDecoder(label, { fatal: true });
       return decoder.decode(buffer);
@@ -4679,10 +4697,19 @@ async function verifyTurnstile(token, secret, remoteip) {
   }
 }
 
+// server/src/utils/oauthConfig.js
+var DEFAULT_BGM_APP_ID = "bgm61416a088eff71580";
+function getOAuthCredentials(env, logPath = "oauth") {
+  const appId = env?.BGM_APP_ID || DEFAULT_BGM_APP_ID;
+  const appSecret = env?.BGM_APP_SECRET || null;
+  if (!appSecret) {
+    logError("BGM_APP_SECRET \u672A\u914D\u7F6E\uFF0COAuth \u6388\u6743\u7801\u6D41\u7A0B\u4E0D\u53EF\u7528", { path: logPath });
+  }
+  return { appId, appSecret };
+}
+
 // server/src/routes/auth.js
 var app = new Hono2();
-var DEFAULT_BGM_APP_ID = "bgm61416a088eff71580";
-var DEFAULT_BGM_APP_SECRET = "6b8055c0159fcc5e998059536813026f";
 function isChina(c) {
   return (c.env?.CF_IP_COUNTRY || "") === "CN";
 }
@@ -4852,7 +4879,7 @@ app.get("/oauth-bind-url", jwtAuth(), async (c) => {
   try {
     const currentUser = c.get("user");
     const state = await createOAuthBindState(c.env, currentUser.userId);
-    const appId = c.env?.BGM_APP_ID || DEFAULT_BGM_APP_ID;
+    const { appId } = getOAuthCredentials(c.env, "/auth/oauth-bind-url");
     const url = `${oauthBase(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}&state=${encodeURIComponent(state)}`;
     return c.json({ data: { url }, code: 200 });
   } catch (err) {
@@ -4866,8 +4893,17 @@ app.post("/oauth-bind-callback", jwtAuth(), async (c) => {
     if (!code || !state) {
       return c.json({ data: null, error: "\u7F3A\u5C11\u6388\u6743\u7801\u6216 state", code: 400 }, 400);
     }
-    const appId = c.env?.BGM_APP_ID || DEFAULT_BGM_APP_ID;
-    const appSecret = c.env?.BGM_APP_SECRET || DEFAULT_BGM_APP_SECRET;
+    const { appId, appSecret } = getOAuthCredentials(c.env, "/auth/oauth-bind-callback");
+    if (!appSecret) {
+      return c.json(
+        {
+          data: null,
+          error: "OAuth \u670D\u52A1\u672A\u914D\u7F6E\uFF08\u7F3A\u5C11 BGM_APP_SECRET \u73AF\u5883\u53D8\u91CF\uFF09\uFF0C\u8BF7\u4F7F\u7528 Bangumi \u76F4\u767B",
+          code: 503
+        },
+        503
+      );
+    }
     const result = await bindBangumiByOAuth(c.env.DB, c.env, {
       code,
       state,
@@ -5091,8 +5127,12 @@ async function getPersonSubjects(id, opts) {
 
 // server/src/routes/user.js
 var app2 = new Hono2();
-var DEFAULT_APP_ID = "bgm61416a088eff71580";
-var DEFAULT_APP_SECRET = "6b8055c0159fcc5e998059536813026f";
+function oauthNotConfigured(c) {
+  return c.json(
+    { error: "OAuth \u670D\u52A1\u672A\u914D\u7F6E\uFF08\u7F3A\u5C11 BGM_APP_SECRET \u73AF\u5883\u53D8\u91CF\uFF09\uFF0C\u8BF7\u4F7F\u7528 Bangumi \u76F4\u767B\uFF08\u7C98\u8D34 Access Token\uFF09" },
+    503
+  );
+}
 function isChina2(c) {
   return (c.env?.CF_IP_COUNTRY || "") === "CN";
 }
@@ -5135,7 +5175,7 @@ app2.post("/auth", async (c) => {
   }
 });
 app2.get("/oauth-url", (c) => {
-  const appId = c.env?.BGM_APP_ID || DEFAULT_APP_ID;
+  const { appId } = getOAuthCredentials(c.env, "/user/oauth-url");
   const url = `${oauthBase2(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri2(c))}`;
   return c.json({ data: url });
 });
@@ -5143,8 +5183,8 @@ app2.post("/oauth-callback", async (c) => {
   try {
     const { code } = await c.req.json();
     if (!code) return c.json({ error: "\u7F3A\u5C11\u6388\u6743\u7801" }, 400);
-    const appId = c.env?.BGM_APP_ID || DEFAULT_APP_ID;
-    const appSecret = c.env?.BGM_APP_SECRET || DEFAULT_APP_SECRET;
+    const { appId, appSecret } = getOAuthCredentials(c.env, "/user/oauth-callback");
+    if (!appSecret) return oauthNotConfigured(c);
     const params = new URLSearchParams({
       grant_type: "authorization_code",
       client_id: appId,
@@ -5172,8 +5212,8 @@ app2.post("/refresh-token", async (c) => {
   try {
     const { refreshToken } = await c.req.json();
     if (!refreshToken) return c.json({ error: "\u7F3A\u5C11 refresh token" }, 400);
-    const appId = c.env?.BGM_APP_ID || DEFAULT_APP_ID;
-    const appSecret = c.env?.BGM_APP_SECRET || DEFAULT_APP_SECRET;
+    const { appId, appSecret } = getOAuthCredentials(c.env, "/user/refresh-token");
+    if (!appSecret) return oauthNotConfigured(c);
     const params = new URLSearchParams({
       grant_type: "refresh_token",
       client_id: appId,
@@ -17687,34 +17727,48 @@ var FALLBACK_GROUPS = [
   },
   { id: "tech", name: "\u6280\u672F", description: "\u6280\u672F\u4EA4\u6D41\u5C0F\u7EC4", member_count: 1800, avatar: "" }
 ];
+function groupIdFromHref(href) {
+  const m = String(href || "").match(/(?:^|[/])group\/([^/?#]+)/);
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return m[1];
+  }
+}
+function collapseText(str) {
+  return (str || "").replace(/\s+/g, " ").trim();
+}
 function parseGroupListHTML(html, base) {
   const groups = [];
   const seen = /* @__PURE__ */ new Set();
-  const regex = /<a[^>]+href="\/group\/([^"/]+)"[^>]*>([\s\S]*?)<\/a>/gi;
-  let m;
-  while ((m = regex.exec(html)) !== null) {
-    const id = unescapeHtml(m[1]).trim();
-    const rawAnchor = m[0];
-    const rawName = m[2];
-    if (/\.(jpg|png|gif)$/i.test(id)) continue;
+  const { document } = parseHTML(html);
+  for (const anchor of document.querySelectorAll("a[href]")) {
+    const id = collapseText(groupIdFromHref(anchor.getAttribute("href")));
+    if (!id) continue;
+    if (/\.(jpg|png|gif|jpeg|webp)$/i.test(id)) continue;
     if (/^\d+$/.test(id)) continue;
     if (id === "new_topic" || id.startsWith("topic")) continue;
     if (id === "discover" || id === "all" || id === "category") continue;
-    const name = unescapeHtml(stripTags(rawName).replace(/\s+/g, " ")).trim();
+    const name = collapseText(anchor.textContent);
     if (!name || /^\d+$/.test(name)) continue;
-    const afterAnchor = html.slice(
-      m.index + rawAnchor.length,
-      Math.min(html.length, m.index + rawAnchor.length + 120)
-    );
     let member_count = 0;
-    const memberMatch = afterAnchor.match(/([0-9]+)\s*(?:位成员|成员|members?)/i);
+    let containerText = anchor.parentElement?.textContent || "";
+    if (!containerText) {
+      let sib = anchor.nextElementSibling;
+      while (sib && containerText.length < 200) {
+        containerText += " " + (sib.textContent || "");
+        sib = sib.nextElementSibling;
+      }
+    }
+    const memberMatch = containerText.match(/([0-9][0-9,]*)\s*(?:位成员|成员|members?)/i);
     if (memberMatch) {
       member_count = parseNumber(memberMatch[1]);
     }
     let avatar = "";
-    const imgMatch = rawAnchor.match(/<img[^>]+src="([^"]+)"[^>]*>/i) || html.slice(Math.max(0, m.index - 200), m.index).match(/<img[^>]+src="([^"]+)"[^>]*>$/i);
-    if (imgMatch) {
-      avatar = fixUrl(imgMatch[1], base);
+    const img = anchor.querySelector("img[src]") || anchor.parentElement?.querySelector("img[src]");
+    if (img) {
+      avatar = fixUrl(img.getAttribute("src"), base);
     }
     if (!seen.has(id)) {
       seen.add(id);
@@ -17731,72 +17785,104 @@ function parseGroupListHTML(html, base) {
   }
   return groups;
 }
+function firstByClassSubstring(document, substr) {
+  for (const el of document.querySelectorAll("[class]")) {
+    if ((el.getAttribute("class") || "").includes(substr)) return el;
+  }
+  return null;
+}
 function parseGroupDetailHTML(html, id, base) {
-  const nameMatch = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
-  const name = nameMatch ? unescapeHtml(stripTags(nameMatch[1])) : id;
+  const { document } = parseHTML(html);
+  const h1 = document.querySelector("h1");
+  const name = h1 ? collapseText(h1.textContent) : "";
+  const finalName = name || id;
   let description = "";
-  const descPatterns = [
-    /<div[^>]*class="[^"]*group_desc[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-    /<div[^>]*class="[^"]*text[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-    /<div[^>]*class="[^"]*intro[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-    /<p[^>]*class="[^"]*tip[^"]*"[^>]*>([\s\S]*?)<\/p>/i
-  ];
-  for (const re of descPatterns) {
-    const m = html.match(re);
-    if (m) {
-      const text = unescapeHtml(stripTags(m[1]));
-      if (text) {
-        description = text;
+  for (const pattern of ["group_desc", "text", "intro", "tip"]) {
+    const el = firstByClassSubstring(document, pattern);
+    const text = el ? collapseText(el.textContent) : "";
+    if (text) {
+      description = el.textContent.trim();
+      break;
+    }
+  }
+  let member_count = 0;
+  const bodyText = document.body?.textContent || "";
+  const memberMatch = bodyText.match(/([0-9,]+)\s*(?:位成员|成员|members?)/i);
+  if (memberMatch) {
+    member_count = parseNumber(memberMatch[1]);
+  } else {
+    const memberEl = firstByClassSubstring(document, "group_member") || firstByClassSubstring(document, "member") || firstByClassSubstring(document, "sub");
+    if (memberEl) {
+      member_count = parseNumber(memberEl.textContent);
+    }
+  }
+  if (!member_count) {
+    for (const strong of document.querySelectorAll("strong")) {
+      const strongText = collapseText(strong.textContent);
+      if (!/^\d[\d,]*$/.test(strongText)) continue;
+      const parentText = strong.parentElement?.textContent || "";
+      if (/(?:位成员|成员|members?)/i.test(parentText)) {
+        member_count = parseNumber(strongText);
         break;
       }
     }
   }
-  let member_count = 0;
-  const memberMatch = html.match(/([0-9,]+)\s*(?:位成员|成员|members?)/i) || html.match(
-    /<span[^>]*class="[^"]*(?:group_member|member|sub)[^"]*"[^>]*>([\s\S]*?)<\/span>/i
-  ) || html.match(/<strong>([0-9,]+)<\/strong>\s*(?:位成员|成员|members?)/i);
-  if (memberMatch) {
-    member_count = parseNumber(memberMatch[1]);
-  }
   let avatar = "";
-  const h1Idx = html.search(/<h1\b/i);
-  if (h1Idx !== -1) {
-    const headContext = html.slice(Math.max(0, h1Idx - 500), h1Idx + 500);
-    const avatarMatch = headContext.match(/<img[^>]+src="([^"]+)"[^>]*>/i);
-    avatar = avatarMatch ? fixUrl(avatarMatch[1], base) : "";
+  let node = h1?.parentElement || null;
+  for (let i = 0; i < 4 && node; i++) {
+    const img = node.querySelector("img[src]");
+    if (img) {
+      avatar = fixUrl(img.getAttribute("src"), base);
+      break;
+    }
+    node = node.parentElement;
   }
   const topics = [];
   const seenTopics = /* @__PURE__ */ new Set();
-  const tableMatch = html.match(/<table[^>]*class="[^"]*topic_list[^"]*"[^>]*>([\s\S]*?)<\/table>/i);
-  const topicContext = tableMatch ? tableMatch[1] : "";
-  if (topicContext) {
-    const topicRegex = /<a[^>]+href="\/group\/topic\/(\d+)"[^>]*>([\s\S]*?)<\/a>/gi;
-    let tm;
-    while ((tm = topicRegex.exec(topicContext)) !== null) {
-      const topicId = tm[1];
+  let table = null;
+  for (const t of document.querySelectorAll("table")) {
+    if ((t.getAttribute("class") || "").includes("topic_list")) {
+      table = t;
+      break;
+    }
+  }
+  if (!table) {
+    for (const t of document.querySelectorAll("table")) {
+      if (t.querySelector('a[href*="/group/topic/"]')) {
+        table = t;
+        break;
+      }
+    }
+  }
+  if (table) {
+    for (const anchor of table.querySelectorAll("a[href]")) {
+      const topicMatch = (anchor.getAttribute("href") || "").match(/\/group\/topic\/(\d+)/);
+      if (!topicMatch) continue;
+      const topicId = topicMatch[1];
       if (seenTopics.has(topicId)) continue;
       seenTopics.add(topicId);
-      const title = unescapeHtml(stripTags(tm[2]).replace(/\s+/g, " "));
+      const title = collapseText(anchor.textContent);
       if (!title) continue;
-      const idx = tm.index;
-      const context = topicContext.slice(
-        Math.max(0, idx - 400),
-        Math.min(topicContext.length, idx + 600)
-      );
+      const row = anchor.closest("tr") || anchor.parentElement;
+      const rowText = row?.textContent || "";
       let author = "";
-      const authorMatch = context.match(/<a[^>]+href="\/user\/[^"]+"[^>]*>([\s\S]*?)<\/a>/i);
-      if (authorMatch) {
-        author = unescapeHtml(stripTags(authorMatch[1]));
+      const userLink = row?.querySelector('a[href*="/user/"]');
+      if (userLink) {
+        author = collapseText(userLink.textContent);
       }
       let reply_count = 0;
-      const replyMatch = context.match(/<td[^>]*class="[^"]*posts[^"]*"[^>]*>([\s\S]*?)<\/td>/i) || context.match(/\((\d+)\s*(?:回复|reply|条)/i) || context.match(/(\d+)\s*(?:回复|reply)/i);
-      if (replyMatch) {
-        reply_count = parseNumber(replyMatch[1]);
+      const postsEl = row?.querySelector('td.posts, [class*="posts"]');
+      if (postsEl) {
+        reply_count = parseNumber(postsEl.textContent);
+      }
+      if (!reply_count) {
+        const replyMatch = rowText.match(/\((\d+)\s*(?:回复|reply|条)/i) || rowText.match(/(\d+)\s*(?:回复|reply)/i);
+        if (replyMatch) reply_count = parseNumber(replyMatch[1]);
       }
       let last_reply_time = "";
-      const timeMatch = context.match(/<small[^>]*class="[^"]*time[^"]*"[^>]*>([\s\S]*?)<\/small>/i) || context.match(/<span[^>]*class="[^"]*date[^"]*"[^>]*>([\s\S]*?)<\/span>/i) || context.match(/<span[^>]*class="[^"]*time[^"]*"[^>]*>([\s\S]*?)<\/span>/i) || context.match(/<small[^>]*>([\s\S]*?)<\/small>/i);
-      if (timeMatch) {
-        const timeText = unescapeHtml(stripTags(timeMatch[1]));
+      const timeEl = row?.querySelector("small.time, span.date, span.time, small");
+      if (timeEl) {
+        const timeText = collapseText(timeEl.textContent);
         if (!/^\d+\s*(?:位成员|成员|members?)$/.test(timeText)) {
           last_reply_time = timeText;
         }
@@ -17805,7 +17891,7 @@ function parseGroupDetailHTML(html, id, base) {
       if (topics.length >= 20) break;
     }
   }
-  return { id, name, description, member_count, avatar, topics, url: `${base}/group/${id}` };
+  return { id, name: finalName, description, member_count, avatar, topics, url: `${base}/group/${id}` };
 }
 app9.get("/", async (c) => {
   try {

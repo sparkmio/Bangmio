@@ -1,11 +1,20 @@
 import { Hono } from 'hono'
 import { getClient } from '../services/bangumi.js'
 import { fetchHTML, stripTags, unescapeHtml, parseNumber, fixUrl } from '../utils/http.js'
+import { getOAuthCredentials } from '../utils/oauthConfig.js'
 
 const app = new Hono()
 
-const DEFAULT_APP_ID = 'bgm61416a088eff71580'
-const DEFAULT_APP_SECRET = '6b8055c0159fcc5e998059536813026f'
+/** OAuth App Secret 未配置时的统一错误响应（Bangumi 直登走 OAuth 需要它） */
+function oauthNotConfigured(c) {
+  return c.json(
+    {
+      error:
+        'OAuth 服务未配置（缺少 BGM_APP_SECRET 环境变量），请使用 Bangumi 直登（粘贴 Access Token）'
+    },
+    503
+  )
+}
 
 function isChina(c) {
   return (c.env?.CF_IP_COUNTRY || '') === 'CN'
@@ -55,7 +64,7 @@ app.post('/auth', async c => {
 })
 
 app.get('/oauth-url', c => {
-  const appId = c.env?.BGM_APP_ID || DEFAULT_APP_ID
+  const { appId } = getOAuthCredentials(c.env, '/user/oauth-url')
   const url = `${oauthBase(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}`
   return c.json({ data: url })
 })
@@ -64,8 +73,8 @@ app.post('/oauth-callback', async c => {
   try {
     const { code } = await c.req.json()
     if (!code) return c.json({ error: '缺少授权码' }, 400)
-    const appId = c.env?.BGM_APP_ID || DEFAULT_APP_ID
-    const appSecret = c.env?.BGM_APP_SECRET || DEFAULT_APP_SECRET
+    const { appId, appSecret } = getOAuthCredentials(c.env, '/user/oauth-callback')
+    if (!appSecret) return oauthNotConfigured(c)
     const params = new URLSearchParams({
       grant_type: 'authorization_code',
       client_id: appId,
@@ -94,8 +103,8 @@ app.post('/refresh-token', async c => {
   try {
     const { refreshToken } = await c.req.json()
     if (!refreshToken) return c.json({ error: '缺少 refresh token' }, 400)
-    const appId = c.env?.BGM_APP_ID || DEFAULT_APP_ID
-    const appSecret = c.env?.BGM_APP_SECRET || DEFAULT_APP_SECRET
+    const { appId, appSecret } = getOAuthCredentials(c.env, '/user/refresh-token')
+    if (!appSecret) return oauthNotConfigured(c)
     const params = new URLSearchParams({
       grant_type: 'refresh_token',
       client_id: appId,
