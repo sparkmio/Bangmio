@@ -61,8 +61,8 @@ const props = defineProps({
     default: 'srcdoc',
     validator: value => ['srcdoc', 'src'].includes(value)
   },
-  /** 加载超时时间（毫秒），首次加载 15s，重试时额外增加 5s */
-  timeoutMs: { type: Number, default: 15000 }
+  /** 加载超时时间（毫秒），首次加载 20s，重试时额外增加 5s */
+  timeoutMs: { type: Number, default: 20000 }
 })
 
 const emit = defineEmits(['fallback'])

@@ -16879,6 +16879,15 @@ function stripTags2(s) {
 function collapseSpace(s) {
   return (s || "").replace(/\s+/g, " ").trim();
 }
+async function fetchWithTimeout(url, headers2 = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6e3);
+  try {
+    return await fetch(url, { headers: headers2, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 function parseSearchSuggest(json) {
   const cards = json?.cards || [];
   return cards.filter((c) => c?.url).map((c) => {
@@ -16895,15 +16904,13 @@ function parseSearchSuggest(json) {
 }
 async function searchDouban(name) {
   try {
-    const res2 = await fetch(
+    const res2 = await fetchWithTimeout(
       `${SEARCH_SUGGEST_API}/j/search_suggest?q=${encodeURIComponent(name)}`,
       {
-        headers: {
-          "User-Agent": UA,
-          Referer: "https://www.douban.com/",
-          Accept: "application/json, text/plain, */*",
-          "Accept-Language": "zh-CN,zh;q=0.9"
-        }
+        "User-Agent": UA,
+        Referer: "https://www.douban.com/",
+        Accept: "application/json, text/plain, */*",
+        "Accept-Language": "zh-CN,zh;q=0.9"
       }
     );
     if (res2.ok) {
@@ -16914,16 +16921,15 @@ async function searchDouban(name) {
   } catch {
   }
   const url = `${DOUBAN_API}/j/subject_suggest?q=${encodeURIComponent(name)}`;
-  const res = await fetch(url, {
-    headers: { "User-Agent": UA, Referer: "https://movie.douban.com/" }
-  });
+  const res = await fetchWithTimeout(url, { "User-Agent": UA, Referer: "https://movie.douban.com/" });
   const data = await res.json();
   return data || [];
 }
 async function getDoubanAbstract(subjectId) {
   const url = `${DOUBAN_API}/j/subject_abstract?subject_id=${subjectId}`;
-  const res = await fetch(url, {
-    headers: { "User-Agent": UA, Referer: `https://movie.douban.com/subject/${subjectId}/` }
+  const res = await fetchWithTimeout(url, {
+    "User-Agent": UA,
+    Referer: `https://movie.douban.com/subject/${subjectId}/`
   });
   const data = await res.json();
   return data?.subject || data || null;
@@ -17071,6 +17077,37 @@ async function getDoubanSummary(id) {
   } catch {
   }
   return result;
+}
+
+// server/src/utils/edgeCache.js
+var CACHE_NAMESPACE = "https://bangmio-cache.internal";
+function getEdgeCache() {
+  return typeof caches !== "undefined" ? caches.default : null;
+}
+async function edgeCacheGet(key2) {
+  const cache7 = getEdgeCache();
+  if (!cache7) return null;
+  try {
+    const res = await cache7.match(`${CACHE_NAMESPACE}/${key2}`);
+    if (!res) return null;
+    const text = await res.text();
+    return text || null;
+  } catch {
+    return null;
+  }
+}
+async function edgeCachePut(key2, html, maxAge = 600) {
+  const cache7 = getEdgeCache();
+  if (!cache7 || !html) return;
+  try {
+    await cache7.put(
+      `${CACHE_NAMESPACE}/${key2}`,
+      new Response(html, {
+        headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": `max-age=${maxAge}` }
+      })
+    );
+  } catch {
+  }
 }
 
 // server/src/routes/douban.js
@@ -17334,6 +17371,13 @@ async function buildDoubanRichFallback(id) {
   </div>
 </div>`;
 }
+async function getDoubanFallbackCached(id) {
+  const cached = await edgeCacheGet(`douban/page-fallback/${id}`);
+  if (cached) return cached;
+  const html = await buildDoubanRichFallback(id);
+  await edgeCachePut(`douban/page-fallback/${id}`, html, 600);
+  return html;
+}
 app6.get("/page/:id", async (c) => {
   const id = c.req.param("id");
   if (!id) return c.json({ data: null, error: "\u7F3A\u5C11ID", code: 400 }, 400);
@@ -17342,10 +17386,17 @@ app6.get("/page/:id", async (c) => {
   if (cached) {
     return c.html(cached, 200, { "Content-Type": "text/html; charset=utf-8" });
   }
+  const respondHtml = (html) => c.html(html, 200, { "Content-Type": "text/html; charset=utf-8" });
+  const edgeClean = await edgeCacheGet(`douban/page/${id}`);
+  if (edgeClean) {
+    pageCache.set(cacheKey, edgeClean);
+    return respondHtml(edgeClean);
+  }
   const url = `https://movie.douban.com/subject/${id}/`;
   try {
     const html = await fetchHTML(url, {
-      timeout: 1e4,
+      // 条目页已知被反爬拦截，缩短超时快速进入降级路径，避免 iframe 端 15s 超时
+      timeout: 6e3,
       headers: {
         Referer: "https://movie.douban.com/",
         Cookie: `bid=${makeDoubanBid()}; ll="108288"`
@@ -17353,19 +17404,20 @@ app6.get("/page/:id", async (c) => {
     });
     const isSubjectPage = /#info|interest_sectl|v:summary|rating_per|allstar/i.test(html || "");
     if (!html || html.length < 1e3 || !isSubjectPage) {
-      const fallback = await buildDoubanRichFallback(id);
-      return c.html(fallback, 200, { "Content-Type": "text/html; charset=utf-8" });
+      const fallback = await getDoubanFallbackCached(id);
+      return respondHtml(fallback);
     }
     const fragment = cleanDoubanPage(html);
     if (!fragment || fragment.trim().length < 100) {
-      const fallback = await buildDoubanRichFallback(id);
-      return c.html(fallback, 200, { "Content-Type": "text/html; charset=utf-8" });
+      const fallback = await getDoubanFallbackCached(id);
+      return respondHtml(fallback);
     }
     pageCache.set(cacheKey, fragment);
-    return c.html(fragment, 200, { "Content-Type": "text/html; charset=utf-8" });
+    await edgeCachePut(`douban/page/${id}`, fragment, 600);
+    return respondHtml(fragment);
   } catch {
-    const fallback = await buildDoubanRichFallback(id);
-    return c.html(fallback, 200, { "Content-Type": "text/html; charset=utf-8" });
+    const fallback = await getDoubanFallbackCached(id);
+    return respondHtml(fallback);
   }
 });
 var douban_default = app6;
@@ -17469,10 +17521,7 @@ async function getMoegirlSummary(name, base = DEFAULT_BASE) {
   const result = { title: name, extract: "", url: `${base}/${encoded}` };
   const candidates = [
     `${DEFAULT_BASE}/${encoded}?useskin=vector`,
-    `${DEFAULT_BASE}/${encoded}`,
-    `https://mzh.moegirl.org.cn/${encoded}`,
-    `https://zh.moegirl.uk/${encoded}?useskin=vector`,
-    `https://zh.moegirl.uk/${encoded}`
+    `${DEFAULT_BASE}/${encoded}`
   ];
   let html = "";
   for (const url of candidates) {
@@ -17521,7 +17570,6 @@ async function getMoegirlSummary(name, base = DEFAULT_BASE) {
 // server/src/routes/moegirl.js
 var app8 = new Hono2();
 var MOEGIRL_CN = "https://zh.moegirl.org.cn/api.php";
-var MOEGIRL_INTL = "https://zh.moegirl.uk/api.php";
 var cache4 = createCache(CACHE_TTL_MOEGIRL);
 var MOEGIRL_CN_BASE = "https://zh.moegirl.org.cn";
 var MOEGIRL_BASE_CSS = `
@@ -17603,13 +17651,11 @@ function cleanMoegirlPage(html, base = MOEGIRL_CN_BASE) {
   const fragment = parserOutput ? parserOutput.innerHTML : document.body ? document.body.innerHTML : "";
   return wrapDocument2(fragment);
 }
-function getMoegirlApi(c) {
-  const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-  return isChina7 ? MOEGIRL_CN : MOEGIRL_INTL;
+function getMoegirlApi() {
+  return MOEGIRL_CN;
 }
-function getMoegirlBase(c) {
-  const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-  return isChina7 ? "https://zh.moegirl.org.cn" : "https://zh.moegirl.uk";
+function getMoegirlBase() {
+  return MOEGIRL_CN_BASE;
 }
 async function fetchMoegirlJSON(apiBase, params) {
   const url = `${apiBase}?${params}`;
@@ -17682,15 +17728,10 @@ app8.get("/search", async (c) => {
     const cacheKey = `moesearch_${q}`;
     const cached = cache4.get(cacheKey);
     if (cached) return c.json({ data: cached });
-    const apiBase = getMoegirlApi(c);
+    const apiBase = getMoegirlApi();
     const params = `action=opensearch&search=${encodeURIComponent(q)}&limit=5&format=json`;
-    let json = await fetchMoegirlJSON(apiBase, params);
+    const json = await fetchMoegirlJSON(apiBase, params);
     let results = parseSearchResults(json);
-    if (!results.length) {
-      const fallback = apiBase === MOEGIRL_CN ? MOEGIRL_INTL : MOEGIRL_CN;
-      json = await fetchMoegirlJSON(fallback, params);
-      results = parseSearchResults(json);
-    }
     let page = null;
     if (results.length) {
       const extract = await fetchPageExtract(apiBase, results[0].title);
@@ -17698,7 +17739,7 @@ app8.get("/search", async (c) => {
         page = {
           title: extract.title,
           html: extract.html,
-          url: `${getMoegirlBase(c)}/${encodeURIComponent(results[0].title)}`
+          url: `${getMoegirlBase()}/${encodeURIComponent(results[0].title)}`
         };
       }
     }
@@ -17724,14 +17765,12 @@ function isMoegirlBlockPage(html) {
 function buildMoegirlFallbackHTML(name) {
   const encoded = encodeURIComponent(name);
   const url = `https://zh.moegirl.org.cn/${encoded}`;
-  const ukUrl = `https://zh.moegirl.uk/${encoded}`;
   return `<div style="text-align:center;padding:2.5rem 1rem;font-family:system-ui,-apple-system,'Segoe UI',sans-serif">
   <div style="display:inline-block;padding:1.5rem 2rem;background:#fff5f6;border:1px solid #ffd6dd;border-radius:12px;max-width:420px">
     <p style="margin:0 0 0.5rem;font-size:1rem;color:#666">\u840C\u5A18\u767E\u79D1\u9875\u9762\u6682\u65E0\u6CD5\u5D4C\u5165</p>
     <p style="margin:0 0 1rem;font-size:0.85rem;color:#999">\u840C\u5A18\u767E\u79D1\u5BF9\u7B2C\u4E09\u65B9\u670D\u52A1\u5668\u6709\u8BBF\u95EE\u9650\u5236\uFF0C\u8BF7\u76F4\u63A5\u8BBF\u95EE\u67E5\u770B\u5B8C\u6574\u5185\u5BB9</p>
     <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap">
-      <a href="${url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:0.5rem 1.25rem;background:#ff6b81;color:#fff;text-decoration:none;border-radius:999px;font-size:0.9rem;font-weight:500">\u840C\u5A18\u767E\u79D1\uFF08\u56FD\u5185\uFF09\u2192</a>
-      <a href="${ukUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:0.5rem 1.25rem;background:#fff;color:#ff6b81;border:1px solid #ff6b81;text-decoration:none;border-radius:999px;font-size:0.9rem;font-weight:500">\u840C\u5A18\u767E\u79D1\uFF08\u6D77\u5916\uFF09\u2192</a>
+      <a href="${url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:0.5rem 1.25rem;background:#ff6b81;color:#fff;text-decoration:none;border-radius:999px;font-size:0.9rem;font-weight:500">\u524D\u5F80\u840C\u5A18\u767E\u79D1 \u2192</a>
     </div>
   </div>
 </div>`;
@@ -17746,7 +17785,7 @@ app8.get("/:name/summary", async (c) => {
       name = rawName;
     }
     if (!name) return c.json({ error: "\u7F3A\u5C11\u9875\u9762\u540D" }, 400);
-    const base = getMoegirlBase(c);
+    const base = getMoegirlBase();
     const summary = await getMoegirlSummary(name, base);
     return c.json({ data: summary });
   } catch {
@@ -17767,18 +17806,21 @@ app8.get("/page/:name", async (c) => {
   if (cached) {
     return c.html(cached, 200, { "Content-Type": "text/html; charset=utf-8" });
   }
+  const respondHtml = (html) => c.html(html, 200, { "Content-Type": "text/html; charset=utf-8" });
+  const edgeCached = await edgeCacheGet(`moegirl/page/${name}`);
+  if (edgeCached) {
+    cache4.set(cacheKey, edgeCached);
+    return respondHtml(edgeCached);
+  }
   const encoded = encodeURIComponent(name);
   const candidates = [
     `https://zh.moegirl.org.cn/${encoded}?useskin=vector`,
-    `https://zh.moegirl.org.cn/${encoded}`,
-    `https://mzh.moegirl.org.cn/${encoded}`,
-    `https://zh.moegirl.uk/${encoded}?useskin=vector`,
-    `https://zh.moegirl.uk/${encoded}`
+    `https://zh.moegirl.org.cn/${encoded}`
   ];
   try {
     const { html, url } = await fetchHTMLMulti(candidates, {
-      timeout: 6e3,
-      overallTimeout: 12e3,
+      timeout: 8e3,
+      overallTimeout: 15e3,
       retries: 1,
       headers: {
         Referer: "https://zh.moegirl.org.cn/",
@@ -17790,13 +17832,14 @@ app8.get("/page/:name", async (c) => {
       const fragment = cleanMoegirlPage(html, base);
       if (fragment && fragment.trim().length >= 100) {
         cache4.set(cacheKey, fragment);
-        return c.html(fragment, 200, { "Content-Type": "text/html; charset=utf-8" });
+        await edgeCachePut(`moegirl/page/${name}`, fragment, 3600);
+        return respondHtml(fragment);
       }
     }
   } catch {
   }
   const fallback = buildMoegirlFallbackHTML(name);
-  return c.html(fallback, 200, { "Content-Type": "text/html; charset=utf-8" });
+  return respondHtml(fallback);
 });
 var moegirl_default = app8;
 

@@ -10,6 +10,7 @@ import {
 } from '../services/douban.js'
 import { createCache } from '../utils/cache.js'
 import { fetchHTML, fixUrl } from '../utils/http.js'
+import { edgeCacheGet, edgeCachePut } from '../utils/edgeCache.js'
 import { CACHE_TTL_DOUBAN } from '../config.js'
 
 const app = new Hono()
@@ -354,6 +355,20 @@ async function buildDoubanRichFallback(id) {
 }
 
 /**
+ * 获取豆瓣富内容降级卡片（带边缘缓存，10 分钟 TTL）。
+ * 降级路径涉及 subject_abstract 上游请求，缓存后重复 iframe 加载秒开。
+ * @param {string} id - 豆瓣条目 ID。
+ * @returns {Promise<string>} HTML 片段。
+ */
+async function getDoubanFallbackCached(id) {
+  const cached = await edgeCacheGet(`douban/page-fallback/${id}`)
+  if (cached) return cached
+  const html = await buildDoubanRichFallback(id)
+  await edgeCachePut(`douban/page-fallback/${id}`, html, 600)
+  return html
+}
+
+/**
  * 豆瓣条目页面代理。
  * 抓取豆瓣条目页面，移除导航/侧栏/推荐/广告等噪声后返回清洗的 HTML 片段。
  * 保留评分区（#interest_sectl）、短评区（.comment-item）、长评区（.review-item）等核心内容。
@@ -374,10 +389,20 @@ app.get('/page/:id', async c => {
     return c.html(cached, 200, { 'Content-Type': 'text/html; charset=utf-8' })
   }
 
+  const respondHtml = html => c.html(html, 200, { 'Content-Type': 'text/html; charset=utf-8' })
+
+  // 边缘缓存（跨实例共享）：清洗页与富卡片都缓存，重复 iframe 加载秒开
+  const edgeClean = await edgeCacheGet(`douban/page/${id}`)
+  if (edgeClean) {
+    pageCache.set(cacheKey, edgeClean)
+    return respondHtml(edgeClean)
+  }
+
   const url = `https://movie.douban.com/subject/${id}/`
   try {
     const html = await fetchHTML(url, {
-      timeout: 10000,
+      // 条目页已知被反爬拦截，缩短超时快速进入降级路径，避免 iframe 端 15s 超时
+      timeout: 6000,
       headers: {
         Referer: 'https://movie.douban.com/',
         Cookie: `bid=${makeDoubanBid()}; ll="108288"`
@@ -388,19 +413,20 @@ app.get('/page/:id', async c => {
     // 不用 /login/ 等关键词负向匹配——正常页导航里也含 login 链接，会误伤。
     const isSubjectPage = /#info|interest_sectl|v:summary|rating_per|allstar/i.test(html || '')
     if (!html || html.length < 1000 || !isSubjectPage) {
-      const fallback = await buildDoubanRichFallback(id)
-      return c.html(fallback, 200, { 'Content-Type': 'text/html; charset=utf-8' })
+      const fallback = await getDoubanFallbackCached(id)
+      return respondHtml(fallback)
     }
     const fragment = cleanDoubanPage(html)
     if (!fragment || fragment.trim().length < 100) {
-      const fallback = await buildDoubanRichFallback(id)
-      return c.html(fallback, 200, { 'Content-Type': 'text/html; charset=utf-8' })
+      const fallback = await getDoubanFallbackCached(id)
+      return respondHtml(fallback)
     }
     pageCache.set(cacheKey, fragment)
-    return c.html(fragment, 200, { 'Content-Type': 'text/html; charset=utf-8' })
+    await edgeCachePut(`douban/page/${id}`, fragment, 600)
+    return respondHtml(fragment)
   } catch {
-    const fallback = await buildDoubanRichFallback(id)
-    return c.html(fallback, 200, { 'Content-Type': 'text/html; charset=utf-8' })
+    const fallback = await getDoubanFallbackCached(id)
+    return respondHtml(fallback)
   }
 })
 

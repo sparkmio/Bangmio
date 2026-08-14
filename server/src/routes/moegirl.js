@@ -2,12 +2,13 @@ import { Hono } from 'hono'
 import { parseHTML } from 'linkedom'
 import { createCache } from '../utils/cache.js'
 import { fetchHTML, fetchHTMLMulti, fixUrl } from '../utils/http.js'
+import { edgeCacheGet, edgeCachePut } from '../utils/edgeCache.js'
 import { getMoegirlSummary } from '../services/moegirl.js'
 import { CACHE_TTL_MOEGIRL } from '../config.js'
 
 const app = new Hono()
+// 源统一为 zh.moegirl.org.cn（uk/mzh 镜像不稳定，已按用户要求移除）
 const MOEGIRL_CN = 'https://zh.moegirl.org.cn/api.php'
-const MOEGIRL_INTL = 'https://zh.moegirl.uk/api.php'
 
 const cache = createCache(CACHE_TTL_MOEGIRL)
 
@@ -132,14 +133,12 @@ export function cleanMoegirlPage(html, base = MOEGIRL_CN_BASE) {
   return wrapDocument(fragment)
 }
 
-function getMoegirlApi(c) {
-  const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
-  return isChina ? MOEGIRL_CN : MOEGIRL_INTL
+function getMoegirlApi() {
+  return MOEGIRL_CN
 }
 
-function getMoegirlBase(c) {
-  const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
-  return isChina ? 'https://zh.moegirl.org.cn' : 'https://zh.moegirl.uk'
+function getMoegirlBase() {
+  return MOEGIRL_CN_BASE
 }
 
 async function fetchMoegirlJSON(apiBase, params) {
@@ -182,7 +181,7 @@ function parseSearchResults(json) {
 }
 
 async function fetchPageExtract(apiBase, title) {
-  // apiBase 是 https://zh.moegirl.org.cn/api.php 或 https://zh.moegirl.uk/api.php
+  // apiBase 固定为 https://zh.moegirl.org.cn/api.php
   const base = apiBase.replace('/api.php', '')
   const pageUrl = `${base}/${encodeURIComponent(title)}`
 
@@ -230,16 +229,10 @@ app.get('/search', async c => {
     const cached = cache.get(cacheKey)
     if (cached) return c.json({ data: cached })
 
-    const apiBase = getMoegirlApi(c)
+    const apiBase = getMoegirlApi()
     const params = `action=opensearch&search=${encodeURIComponent(q)}&limit=5&format=json`
-    let json = await fetchMoegirlJSON(apiBase, params)
+    const json = await fetchMoegirlJSON(apiBase, params)
     let results = parseSearchResults(json)
-
-    if (!results.length) {
-      const fallback = apiBase === MOEGIRL_CN ? MOEGIRL_INTL : MOEGIRL_CN
-      json = await fetchMoegirlJSON(fallback, params)
-      results = parseSearchResults(json)
-    }
 
     let page = null
     if (results.length) {
@@ -248,7 +241,7 @@ app.get('/search', async c => {
         page = {
           title: extract.title,
           html: extract.html,
-          url: `${getMoegirlBase(c)}/${encodeURIComponent(results[0].title)}`
+          url: `${getMoegirlBase()}/${encodeURIComponent(results[0].title)}`
         }
       }
     }
@@ -289,14 +282,12 @@ function isMoegirlBlockPage(html) {
 function buildMoegirlFallbackHTML(name) {
   const encoded = encodeURIComponent(name)
   const url = `https://zh.moegirl.org.cn/${encoded}`
-  const ukUrl = `https://zh.moegirl.uk/${encoded}`
   return `<div style="text-align:center;padding:2.5rem 1rem;font-family:system-ui,-apple-system,'Segoe UI',sans-serif">
   <div style="display:inline-block;padding:1.5rem 2rem;background:#fff5f6;border:1px solid #ffd6dd;border-radius:12px;max-width:420px">
     <p style="margin:0 0 0.5rem;font-size:1rem;color:#666">萌娘百科页面暂无法嵌入</p>
     <p style="margin:0 0 1rem;font-size:0.85rem;color:#999">萌娘百科对第三方服务器有访问限制，请直接访问查看完整内容</p>
     <div style="display:flex;gap:0.5rem;justify-content:center;flex-wrap:wrap">
-      <a href="${url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:0.5rem 1.25rem;background:#ff6b81;color:#fff;text-decoration:none;border-radius:999px;font-size:0.9rem;font-weight:500">萌娘百科（国内）→</a>
-      <a href="${ukUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:0.5rem 1.25rem;background:#fff;color:#ff6b81;border:1px solid #ff6b81;text-decoration:none;border-radius:999px;font-size:0.9rem;font-weight:500">萌娘百科（海外）→</a>
+      <a href="${url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:0.5rem 1.25rem;background:#ff6b81;color:#fff;text-decoration:none;border-radius:999px;font-size:0.9rem;font-weight:500">前往萌娘百科 →</a>
     </div>
   </div>
 </div>`
@@ -320,7 +311,7 @@ app.get('/:name/summary', async c => {
       name = rawName
     }
     if (!name) return c.json({ error: '缺少页面名' }, 400)
-    const base = getMoegirlBase(c)
+    const base = getMoegirlBase()
     const summary = await getMoegirlSummary(name, base)
     return c.json({ data: summary })
   } catch {
@@ -332,9 +323,9 @@ app.get('/:name/summary', async c => {
  * 萌娘百科页面代理。
  * 抓取指定页面名的萌娘百科页面，仅保留 .mw-parser-output 内容（不存在则保留整个 body），
  * 移除导航/页脚/侧栏/编辑按钮/脚本/样式/广告后返回清洗的 HTML 片段。
- * 使用 30 分钟内存缓存。
- * 优先抓取国内源（zh.moegirl.org.cn），失败或检测到反爬页时尝试海外源（zh.moegirl.uk），
- * 全部失败时返回 200 + 降级 HTML（直达链接），而非 502，保证前端 iframe 正常展示。
+ * 源统一为 zh.moegirl.org.cn（vector 皮肤优先，默认皮肤回退）；
+ * 使用 30 分钟内存缓存 + 1 小时 Cache API 边缘缓存（跨实例共享，重复加载秒开）。
+ * 抓取失败时返回 200 + 降级 HTML（直达链接），而非 502，保证前端 iframe 正常展示。
  *
  * @route GET /page/:name
  * @param {string} name - 萌娘百科页面名（URL 编码，会自动解码）。
@@ -356,19 +347,25 @@ app.get('/page/:name', async c => {
     return c.html(cached, 200, { 'Content-Type': 'text/html; charset=utf-8' })
   }
 
+  const respondHtml = html => c.html(html, 200, { 'Content-Type': 'text/html; charset=utf-8' })
+
+  // Cache API 边缘缓存：跨实例共享，命中时无需再抓上游
+  const edgeCached = await edgeCacheGet(`moegirl/page/${name}`)
+  if (edgeCached) {
+    cache.set(cacheKey, edgeCached)
+    return respondHtml(edgeCached)
+  }
+
   const encoded = encodeURIComponent(name)
   const candidates = [
     `https://zh.moegirl.org.cn/${encoded}?useskin=vector`,
-    `https://zh.moegirl.org.cn/${encoded}`,
-    `https://mzh.moegirl.org.cn/${encoded}`,
-    `https://zh.moegirl.uk/${encoded}?useskin=vector`,
-    `https://zh.moegirl.uk/${encoded}`
+    `https://zh.moegirl.org.cn/${encoded}`
   ]
 
   try {
     const { html, url } = await fetchHTMLMulti(candidates, {
-      timeout: 6000,
-      overallTimeout: 12000,
+      timeout: 8000,
+      overallTimeout: 15000,
       retries: 1,
       headers: {
         Referer: 'https://zh.moegirl.org.cn/',
@@ -380,7 +377,8 @@ app.get('/page/:name', async c => {
       const fragment = cleanMoegirlPage(html, base)
       if (fragment && fragment.trim().length >= 100) {
         cache.set(cacheKey, fragment)
-        return c.html(fragment, 200, { 'Content-Type': 'text/html; charset=utf-8' })
+        await edgeCachePut(`moegirl/page/${name}`, fragment, 3600)
+        return respondHtml(fragment)
       }
     }
   } catch {
@@ -389,7 +387,7 @@ app.get('/page/:name', async c => {
 
   // 所有源均失败，返回降级 HTML
   const fallback = buildMoegirlFallbackHTML(name)
-  return c.html(fallback, 200, { 'Content-Type': 'text/html; charset=utf-8' })
+  return respondHtml(fallback)
 })
 
 export default app

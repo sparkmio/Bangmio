@@ -15,6 +15,23 @@ function collapseSpace(s) {
 }
 
 /**
+ * 带超时的 fetch（6s）。豆瓣 JSON 接口偶发连接挂起，
+ * 无超时会导致路由整体超过前端 iframe 的 15s 预算。
+ * @param {string} url
+ * @param {Record<string, string>} headers
+ * @returns {Promise<Response>}
+ */
+async function fetchWithTimeout(url, headers = {}) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 6000)
+  try {
+    return await fetch(url, { headers, signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
  * 解析 www.douban.com/j/search_suggest 的返回结构。
  * cards[].card_subtitle 形如 "9.0分 / 2022 / 日本 / 动画 音乐 / 斋藤圭一郎 / 青山吉能 铃代纱弓"。
  * @param {object} json - search_suggest 原始 JSON。
@@ -48,15 +65,13 @@ function parseSearchSuggest(json) {
 export async function searchDouban(name) {
   // 优先 search_suggest
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${SEARCH_SUGGEST_API}/j/search_suggest?q=${encodeURIComponent(name)}`,
       {
-        headers: {
-          'User-Agent': UA,
-          Referer: 'https://www.douban.com/',
-          Accept: 'application/json, text/plain, */*',
-          'Accept-Language': 'zh-CN,zh;q=0.9'
-        }
+        'User-Agent': UA,
+        Referer: 'https://www.douban.com/',
+        Accept: 'application/json, text/plain, */*',
+        'Accept-Language': 'zh-CN,zh;q=0.9'
       }
     )
     if (res.ok) {
@@ -69,8 +84,9 @@ export async function searchDouban(name) {
   }
 
   const url = `${DOUBAN_API}/j/subject_suggest?q=${encodeURIComponent(name)}`
-  const res = await fetch(url, {
-    headers: { 'User-Agent': UA, Referer: 'https://movie.douban.com/' }
+  const res = await fetchWithTimeout(url, {
+    'User-Agent': UA,
+    Referer: 'https://movie.douban.com/'
   })
   const data = await res.json()
   return data || []
@@ -83,8 +99,9 @@ export async function searchDouban(name) {
  */
 export async function getDoubanAbstract(subjectId) {
   const url = `${DOUBAN_API}/j/subject_abstract?subject_id=${subjectId}`
-  const res = await fetch(url, {
-    headers: { 'User-Agent': UA, Referer: `https://movie.douban.com/subject/${subjectId}/` }
+  const res = await fetchWithTimeout(url, {
+    'User-Agent': UA,
+    Referer: `https://movie.douban.com/subject/${subjectId}/`
   })
   const data = await res.json()
   return data?.subject || data || null
