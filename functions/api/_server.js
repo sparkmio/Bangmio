@@ -1566,7 +1566,7 @@ var require_canvas = __commonJS({
   }
 });
 
-// server/node_modules/hono/dist/compose.js
+// node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
     let index = -1;
@@ -1610,10 +1610,10 @@ var compose = (middleware, onError, onNotFound) => {
   };
 };
 
-// server/node_modules/hono/dist/request/constants.js
+// node_modules/hono/dist/request/constants.js
 var GET_MATCH_RESULT = /* @__PURE__ */ Symbol();
 
-// server/node_modules/hono/dist/utils/buffer.js
+// node_modules/hono/dist/utils/buffer.js
 var bufferToFormData = (arrayBuffer, contentType) => {
   const response = new Response(arrayBuffer, {
     headers: {
@@ -1624,7 +1624,7 @@ var bufferToFormData = (arrayBuffer, contentType) => {
   return response.formData();
 };
 
-// server/node_modules/hono/dist/utils/body.js
+// node_modules/hono/dist/utils/body.js
 var isRawRequest = (request) => "headers" in request;
 var parseBody = async (request, options = /* @__PURE__ */ Object.create(null)) => {
   const { all = false, dot = false } = options;
@@ -1637,12 +1637,6 @@ var parseBody = async (request, options = /* @__PURE__ */ Object.create(null)) =
   return {};
 };
 async function parseFormData(request, options) {
-  if (!isRawRequest(request) && request.bodyCache.formData) {
-    return convertFormDataToBodyData(
-      await request.bodyCache.formData,
-      options
-    );
-  }
   const headers2 = isRawRequest(request) ? request.headers : request.raw.headers;
   const arrayBuffer = await request.arrayBuffer();
   const formDataPromise = bufferToFormData(arrayBuffer, headers2.get("Content-Type") || "");
@@ -1710,7 +1704,7 @@ var handleParsingNestedValues = (form, key2, value) => {
   });
 };
 
-// server/node_modules/hono/dist/utils/url.js
+// node_modules/hono/dist/utils/url.js
 var splitPath = (path) => {
   const paths = path.split("/");
   if (paths[0] === "") {
@@ -1914,7 +1908,7 @@ var getQueryParams = (url, key2) => {
 };
 var decodeURIComponent_ = decodeURIComponent;
 
-// server/node_modules/hono/dist/request.js
+// node_modules/hono/dist/request.js
 var tryDecodeURIComponent = (str) => tryDecode(str, decodeURIComponent_);
 var HonoRequest = class {
   /**
@@ -2197,7 +2191,7 @@ var HonoRequest = class {
   }
 };
 
-// server/node_modules/hono/dist/utils/html.js
+// node_modules/hono/dist/utils/html.js
 var HtmlEscapedCallbackPhase = {
   Stringify: 1,
   BeforeStream: 2,
@@ -2239,7 +2233,7 @@ var resolveCallback = async (str, phase, preserveCallbacks, context, buffer) => 
   }
 };
 
-// server/node_modules/hono/dist/context.js
+// node_modules/hono/dist/context.js
 var TEXT_PLAIN = "text/plain; charset=UTF-8";
 var setDefaultContentType = (contentType, headers2) => {
   return {
@@ -2646,7 +2640,7 @@ var Context = class {
   };
 };
 
-// server/node_modules/hono/dist/router.js
+// node_modules/hono/dist/router.js
 var METHOD_NAME_ALL = "ALL";
 var METHOD_NAME_ALL_LOWERCASE = "all";
 var METHODS = ["get", "post", "put", "delete", "options", "patch"];
@@ -2654,10 +2648,10 @@ var MESSAGE_MATCHER_IS_ALREADY_BUILT = "Can not add a route since the matcher is
 var UnsupportedPathError = class extends Error {
 };
 
-// server/node_modules/hono/dist/utils/constants.js
+// node_modules/hono/dist/utils/constants.js
 var COMPOSED_HANDLER = "__COMPOSED_HANDLER";
 
-// server/node_modules/hono/dist/hono-base.js
+// node_modules/hono/dist/hono-base.js
 var notFoundHandler = (c) => {
   return c.text("404 Not Found", 404);
 };
@@ -3033,7 +3027,7 @@ var Hono = class _Hono {
   };
 };
 
-// server/node_modules/hono/dist/router/reg-exp-router/matcher.js
+// node_modules/hono/dist/router/reg-exp-router/matcher.js
 var emptyParam = [];
 function match(method, path) {
   const matchers = this.buildAllMatchers();
@@ -3054,7 +3048,7 @@ function match(method, path) {
   return match2(method, path);
 }
 
-// server/node_modules/hono/dist/router/reg-exp-router/node.js
+// node_modules/hono/dist/router/reg-exp-router/node.js
 var LABEL_REG_EXP_STR = "[^/]+";
 var ONLY_WILDCARD_REG_EXP_STR = ".*";
 var TAIL_WILDCARD_REG_EXP_STR = "(?:|/.*)";
@@ -3162,7 +3156,7 @@ var Node = class _Node {
   }
 };
 
-// server/node_modules/hono/dist/router/reg-exp-router/trie.js
+// node_modules/hono/dist/router/reg-exp-router/trie.js
 var Trie = class {
   #context = { varIndex: 0 };
   #root = new Node();
@@ -3218,7 +3212,7 @@ var Trie = class {
   }
 };
 
-// server/node_modules/hono/dist/router/reg-exp-router/router.js
+// node_modules/hono/dist/router/reg-exp-router/router.js
 var nullMatcher = [/^$/, [], /* @__PURE__ */ Object.create(null)];
 var wildcardRegExpCache = /* @__PURE__ */ Object.create(null);
 function buildWildcardRegExp(path) {
@@ -3397,7 +3391,7 @@ var RegExpRouter = class {
   }
 };
 
-// server/node_modules/hono/dist/router/smart-router/router.js
+// node_modules/hono/dist/router/smart-router/router.js
 var SmartRouter = class {
   name = "SmartRouter";
   #routers = [];
@@ -3452,7 +3446,7 @@ var SmartRouter = class {
   }
 };
 
-// server/node_modules/hono/dist/router/trie-router/node.js
+// node_modules/hono/dist/router/trie-router/node.js
 var emptyParams = /* @__PURE__ */ Object.create(null);
 var hasChildren = (children) => {
   for (const _ in children) {
@@ -3636,7 +3630,7 @@ var Node2 = class _Node2 {
   }
 };
 
-// server/node_modules/hono/dist/router/trie-router/router.js
+// node_modules/hono/dist/router/trie-router/router.js
 var TrieRouter = class {
   name = "TrieRouter";
   #node;
@@ -3658,7 +3652,7 @@ var TrieRouter = class {
   }
 };
 
-// server/node_modules/hono/dist/hono.js
+// node_modules/hono/dist/hono.js
 var Hono2 = class extends Hono {
   /**
    * Creates an instance of the Hono class.
@@ -3673,7 +3667,7 @@ var Hono2 = class extends Hono {
   }
 };
 
-// server/node_modules/hono/dist/middleware/cors/index.js
+// node_modules/hono/dist/middleware/cors/index.js
 var cors = (options) => {
   const opts = {
     origin: "*",
@@ -16921,7 +16915,10 @@ async function searchDouban(name) {
   } catch {
   }
   const url = `${DOUBAN_API}/j/subject_suggest?q=${encodeURIComponent(name)}`;
-  const res = await fetchWithTimeout(url, { "User-Agent": UA, Referer: "https://movie.douban.com/" });
+  const res = await fetchWithTimeout(url, {
+    "User-Agent": UA,
+    Referer: "https://movie.douban.com/"
+  });
   const data = await res.json();
   return data || [];
 }
@@ -17103,7 +17100,10 @@ async function edgeCachePut(key2, html, maxAge = 600) {
     await cache7.put(
       `${CACHE_NAMESPACE}/${key2}`,
       new Response(html, {
-        headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": `max-age=${maxAge}` }
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": `max-age=${maxAge}`
+        }
       })
     );
   } catch {
@@ -17519,10 +17519,7 @@ function collapseSpace2(s) {
 async function getMoegirlSummary(name, base = DEFAULT_BASE) {
   const encoded = encodeURIComponent(name);
   const result = { title: name, extract: "", url: `${base}/${encoded}` };
-  const candidates = [
-    `${DEFAULT_BASE}/${encoded}?useskin=vector`,
-    `${DEFAULT_BASE}/${encoded}`
-  ];
+  const candidates = [`${DEFAULT_BASE}/${encoded}?useskin=vector`, `${DEFAULT_BASE}/${encoded}`];
   let html = "";
   for (const url of candidates) {
     try {

@@ -1,331 +1,311 @@
 {
   "inputs": {
-    "server/node_modules/hono/dist/compose.js": { "bytes": 1161, "imports": [], "format": "esm" },
-    "server/node_modules/hono/dist/http-exception.js": {
-      "bytes": 957,
-      "imports": [],
-      "format": "esm"
-    },
-    "server/node_modules/hono/dist/request/constants.js": {
-      "bytes": 108,
-      "imports": [],
-      "format": "esm"
-    },
-    "server/node_modules/hono/dist/utils/crypto.js": {
-      "bytes": 1144,
-      "imports": [],
-      "format": "esm"
-    },
-    "server/node_modules/hono/dist/utils/buffer.js": {
+    "node_modules/hono/dist/compose.js": { "bytes": 1161, "imports": [], "format": "esm" },
+    "node_modules/hono/dist/http-exception.js": { "bytes": 957, "imports": [], "format": "esm" },
+    "node_modules/hono/dist/request/constants.js": { "bytes": 108, "imports": [], "format": "esm" },
+    "node_modules/hono/dist/utils/crypto.js": { "bytes": 1144, "imports": [], "format": "esm" },
+    "node_modules/hono/dist/utils/buffer.js": {
       "bytes": 2199,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/utils/crypto.js",
+          "path": "node_modules/hono/dist/utils/crypto.js",
           "kind": "import-statement",
           "original": "./crypto.js"
         }
       ],
       "format": "esm"
     },
-    "server/node_modules/hono/dist/utils/body.js": {
-      "bytes": 2813,
+    "node_modules/hono/dist/utils/body.js": {
+      "bytes": 2648,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/utils/buffer.js",
+          "path": "node_modules/hono/dist/utils/buffer.js",
           "kind": "import-statement",
           "original": "./buffer.js"
         }
       ],
       "format": "esm"
     },
-    "server/node_modules/hono/dist/utils/url.js": { "bytes": 6458, "imports": [], "format": "esm" },
-    "server/node_modules/hono/dist/request.js": {
-      "bytes": 8161,
+    "node_modules/hono/dist/utils/url.js": { "bytes": 6458, "imports": [], "format": "esm" },
+    "node_modules/hono/dist/request.js": {
+      "bytes": 8054,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/http-exception.js",
+          "path": "node_modules/hono/dist/http-exception.js",
           "kind": "import-statement",
           "original": "./http-exception.js"
         },
         {
-          "path": "server/node_modules/hono/dist/request/constants.js",
+          "path": "node_modules/hono/dist/request/constants.js",
           "kind": "import-statement",
           "original": "./request/constants.js"
         },
         {
-          "path": "server/node_modules/hono/dist/utils/body.js",
+          "path": "node_modules/hono/dist/utils/body.js",
           "kind": "import-statement",
           "original": "./utils/body.js"
         },
         {
-          "path": "server/node_modules/hono/dist/utils/url.js",
+          "path": "node_modules/hono/dist/utils/url.js",
           "kind": "import-statement",
           "original": "./utils/url.js"
         }
       ],
       "format": "esm"
     },
-    "server/node_modules/hono/dist/utils/html.js": {
-      "bytes": 3001,
-      "imports": [],
-      "format": "esm"
-    },
-    "server/node_modules/hono/dist/context.js": {
+    "node_modules/hono/dist/utils/html.js": { "bytes": 3001, "imports": [], "format": "esm" },
+    "node_modules/hono/dist/context.js": {
       "bytes": 10916,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/request.js",
+          "path": "node_modules/hono/dist/request.js",
           "kind": "import-statement",
           "original": "./request.js"
         },
         {
-          "path": "server/node_modules/hono/dist/utils/html.js",
+          "path": "node_modules/hono/dist/utils/html.js",
           "kind": "import-statement",
           "original": "./utils/html.js"
         }
       ],
       "format": "esm"
     },
-    "server/node_modules/hono/dist/router.js": { "bytes": 433, "imports": [], "format": "esm" },
-    "server/node_modules/hono/dist/utils/constants.js": {
-      "bytes": 102,
-      "imports": [],
-      "format": "esm"
-    },
-    "server/node_modules/hono/dist/hono-base.js": {
+    "node_modules/hono/dist/router.js": { "bytes": 433, "imports": [], "format": "esm" },
+    "node_modules/hono/dist/utils/constants.js": { "bytes": 102, "imports": [], "format": "esm" },
+    "node_modules/hono/dist/hono-base.js": {
       "bytes": 11425,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/compose.js",
+          "path": "node_modules/hono/dist/compose.js",
           "kind": "import-statement",
           "original": "./compose.js"
         },
         {
-          "path": "server/node_modules/hono/dist/context.js",
+          "path": "node_modules/hono/dist/context.js",
           "kind": "import-statement",
           "original": "./context.js"
         },
         {
-          "path": "server/node_modules/hono/dist/router.js",
+          "path": "node_modules/hono/dist/router.js",
           "kind": "import-statement",
           "original": "./router.js"
         },
         {
-          "path": "server/node_modules/hono/dist/utils/constants.js",
+          "path": "node_modules/hono/dist/utils/constants.js",
           "kind": "import-statement",
           "original": "./utils/constants.js"
         },
         {
-          "path": "server/node_modules/hono/dist/utils/url.js",
+          "path": "node_modules/hono/dist/utils/url.js",
           "kind": "import-statement",
           "original": "./utils/url.js"
         }
       ],
       "format": "esm"
     },
-    "server/node_modules/hono/dist/router/reg-exp-router/matcher.js": {
+    "node_modules/hono/dist/router/reg-exp-router/matcher.js": {
       "bytes": 670,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/router.js",
+          "path": "node_modules/hono/dist/router.js",
           "kind": "import-statement",
           "original": "../../router.js"
         }
       ],
       "format": "esm"
     },
-    "server/node_modules/hono/dist/router/reg-exp-router/node.js": {
+    "node_modules/hono/dist/router/reg-exp-router/node.js": {
       "bytes": 3411,
       "imports": [],
       "format": "esm"
     },
-    "server/node_modules/hono/dist/router/reg-exp-router/trie.js": {
+    "node_modules/hono/dist/router/reg-exp-router/trie.js": {
       "bytes": 1689,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/router/reg-exp-router/node.js",
+          "path": "node_modules/hono/dist/router/reg-exp-router/node.js",
           "kind": "import-statement",
           "original": "./node.js"
         }
       ],
       "format": "esm"
     },
-    "server/node_modules/hono/dist/router/reg-exp-router/router.js": {
+    "node_modules/hono/dist/router/reg-exp-router/router.js": {
       "bytes": 6502,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/router.js",
+          "path": "node_modules/hono/dist/router.js",
           "kind": "import-statement",
           "original": "../../router.js"
         },
         {
-          "path": "server/node_modules/hono/dist/utils/url.js",
+          "path": "node_modules/hono/dist/utils/url.js",
           "kind": "import-statement",
           "original": "../../utils/url.js"
         },
         {
-          "path": "server/node_modules/hono/dist/router/reg-exp-router/matcher.js",
+          "path": "node_modules/hono/dist/router/reg-exp-router/matcher.js",
           "kind": "import-statement",
           "original": "./matcher.js"
         },
         {
-          "path": "server/node_modules/hono/dist/router/reg-exp-router/node.js",
+          "path": "node_modules/hono/dist/router/reg-exp-router/node.js",
           "kind": "import-statement",
           "original": "./node.js"
         },
         {
-          "path": "server/node_modules/hono/dist/router/reg-exp-router/trie.js",
+          "path": "node_modules/hono/dist/router/reg-exp-router/trie.js",
           "kind": "import-statement",
           "original": "./trie.js"
         }
       ],
       "format": "esm"
     },
-    "server/node_modules/hono/dist/router/reg-exp-router/prepared-router.js": {
+    "node_modules/hono/dist/router/reg-exp-router/prepared-router.js": {
       "bytes": 4252,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/router.js",
+          "path": "node_modules/hono/dist/router.js",
           "kind": "import-statement",
           "original": "../../router.js"
         },
         {
-          "path": "server/node_modules/hono/dist/router/reg-exp-router/matcher.js",
+          "path": "node_modules/hono/dist/router/reg-exp-router/matcher.js",
           "kind": "import-statement",
           "original": "./matcher.js"
         },
         {
-          "path": "server/node_modules/hono/dist/router/reg-exp-router/router.js",
+          "path": "node_modules/hono/dist/router/reg-exp-router/router.js",
           "kind": "import-statement",
           "original": "./router.js"
         }
       ],
       "format": "esm"
     },
-    "server/node_modules/hono/dist/router/reg-exp-router/index.js": {
+    "node_modules/hono/dist/router/reg-exp-router/index.js": {
       "bytes": 274,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/router/reg-exp-router/router.js",
+          "path": "node_modules/hono/dist/router/reg-exp-router/router.js",
           "kind": "import-statement",
           "original": "./router.js"
         },
         {
-          "path": "server/node_modules/hono/dist/router/reg-exp-router/prepared-router.js",
+          "path": "node_modules/hono/dist/router/reg-exp-router/prepared-router.js",
           "kind": "import-statement",
           "original": "./prepared-router.js"
         }
       ],
       "format": "esm"
     },
-    "server/node_modules/hono/dist/router/smart-router/router.js": {
+    "node_modules/hono/dist/router/smart-router/router.js": {
       "bytes": 1496,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/router.js",
+          "path": "node_modules/hono/dist/router.js",
           "kind": "import-statement",
           "original": "../../router.js"
         }
       ],
       "format": "esm"
     },
-    "server/node_modules/hono/dist/router/smart-router/index.js": {
+    "node_modules/hono/dist/router/smart-router/index.js": {
       "bytes": 105,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/router/smart-router/router.js",
+          "path": "node_modules/hono/dist/router/smart-router/router.js",
           "kind": "import-statement",
           "original": "./router.js"
         }
       ],
       "format": "esm"
     },
-    "server/node_modules/hono/dist/router/trie-router/node.js": {
+    "node_modules/hono/dist/router/trie-router/node.js": {
       "bytes": 6456,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/router.js",
+          "path": "node_modules/hono/dist/router.js",
           "kind": "import-statement",
           "original": "../../router.js"
         },
         {
-          "path": "server/node_modules/hono/dist/utils/url.js",
+          "path": "node_modules/hono/dist/utils/url.js",
           "kind": "import-statement",
           "original": "../../utils/url.js"
         }
       ],
       "format": "esm"
     },
-    "server/node_modules/hono/dist/router/trie-router/router.js": {
+    "node_modules/hono/dist/router/trie-router/router.js": {
       "bytes": 633,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/utils/url.js",
+          "path": "node_modules/hono/dist/utils/url.js",
           "kind": "import-statement",
           "original": "../../utils/url.js"
         },
         {
-          "path": "server/node_modules/hono/dist/router/trie-router/node.js",
+          "path": "node_modules/hono/dist/router/trie-router/node.js",
           "kind": "import-statement",
           "original": "./node.js"
         }
       ],
       "format": "esm"
     },
-    "server/node_modules/hono/dist/router/trie-router/index.js": {
+    "node_modules/hono/dist/router/trie-router/index.js": {
       "bytes": 102,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/router/trie-router/router.js",
+          "path": "node_modules/hono/dist/router/trie-router/router.js",
           "kind": "import-statement",
           "original": "./router.js"
         }
       ],
       "format": "esm"
     },
-    "server/node_modules/hono/dist/hono.js": {
+    "node_modules/hono/dist/hono.js": {
       "bytes": 610,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/hono-base.js",
+          "path": "node_modules/hono/dist/hono-base.js",
           "kind": "import-statement",
           "original": "./hono-base.js"
         },
         {
-          "path": "server/node_modules/hono/dist/router/reg-exp-router/index.js",
+          "path": "node_modules/hono/dist/router/reg-exp-router/index.js",
           "kind": "import-statement",
           "original": "./router/reg-exp-router/index.js"
         },
         {
-          "path": "server/node_modules/hono/dist/router/smart-router/index.js",
+          "path": "node_modules/hono/dist/router/smart-router/index.js",
           "kind": "import-statement",
           "original": "./router/smart-router/index.js"
         },
         {
-          "path": "server/node_modules/hono/dist/router/trie-router/index.js",
+          "path": "node_modules/hono/dist/router/trie-router/index.js",
           "kind": "import-statement",
           "original": "./router/trie-router/index.js"
         }
       ],
       "format": "esm"
     },
-    "server/node_modules/hono/dist/index.js": {
+    "node_modules/hono/dist/index.js": {
       "bytes": 120,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/hono.js",
+          "path": "node_modules/hono/dist/hono.js",
           "kind": "import-statement",
           "original": "./hono.js"
         },
         {
-          "path": "server/node_modules/hono/dist/context.js",
+          "path": "node_modules/hono/dist/context.js",
           "kind": "import-statement",
           "original": "./context.js"
         }
       ],
       "format": "esm"
     },
-    "server/node_modules/hono/dist/middleware/cors/index.js": {
+    "node_modules/hono/dist/middleware/cors/index.js": {
       "bytes": 2614,
       "imports": [],
       "format": "esm"
@@ -429,7 +409,7 @@
       "bytes": 14328,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/index.js",
+          "path": "node_modules/hono/dist/index.js",
           "kind": "import-statement",
           "original": "hono"
         },
@@ -476,7 +456,7 @@
       "bytes": 15976,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/index.js",
+          "path": "node_modules/hono/dist/index.js",
           "kind": "import-statement",
           "original": "hono"
         },
@@ -513,7 +493,7 @@
       "bytes": 990,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/index.js",
+          "path": "node_modules/hono/dist/index.js",
           "kind": "import-statement",
           "original": "hono"
         },
@@ -545,7 +525,7 @@
       "bytes": 7514,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/index.js",
+          "path": "node_modules/hono/dist/index.js",
           "kind": "import-statement",
           "original": "hono"
         },
@@ -4878,7 +4858,7 @@
       "bytes": 17544,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/index.js",
+          "path": "node_modules/hono/dist/index.js",
           "kind": "import-statement",
           "original": "hono"
         },
@@ -4902,7 +4882,7 @@
       "format": "esm"
     },
     "server/src/services/douban.js": {
-      "bytes": 12080,
+      "bytes": 12090,
       "imports": [
         {
           "path": "node_modules/linkedom/esm/index.js",
@@ -4917,12 +4897,12 @@
       ],
       "format": "esm"
     },
-    "server/src/utils/edgeCache.js": { "bytes": 1700, "imports": [], "format": "esm" },
+    "server/src/utils/edgeCache.js": { "bytes": 1728, "imports": [], "format": "esm" },
     "server/src/routes/douban.js": {
       "bytes": 15811,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/index.js",
+          "path": "node_modules/hono/dist/index.js",
           "kind": "import-statement",
           "original": "hono"
         },
@@ -4964,7 +4944,7 @@
       "bytes": 3223,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/index.js",
+          "path": "node_modules/hono/dist/index.js",
           "kind": "import-statement",
           "original": "hono"
         },
@@ -4988,7 +4968,7 @@
       "format": "esm"
     },
     "server/src/services/moegirl.js": {
-      "bytes": 2936,
+      "bytes": 2924,
       "imports": [
         {
           "path": "node_modules/linkedom/esm/index.js",
@@ -5007,7 +4987,7 @@
       "bytes": 12920,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/index.js",
+          "path": "node_modules/hono/dist/index.js",
           "kind": "import-statement",
           "original": "hono"
         },
@@ -5044,7 +5024,7 @@
       "bytes": 17085,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/index.js",
+          "path": "node_modules/hono/dist/index.js",
           "kind": "import-statement",
           "original": "hono"
         },
@@ -5082,7 +5062,7 @@
       "bytes": 987,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/index.js",
+          "path": "node_modules/hono/dist/index.js",
           "kind": "import-statement",
           "original": "hono"
         },
@@ -5104,12 +5084,12 @@
       "bytes": 3344,
       "imports": [
         {
-          "path": "server/node_modules/hono/dist/index.js",
+          "path": "node_modules/hono/dist/index.js",
           "kind": "import-statement",
           "original": "hono"
         },
         {
-          "path": "server/node_modules/hono/dist/middleware/cors/index.js",
+          "path": "node_modules/hono/dist/middleware/cors/index.js",
           "kind": "import-statement",
           "original": "hono/cors"
         },
@@ -5213,26 +5193,26 @@
         "node_modules/cssom/lib/index.js": { "bytesInOutput": 1472 },
         "node_modules/linkedom/commonjs/canvas-shim.cjs": { "bytesInOutput": 444 },
         "node_modules/linkedom/commonjs/canvas.cjs": { "bytesInOutput": 238 },
-        "server/node_modules/hono/dist/compose.js": { "bytesInOutput": 1129 },
-        "server/node_modules/hono/dist/request/constants.js": { "bytesInOutput": 49 },
-        "server/node_modules/hono/dist/utils/buffer.js": { "bytesInOutput": 350 },
-        "server/node_modules/hono/dist/utils/body.js": { "bytesInOutput": 2755 },
-        "server/node_modules/hono/dist/utils/url.js": { "bytesInOutput": 6085 },
-        "server/node_modules/hono/dist/request.js": { "bytesInOutput": 6919 },
-        "server/node_modules/hono/dist/utils/html.js": { "bytesInOutput": 1060 },
-        "server/node_modules/hono/dist/context.js": { "bytesInOutput": 10767 },
-        "server/node_modules/hono/dist/router.js": { "bytesInOutput": 286 },
-        "server/node_modules/hono/dist/utils/constants.js": { "bytesInOutput": 45 },
-        "server/node_modules/hono/dist/hono-base.js": { "bytesInOutput": 11121 },
-        "server/node_modules/hono/dist/router/reg-exp-router/matcher.js": { "bytesInOutput": 545 },
-        "server/node_modules/hono/dist/router/reg-exp-router/node.js": { "bytesInOutput": 3341 },
-        "server/node_modules/hono/dist/router/reg-exp-router/trie.js": { "bytesInOutput": 1599 },
-        "server/node_modules/hono/dist/router/reg-exp-router/router.js": { "bytesInOutput": 6148 },
-        "server/node_modules/hono/dist/router/smart-router/router.js": { "bytesInOutput": 1345 },
-        "server/node_modules/hono/dist/router/trie-router/node.js": { "bytesInOutput": 6324 },
-        "server/node_modules/hono/dist/router/trie-router/router.js": { "bytesInOutput": 481 },
-        "server/node_modules/hono/dist/hono.js": { "bytesInOutput": 343 },
-        "server/node_modules/hono/dist/middleware/cors/index.js": { "bytesInOutput": 2570 },
+        "node_modules/hono/dist/compose.js": { "bytesInOutput": 1129 },
+        "node_modules/hono/dist/request/constants.js": { "bytesInOutput": 49 },
+        "node_modules/hono/dist/utils/buffer.js": { "bytesInOutput": 350 },
+        "node_modules/hono/dist/utils/body.js": { "bytesInOutput": 2590 },
+        "node_modules/hono/dist/utils/url.js": { "bytesInOutput": 6085 },
+        "node_modules/hono/dist/request.js": { "bytesInOutput": 6919 },
+        "node_modules/hono/dist/utils/html.js": { "bytesInOutput": 1060 },
+        "node_modules/hono/dist/context.js": { "bytesInOutput": 10767 },
+        "node_modules/hono/dist/router.js": { "bytesInOutput": 286 },
+        "node_modules/hono/dist/utils/constants.js": { "bytesInOutput": 45 },
+        "node_modules/hono/dist/hono-base.js": { "bytesInOutput": 11121 },
+        "node_modules/hono/dist/router/reg-exp-router/matcher.js": { "bytesInOutput": 545 },
+        "node_modules/hono/dist/router/reg-exp-router/node.js": { "bytesInOutput": 3341 },
+        "node_modules/hono/dist/router/reg-exp-router/trie.js": { "bytesInOutput": 1599 },
+        "node_modules/hono/dist/router/reg-exp-router/router.js": { "bytesInOutput": 6148 },
+        "node_modules/hono/dist/router/smart-router/router.js": { "bytesInOutput": 1345 },
+        "node_modules/hono/dist/router/trie-router/node.js": { "bytesInOutput": 6324 },
+        "node_modules/hono/dist/router/trie-router/router.js": { "bytesInOutput": 481 },
+        "node_modules/hono/dist/hono.js": { "bytesInOutput": 343 },
+        "node_modules/hono/dist/middleware/cors/index.js": { "bytesInOutput": 2570 },
         "server/src/utils/logger.js": { "bytesInOutput": 383 },
         "server/src/utils/rateLimit.js": { "bytesInOutput": 965 },
         "server/src/middleware/security.js": { "bytesInOutput": 685 },
@@ -5480,18 +5460,18 @@
         "node_modules/linkedom/esm/index.js": { "bytesInOutput": 242 },
         "server/src/utils/cache.js": { "bytesInOutput": 906 },
         "server/src/routes/comments.js": { "bytesInOutput": 17997 },
-        "server/src/services/douban.js": { "bytesInOutput": 8199 },
-        "server/src/utils/edgeCache.js": { "bytesInOutput": 791 },
+        "server/src/services/douban.js": { "bytesInOutput": 8209 },
+        "server/src/utils/edgeCache.js": { "bytesInOutput": 819 },
         "server/src/routes/douban.js": { "bytesInOutput": 12585 },
         "server/src/routes/bilibili.js": { "bytesInOutput": 3024 },
-        "server/src/services/moegirl.js": { "bytesInOutput": 1928 },
+        "server/src/services/moegirl.js": { "bytesInOutput": 1916 },
         "server/src/routes/moegirl.js": { "bytesInOutput": 9524 },
         "server/src/routes/groups.js": { "bytesInOutput": 13712 },
         "server/src/services/music.js": { "bytesInOutput": 3261 },
         "server/src/routes/music.js": { "bytesInOutput": 604 },
         "server/src/app.js": { "bytesInOutput": 2087 }
       },
-      "bytes": 695641
+      "bytes": 695362
     }
   }
 }
