@@ -296,30 +296,35 @@ export async function getDoubanSummary(id) {
         'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
       }
     })
-    if (!html || html.length < 500) return result
+    if (html && html.length >= 500) {
+      const { document } = parseHTML(html)
 
-    const { document } = parseHTML(html)
+      // 简介：优先展开版 .all，其次 #link-report，最后 property="v:summary"
+      const introEl =
+        document.querySelector('#link-report .all') ||
+        document.querySelector('#link-report') ||
+        document.querySelector('[property="v:summary"]')
+      if (introEl) {
+        result.intro = collapseSpace(stripTags(introEl.innerHTML))
+      }
 
-    // 简介：优先展开版 .all，其次 #link-report，最后 property="v:summary"
-    const introEl =
-      document.querySelector('#link-report .all') ||
-      document.querySelector('#link-report') ||
-      document.querySelector('[property="v:summary"]')
-    if (introEl) {
-      result.intro = collapseSpace(stripTags(introEl.innerHTML))
+      result.keyInfo = parseDoubanInfo(document)
+
+      // 若 abstract 未拿到 title，尝试从页面 title/h1 补充
+      if (!result.title) {
+        const titleEl = document.querySelector('h1 span') || document.querySelector('title')
+        if (titleEl) {
+          result.title = collapseSpace(stripTags(titleEl.innerHTML)).replace(
+            /\s*\(\s*豆瓣\s*\)$/i,
+            ''
+          )
+        }
+      }
     }
 
-    result.keyInfo = parseDoubanInfo(document)
-
-    // 若 abstract 未拿到 title，尝试从页面 title/h1 补充
-    if (!result.title) {
-      const titleEl = document.querySelector('h1 span') || document.querySelector('title')
-      if (titleEl) {
-        result.title = collapseSpace(stripTags(titleEl.innerHTML)).replace(
-          /\s*\(\s*豆瓣\s*\)$/i,
-          ''
-        )
-      }
+    // 条目页 HTML 被反爬拦截时 intro 为空：用 subject_abstract 的热门短评兜底
+    if (!result.intro && abstract?.short_comment?.content) {
+      result.intro = collapseSpace(stripTags(String(abstract.short_comment.content)))
     }
   } catch {
     // 静默忽略，返回已有字段

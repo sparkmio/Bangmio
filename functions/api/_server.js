@@ -16895,14 +16895,17 @@ function parseSearchSuggest(json) {
 }
 async function searchDouban(name) {
   try {
-    const res2 = await fetch(`${SEARCH_SUGGEST_API}/j/search_suggest?q=${encodeURIComponent(name)}`, {
-      headers: {
-        "User-Agent": UA,
-        Referer: "https://www.douban.com/",
-        Accept: "application/json, text/plain, */*",
-        "Accept-Language": "zh-CN,zh;q=0.9"
+    const res2 = await fetch(
+      `${SEARCH_SUGGEST_API}/j/search_suggest?q=${encodeURIComponent(name)}`,
+      {
+        headers: {
+          "User-Agent": UA,
+          Referer: "https://www.douban.com/",
+          Accept: "application/json, text/plain, */*",
+          "Accept-Language": "zh-CN,zh;q=0.9"
+        }
       }
-    });
+    );
     if (res2.ok) {
       const data2 = await res2.json();
       const parsed = parseSearchSuggest(data2);
@@ -17045,21 +17048,25 @@ async function getDoubanSummary(id) {
         "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
       }
     });
-    if (!html || html.length < 500) return result;
-    const { document } = parseHTML(html);
-    const introEl = document.querySelector("#link-report .all") || document.querySelector("#link-report") || document.querySelector('[property="v:summary"]');
-    if (introEl) {
-      result.intro = collapseSpace(stripTags2(introEl.innerHTML));
-    }
-    result.keyInfo = parseDoubanInfo(document);
-    if (!result.title) {
-      const titleEl = document.querySelector("h1 span") || document.querySelector("title");
-      if (titleEl) {
-        result.title = collapseSpace(stripTags2(titleEl.innerHTML)).replace(
-          /\s*\(\s*豆瓣\s*\)$/i,
-          ""
-        );
+    if (html && html.length >= 500) {
+      const { document } = parseHTML(html);
+      const introEl = document.querySelector("#link-report .all") || document.querySelector("#link-report") || document.querySelector('[property="v:summary"]');
+      if (introEl) {
+        result.intro = collapseSpace(stripTags2(introEl.innerHTML));
       }
+      result.keyInfo = parseDoubanInfo(document);
+      if (!result.title) {
+        const titleEl = document.querySelector("h1 span") || document.querySelector("title");
+        if (titleEl) {
+          result.title = collapseSpace(stripTags2(titleEl.innerHTML)).replace(
+            /\s*\(\s*豆瓣\s*\)$/i,
+            ""
+          );
+        }
+      }
+    }
+    if (!result.intro && abstract?.short_comment?.content) {
+      result.intro = collapseSpace(stripTags2(String(abstract.short_comment.content)));
     }
   } catch {
   }
