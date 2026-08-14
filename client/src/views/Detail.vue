@@ -668,53 +668,41 @@
         <div v-if="doubanLoading" class="flex justify-center py-10">
           <span class="loading loading-spinner loading-lg text-primary" />
         </div>
-        <div v-else-if="doubanDetails" class="space-y-4">
-          <div v-if="!doubanFallback" class="bg-base-200/40 rounded-xl p-5 text-center">
-            <p class="text-4xl font-black text-amber-500">
-              {{ doubanDetails.rate || '-' }}
-            </p>
-            <div class="flex items-center gap-0.5 mt-1 justify-center">
-              <svg
-                v-for="i in 5"
-                :key="i"
-                class="w-4 h-4"
-                :class="
-                  i <= Math.round(parseFloat(doubanDetails.rate) / 2)
-                    ? 'text-amber-400'
-                    : 'text-base-300'
-                "
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
-                />
-              </svg>
-            </div>
-            <p class="text-xs text-base-content/50 mt-1">豆瓣评分</p>
-            <a :href="doubanDetails.url" target="_blank" class="btn btn-xs btn-ghost mt-3 w-full"
-              >查看详情 →</a
+        <div v-else-if="doubanDetails" class="bg-base-200/40 rounded-xl p-6">
+          <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <h2 class="text-xl font-bold text-base-content break-words">
+              {{ doubanSummary?.title || doubanDetails.title || '豆瓣条目' }}
+            </h2>
+          </div>
+          <div class="flex items-baseline gap-2 mb-2 flex-wrap">
+            <span class="text-5xl font-black text-amber-500">{{ doubanDetails.rate || '-' }}</span>
+            <span class="text-amber-400 text-lg tracking-widest">{{ doubanStars }}</span>
+            <span class="text-xs text-base-content/40">豆瓣评分</span>
+          </div>
+          <p v-if="doubanMeta" class="text-sm text-base-content/60 mb-4">{{ doubanMeta }}</p>
+          <div
+            v-if="doubanIntro"
+            class="border-l-4 border-l-amber-500/60 bg-base-100/60 rounded-r-lg p-4 mb-5 text-sm leading-relaxed text-base-content/75"
+          >
+            {{ doubanIntro }}
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <a :href="doubanDetails.url" target="_blank" class="btn btn-sm btn-primary"
+              >前往豆瓣查看 →</a
+            >
+            <a
+              :href="`${doubanDetails.url}comments?status=P`"
+              target="_blank"
+              class="btn btn-sm btn-outline"
+              >查看短评</a
+            >
+            <a :href="`${doubanDetails.url}reviews`" target="_blank" class="btn btn-sm btn-ghost"
+              >查看长评</a
             >
           </div>
-          <ExternalEmbedFallback
-            v-if="doubanFallback"
-            source="douban"
-            :title="doubanSummary?.title || doubanDetails.title || '豆瓣条目'"
-            :content="doubanSummary?.intro || ''"
-            :url="doubanSummary?.url || doubanDetails.url"
-            :meta="doubanSummary || doubanDetails"
-            :reason="doubanFallbackReason"
-            @retry="retryDoubanIframe"
-          />
-          <IframeEmbed
-            v-else-if="doubanDetails.id"
-            ref="doubanIframeRef"
-            :src="`/api/v1/douban/page/${doubanDetails.id}`"
-            :mode="embedMode"
-            title="豆瓣评论"
-            loading-text="正在加载豆瓣评论..."
-            @fallback="onDoubanFallback"
-          />
+          <p class="text-xs text-base-content/30 mt-3">
+            豆瓣限制第三方页面嵌入，此处展示结构化数据摘要
+          </p>
         </div>
         <div v-else class="py-10 text-center">
           <p class="text-base-content/40 text-sm mb-3">未找到豆瓣条目</p>
@@ -894,10 +882,7 @@ const topics = ref([])
 const topicLoading = ref(false)
 const moegirlPageName = ref('')
 const moegirlLoading = ref(false)
-const doubanFallback = ref(false)
-const doubanFallbackReason = ref('error')
 const doubanSummary = ref(null)
-const doubanIframeRef = ref(null)
 const moegirlFallback = ref(false)
 const moegirlFallbackReason = ref('error')
 const moegirlSummary = ref(null)
@@ -930,6 +915,33 @@ const musicGroups = computed(() => {
   return groups
 })
 
+// ===== 豆瓣结构化卡片 =====
+// 豆瓣条目页 HTML 被上游反爬强制拦截，无法 iframe 内嵌；
+// 改用可用 JSON 接口（subject_abstract 等）的数据渲染卡片（PROJECT_ISSUES 1.1）
+const doubanStars = computed(() => {
+  const star = Math.round((parseFloat(doubanDetails.value?.rate) || 0) / 2)
+  return '★'.repeat(Math.min(star, 5)) + '☆'.repeat(Math.max(0, 5 - Math.min(star, 5)))
+})
+const doubanMeta = computed(() => {
+  const d = doubanDetails.value
+  if (!d) return ''
+  return [
+    d.release_year ? `${d.release_year} 年` : '',
+    d.types?.join(' / ') || '',
+    d.episodes_count ? `${d.episodes_count} 集` : ''
+  ]
+    .filter(Boolean)
+    .join(' · ')
+})
+const doubanIntro = computed(() => {
+  const summaryIntro = doubanSummary.value?.intro || ''
+  const shortComment =
+    typeof doubanDetails.value?.short_comment?.content === 'string'
+      ? doubanDetails.value.short_comment.content
+      : ''
+  return summaryIntro || shortComment || ''
+})
+
 function barWidth(i) {
   const max = Math.max(...Object.values(anime.value.rating?.count || {}), 1)
   return ((anime.value.rating?.count[i] || 0) / max) * 100
@@ -960,6 +972,16 @@ async function fetchDoubanDetails() {
     const name = anime.value?.name_cn || anime.value?.name
     const res = await doubanAPI.getDetails(id, name)
     doubanDetails.value = res.data?.data || null
+
+    // 拿到豆瓣 id 后并行拉结构化摘要（补充简介 intro），卡片直接展示
+    if (doubanDetails.value?.id) {
+      try {
+        const sRes = await doubanAPI.getSummary(doubanDetails.value.id)
+        doubanSummary.value = sRes.data?.data || null
+      } catch {
+        doubanSummary.value = null
+      }
+    }
   } catch {
     doubanDetails.value = null
   }
@@ -1042,19 +1064,6 @@ async function fetchMoegirlSearch() {
   moegirlLoading.value = false
 }
 
-async function onDoubanFallback(reason = 'error') {
-  doubanFallback.value = true
-  doubanFallbackReason.value = reason || 'error'
-  const id = doubanDetails.value?.id
-  if (!id) return
-  try {
-    const res = await doubanAPI.getSummary(id)
-    doubanSummary.value = res.data?.data || null
-  } catch {
-    doubanSummary.value = null
-  }
-}
-
 async function onMoegirlFallback(reason = 'error') {
   moegirlFallback.value = true
   moegirlFallbackReason.value = reason || 'error'
@@ -1066,14 +1075,6 @@ async function onMoegirlFallback(reason = 'error') {
   } catch {
     moegirlSummary.value = null
   }
-}
-
-function retryDoubanIframe() {
-  doubanFallback.value = false
-  doubanFallbackReason.value = 'error'
-  nextTick(() => {
-    doubanIframeRef.value?.retry()
-  })
 }
 
 function retryMoegirlIframe() {
@@ -1258,8 +1259,6 @@ watch(
       collectionComment.value = ''
       topics.value = []
       doubanDetails.value = null
-      doubanFallback.value = false
-      doubanFallbackReason.value = 'error'
       doubanSummary.value = null
       bilibiliDetails.value = null
       moegirlPageName.value = ''
