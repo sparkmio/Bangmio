@@ -113,14 +113,14 @@
 | **严重程度** | ~~P2 — 容易引入不一致~~ → 已修复                                                                                                                                                                                                                                                                        |
 | **修复方案** | 新增 [authStorage.js](file:///d:/Bangmio%20v4/client/src/utils/authStorage.js) 集中管理 6 个 key 的读写与清除；旧 key 迁移逻辑独立为 `migrateOldAuthKeys()`；auth store 与 [api/index.js](file:///d:/Bangmio%20v4/client/src/api/index.js) 拦截器中的直接操作全部收敛到该模块（key 保持不变，向后兼容） |
 
-### 3.3 Detail.vue 文件过大（1230 行）
+### 3.3 Detail.vue 文件过大（1230 行） ✅ 已修复
 
-| 项目         | 内容                                                                                                                                            |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **表现**     | [Detail.vue](file:///d:/Bangmio%20v4/client/src/views/Detail.vue) 包含 13 个 Tab 的模板与全部逻辑，单文件 1230 行，难以维护                     |
-| **影响范围** | 开发体验                                                                                                                                        |
-| **严重程度** | P2 — 可维护性差                                                                                                                                 |
-| **建议**     | 将各 Tab 内容拆分为独立子组件（如 `TabRating.vue`、`TabDouban.vue`、`TabMoegirl.vue`、`TabMusic.vue` 等），Detail.vue 仅负责数据加载与 Tab 切换 |
+| 项目         | 内容                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **表现**     | ~~[Detail.vue](file:///d:/Bangmio%20v4/client/src/views/Detail.vue) 包含 13 个 Tab 的模板与全部逻辑，单文件 1230 行，难以维护~~ → 已修复                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **影响范围** | 开发体验                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **严重程度** | ~~P2 — 可维护性差~~ → 已修复                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **修复方案** | 拆分为 13 个 Tab 子组件（[client/src/components/detail/](file:///d:/Bangmio%20v4/client/src/components/detail/)，含 TabOverview/TabEpisodes/TabCharacters/TabStaff/TabRelations/TabTalkbox/TabTopics/TabWiki/TabRating/TabDouban/TabMusic/TabStreaming/TabMoegirl），Detail.vue 仅保留 Hero、收藏交互、数据加载与 Tab 编排（约 560 行）；TabTopics（发帖弹窗）与 TabMoegirl（搜索/降级/重试）逻辑随组件自包含，cvtCareer/barWidth/infoValue/豆瓣卡片 computed 等辅助逻辑随组件下沉，新增共享工具 [career.js](file:///d:/Bangmio%20v4/client/src/utils/career.js)；另拆 [Profile.vue](file:///d:/Bangmio%20v4/client/src/views/Profile.vue)（1036 行 → 约 580 行）为 ProfileCollections/ProfileTimelineCard/ProfileStatsPanel + [profile.js](file:///d:/Bangmio%20v4/client/src/utils/profile.js) 工具；新增 15 个组件冒烟/逻辑测试（tabs.test.js + profile.test.js） |
 
 ### 3.4 错误处理不统一 ✅ 已修复（后端部分）
 
@@ -142,12 +142,13 @@
 
 ### 3.6 无端到端（E2E）测试
 
-| 项目         | 内容                                                                                                    |
-| ------------ | ------------------------------------------------------------------------------------------------------- |
-| **表现**     | 项目仅有 Vitest 单元/集成测试（186 passed），无 E2E 测试覆盖关键用户流程（登录→绑定→收藏→查看 Profile） |
-| **影响范围** | 回归质量保障                                                                                            |
-| **严重程度** | P2 — 回归风险                                                                                           |
-| **建议**     | 引入 Playwright 覆盖核心流程：注册→绑定→浏览→收藏→评分→个人页                                           |
+| 项目         | 内容                                                                                                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **表现**     | 项目仅有 Vitest 单元/集成测试（220 passed），无 E2E 测试覆盖关键用户流程（登录→绑定→收藏→查看 Profile）                                                                  |
+| **影响范围** | 回归质量保障                                                                                                                                                             |
+| **严重程度** | P2 — 回归风险                                                                                                                                                            |
+| **进展**     | 2026-08-14 已补齐前端组件测试：CollectionButton 6 个用例从「依赖缺失跳过」恢复为真实执行，新增 Detail Tab 组件 10 个冒烟用例与 Profile 子组件 5 个逻辑用例；E2E 仍待引入 |
+| **建议**     | 引入 Playwright 覆盖核心流程：注册→绑定→浏览→收藏→评分→个人页                                                                                                            |
 
 ---
 
@@ -308,11 +309,11 @@
 | P1     | loginWithBangmio 未转发 captchaToken | ✅ 已修复   | 函数签名增加 captchaToken 参数（`bf250b4`）                                                                 |
 | P1     | Turnstile 域名配置锁死流程           | ✅ 已修复   | 注册/忘记密码/发码全部降级放行 + 日志，邮箱验证码与限流兜底                                                 |
 | P2     | groups.js 正则解析                   | ✅ 已修复   | 迁移到 linkedom + 7 个 fixture 测试，顺带修复成员数千分位 bug                                               |
-| P2     | Detail.vue 拆分                      | 待修复      | 按拆 Tab 子组件                                                                                             |
+| P2     | Detail.vue 拆分                      | ✅ 已修复   | 13 个 Tab 子组件 + Profile 拆分 + 15 个组件测试（2026-08-14）                                               |
 | P2     | OAuth Secret 硬编码                  | ✅ 已修复   | oauthConfig.js 集中读取：环境变量优先，未配置回退半公开默认值（曾改为缺失 503 导致线上登录故障，已回滚）    |
 | P2     | auth.js localStorage 分散            | ✅ 已修复   | 新增 authStorage.js 集中管理 6 个 key，迁移逻辑独立                                                         |
 | P2     | 错误处理不统一                       | ✅ 已修复   | 新增 utils/errors.js（errorResponse + upstreamError），后端两处路由统一引用；前端部分遗留                   |
-| P2     | 无 E2E 测试                          | 待修复      | 引入 Playwright                                                                                             |
+| P2     | 无 E2E 测试                          | ⚠️ 部分改善 | 组件测试已补齐（CollectionButton/Detail Tabs/Profile）；Playwright E2E 仍待引入                             |
 | P2     | X-Bangumi-Username 可伪造            | ✅ 已修复   | userVerify.js：/v0/me 首次验证 + 10 分钟 TTL 缓存，不匹配 403，上游异常 fail-open；6 个单测                 |
 | P2     | 速率限制内存级                       | 待修复      | 评估 KV 方案                                                                                                |
 | P3     | 页面切换动画                         | ✅ 已修复   | prefers-reduced-motion（`6e1147a`）                                                                         |
@@ -330,4 +331,17 @@
 
 ---
 
-_本文档基于 2026-07-23 代码审查生成，并于 2026-07-23 更新修复状态；2026-08-13 完成两轮深挖修复（第一轮：收藏冗余请求、\_server.js 自动重建、OAuth Secret、groups.js linkedom、authStorage、SEO meta、Tab 预取、TextDecoder 检测；第二轮：错误处理统一、Turnstile 降级、B站/豆瓣文案、groups Cache API、直登 401 提示、username 伪造防护），测试 186 → 199 passed。供后续优化参考。_
+_本文档基于 2026-07-23 代码审查生成，并于 2026-07-23 更新修复状态；2026-08-13 完成两轮深挖修复（第一轮：收藏冗余请求、\_server.js 自动重建、OAuth Secret、groups.js linkedom、authStorage、SEO meta、Tab 预取、TextDecoder 检测；第二轮：错误处理统一、Turnstile 降级、B站/豆瓣文案、groups Cache API、直登 401 提示、username 伪造防护），测试 186 → 199 passed。_
+
+### 2026-08-14 第三轮修复（工程质量批次）
+
+1. **CI 收紧**：[ci.yml](file:///d:/Bangmio%20v4/.github/workflows/ci.yml) 移除 lint/test 两处 continue-on-error（此前注释声称"有较多 lint 错误"，实测早已全绿），CI 恢复真实把关能力。
+2. **组件测试基础设施**：根目录安装 @vue/test-utils + jsdom + @vitejs/plugin-vue，[vitest.config.js](file:///d:/Bangmio%20v4/vitest.config.js) 增加 vue 插件、environmentMatchGlobs（components 目录用 jsdom）与 vue 单一实例 alias（解决根依赖与 client 依赖双 vue 实例导致响应式更新失效的问题）；[CollectionButton.test.js](file:///d:/Bangmio%20v4/client/src/components/CollectionButton.test.js) 移除依赖缺失跳过逻辑，6 个用例真实执行。
+3. **服务端双 package 合并**：删除 server/package.json、server/package-lock.json 与 server/node_modules（内含旧 hono 4.9），后端统一使用根目录 hono 4.12.29（bundle 已重建）；@hono/node-server 上移根 devDependencies。
+4. **本地开发脚本修复**：dev:server 入口从 server/src/app.js（不监听端口，原脚本无效）改为 server/src/index.js，新增 server:start。
+5. **文档对齐**：[client/.env.example](file:///d:/Bangmio%20v4/client/.env.example) 变量名 VITE_API_BASE_URL → VITE_API_BASE（与代码一致）。
+6. **仓库卫生**：[.gitignore](file:///d:/Bangmio%20v4/.gitignore) 忽略实验性爬虫目录 ScrapyDouban-analysis/。
+7. **大文件拆分**：Detail.vue 1277 → 约 560 行（13 个 Tab 子组件），Profile.vue 1036 → 约 580 行（3 个子组件 + 工具函数），详见 3.3。
+8. **测试覆盖**：220 passed / 0 skipped（新增 6 个 CollectionButton + 10 个 Detail Tabs + 5 个 Profile 组件用例）。
+
+_供后续优化参考。_

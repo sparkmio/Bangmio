@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   build:
@@ -28,11 +28,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
-        continue-on-error: true  # 当前有较多 lint 错误，不阻塞 CI
 
       - name: Test
         run: npm test
-        continue-on-error: true  # 测试可能不全，不阻塞初期 CI
 
       - name: Build
         run: npm run build

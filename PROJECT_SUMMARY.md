@@ -25,7 +25,7 @@ Bangmio 是 [Bangumi (bgm.tv)](https://bgm.tv) 的第三方客户端，提供动
 | 邮件     | Resend（发件人 `Bangmio <signup@bangmio.site>`）               |
 | 人机验证 | Cloudflare Turnstile                                           |
 | 部署     | Cloudflare Pages（构建产物 `client/dist`）                     |
-| 测试     | Vitest（186 passed / 6 skipped）                               |
+| 测试     | Vitest（220 passed / 0 skipped）                               |
 
 ### 脚本（根 package.json）
 
@@ -255,7 +255,7 @@ database_name = "bangmio-users"
 
 ## 九、构建与部署流程
 
-1. `npm test` — 运行 Vitest（186 passed / 6 skipped）
+1. `npm test` — 运行 Vitest（220 passed / 0 skipped）
 2. `npm run lint` — ESLint 检查
 3. `npm run build` — 依次执行：
    - `server:build`：esbuild 打包后端到 `functions/api/_server.js`（+ `_meta.json`）

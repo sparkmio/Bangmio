@@ -34,3 +34,6 @@ client/.env.*.local
 
 # 含硬编码 API Key 的本地脚本，禁止提交
 send_email.js
+
+# 豆瓣反爬实验项目（独立的 Scrapy 工程，不属于本仓库）
+ScrapyDouban-analysis/

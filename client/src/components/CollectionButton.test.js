@@ -1,32 +1,12 @@
 /**
  * Task 13: CollectionButton 状态同步逻辑测试
  *
- * 依赖说明：
- *   本测试依赖 `@vue/test-utils` 与 `jsdom` 环境，但项目当前未安装该依赖。
- *   运行前需先安装：
- *     cd client && npm install -D @vue/test-utils jsdom
- *   并为 .vue 组件测试启用 jsdom 环境（修改 vitest.config.js）：
- *     test: {
- *       environment: 'jsdom',
- *       // 或使用 environmentMatchGlobs 区分纯函数测试（node）与组件测试（jsdom）
- *     }
- *
- *   依赖缺失时，所有用例会被 describe.skip 自动跳过，不影响其它测试文件。
+ * 环境要求：jsdom（vitest.config.js 中 environmentMatchGlobs 已为
+ * client/src/components/** 下的测试配置），依赖 @vue/test-utils（根 devDependencies）。
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-
-// 动态加载可选依赖；缺失时跳过整套测试
-let mount = null
-let CollectionButton = null
-let dependencyMissing = false
-
-try {
-  const vueTestUtils = await import('@vue/test-utils')
-  mount = vueTestUtils.mount
-  CollectionButton = (await import('./CollectionButton.vue')).default
-} catch {
-  dependencyMissing = true
-}
+import { mount } from '@vue/test-utils'
+import CollectionButton from './CollectionButton.vue'
 
 function makeProps(overrides = {}) {
   return {
@@ -40,9 +20,7 @@ function makeProps(overrides = {}) {
   }
 }
 
-const suite = dependencyMissing ? describe.skip : describe
-
-suite('CollectionButton / 状态同步逻辑', () => {
+describe('CollectionButton / 状态同步逻辑', () => {
   let wrapper
 
   beforeEach(() => {

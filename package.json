@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "npm run dev --prefix client",
-    "dev:server": "node --watch server/src/app.js",
+    "dev:server": "node --watch server/src/index.js",
+    "server:start": "node server/src/index.js",
     "dev:all": "concurrently -n server,client -c yellow,cyan \"npm:dev:server\" \"npm:dev\"",
     "build": "npm run server:build && npm run bundle:size && cd client && npm install --no-audit --no-fund && npm run build",
     "server:build": "npx esbuild server/src/app.js --bundle --platform=node --format=esm --outfile=functions/api/_server.js --metafile=functions/api/_meta.json",
@@ -19,8 +20,13 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "@hono/node-server": "^1.17.0",
+    "@vitejs/plugin-vue": "^5.2.4",
+    "@vue/test-utils": "^2.4.6",
     "concurrently": "^9.1.0",
+    "vue": "^3.5.34",
     "esbuild": "^0.28.1",
+    "jsdom": "^25.0.1",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vue": "^9.27.0",
