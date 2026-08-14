@@ -245,7 +245,7 @@ describe('GET /page/:name', () => {
     )
   })
 
-  it('上游抓取失败返回 200 与降级 HTML（直达链接，四源尝试）', async () => {
+  it('上游抓取失败返回 200 与降级 HTML（直达链接，五源尝试）', async () => {
     fetchHTML.mockRejectedValue(new Error('upstream unavailable'))
 
     const res = await app.request('/page/FailPage', { method: 'GET' })
@@ -259,8 +259,8 @@ describe('GET /page/:name', () => {
     expect(html).toContain('https://zh.moegirl.org.cn/FailPage')
     expect(html).toContain('https://zh.moegirl.uk/FailPage')
 
-    // 四源尝试：vector 皮肤 + 默认皮肤，国内 + 海外
-    expect(fetchHTML).toHaveBeenCalledTimes(4)
+    // 五源尝试：国内 vector/默认/移动端 + 海外 vector/默认
+    expect(fetchHTML).toHaveBeenCalledTimes(5)
     expect(fetchHTML).toHaveBeenNthCalledWith(
       1,
       'https://zh.moegirl.org.cn/FailPage?useskin=vector',
@@ -273,11 +273,16 @@ describe('GET /page/:name', () => {
     )
     expect(fetchHTML).toHaveBeenNthCalledWith(
       3,
-      'https://zh.moegirl.uk/FailPage?useskin=vector',
+      'https://mzh.moegirl.org.cn/FailPage',
       expect.objectContaining({ headers: expect.any(Object) })
     )
     expect(fetchHTML).toHaveBeenNthCalledWith(
       4,
+      'https://zh.moegirl.uk/FailPage?useskin=vector',
+      expect.objectContaining({ headers: expect.any(Object) })
+    )
+    expect(fetchHTML).toHaveBeenNthCalledWith(
+      5,
       'https://zh.moegirl.uk/FailPage',
       expect.objectContaining({ headers: expect.any(Object) })
     )

@@ -2,6 +2,7 @@ import { parseHTML } from 'linkedom'
 import { fetchHTML } from '../utils/http.js'
 
 const DOUBAN_API = 'https://movie.douban.com'
+const SEARCH_SUGGEST_API = 'https://www.douban.com'
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
 
@@ -14,11 +15,59 @@ function collapseSpace(s) {
 }
 
 /**
- * 在豆瓣搜索条目（基于豆瓣 suggest 接口，常用于番剧→豆瓣关联匹配）。
+ * 解析 www.douban.com/j/search_suggest 的返回结构。
+ * cards[].card_subtitle 形如 "9.0分 / 2022 / 日本 / 动画 音乐 / 斋藤圭一郎 / 青山吉能 铃代纱弓"。
+ * @param {object} json - search_suggest 原始 JSON。
+ * @returns {Array<{ id: string, title: string, year: string, rate: string, cover: string }>}
+ */
+function parseSearchSuggest(json) {
+  const cards = json?.cards || []
+  return cards
+    .filter(c => c?.url)
+    .map(c => {
+      const m = String(c.url || '').match(/\/subject\/(\d+)\//)
+      const rateMatch = String(c.card_subtitle || '').match(/([\d.]+)分/)
+      return {
+        id: m ? m[1] : '',
+        title: c.title || '',
+        year: c.year || '',
+        rate: rateMatch ? rateMatch[1] : '',
+        cover: c.cover_url || ''
+      }
+    })
+    .filter(c => c.id)
+}
+
+/**
+ * 在豆瓣搜索条目（番剧→豆瓣关联匹配）。
+ * 优先 www.douban.com/j/search_suggest（自带评分摘要），失败或为空时回退
+ * movie.douban.com/j/subject_suggest（旧接口）。
  * @param {string} name - 搜索关键词（番剧名等）。
- * @returns {Promise<Array<Object>>} 豆瓣 suggest 返回的候选条目数组，可能为空。
+ * @returns {Promise<Array<Object>>} 候选条目数组，可能为空。
  */
 export async function searchDouban(name) {
+  // 优先 search_suggest
+  try {
+    const res = await fetch(
+      `${SEARCH_SUGGEST_API}/j/search_suggest?q=${encodeURIComponent(name)}`,
+      {
+        headers: {
+          'User-Agent': UA,
+          Referer: 'https://www.douban.com/',
+          Accept: 'application/json, text/plain, */*',
+          'Accept-Language': 'zh-CN,zh;q=0.9'
+        }
+      }
+    )
+    if (res.ok) {
+      const data = await res.json()
+      const parsed = parseSearchSuggest(data)
+      if (parsed.length) return parsed
+    }
+  } catch {
+    // 回退到 subject_suggest
+  }
+
   const url = `${DOUBAN_API}/j/subject_suggest?q=${encodeURIComponent(name)}`
   const res = await fetch(url, {
     headers: { 'User-Agent': UA, Referer: 'https://movie.douban.com/' }

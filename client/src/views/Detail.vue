@@ -716,7 +716,15 @@
             @fallback="onDoubanFallback"
           />
         </div>
-        <div v-else class="py-10 text-center text-base-content/40 text-sm">未找到豆瓣条目</div>
+        <div v-else class="py-10 text-center">
+          <p class="text-base-content/40 text-sm mb-3">未找到豆瓣条目</p>
+          <a
+            :href="`https://www.douban.com/search?q=${encodeURIComponent(anime.name_cn || anime.name)}`"
+            target="_blank"
+            class="btn btn-sm btn-ghost text-primary"
+            >前往豆瓣搜索 →</a
+          >
+        </div>
       </div>
 
       <!-- 音乐 -->
@@ -815,7 +823,15 @@
           loading-text="正在加载萌娘百科..."
           @fallback="onMoegirlFallback"
         />
-        <div v-else class="py-10 text-center text-base-content/40 text-sm">未找到萌娘百科条目</div>
+        <div v-else class="py-10 text-center">
+          <p class="text-base-content/40 text-sm mb-3">未找到萌娘百科条目</p>
+          <a
+            :href="`https://zh.moegirl.org.cn/index.php?search=${encodeURIComponent(anime.name_cn || anime.name)}`"
+            target="_blank"
+            class="btn btn-sm btn-ghost text-primary"
+            >前往萌娘百科搜索 →</a
+          >
+        </div>
       </div>
     </div>
   </div>

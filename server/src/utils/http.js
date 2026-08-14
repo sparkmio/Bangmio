@@ -123,16 +123,17 @@ export async function fetchHTML(url, { timeout = 12000, headers = {} } = {}) {
  * - 全部失败后抛出最后一个错误。
  *
  * @param {string[]} urls - 候选 URL 数组。
- * @param {{ timeout?: number, overallTimeout?: number, retries?: number }} [opts]
+ * @param {{ timeout?: number, overallTimeout?: number, retries?: number, headers?: Record<string, string> }} [opts]
  *   - timeout: 单次请求超时时间（毫秒），默认 8000。
  *   - overallTimeout: 整体超时时间（毫秒），默认 18000。
  *   - retries: 单个源失败后的重试次数，默认 1。
+ *   - headers: 透传给每次 fetchHTML 的额外请求头（与默认头合并）。
  * @returns {Promise<{ html: string, url: string }>} 成功的 HTML 及对应 URL。
  * @throws {Error} 当所有 URL 均失败或整体超时时抛出错误。
  */
 export async function fetchHTMLMulti(
   urls,
-  { timeout = 8000, overallTimeout = 18000, retries = 1 } = {}
+  { timeout = 8000, overallTimeout = 18000, retries = 1, headers = {} } = {}
 ) {
   if (!urls || urls.length === 0) {
     throw new Error('All sources failed')
@@ -143,7 +144,7 @@ export async function fetchHTMLMulti(
   const fetchOneWithRetry = async url => {
     for (let i = 0; i <= retries; i++) {
       try {
-        const html = await fetchHTML(url, { timeout })
+        const html = await fetchHTML(url, { timeout, headers })
         if (html) return { html, url }
       } catch (e) {
         lastErr = e

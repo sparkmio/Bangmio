@@ -144,14 +144,24 @@ function getMoegirlBase(c) {
 
 async function fetchMoegirlJSON(apiBase, params) {
   const url = `${apiBase}?${params}`
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Bangmio/1.0',
-      Accept: 'application/json'
-    }
-  })
-  if (!res.ok) return null
-  return await res.json()
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 10000)
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Bangmio/1.0',
+        Accept: 'application/json'
+      }
+    })
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 function parseSearchResults(json) {
@@ -350,6 +360,7 @@ app.get('/page/:name', async c => {
   const candidates = [
     `https://zh.moegirl.org.cn/${encoded}?useskin=vector`,
     `https://zh.moegirl.org.cn/${encoded}`,
+    `https://mzh.moegirl.org.cn/${encoded}`,
     `https://zh.moegirl.uk/${encoded}?useskin=vector`,
     `https://zh.moegirl.uk/${encoded}`
   ]

@@ -320,16 +320,6 @@ app.post('/oauth-bind-callback', jwtAuth(), async c => {
       return c.json({ data: null, error: '缺少授权码或 state', code: 400 }, 400)
     }
     const { appId, appSecret } = getOAuthCredentials(c.env, '/auth/oauth-bind-callback')
-    if (!appSecret) {
-      return c.json(
-        {
-          data: null,
-          error: 'OAuth 服务未配置（缺少 BGM_APP_SECRET 环境变量），请使用 Bangumi 直登',
-          code: 503
-        },
-        503
-      )
-    }
     const result = await bindBangumiByOAuth(c.env.DB, c.env, {
       code,
       state,

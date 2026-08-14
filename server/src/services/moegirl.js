@@ -24,10 +24,11 @@ export async function getMoegirlSummary(name, base = DEFAULT_BASE) {
   const encoded = encodeURIComponent(name)
   const result = { title: name, extract: '', url: `${base}/${encoded}` }
 
-  // 优先尝试 vector 皮肤，再回退默认皮肤；国内/海外双源容错
+  // 优先尝试 vector 皮肤，再回退默认皮肤；国内/移动/海外多源容错
   const candidates = [
     `${DEFAULT_BASE}/${encoded}?useskin=vector`,
     `${DEFAULT_BASE}/${encoded}`,
+    `https://mzh.moegirl.org.cn/${encoded}`,
     `https://zh.moegirl.uk/${encoded}?useskin=vector`,
     `https://zh.moegirl.uk/${encoded}`
   ]

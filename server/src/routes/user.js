@@ -5,17 +5,6 @@ import { getOAuthCredentials } from '../utils/oauthConfig.js'
 
 const app = new Hono()
 
-/** OAuth App Secret 未配置时的统一错误响应（Bangumi 直登走 OAuth 需要它） */
-function oauthNotConfigured(c) {
-  return c.json(
-    {
-      error:
-        'OAuth 服务未配置（缺少 BGM_APP_SECRET 环境变量），请使用 Bangumi 直登（粘贴 Access Token）'
-    },
-    503
-  )
-}
-
 function isChina(c) {
   return (c.env?.CF_IP_COUNTRY || '') === 'CN'
 }
@@ -74,7 +63,6 @@ app.post('/oauth-callback', async c => {
     const { code } = await c.req.json()
     if (!code) return c.json({ error: '缺少授权码' }, 400)
     const { appId, appSecret } = getOAuthCredentials(c.env, '/user/oauth-callback')
-    if (!appSecret) return oauthNotConfigured(c)
     const params = new URLSearchParams({
       grant_type: 'authorization_code',
       client_id: appId,
@@ -104,7 +92,6 @@ app.post('/refresh-token', async c => {
     const { refreshToken } = await c.req.json()
     if (!refreshToken) return c.json({ error: '缺少 refresh token' }, 400)
     const { appId, appSecret } = getOAuthCredentials(c.env, '/user/refresh-token')
-    if (!appSecret) return oauthNotConfigured(c)
     const params = new URLSearchParams({
       grant_type: 'refresh_token',
       client_id: appId,

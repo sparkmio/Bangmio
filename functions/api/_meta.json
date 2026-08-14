@@ -361,7 +361,7 @@
     "server/src/db/emailCodes.js": { "bytes": 4928, "imports": [], "format": "esm" },
     "server/src/utils/email.js": { "bytes": 3818, "imports": [], "format": "esm" },
     "server/src/utils/http.js": {
-      "bytes": 7707,
+      "bytes": 7852,
       "imports": [
         {
           "path": "server/src/utils/logger.js",
@@ -414,7 +414,7 @@
     },
     "server/src/utils/turnstile.js": { "bytes": 2375, "imports": [], "format": "esm" },
     "server/src/utils/oauthConfig.js": {
-      "bytes": 1116,
+      "bytes": 1470,
       "imports": [
         {
           "path": "server/src/utils/logger.js",
@@ -426,7 +426,7 @@
     },
     "server/src/utils/errors.js": { "bytes": 1962, "imports": [], "format": "esm" },
     "server/src/routes/auth.js": {
-      "bytes": 14569,
+      "bytes": 14328,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -473,7 +473,7 @@
     },
     "server/src/services/bangumi.js": { "bytes": 10766, "imports": [], "format": "esm" },
     "server/src/routes/user.js": {
-      "bytes": 16386,
+      "bytes": 15976,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -4902,7 +4902,7 @@
       "format": "esm"
     },
     "server/src/services/douban.js": {
-      "bytes": 10055,
+      "bytes": 11595,
       "imports": [
         {
           "path": "node_modules/linkedom/esm/index.js",
@@ -4918,7 +4918,7 @@
       "format": "esm"
     },
     "server/src/routes/douban.js": {
-      "bytes": 11601,
+      "bytes": 14862,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -4982,7 +4982,7 @@
       "format": "esm"
     },
     "server/src/services/moegirl.js": {
-      "bytes": 3131,
+      "bytes": 3184,
       "imports": [
         {
           "path": "node_modules/linkedom/esm/index.js",
@@ -4998,7 +4998,7 @@
       "format": "esm"
     },
     "server/src/routes/moegirl.js": {
-      "bytes": 12970,
+      "bytes": 13357,
       "imports": [
         {
           "path": "server/node_modules/hono/dist/index.js",
@@ -5232,14 +5232,14 @@
         "server/src/db/users.js": { "bytesInOutput": 4072 },
         "server/src/db/emailCodes.js": { "bytesInOutput": 2239 },
         "server/src/utils/email.js": { "bytesInOutput": 2721 },
-        "server/src/utils/http.js": { "bytesInOutput": 3429 },
+        "server/src/utils/http.js": { "bytesInOutput": 3472 },
         "server/src/services/auth.js": { "bytesInOutput": 9837 },
         "server/src/utils/turnstile.js": { "bytesInOutput": 867 },
-        "server/src/utils/oauthConfig.js": { "bytesInOutput": 395 },
+        "server/src/utils/oauthConfig.js": { "bytesInOutput": 488 },
         "server/src/utils/errors.js": { "bytesInOutput": 834 },
-        "server/src/routes/auth.js": { "bytesInOutput": 9752 },
+        "server/src/routes/auth.js": { "bytesInOutput": 9453 },
         "server/src/services/bangumi.js": { "bytesInOutput": 5574 },
-        "server/src/routes/user.js": { "bytesInOutput": 15612 },
+        "server/src/routes/user.js": { "bytesInOutput": 15236 },
         "server/src/controllers/animeController.js": { "bytesInOutput": 4411 },
         "server/src/routes/anime.js": { "bytesInOutput": 683 },
         "server/src/services/userVerify.js": { "bytesInOutput": 787 },
@@ -5469,17 +5469,17 @@
         "node_modules/linkedom/esm/index.js": { "bytesInOutput": 242 },
         "server/src/utils/cache.js": { "bytesInOutput": 906 },
         "server/src/routes/comments.js": { "bytesInOutput": 17997 },
-        "server/src/services/douban.js": { "bytesInOutput": 6743 },
-        "server/src/routes/douban.js": { "bytesInOutput": 9070 },
+        "server/src/services/douban.js": { "bytesInOutput": 7732 },
+        "server/src/routes/douban.js": { "bytesInOutput": 12078 },
         "server/src/routes/bilibili.js": { "bytesInOutput": 3024 },
-        "server/src/services/moegirl.js": { "bytesInOutput": 2023 },
-        "server/src/routes/moegirl.js": { "bytesInOutput": 9862 },
+        "server/src/services/moegirl.js": { "bytesInOutput": 2068 },
+        "server/src/routes/moegirl.js": { "bytesInOutput": 10251 },
         "server/src/routes/groups.js": { "bytesInOutput": 13712 },
         "server/src/services/music.js": { "bytesInOutput": 3261 },
         "server/src/routes/music.js": { "bytesInOutput": 604 },
         "server/src/app.js": { "bytesInOutput": 2087 }
       },
-      "bytes": 690817
+      "bytes": 694709
     }
   }
 }

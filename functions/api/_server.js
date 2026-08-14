@@ -4360,7 +4360,7 @@ async function fetchHTML(url, { timeout = 12e3, headers: headers2 = {} } = {}) {
     throw e;
   }
 }
-async function fetchHTMLMulti(urls, { timeout = 8e3, overallTimeout = 18e3, retries = 1 } = {}) {
+async function fetchHTMLMulti(urls, { timeout = 8e3, overallTimeout = 18e3, retries = 1, headers: headers2 = {} } = {}) {
   if (!urls || urls.length === 0) {
     throw new Error("All sources failed");
   }
@@ -4368,7 +4368,7 @@ async function fetchHTMLMulti(urls, { timeout = 8e3, overallTimeout = 18e3, retr
   const fetchOneWithRetry = async (url) => {
     for (let i = 0; i <= retries; i++) {
       try {
-        const html = await fetchHTML(url, { timeout });
+        const html = await fetchHTML(url, { timeout, headers: headers2 });
         if (html) return { html, url };
       } catch (e) {
         lastErr = e;
@@ -4699,11 +4699,12 @@ async function verifyTurnstile(token, secret, remoteip) {
 
 // server/src/utils/oauthConfig.js
 var DEFAULT_BGM_APP_ID = "bgm61416a088eff71580";
+var DEFAULT_BGM_APP_SECRET = "6b8055c0159fcc5e998059536813026f";
 function getOAuthCredentials(env, logPath = "oauth") {
   const appId = env?.BGM_APP_ID || DEFAULT_BGM_APP_ID;
-  const appSecret = env?.BGM_APP_SECRET || null;
-  if (!appSecret) {
-    logError("BGM_APP_SECRET \u672A\u914D\u7F6E\uFF0COAuth \u6388\u6743\u7801\u6D41\u7A0B\u4E0D\u53EF\u7528", { path: logPath });
+  const appSecret = env?.BGM_APP_SECRET || DEFAULT_BGM_APP_SECRET;
+  if (!env?.BGM_APP_SECRET) {
+    logError("BGM_APP_SECRET \u672A\u914D\u7F6E\uFF0C\u56DE\u9000\u5230\u5185\u7F6E\u9ED8\u8BA4\u51ED\u636E", { path: logPath });
   }
   return { appId, appSecret };
 }
@@ -4902,16 +4903,6 @@ app.post("/oauth-bind-callback", jwtAuth(), async (c) => {
       return c.json({ data: null, error: "\u7F3A\u5C11\u6388\u6743\u7801\u6216 state", code: 400 }, 400);
     }
     const { appId, appSecret } = getOAuthCredentials(c.env, "/auth/oauth-bind-callback");
-    if (!appSecret) {
-      return c.json(
-        {
-          data: null,
-          error: "OAuth \u670D\u52A1\u672A\u914D\u7F6E\uFF08\u7F3A\u5C11 BGM_APP_SECRET \u73AF\u5883\u53D8\u91CF\uFF09\uFF0C\u8BF7\u4F7F\u7528 Bangumi \u76F4\u767B",
-          code: 503
-        },
-        503
-      );
-    }
     const result = await bindBangumiByOAuth(c.env.DB, c.env, {
       code,
       state,
@@ -5135,14 +5126,6 @@ async function getPersonSubjects(id, opts) {
 
 // server/src/routes/user.js
 var app2 = new Hono2();
-function oauthNotConfigured(c) {
-  return c.json(
-    {
-      error: "OAuth \u670D\u52A1\u672A\u914D\u7F6E\uFF08\u7F3A\u5C11 BGM_APP_SECRET \u73AF\u5883\u53D8\u91CF\uFF09\uFF0C\u8BF7\u4F7F\u7528 Bangumi \u76F4\u767B\uFF08\u7C98\u8D34 Access Token\uFF09"
-    },
-    503
-  );
-}
 function isChina2(c) {
   return (c.env?.CF_IP_COUNTRY || "") === "CN";
 }
@@ -5194,7 +5177,6 @@ app2.post("/oauth-callback", async (c) => {
     const { code } = await c.req.json();
     if (!code) return c.json({ error: "\u7F3A\u5C11\u6388\u6743\u7801" }, 400);
     const { appId, appSecret } = getOAuthCredentials(c.env, "/user/oauth-callback");
-    if (!appSecret) return oauthNotConfigured(c);
     const params = new URLSearchParams({
       grant_type: "authorization_code",
       client_id: appId,
@@ -5223,7 +5205,6 @@ app2.post("/refresh-token", async (c) => {
     const { refreshToken } = await c.req.json();
     if (!refreshToken) return c.json({ error: "\u7F3A\u5C11 refresh token" }, 400);
     const { appId, appSecret } = getOAuthCredentials(c.env, "/user/refresh-token");
-    if (!appSecret) return oauthNotConfigured(c);
     const params = new URLSearchParams({
       grant_type: "refresh_token",
       client_id: appId,
@@ -16890,6 +16871,7 @@ var comments_default = app5;
 
 // server/src/services/douban.js
 var DOUBAN_API = "https://movie.douban.com";
+var SEARCH_SUGGEST_API = "https://www.douban.com";
 var UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 function stripTags2(s) {
   return (s || "").replace(/<[^>]+>/g, "").trim();
@@ -16897,7 +16879,37 @@ function stripTags2(s) {
 function collapseSpace(s) {
   return (s || "").replace(/\s+/g, " ").trim();
 }
+function parseSearchSuggest(json) {
+  const cards = json?.cards || [];
+  return cards.filter((c) => c?.url).map((c) => {
+    const m = String(c.url || "").match(/\/subject\/(\d+)\//);
+    const rateMatch = String(c.card_subtitle || "").match(/([\d.]+)分/);
+    return {
+      id: m ? m[1] : "",
+      title: c.title || "",
+      year: c.year || "",
+      rate: rateMatch ? rateMatch[1] : "",
+      cover: c.cover_url || ""
+    };
+  }).filter((c) => c.id);
+}
 async function searchDouban(name) {
+  try {
+    const res2 = await fetch(`${SEARCH_SUGGEST_API}/j/search_suggest?q=${encodeURIComponent(name)}`, {
+      headers: {
+        "User-Agent": UA,
+        Referer: "https://www.douban.com/",
+        Accept: "application/json, text/plain, */*",
+        "Accept-Language": "zh-CN,zh;q=0.9"
+      }
+    });
+    if (res2.ok) {
+      const data2 = await res2.json();
+      const parsed = parseSearchSuggest(data2);
+      if (parsed.length) return parsed;
+    }
+  } catch {
+  }
   const url = `${DOUBAN_API}/j/subject_suggest?q=${encodeURIComponent(name)}`;
   const res = await fetch(url, {
     headers: { "User-Agent": UA, Referer: "https://movie.douban.com/" }
@@ -17262,13 +17274,56 @@ app6.get("/:id/summary", async (c) => {
     return c.json({ data: null });
   }
 });
-function buildDoubanFallbackHTML(id) {
+async function buildDoubanRichFallback(id) {
   const url = `https://movie.douban.com/subject/${id}/`;
-  return `<div style="text-align:center;padding:2.5rem 1rem;font-family:system-ui,-apple-system,'Segoe UI',sans-serif">
+  let s = null;
+  try {
+    const abstract = await getDoubanAbstract(id);
+    s = abstract || null;
+  } catch {
+    s = null;
+  }
+  if (!s || !s.title) {
+    return `<div style="text-align:center;padding:2.5rem 1rem;font-family:system-ui,-apple-system,'Segoe UI',sans-serif">
   <div style="display:inline-block;padding:1.5rem 2rem;background:#fff5f6;border:1px solid #ffd6dd;border-radius:12px;max-width:400px">
     <p style="margin:0 0 0.5rem;font-size:1rem;color:#666">\u8C46\u74E3\u9875\u9762\u6682\u65E0\u6CD5\u5D4C\u5165</p>
     <p style="margin:0 0 1rem;font-size:0.85rem;color:#999">\u8C46\u74E3\u5BF9\u7B2C\u4E09\u65B9\u670D\u52A1\u5668\u6709\u8BBF\u95EE\u9650\u5236\uFF0C\u8BF7\u76F4\u63A5\u8BBF\u95EE\u8C46\u74E3\u67E5\u770B\u5B8C\u6574\u5185\u5BB9</p>
     <a href="${url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:0.5rem 1.25rem;background:#ff6b81;color:#fff;text-decoration:none;border-radius:999px;font-size:0.9rem;font-weight:500">\u524D\u5F80\u8C46\u74E3\u67E5\u770B \u2192</a>
+  </div>
+</div>`;
+  }
+  const title = String(s.title || "").replace(/\s*\((\d{4})\)\s*$/, "").replace(/（豆瓣）$/, "");
+  const rate = s.rate || "";
+  const star = Number(s.star) || 0;
+  const stars = "\u2605".repeat(Math.round(star / 2)) + "\u2606".repeat(5 - Math.round(star / 2));
+  const meta = [
+    s.release_year ? `${s.release_year} \u5E74` : "",
+    s.region || "",
+    (s.types || []).join(" / "),
+    s.episodes_count ? `${s.episodes_count} \u96C6` : "",
+    s.duration ? `\u5355\u96C6 ${s.duration}` : ""
+  ].filter(Boolean).join(" \xB7 ");
+  const directors = (s.directors || []).join(" / ");
+  const actors = (s.actors || []).slice(0, 6).join(" / ");
+  const comment = s.short_comment?.content ? String(s.short_comment.content).replace(/\n/g, "<br>") : "";
+  return `<div style="font-family:system-ui,-apple-system,'Segoe UI','PingFang SC',sans-serif;padding:1.25rem;background:#fff;color:#333">
+  <div style="display:flex;gap:1rem;align-items:flex-start;flex-wrap:wrap">
+    <div style="flex:1;min-width:220px">
+      <h1 style="margin:0 0 0.4rem;font-size:1.25rem;line-height:1.4">${title}</h1>
+      <div style="display:flex;align-items:baseline;gap:0.5rem;margin-bottom:0.3rem">
+        <span style="font-size:2rem;font-weight:700;color:#e09015">${rate || "\u2014"}</span>
+        <span style="color:#e09015;letter-spacing:2px">${stars}</span>
+      </div>
+      <p style="margin:0 0 0.75rem;font-size:0.85rem;color:#666">${meta}</p>
+      ${directors ? `<p style="margin:0 0 0.25rem;font-size:0.85rem;color:#666">\u5BFC\u6F14\uFF1A${directors}</p>` : ""}
+      ${actors ? `<p style="margin:0 0 0.75rem;font-size:0.85rem;color:#666">\u4E3B\u6F14\uFF1A${actors}</p>` : ""}
+      ${comment ? `<div style="background:#f9f9f9;border-left:3px solid #ff6b81;padding:0.6rem 0.8rem;font-size:0.85rem;color:#555;line-height:1.6;border-radius:0 8px 8px 0;margin-bottom:0.75rem"><b>\u70ED\u95E8\u77ED\u8BC4</b>\uFF1A${comment}</div>` : ""}
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+        <a href="${url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:0.45rem 1rem;background:#ff6b81;color:#fff;text-decoration:none;border-radius:999px;font-size:0.85rem;font-weight:500">\u524D\u5F80\u8C46\u74E3\u67E5\u770B \u2192</a>
+        <a href="${url}comments?status=P" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:0.45rem 1rem;background:#fff;color:#ff6b81;border:1px solid #ff6b81;text-decoration:none;border-radius:999px;font-size:0.85rem">\u67E5\u770B\u77ED\u8BC4</a>
+      </div>
+      <p style="margin:0.6rem 0 0;font-size:0.75rem;color:#aaa">\u8C46\u74E3\u9650\u5236\u7B2C\u4E09\u65B9\u9875\u9762\u5D4C\u5165\uFF0C\u6B64\u5904\u5C55\u793A\u7ED3\u6784\u5316\u6458\u8981</p>
+    </div>
   </div>
 </div>`;
 }
@@ -17289,19 +17344,20 @@ app6.get("/page/:id", async (c) => {
         Cookie: `bid=${makeDoubanBid()}; ll="108288"`
       }
     });
-    if (!html || html.length < 1e3 || /login|验证|请输入|forbidden|访问受限/i.test(html)) {
-      const fallback = buildDoubanFallbackHTML(id);
+    const isSubjectPage = /#info|interest_sectl|v:summary|rating_per|allstar/i.test(html || "");
+    if (!html || html.length < 1e3 || !isSubjectPage) {
+      const fallback = await buildDoubanRichFallback(id);
       return c.html(fallback, 200, { "Content-Type": "text/html; charset=utf-8" });
     }
     const fragment = cleanDoubanPage(html);
     if (!fragment || fragment.trim().length < 100) {
-      const fallback = buildDoubanFallbackHTML(id);
+      const fallback = await buildDoubanRichFallback(id);
       return c.html(fallback, 200, { "Content-Type": "text/html; charset=utf-8" });
     }
     pageCache.set(cacheKey, fragment);
     return c.html(fragment, 200, { "Content-Type": "text/html; charset=utf-8" });
   } catch {
-    const fallback = buildDoubanFallbackHTML(id);
+    const fallback = await buildDoubanRichFallback(id);
     return c.html(fallback, 200, { "Content-Type": "text/html; charset=utf-8" });
   }
 });
@@ -17407,6 +17463,7 @@ async function getMoegirlSummary(name, base = DEFAULT_BASE) {
   const candidates = [
     `${DEFAULT_BASE}/${encoded}?useskin=vector`,
     `${DEFAULT_BASE}/${encoded}`,
+    `https://mzh.moegirl.org.cn/${encoded}`,
     `https://zh.moegirl.uk/${encoded}?useskin=vector`,
     `https://zh.moegirl.uk/${encoded}`
   ];
@@ -17549,14 +17606,23 @@ function getMoegirlBase(c) {
 }
 async function fetchMoegirlJSON(apiBase, params) {
   const url = `${apiBase}?${params}`;
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": "Bangmio/1.0",
-      Accept: "application/json"
-    }
-  });
-  if (!res.ok) return null;
-  return await res.json();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 1e4);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Bangmio/1.0",
+        Accept: "application/json"
+      }
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 function parseSearchResults(json) {
   const results = [];
@@ -17698,6 +17764,7 @@ app8.get("/page/:name", async (c) => {
   const candidates = [
     `https://zh.moegirl.org.cn/${encoded}?useskin=vector`,
     `https://zh.moegirl.org.cn/${encoded}`,
+    `https://mzh.moegirl.org.cn/${encoded}`,
     `https://zh.moegirl.uk/${encoded}?useskin=vector`,
     `https://zh.moegirl.uk/${encoded}`
   ];

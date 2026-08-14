@@ -284,17 +284,71 @@ app.get('/:id/summary', async c => {
 })
 
 /**
- * 生成豆瓣降级 HTML：当上游抓取失败时返回，包含直达链接与提示。
+ * 生成豆瓣降级 HTML：当上游页面抓取被反爬拦截时，改用可用 JSON 接口
+ * （/j/subject_abstract）的数据渲染富内容卡片，而非空洞的「无法嵌入」占位。
  * @param {string} id - 豆瓣条目 ID。
- * @returns {string} HTML 片段。
+ * @returns {Promise<string>} HTML 片段。
  */
-function buildDoubanFallbackHTML(id) {
+async function buildDoubanRichFallback(id) {
   const url = `https://movie.douban.com/subject/${id}/`
-  return `<div style="text-align:center;padding:2.5rem 1rem;font-family:system-ui,-apple-system,'Segoe UI',sans-serif">
+  let s = null
+  try {
+    const abstract = await getDoubanAbstract(id)
+    s = abstract || null
+  } catch {
+    s = null
+  }
+
+  if (!s || !s.title) {
+    // 无结构化数据：返回最简占位
+    return `<div style="text-align:center;padding:2.5rem 1rem;font-family:system-ui,-apple-system,'Segoe UI',sans-serif">
   <div style="display:inline-block;padding:1.5rem 2rem;background:#fff5f6;border:1px solid #ffd6dd;border-radius:12px;max-width:400px">
     <p style="margin:0 0 0.5rem;font-size:1rem;color:#666">豆瓣页面暂无法嵌入</p>
     <p style="margin:0 0 1rem;font-size:0.85rem;color:#999">豆瓣对第三方服务器有访问限制，请直接访问豆瓣查看完整内容</p>
     <a href="${url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:0.5rem 1.25rem;background:#ff6b81;color:#fff;text-decoration:none;border-radius:999px;font-size:0.9rem;font-weight:500">前往豆瓣查看 →</a>
+  </div>
+</div>`
+  }
+
+  const title = String(s.title || '')
+    .replace(/\s*\((\d{4})\)\s*$/, '')
+    .replace(/（豆瓣）$/, '')
+  const rate = s.rate || ''
+  const star = Number(s.star) || 0
+  const stars = '★'.repeat(Math.round(star / 2)) + '☆'.repeat(5 - Math.round(star / 2))
+  const meta = [
+    s.release_year ? `${s.release_year} 年` : '',
+    s.region || '',
+    (s.types || []).join(' / '),
+    s.episodes_count ? `${s.episodes_count} 集` : '',
+    s.duration ? `单集 ${s.duration}` : ''
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  const directors = (s.directors || []).join(' / ')
+  const actors = (s.actors || []).slice(0, 6).join(' / ')
+  const comment = s.short_comment?.content
+    ? String(s.short_comment.content).replace(/\n/g, '<br>')
+    : ''
+
+  return `<div style="font-family:system-ui,-apple-system,'Segoe UI','PingFang SC',sans-serif;padding:1.25rem;background:#fff;color:#333">
+  <div style="display:flex;gap:1rem;align-items:flex-start;flex-wrap:wrap">
+    <div style="flex:1;min-width:220px">
+      <h1 style="margin:0 0 0.4rem;font-size:1.25rem;line-height:1.4">${title}</h1>
+      <div style="display:flex;align-items:baseline;gap:0.5rem;margin-bottom:0.3rem">
+        <span style="font-size:2rem;font-weight:700;color:#e09015">${rate || '—'}</span>
+        <span style="color:#e09015;letter-spacing:2px">${stars}</span>
+      </div>
+      <p style="margin:0 0 0.75rem;font-size:0.85rem;color:#666">${meta}</p>
+      ${directors ? `<p style="margin:0 0 0.25rem;font-size:0.85rem;color:#666">导演：${directors}</p>` : ''}
+      ${actors ? `<p style="margin:0 0 0.75rem;font-size:0.85rem;color:#666">主演：${actors}</p>` : ''}
+      ${comment ? `<div style="background:#f9f9f9;border-left:3px solid #ff6b81;padding:0.6rem 0.8rem;font-size:0.85rem;color:#555;line-height:1.6;border-radius:0 8px 8px 0;margin-bottom:0.75rem"><b>热门短评</b>：${comment}</div>` : ''}
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+        <a href="${url}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:0.45rem 1rem;background:#ff6b81;color:#fff;text-decoration:none;border-radius:999px;font-size:0.85rem;font-weight:500">前往豆瓣查看 →</a>
+        <a href="${url}comments?status=P" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:0.45rem 1rem;background:#fff;color:#ff6b81;border:1px solid #ff6b81;text-decoration:none;border-radius:999px;font-size:0.85rem">查看短评</a>
+      </div>
+      <p style="margin:0.6rem 0 0;font-size:0.75rem;color:#aaa">豆瓣限制第三方页面嵌入，此处展示结构化摘要</p>
+    </div>
   </div>
 </div>`
 }
@@ -329,20 +383,23 @@ app.get('/page/:id', async c => {
         Cookie: `bid=${makeDoubanBid()}; ll="108288"`
       }
     })
-    // 检测是否被反爬拦截（登录页/验证页通常很短或包含特定关键词）
-    if (!html || html.length < 1000 || /login|验证|请输入|forbidden|访问受限/i.test(html)) {
-      const fallback = buildDoubanFallbackHTML(id)
+    // 正向判定：豆瓣条目页必含 #info（影片信息）/#interest_sectl（评分区）等核心区块；
+    // 拦截页、验证页、登录页（id="tok"、passport）都没有这些区块，一律走富内容降级。
+    // 不用 /login/ 等关键词负向匹配——正常页导航里也含 login 链接，会误伤。
+    const isSubjectPage = /#info|interest_sectl|v:summary|rating_per|allstar/i.test(html || '')
+    if (!html || html.length < 1000 || !isSubjectPage) {
+      const fallback = await buildDoubanRichFallback(id)
       return c.html(fallback, 200, { 'Content-Type': 'text/html; charset=utf-8' })
     }
     const fragment = cleanDoubanPage(html)
     if (!fragment || fragment.trim().length < 100) {
-      const fallback = buildDoubanFallbackHTML(id)
+      const fallback = await buildDoubanRichFallback(id)
       return c.html(fallback, 200, { 'Content-Type': 'text/html; charset=utf-8' })
     }
     pageCache.set(cacheKey, fragment)
     return c.html(fragment, 200, { 'Content-Type': 'text/html; charset=utf-8' })
   } catch {
-    const fallback = buildDoubanFallbackHTML(id)
+    const fallback = await buildDoubanRichFallback(id)
     return c.html(fallback, 200, { 'Content-Type': 'text/html; charset=utf-8' })
   }
 })
