@@ -351,8 +351,19 @@
       ],
       "format": "esm"
     },
+    "server/src/services/oauth.js": {
+      "bytes": 3071,
+      "imports": [
+        {
+          "path": "server/src/utils/logger.js",
+          "kind": "import-statement",
+          "original": "../utils/logger.js"
+        }
+      ],
+      "format": "esm"
+    },
     "server/src/services/auth.js": {
-      "bytes": 19123,
+      "bytes": 19388,
       "imports": [
         {
           "path": "server/src/utils/crypto.js",
@@ -385,6 +396,11 @@
           "original": "../utils/http.js"
         },
         {
+          "path": "server/src/services/oauth.js",
+          "kind": "import-statement",
+          "original": "./oauth.js"
+        },
+        {
           "path": "server/src/utils/logger.js",
           "kind": "import-statement",
           "original": "../utils/logger.js"
@@ -394,7 +410,7 @@
     },
     "server/src/utils/turnstile.js": { "bytes": 2351, "imports": [], "format": "esm" },
     "server/src/utils/oauthConfig.js": {
-      "bytes": 1012,
+      "bytes": 1076,
       "imports": [
         {
           "path": "server/src/utils/logger.js",
@@ -404,7 +420,7 @@
       ],
       "format": "esm"
     },
-    "server/src/utils/errors.js": { "bytes": 1962, "imports": [], "format": "esm" },
+    "server/src/utils/errors.js": { "bytes": 2232, "imports": [], "format": "esm" },
     "server/src/routes/auth.js": {
       "bytes": 14438,
       "imports": [
@@ -475,7 +491,7 @@
     },
     "server/src/services/bangumi.js": { "bytes": 10766, "imports": [], "format": "esm" },
     "server/src/routes/user.js": {
-      "bytes": 17775,
+      "bytes": 17970,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -491,6 +507,11 @@
           "path": "server/src/services/bangumi.js",
           "kind": "import-statement",
           "original": "../services/bangumi.js"
+        },
+        {
+          "path": "server/src/services/oauth.js",
+          "kind": "import-statement",
+          "original": "../services/oauth.js"
         },
         {
           "path": "server/src/utils/http.js",
@@ -5256,15 +5277,16 @@
         "server/src/db/emailCodes.js": { "bytesInOutput": 2239 },
         "server/src/utils/email.js": { "bytesInOutput": 2721 },
         "server/src/utils/http.js": { "bytesInOutput": 3472 },
-        "server/src/services/auth.js": { "bytesInOutput": 9837 },
+        "server/src/services/oauth.js": { "bytesInOutput": 2152 },
+        "server/src/services/auth.js": { "bytesInOutput": 10126 },
         "server/src/utils/turnstile.js": { "bytesInOutput": 863 },
-        "server/src/utils/oauthConfig.js": { "bytesInOutput": 388 },
-        "server/src/utils/errors.js": { "bytesInOutput": 834 },
+        "server/src/utils/oauthConfig.js": { "bytesInOutput": 454 },
+        "server/src/utils/errors.js": { "bytesInOutput": 1153 },
         "server/src/routes/auth.js": { "bytesInOutput": 9906 },
         "node_modules/hono/dist/utils/cookie.js": { "bytesInOutput": 3747 },
         "node_modules/hono/dist/helper/cookie/index.js": { "bytesInOutput": 1260 },
         "server/src/services/bangumi.js": { "bytesInOutput": 5574 },
-        "server/src/routes/user.js": { "bytesInOutput": 16590 },
+        "server/src/routes/user.js": { "bytesInOutput": 16940 },
         "server/src/controllers/animeController.js": { "bytesInOutput": 4411 },
         "server/src/routes/anime.js": { "bytesInOutput": 683 },
         "server/src/services/userVerify.js": { "bytesInOutput": 787 },
@@ -5505,7 +5527,7 @@
         "server/src/routes/music.js": { "bytesInOutput": 604 },
         "server/src/app.js": { "bytesInOutput": 2480 }
       },
-      "bytes": 701717
+      "bytes": 704926
     }
   }
 }

@@ -4400,6 +4400,71 @@ function fixUrl(url, base = "") {
   return url;
 }
 
+// server/src/services/oauth.js
+var BGM_OFFICIAL_OAUTH_BASE = "https://bgm.tv";
+async function exchangeBangumiOAuthCode({
+  code,
+  appId,
+  appSecret,
+  redirectUri: redirectUri3,
+  preferredBase,
+  grantType = "authorization_code"
+}) {
+  const bases = [BGM_OFFICIAL_OAUTH_BASE, preferredBase].filter(
+    (base, index, list) => base && list.indexOf(base) === index
+  );
+  let lastError;
+  for (const base of bases) {
+    const params = new URLSearchParams({
+      grant_type: grantType,
+      client_id: appId,
+      client_secret: appSecret,
+      redirect_uri: redirectUri3
+    });
+    if (grantType === "authorization_code") {
+      params.set("code", code);
+    } else {
+      params.set("refresh_token", code);
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12e3);
+    try {
+      const response = await fetch(`${base}/oauth/access_token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json"
+        },
+        body: params.toString(),
+        signal: controller.signal
+      });
+      const data = await response.json().catch(() => ({}));
+      const accessToken = data?.access_token;
+      if (response.ok && accessToken) {
+        return {
+          accessToken,
+          refreshToken: data?.refresh_token || ""
+        };
+      }
+      const error = new Error(data?.error_description || data?.error || `HTTP ${response.status}`);
+      error.code = "provider_error";
+      error.providerStatus = response.status;
+      error.providerError = data?.error || "";
+      lastError = error;
+      if (response.status < 500) break;
+    } catch (err) {
+      const error = new Error("Bangumi OAuth endpoint unavailable");
+      error.code = "network_error";
+      error.providerError = err?.name === "AbortError" ? "timeout" : String(err);
+      lastError = error;
+      logError("Bangumi OAuth endpoint request failed", { base, error: error.providerError });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw lastError || Object.assign(new Error("Bangumi OAuth endpoint unavailable"), { code: "network_error" });
+}
+
 // server/src/services/auth.js
 var BGM_ME_API = "https://api.bgm.tv/v0/me";
 var OAUTH_BIND_STATE_TTL = 5 * 60;
@@ -4573,26 +4638,31 @@ async function bindBangumiByOAuth(db, env, { code, state, oauthBase: oauthBase3,
   const userId = stateResult.userId;
   let accessToken;
   try {
-    const params = new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: appId,
-      client_secret: appSecret,
+    const token2 = await exchangeBangumiOAuthCode({
       code,
-      redirect_uri: redirectUri3
+      appId,
+      appSecret,
+      redirectUri: redirectUri3,
+      preferredBase: oauthBase3
     });
-    const tokenRes = await fetch(`${oauthBase3}/oauth/access_token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: params.toString()
-    });
-    const tokenData = await tokenRes.json();
-    accessToken = tokenData.access_token;
+    accessToken = token2.accessToken;
   } catch (err) {
-    logError("OAuth \u6388\u6743\u7801\u6362\u53D6\u5931\u8D25", { userId, error: String(err) });
+    logError("OAuth \u6388\u6743\u7801\u6362\u53D6\u5931\u8D25", {
+      userId,
+      code: err?.code,
+      providerStatus: err?.providerStatus,
+      providerError: err?.providerError
+    });
+    if (err?.providerError === "invalid_client") {
+      throw httpError(502, "Bangumi OAuth \u914D\u7F6E\u65E0\u6548\uFF0C\u8BF7\u68C0\u67E5 App ID \u4E0E App Secret");
+    }
+    if (err?.providerError === "invalid_grant") {
+      throw httpError(400, "Bangumi \u6388\u6743\u7801\u65E0\u6548\u6216\u56DE\u8C03\u5730\u5740\u4E0D\u5339\u914D\uFF0C\u8BF7\u91CD\u65B0\u53D1\u8D77\u7ED1\u5B9A");
+    }
+    if (err?.code === "network_error") {
+      throw httpError(502, "Bangumi OAuth \u670D\u52A1\u6682\u65F6\u4E0D\u53EF\u7528\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+    }
     throw httpError(400, "\u6388\u6743\u7801\u65E0\u6548\u6216\u5DF2\u8FC7\u671F");
-  }
-  if (!accessToken) {
-    throw httpError(400, "\u83B7\u53D6 Bangumi Access Token \u5931\u8D25");
   }
   let me;
   try {
@@ -4698,7 +4768,9 @@ function getOAuthCredentials(env, logPath = "oauth") {
   const appSecret = env?.BGM_APP_SECRET;
   if (!appSecret) {
     logError("BGM_APP_SECRET \u672A\u914D\u7F6E", { path: logPath });
-    throw new Error("OAuth \u670D\u52A1\u672A\u914D\u7F6E");
+    const error = new Error("OAuth \u670D\u52A1\u672A\u914D\u7F6E");
+    error.code = "oauth_config_missing";
+    throw error;
   }
   return { appId, appSecret };
 }
@@ -4708,6 +4780,16 @@ function isHttpError(err) {
   return err instanceof Error && typeof err.status === "number";
 }
 function errorResponse(err, fallbackMessage = "\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF") {
+  if (err?.code === "oauth_config_missing") {
+    return Response.json(
+      {
+        data: null,
+        error: "\u670D\u52A1\u5668\u672A\u914D\u7F6E BGM_APP_SECRET\uFF0C\u8BF7\u5728 Cloudflare Pages Production \u73AF\u5883\u53D8\u91CF\u4E2D\u6DFB\u52A0",
+        code: 503
+      },
+      { status: 503 }
+    );
+  }
   if (isHttpError(err)) {
     return Response.json(
       { data: null, error: err.message, code: err.status },
@@ -5380,33 +5462,45 @@ app2.post("/oauth-callback", async (c) => {
       return c.json({ error: "\u6388\u6743\u72B6\u6001\u65E0\u6548\u6216\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55" }, 400);
     }
     const { appId, appSecret } = getOAuthCredentials(c.env, "/user/oauth-callback");
-    const params = new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: appId,
-      client_secret: appSecret,
+    const { accessToken, refreshToken } = await exchangeBangumiOAuthCode({
       code,
-      redirect_uri: redirectUri2(c)
+      appId,
+      appSecret,
+      redirectUri: redirectUri2(c),
+      preferredBase: oauthBase2(c)
     });
-    const tokenRes = await fetch(`${oauthBase2(c)}/oauth/access_token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: params.toString()
-    });
-    const tokenData = await tokenRes.json().catch(() => ({}));
-    const accessToken = tokenData.access_token;
-    const refreshToken = tokenData.refresh_token;
-    if (!tokenRes.ok || !accessToken) {
-      logError("Bangumi OAuth token exchange failed", {
-        status: tokenRes.status,
-        error: tokenData?.error,
-        errorDescription: tokenData?.error_description
-      });
-      return c.json({ error: "Bangumi \u6388\u6743\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5 App ID\u3001App Secret \u548C\u56DE\u8C03\u5730\u5740\u914D\u7F6E" }, 502);
-    }
     const client = getClient(accessToken, isChina2(c));
     const user = await client.get("/v0/me");
     return c.json({ data: { user, token: accessToken, refreshToken: refreshToken || "" } });
   } catch (err) {
+    if (err?.code === "provider_error") {
+      logError("Bangumi OAuth token exchange failed", {
+        status: err.providerStatus,
+        error: err.providerError
+      });
+      if (err.providerError === "invalid_client") {
+        return c.json(
+          { error: "Bangumi OAuth \u914D\u7F6E\u65E0\u6548\uFF0C\u8BF7\u786E\u8BA4 BGM_APP_ID\u3001BGM_APP_SECRET \u5C5E\u4E8E\u540C\u4E00\u4E2A\u5E94\u7528" },
+          502
+        );
+      }
+      if (err.providerError === "invalid_grant") {
+        return c.json({ error: "Bangumi \u6388\u6743\u7801\u65E0\u6548\u6216\u56DE\u8C03\u5730\u5740\u4E0D\u5339\u914D\uFF0C\u8BF7\u91CD\u65B0\u53D1\u8D77\u767B\u5F55" }, 400);
+      }
+      return c.json(
+        { error: "Bangumi OAuth \u6388\u6743\u7801\u4EA4\u6362\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5 App ID\u3001App Secret \u548C\u56DE\u8C03\u5730\u5740\u914D\u7F6E" },
+        502
+      );
+    }
+    if (err?.code === "network_error") {
+      return c.json({ error: "Bangumi OAuth \u670D\u52A1\u6682\u65F6\u4E0D\u53EF\u7528\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5" }, 502);
+    }
+    if (err?.message === "OAuth \u670D\u52A1\u672A\u914D\u7F6E") {
+      return c.json(
+        { error: "\u670D\u52A1\u5668\u672A\u914D\u7F6E BGM_APP_SECRET\uFF0C\u8BF7\u5728 Cloudflare Pages Production \u73AF\u5883\u53D8\u91CF\u4E2D\u6DFB\u52A0" },
+        503
+      );
+    }
     return c.json({ error: "\u6388\u6743\u5931\u8D25\uFF0C\u8BF7\u786E\u4FDD\u56DE\u8C03\u5730\u5740\u5DF2\u5728 bgm.tv/dev/app \u8BBE\u7F6E" }, 500);
   }
 });
@@ -5415,21 +5509,15 @@ app2.post("/refresh-token", async (c) => {
     const { refreshToken } = await c.req.json();
     if (!refreshToken) return c.json({ error: "\u7F3A\u5C11 refresh token" }, 400);
     const { appId, appSecret } = getOAuthCredentials(c.env, "/user/refresh-token");
-    const params = new URLSearchParams({
-      grant_type: "refresh_token",
-      client_id: appId,
-      client_secret: appSecret,
-      refresh_token: refreshToken,
-      redirect_uri: redirectUri2(c)
+    const { accessToken, refreshToken: returnedRefreshToken } = await exchangeBangumiOAuthCode({
+      code: refreshToken,
+      appId,
+      appSecret,
+      redirectUri: redirectUri2(c),
+      preferredBase: oauthBase2(c),
+      grantType: "refresh_token"
     });
-    const tokenRes = await fetch(`${oauthBase2(c)}/oauth/access_token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: params.toString()
-    });
-    const tokenData = await tokenRes.json();
-    const accessToken = tokenData.access_token;
-    const newRefreshToken = tokenData.refresh_token || refreshToken;
+    const newRefreshToken = returnedRefreshToken || refreshToken;
     if (!accessToken) return c.json({ error: "\u5237\u65B0 Token \u5931\u8D25" }, 400);
     const client = getClient(accessToken, isChina2(c));
     const user = await client.get("/v0/me");

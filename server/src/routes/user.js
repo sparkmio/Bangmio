@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { getClient } from '../services/bangumi.js'
+import { exchangeBangumiOAuthCode } from '../services/oauth.js'
 import { fetchHTML, stripTags, unescapeHtml, parseNumber, fixUrl } from '../utils/http.js'
 import { getOAuthCredentials } from '../utils/oauthConfig.js'
 import { logError } from '../utils/logger.js'
@@ -102,33 +103,45 @@ app.post('/oauth-callback', async c => {
       return c.json({ error: '授权状态无效或已过期，请重新登录' }, 400)
     }
     const { appId, appSecret } = getOAuthCredentials(c.env, '/user/oauth-callback')
-    const params = new URLSearchParams({
-      grant_type: 'authorization_code',
-      client_id: appId,
-      client_secret: appSecret,
+    const { accessToken, refreshToken } = await exchangeBangumiOAuthCode({
       code,
-      redirect_uri: redirectUri(c)
+      appId,
+      appSecret,
+      redirectUri: redirectUri(c),
+      preferredBase: oauthBase(c)
     })
-    const tokenRes = await fetch(`${oauthBase(c)}/oauth/access_token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params.toString()
-    })
-    const tokenData = await tokenRes.json().catch(() => ({}))
-    const accessToken = tokenData.access_token
-    const refreshToken = tokenData.refresh_token
-    if (!tokenRes.ok || !accessToken) {
-      logError('Bangumi OAuth token exchange failed', {
-        status: tokenRes.status,
-        error: tokenData?.error,
-        errorDescription: tokenData?.error_description
-      })
-      return c.json({ error: 'Bangumi 授权失败，请检查 App ID、App Secret 和回调地址配置' }, 502)
-    }
     const client = getClient(accessToken, isChina(c))
     const user = await client.get('/v0/me')
     return c.json({ data: { user, token: accessToken, refreshToken: refreshToken || '' } })
   } catch (err) {
+    if (err?.code === 'provider_error') {
+      logError('Bangumi OAuth token exchange failed', {
+        status: err.providerStatus,
+        error: err.providerError
+      })
+      if (err.providerError === 'invalid_client') {
+        return c.json(
+          { error: 'Bangumi OAuth 配置无效，请确认 BGM_APP_ID、BGM_APP_SECRET 属于同一个应用' },
+          502
+        )
+      }
+      if (err.providerError === 'invalid_grant') {
+        return c.json({ error: 'Bangumi 授权码无效或回调地址不匹配，请重新发起登录' }, 400)
+      }
+      return c.json(
+        { error: 'Bangumi OAuth 授权码交换失败，请检查 App ID、App Secret 和回调地址配置' },
+        502
+      )
+    }
+    if (err?.code === 'network_error') {
+      return c.json({ error: 'Bangumi OAuth 服务暂时不可用，请稍后重试' }, 502)
+    }
+    if (err?.message === 'OAuth 服务未配置') {
+      return c.json(
+        { error: '服务器未配置 BGM_APP_SECRET，请在 Cloudflare Pages Production 环境变量中添加' },
+        503
+      )
+    }
     return c.json({ error: '授权失败，请确保回调地址已在 bgm.tv/dev/app 设置' }, 500)
   }
 })
@@ -138,21 +151,15 @@ app.post('/refresh-token', async c => {
     const { refreshToken } = await c.req.json()
     if (!refreshToken) return c.json({ error: '缺少 refresh token' }, 400)
     const { appId, appSecret } = getOAuthCredentials(c.env, '/user/refresh-token')
-    const params = new URLSearchParams({
-      grant_type: 'refresh_token',
-      client_id: appId,
-      client_secret: appSecret,
-      refresh_token: refreshToken,
-      redirect_uri: redirectUri(c)
+    const { accessToken, refreshToken: returnedRefreshToken } = await exchangeBangumiOAuthCode({
+      code: refreshToken,
+      appId,
+      appSecret,
+      redirectUri: redirectUri(c),
+      preferredBase: oauthBase(c),
+      grantType: 'refresh_token'
     })
-    const tokenRes = await fetch(`${oauthBase(c)}/oauth/access_token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params.toString()
-    })
-    const tokenData = await tokenRes.json()
-    const accessToken = tokenData.access_token
-    const newRefreshToken = tokenData.refresh_token || refreshToken
+    const newRefreshToken = returnedRefreshToken || refreshToken
     if (!accessToken) return c.json({ error: '刷新 Token 失败' }, 400)
     const client = getClient(accessToken, isChina(c))
     const user = await client.get('/v0/me')

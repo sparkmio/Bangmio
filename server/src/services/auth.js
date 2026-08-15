@@ -43,6 +43,7 @@ import {
 } from '../db/emailCodes.js'
 import { sendEmail, buildVerificationEmailHTML } from '../utils/email.js'
 import { fetchHTML } from '../utils/http.js'
+import { exchangeBangumiOAuthCode } from './oauth.js'
 import { logError, logInfo } from '../utils/logger.js'
 
 /** Bangumi `/v0/me` 接口地址，用于验证 Access Token 有效性 */
@@ -388,29 +389,34 @@ export async function bindBangumiByOAuth(
   }
   const userId = stateResult.userId
 
-  // 用授权码换取 access_token
+  // 用授权码换取 access_token；官方端点优先，镜像端点仅作为回退。
   let accessToken
   try {
-    const params = new URLSearchParams({
-      grant_type: 'authorization_code',
-      client_id: appId,
-      client_secret: appSecret,
+    const token = await exchangeBangumiOAuthCode({
       code,
-      redirect_uri: redirectUri
+      appId,
+      appSecret,
+      redirectUri,
+      preferredBase: oauthBase
     })
-    const tokenRes = await fetch(`${oauthBase}/oauth/access_token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params.toString()
-    })
-    const tokenData = await tokenRes.json()
-    accessToken = tokenData.access_token
+    accessToken = token.accessToken
   } catch (err) {
-    logError('OAuth 授权码换取失败', { userId, error: String(err) })
+    logError('OAuth 授权码换取失败', {
+      userId,
+      code: err?.code,
+      providerStatus: err?.providerStatus,
+      providerError: err?.providerError
+    })
+    if (err?.providerError === 'invalid_client') {
+      throw httpError(502, 'Bangumi OAuth 配置无效，请检查 App ID 与 App Secret')
+    }
+    if (err?.providerError === 'invalid_grant') {
+      throw httpError(400, 'Bangumi 授权码无效或回调地址不匹配，请重新发起绑定')
+    }
+    if (err?.code === 'network_error') {
+      throw httpError(502, 'Bangumi OAuth 服务暂时不可用，请稍后重试')
+    }
     throw httpError(400, '授权码无效或已过期')
-  }
-  if (!accessToken) {
-    throw httpError(400, '获取 Bangumi Access Token 失败')
   }
 
   // 验证 token 并获取 Bangumi 用户信息

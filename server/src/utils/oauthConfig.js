@@ -21,7 +21,9 @@ export function getOAuthCredentials(env, logPath = 'oauth') {
   const appSecret = env?.BGM_APP_SECRET
   if (!appSecret) {
     logError('BGM_APP_SECRET 未配置', { path: logPath })
-    throw new Error('OAuth 服务未配置')
+    const error = new Error('OAuth 服务未配置')
+    error.code = 'oauth_config_missing'
+    throw error
   }
   return { appId, appSecret }
 }

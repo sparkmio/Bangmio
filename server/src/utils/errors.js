@@ -23,6 +23,16 @@ export function isHttpError(err) {
  * @returns {Response} 标准 JSON 响应。
  */
 export function errorResponse(err, fallbackMessage = '服务器内部错误') {
+  if (err?.code === 'oauth_config_missing') {
+    return Response.json(
+      {
+        data: null,
+        error: '服务器未配置 BGM_APP_SECRET，请在 Cloudflare Pages Production 环境变量中添加',
+        code: 503
+      },
+      { status: 503 }
+    )
+  }
   if (isHttpError(err)) {
     return Response.json(
       { data: null, error: err.message, code: err.status },

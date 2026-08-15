@@ -38,8 +38,18 @@ Bangumi (bgm.tv) 第三方客户端。支持 OAuth 登录、动画浏览与搜�
 | ---- | --------------------------------------------------- |
 | 前端 | Vue 3 + Vite + Pinia + TailwindCSS + DaisyUI + GSAP |
 | 后端 | Hono（Cloudflare Pages Functions）                  |
-| API  | 代理 Bangumi API v0 + 网页抓取第三方平台                      |
+| API  | 代理 Bangumi API v0 + 网页抓取第三方平台            |
 | 部署 | Cloudflare Pages                                    |
+
+## Cloudflare Pages OAuth 配置
+
+生产环境的 Bangumi OAuth 需要在 Cloudflare Pages 项目 `bangmio` 的 **Settings → Variables and Secrets → Production** 中配置：
+
+- `BGM_APP_SECRET`：从 Bangumi OAuth 应用复制的 Secret，类型选择 **Secret**（必填）；
+- `BGM_APP_ID`：可选，默认使用仓库中的公开 App ID；如果填写，必须和 `BGM_APP_SECRET` 属于同一个 OAuth 应用；
+- `OAUTH_REDIRECT_URI`：`https://bangmio.site/login/callback`，必须与 Bangumi 应用后台完全一致。
+
+修改 Production 变量后请重新部署一次，再从 `https://bangmio.site` 发起登录。不要使用 `www` 或 `pages.dev` 地址测试 OAuth。授权返回后如果仍失败，页面会区分显示：配置错误、回调地址/授权码错误，或 Bangumi 上游暂时不可用。
 
 ## 相关链接
 
