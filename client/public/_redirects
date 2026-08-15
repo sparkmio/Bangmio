@@ -1,0 +1,3 @@
+# Serve the Vue entry for every client-side route so direct OAuth callbacks
+# keep their code/state query parameters instead of falling through to 404.html.
+/* /index.html 200

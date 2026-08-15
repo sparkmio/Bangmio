@@ -99,9 +99,9 @@ export const useAuthStore = defineStore('auth', () => {
   function redirectAfterAuth() {
     const redirect = router.currentRoute.value?.query?.redirect
     if (redirect && typeof redirect === 'string') {
-      router.push(redirect)
+      return router.push(redirect)
     } else {
-      router.push('/')
+      return router.push('/')
     }
   }
 
@@ -124,7 +124,7 @@ export const useAuthStore = defineStore('auth', () => {
         await fetchBgmUserProfile()
       }
       error.value = ''
-      redirectAfterAuth()
+      await redirectAfterAuth()
     } catch (err) {
       error.value = err.response?.data?.error || err.message || '登录失败'
       throw err
@@ -249,7 +249,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
       saveBangumiAuth(accessToken, data.user)
       error.value = ''
-      redirectAfterAuth()
+      await redirectAfterAuth()
     } catch (err) {
       error.value = err.response?.data?.error || err.message || 'Token 验证失败'
       throw err
@@ -270,7 +270,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
       saveBangumiAuth(data.token, data.user)
       error.value = ''
-      redirectAfterAuth()
+      await redirectAfterAuth()
     } catch (err) {
       error.value = err.response?.data?.error || err.message || '授权失败'
       throw err
