@@ -475,7 +475,7 @@
     },
     "server/src/services/bangumi.js": { "bytes": 10766, "imports": [], "format": "esm" },
     "server/src/routes/user.js": {
-      "bytes": 16643,
+      "bytes": 17775,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -501,6 +501,11 @@
           "path": "server/src/utils/oauthConfig.js",
           "kind": "import-statement",
           "original": "../utils/oauthConfig.js"
+        },
+        {
+          "path": "server/src/utils/logger.js",
+          "kind": "import-statement",
+          "original": "../utils/logger.js"
         }
       ],
       "format": "esm"
@@ -5259,7 +5264,7 @@
         "node_modules/hono/dist/utils/cookie.js": { "bytesInOutput": 3747 },
         "node_modules/hono/dist/helper/cookie/index.js": { "bytesInOutput": 1260 },
         "server/src/services/bangumi.js": { "bytesInOutput": 5574 },
-        "server/src/routes/user.js": { "bytesInOutput": 15895 },
+        "server/src/routes/user.js": { "bytesInOutput": 16590 },
         "server/src/controllers/animeController.js": { "bytesInOutput": 4411 },
         "server/src/routes/anime.js": { "bytesInOutput": 683 },
         "server/src/services/userVerify.js": { "bytesInOutput": 787 },
@@ -5500,7 +5505,7 @@
         "server/src/routes/music.js": { "bytesInOutput": 604 },
         "server/src/app.js": { "bytesInOutput": 2480 }
       },
-      "bytes": 701022
+      "bytes": 701717
     }
   }
 }

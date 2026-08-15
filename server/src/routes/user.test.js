@@ -17,6 +17,7 @@ describe('Bangumi OAuth login', () => {
     expect(state).toBeTruthy()
     expect(cookie).toContain('HttpOnly')
     expect(cookie).toContain('SameSite=Lax')
+    expect(cookie).toContain('Domain=.bangmio.site')
 
     const callback = await app.request(
       'https://bangmio.site/oauth-callback',

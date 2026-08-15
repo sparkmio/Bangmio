@@ -3,6 +3,7 @@ import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { getClient } from '../services/bangumi.js'
 import { fetchHTML, stripTags, unescapeHtml, parseNumber, fixUrl } from '../utils/http.js'
 import { getOAuthCredentials } from '../utils/oauthConfig.js'
+import { logError } from '../utils/logger.js'
 
 const app = new Hono()
 const OAUTH_STATE_COOKIE = 'bangmio_oauth_state'
@@ -17,6 +18,35 @@ function redirectUri(c) {
 
 function oauthBase(c) {
   return isChina(c) ? 'https://bangumi.lol' : 'https://bgm.tv'
+}
+
+/**
+ * OAuth state cookie 需要在 www 与 apex 域名之间保持可见。
+ * 线上回调地址固定为 bangmio.site，但用户可能从 www.bangmio.site 发起登录；
+ * 不指定 Domain 时，浏览器会把 state cookie 限制在发起请求的那个主机，
+ * 导致授权成功返回后校验 state 失败。
+ */
+function oauthCookieOptions(c, overrides = {}) {
+  const callbackUrl = redirectUri(c)
+  let domain
+  try {
+    const hostname = new URL(callbackUrl).hostname
+    if (hostname === 'bangmio.site' || hostname.endsWith('.bangmio.site')) {
+      domain = '.bangmio.site'
+    }
+  } catch {
+    // 使用默认 host-only cookie；非法回调地址会在后续 OAuth 交换阶段被发现。
+  }
+
+  return {
+    httpOnly: true,
+    secure: callbackUrl.startsWith('https://'),
+    sameSite: 'Lax',
+    maxAge: 10 * 60,
+    path: '/api/v1/user',
+    ...(domain ? { domain } : {}),
+    ...overrides
+  }
 }
 
 function escapeRegex(s) {
@@ -57,14 +87,7 @@ app.post('/auth', async c => {
 app.get('/oauth-url', c => {
   const { appId } = getOAuthCredentials(c.env, '/user/oauth-url')
   const state = crypto.randomUUID()
-  const secure = redirectUri(c).startsWith('https://')
-  setCookie(c, OAUTH_STATE_COOKIE, state, {
-    httpOnly: true,
-    secure,
-    sameSite: 'Lax',
-    maxAge: 10 * 60,
-    path: '/api/v1/user'
-  })
+  setCookie(c, OAUTH_STATE_COOKIE, state, oauthCookieOptions(c))
   const url = `${oauthBase(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}&state=${encodeURIComponent(state)}`
   return c.json({ data: url })
 })
@@ -74,7 +97,7 @@ app.post('/oauth-callback', async c => {
     const { code, state } = await c.req.json()
     if (!code || !state) return c.json({ error: '缺少授权码或 state' }, 400)
     const expectedState = getCookie(c, OAUTH_STATE_COOKIE)
-    deleteCookie(c, OAUTH_STATE_COOKIE, { path: '/api/v1/user' })
+    deleteCookie(c, OAUTH_STATE_COOKIE, oauthCookieOptions(c, { maxAge: 0 }))
     if (!expectedState || state !== expectedState) {
       return c.json({ error: '授权状态无效或已过期，请重新登录' }, 400)
     }
@@ -91,10 +114,17 @@ app.post('/oauth-callback', async c => {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString()
     })
-    const tokenData = await tokenRes.json()
+    const tokenData = await tokenRes.json().catch(() => ({}))
     const accessToken = tokenData.access_token
     const refreshToken = tokenData.refresh_token
-    if (!accessToken) return c.json({ error: '获取 Token 失败' }, 400)
+    if (!tokenRes.ok || !accessToken) {
+      logError('Bangumi OAuth token exchange failed', {
+        status: tokenRes.status,
+        error: tokenData?.error,
+        errorDescription: tokenData?.error_description
+      })
+      return c.json({ error: 'Bangumi 授权失败，请检查 App ID、App Secret 和回调地址配置' }, 502)
+    }
     const client = getClient(accessToken, isChina(c))
     const user = await client.get('/v0/me')
     return c.json({ data: { user, token: accessToken, refreshToken: refreshToken || '' } })

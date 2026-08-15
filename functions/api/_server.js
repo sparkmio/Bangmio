@@ -5311,6 +5311,26 @@ function redirectUri2(c) {
 function oauthBase2(c) {
   return isChina2(c) ? "https://bangumi.lol" : "https://bgm.tv";
 }
+function oauthCookieOptions(c, overrides = {}) {
+  const callbackUrl = redirectUri2(c);
+  let domain;
+  try {
+    const hostname = new URL(callbackUrl).hostname;
+    if (hostname === "bangmio.site" || hostname.endsWith(".bangmio.site")) {
+      domain = ".bangmio.site";
+    }
+  } catch {
+  }
+  return {
+    httpOnly: true,
+    secure: callbackUrl.startsWith("https://"),
+    sameSite: "Lax",
+    maxAge: 10 * 60,
+    path: "/api/v1/user",
+    ...domain ? { domain } : {},
+    ...overrides
+  };
+}
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -5346,14 +5366,7 @@ app2.post("/auth", async (c) => {
 app2.get("/oauth-url", (c) => {
   const { appId } = getOAuthCredentials(c.env, "/user/oauth-url");
   const state = crypto.randomUUID();
-  const secure = redirectUri2(c).startsWith("https://");
-  setCookie(c, OAUTH_STATE_COOKIE, state, {
-    httpOnly: true,
-    secure,
-    sameSite: "Lax",
-    maxAge: 10 * 60,
-    path: "/api/v1/user"
-  });
+  setCookie(c, OAUTH_STATE_COOKIE, state, oauthCookieOptions(c));
   const url = `${oauthBase2(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri2(c))}&state=${encodeURIComponent(state)}`;
   return c.json({ data: url });
 });
@@ -5362,7 +5375,7 @@ app2.post("/oauth-callback", async (c) => {
     const { code, state } = await c.req.json();
     if (!code || !state) return c.json({ error: "\u7F3A\u5C11\u6388\u6743\u7801\u6216 state" }, 400);
     const expectedState = getCookie(c, OAUTH_STATE_COOKIE);
-    deleteCookie(c, OAUTH_STATE_COOKIE, { path: "/api/v1/user" });
+    deleteCookie(c, OAUTH_STATE_COOKIE, oauthCookieOptions(c, { maxAge: 0 }));
     if (!expectedState || state !== expectedState) {
       return c.json({ error: "\u6388\u6743\u72B6\u6001\u65E0\u6548\u6216\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55" }, 400);
     }
@@ -5379,10 +5392,17 @@ app2.post("/oauth-callback", async (c) => {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: params.toString()
     });
-    const tokenData = await tokenRes.json();
+    const tokenData = await tokenRes.json().catch(() => ({}));
     const accessToken = tokenData.access_token;
     const refreshToken = tokenData.refresh_token;
-    if (!accessToken) return c.json({ error: "\u83B7\u53D6 Token \u5931\u8D25" }, 400);
+    if (!tokenRes.ok || !accessToken) {
+      logError("Bangumi OAuth token exchange failed", {
+        status: tokenRes.status,
+        error: tokenData?.error,
+        errorDescription: tokenData?.error_description
+      });
+      return c.json({ error: "Bangumi \u6388\u6743\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5 App ID\u3001App Secret \u548C\u56DE\u8C03\u5730\u5740\u914D\u7F6E" }, 502);
+    }
     const client = getClient(accessToken, isChina2(c));
     const user = await client.get("/v0/me");
     return c.json({ data: { user, token: accessToken, refreshToken: refreshToken || "" } });
