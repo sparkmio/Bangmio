@@ -112,10 +112,11 @@ const routes = [
     name: 'Groups',
     component: () => import(/* webpackChunkName: "groups" */ '../views/Groups.vue')
   },
+
   {
+    // Preserve existing game bookmarks after the feature was removed.
     path: '/jump',
-    name: 'JumpGame',
-    component: () => import(/* webpackChunkName: "jump-game" */ '../views/JumpGame.vue')
+    redirect: '/settings'
   },
   {
     path: '/group/:id',

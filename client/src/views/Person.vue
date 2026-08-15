@@ -12,6 +12,7 @@
         <div class="flex-shrink-0 w-44 md:w-52 mx-auto md:mx-0">
           <img
             v-if="person.images?.large || person.images?.medium"
+            v-image-placeholder
             :src="person.images.large || person.images.medium"
             :alt="person.name"
             class="w-full rounded-xl shadow-lg"
@@ -95,6 +96,7 @@
             <figure class="w-12 shrink-0">
               <img
                 v-if="subj.image"
+                v-image-placeholder
                 :src="subj.image"
                 :alt="subj.name_cn || subj.name"
                 loading="lazy"

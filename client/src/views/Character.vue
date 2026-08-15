@@ -12,6 +12,7 @@
         <div class="flex-shrink-0 w-44 md:w-52 mx-auto md:mx-0">
           <img
             v-if="character.images?.large || character.images?.medium"
+            v-image-placeholder
             :src="character.images.large || character.images.medium"
             :alt="character.name"
             class="w-full rounded-xl shadow-lg"
@@ -99,6 +100,7 @@
               <div class="w-10 h-10 rounded-full bg-primary text-primary-content">
                 <img
                   v-if="cp.images?.medium || cp.images?.grid"
+                  v-image-placeholder
                   :src="cp.images.medium || cp.images.grid"
                   :alt="cp.name"
                   loading="lazy"
@@ -131,6 +133,7 @@
             <figure class="w-12 shrink-0">
               <img
                 v-if="subj.image"
+                v-image-placeholder
                 :src="subj.image"
                 :alt="subj.name_cn || subj.name"
                 loading="lazy"

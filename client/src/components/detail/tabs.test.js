@@ -13,12 +13,17 @@ import TabRating from './TabRating.vue'
 import TabDouban from './TabDouban.vue'
 import TabMusic from './TabMusic.vue'
 import TabStreaming from './TabStreaming.vue'
+import { vImagePlaceholder } from '../../directives/imagePlaceholder.js'
 
 const routerLinkStub = {
   template: '<a class="router-link-stub"><slot /></a>',
   props: ['to']
 }
 
+const routerTestGlobal = {
+  stubs: { 'router-link': routerLinkStub },
+  directives: { 'image-placeholder': vImagePlaceholder }
+}
 describe('Detail Tab 子组件冒烟测试', () => {
   it('TabEpisodes 渲染章节与空状态', () => {
     const w = mount(TabEpisodes, {
@@ -38,13 +43,13 @@ describe('Detail Tab 子组件冒烟测试', () => {
   it('TabCharacters 渲染角色列表与空状态', () => {
     const w = mount(TabCharacters, {
       props: { characters: [{ id: 1, name: '主角A', relation: '主角', images: {} }] },
-      global: { stubs: { 'router-link': routerLinkStub } }
+      global: routerTestGlobal
     })
     expect(w.text()).toContain('主角A')
     expect(w.findAll('.router-link-stub')).toHaveLength(1)
     const empty = mount(TabCharacters, {
       props: { characters: [] },
-      global: { stubs: { 'router-link': routerLinkStub } }
+      global: routerTestGlobal
     })
     expect(empty.text()).toContain('暂无角色信息')
   })
@@ -57,14 +62,14 @@ describe('Detail Tab 子组件冒烟测试', () => {
           { id: 2, name: '导演', relation: '导演', career: [] }
         ]
       },
-      global: { stubs: { 'router-link': routerLinkStub } }
+      global: routerTestGlobal
     })
     expect(w.text()).toContain('某人')
     expect(w.text()).toContain('声优')
     expect(w.text()).toContain('导演')
     const empty = mount(TabStaff, {
       props: { persons: [] },
-      global: { stubs: { 'router-link': routerLinkStub } }
+      global: routerTestGlobal
     })
     expect(empty.text()).toContain('暂无制作人员信息')
   })

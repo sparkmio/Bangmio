@@ -5,6 +5,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import App from './App.vue'
 import router from './router'
 import { vSafeHtml } from './directives/safeHtml.js'
+import { vImagePlaceholder } from './directives/imagePlaceholder.js'
 import './assets/main.css'
 
 gsap.registerPlugin(ScrollTrigger)
@@ -13,4 +14,5 @@ const app = createApp(App)
 app.use(createPinia())
 app.use(router)
 app.directive('safe-html', vSafeHtml)
+app.directive('image-placeholder', vImagePlaceholder)
 app.mount('#app')

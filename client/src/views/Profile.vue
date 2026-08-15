@@ -159,6 +159,7 @@
                   >
                     <img
                       v-if="f.avatar"
+                      v-image-placeholder
                       :src="f.avatar"
                       :alt="f.nickname"
                       class="w-full h-full object-cover"
@@ -205,6 +206,7 @@
                   >
                     <img
                       v-if="g.avatar"
+                      v-image-placeholder
                       :src="g.avatar"
                       :alt="g.name"
                       class="w-full h-full object-cover"
@@ -288,6 +290,7 @@
                   >
                     <img
                       v-if="char.images?.medium"
+                      v-image-placeholder
                       :src="char.images.medium"
                       :alt="char.name"
                       class="w-full h-full object-cover"
@@ -316,6 +319,7 @@
                   >
                     <img
                       v-if="person.images?.medium"
+                      v-image-placeholder
                       :src="person.images.medium"
                       :alt="person.name"
                       class="w-full h-full object-cover"

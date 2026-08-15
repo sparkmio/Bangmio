@@ -93,6 +93,7 @@
             >
               <img
                 v-if="g.icon || g.avatar"
+                v-image-placeholder
                 :src="g.icon || g.avatar"
                 :alt="g.name"
                 class="w-full h-full object-cover"

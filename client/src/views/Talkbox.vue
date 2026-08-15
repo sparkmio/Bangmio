@@ -22,6 +22,7 @@
                 <div class="w-8 h-8 rounded-full bg-primary text-primary-content">
                   <img
                     v-if="c.user?.avatar"
+                    v-image-placeholder
                     :src="c.user.avatar"
                     :alt="c.user?.username || ''"
                     loading="lazy"
@@ -51,6 +52,7 @@
                       <div class="w-6 h-6 rounded-full bg-primary text-primary-content">
                         <img
                           v-if="sub.user?.avatar"
+                          v-image-placeholder
                           :src="sub.user.avatar"
                           :alt="sub.user?.username || ''"
                           loading="lazy"

@@ -42,6 +42,7 @@
                   col.subject?.images?.grid ||
                   col.subject?.images?.medium
                 "
+                v-image-placeholder
                 :src="
                   col.subject?.images?.common ||
                   col.subject?.images?.grid ||

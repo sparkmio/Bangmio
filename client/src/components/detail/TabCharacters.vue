@@ -12,6 +12,7 @@
             class="w-16 h-16 rounded-full ring-2 ring-base-300 group-hover:ring-primary/40 transition-all"
           >
             <img
+              v-image-placeholder
               :src="char.images?.grid || char.images?.medium"
               :alt="char.name"
               loading="lazy"

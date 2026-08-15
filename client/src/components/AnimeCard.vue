@@ -6,6 +6,7 @@
       <div class="aspect-[2/3] relative bg-base-300">
         <img
           v-if="imageSrc && !imgError"
+          v-image-placeholder
           :src="imageSrc"
           :alt="anime.name_cn || anime.name"
           class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"

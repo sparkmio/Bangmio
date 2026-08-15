@@ -11,6 +11,7 @@
           <div class="w-12 h-12 rounded-full bg-primary/20">
             <img
               v-if="p.images?.medium || p.images?.grid"
+              v-image-placeholder
               :src="p.images.medium || p.images.grid"
               :alt="p.name"
               loading="lazy"

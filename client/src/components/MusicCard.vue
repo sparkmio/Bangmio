@@ -9,6 +9,7 @@
           <div class="w-14 h-14 rounded-lg overflow-hidden bg-base-300/50">
             <img
               v-if="track?.cover || image"
+              v-image-placeholder
               :src="track?.cover || image"
               :alt="displayName"
               loading="lazy"

@@ -38,7 +38,12 @@
       </div>
     </div>
 
-    <LoadingState v-if="currentUsername" :loading="loading" :error="error" @retry="fetchCollections" />
+    <LoadingState
+      v-if="currentUsername"
+      :loading="loading"
+      :error="error"
+      @retry="fetchCollections"
+    />
 
     <div v-if="currentUsername && !loading && !error">
       <div v-if="!collections.length" class="py-16 text-center text-base-content/40">
@@ -64,6 +69,7 @@
             >
               <img
                 v-if="col.subject?.images?.common || col.subject?.images?.grid"
+                v-image-placeholder
                 :src="col.subject.images.common || col.subject.images.grid"
                 :alt="col.subject?.name_cn || col.subject?.name"
                 class="w-10 h-14 sm:w-11 sm:h-[60px] rounded object-cover flex-shrink-0"
@@ -110,6 +116,7 @@
             <div class="flex gap-5 mb-4">
               <img
                 v-if="selected.subject?.images?.large || selected.subject?.images?.common"
+                v-image-placeholder
                 :src="selected.subject.images.large || selected.subject.images.common"
                 :alt="selected.subject?.name_cn || selected.subject?.name"
                 class="w-28 h-40 rounded-lg object-cover shadow-md flex-shrink-0"

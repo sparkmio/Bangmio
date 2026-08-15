@@ -13,6 +13,7 @@
             <div class="w-8 h-8 rounded-full bg-primary text-primary-content">
               <img
                 v-if="c.user?.avatar"
+                v-image-placeholder
                 :src="c.user.avatar"
                 :alt="c.user?.username || ''"
                 loading="lazy"

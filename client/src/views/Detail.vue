@@ -16,6 +16,7 @@
       <div class="absolute inset-0 overflow-hidden">
         <img
           v-if="anime.images?.large || anime.images?.common"
+          v-image-placeholder
           :src="anime.images.large || anime.images.common"
           alt=""
           loading="lazy"
@@ -39,6 +40,7 @@
           <div class="flex-shrink-0 w-40 sm:w-48 md:w-60 mx-auto md:mx-0">
             <img
               v-if="anime.images?.large || anime.images?.common"
+              v-image-placeholder
               :src="anime.images.large || anime.images.common"
               :alt="anime.name_cn || anime.name"
               loading="lazy"

@@ -34,6 +34,7 @@
               <div class="w-10 h-10 rounded-full bg-primary text-primary-content">
                 <img
                   v-if="topic.op.user?.avatar"
+                  v-image-placeholder
                   :src="topic.op.user.avatar"
                   :alt="topic.op.user?.username || ''"
                   loading="lazy"
@@ -76,6 +77,7 @@
                   <div class="w-8 h-8 rounded-full bg-primary text-primary-content">
                     <img
                       v-if="r.user?.avatar"
+                      v-image-placeholder
                       :src="r.user.avatar"
                       :alt="r.user?.username || ''"
                       loading="lazy"
@@ -107,6 +109,7 @@
                         <div class="w-6 h-6 rounded-full bg-primary text-primary-content">
                           <img
                             v-if="sub.user?.avatar"
+                            v-image-placeholder
                             :src="sub.user.avatar"
                             :alt="sub.user?.username || ''"
                             loading="lazy"
