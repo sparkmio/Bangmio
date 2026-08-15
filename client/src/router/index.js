@@ -113,6 +113,11 @@ const routes = [
     component: () => import(/* webpackChunkName: "groups" */ '../views/Groups.vue')
   },
   {
+    path: '/jump',
+    name: 'JumpGame',
+    component: () => import(/* webpackChunkName: "jump-game" */ '../views/JumpGame.vue')
+  },
+  {
     path: '/group/:id',
     name: 'GroupDetail',
     component: () => import(/* webpackChunkName: "group-detail" */ '../views/GroupDetail.vue')
