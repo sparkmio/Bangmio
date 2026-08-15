@@ -210,6 +210,27 @@ Bangmio 是 [Bangumi (bgm.tv)](https://bgm.tv) 的第三方客户端，提供动
 - **外部嵌入超时优化**：`fetchHTML` 8s→12s，`fetchHTMLMulti` 整体 12s→18s，豆瓣 `/page` 6s→10s，IframeEmbed 首次 10s→15s/重试后 20s
 - **小组降级提示优化**：`degraded` 时不显示"服务暂不可用"，改为温和提示"部分小组数据为缓存展示"
 
+### 12. 第三轮工程质量修复（2026-08-14，已提交推送至 master）
+
+本次为纯工程质量/可维护性批次，无功能变更；提交 `be2ea01`、`9f8ce90`（GitHub master）。
+
+- **CI 收紧**：移除 [ci.yml](file:///d:/Bangmio%20v4/.github/workflows/ci.yml) 中 lint/test 两处 continue-on-error（此前注释声称"有较多 lint 错误"，实测早已全绿），CI 恢复真实把关能力；同时把 workflow 触发分支从不存在的 `main` 修正为实际远程分支 `master`
+- **组件测试基础设施**：根 package.json 新增 @vue/test-utils、jsdom、@vitejs/plugin-vue；[vitest.config.js](file:///d:/Bangmio%20v4/vitest.config.js) 增加 vue 插件、environmentMatchGlobs（`client/src/components/**` 用例走 jsdom，其余保持 node），并用 alias 统一 vue 到根目录单一副本——解决根依赖与 client 各自解析出双 vue 实例、导致挂载组件响应式更新（v-if 切换 / watch）全部失效的问题
+- **CollectionButton 测试恢复执行**：[CollectionButton.test.js](file:///d:/Bangmio%20v4/client/src/components/CollectionButton.test.js) 移除依赖缺失时的 describe.skip，6 个状态同步用例真实执行（此前一直"假绿"跳过）
+- **服务端双 package 合并**：删除 server/package.json、server/package-lock.json 与 server/node_modules（内含旧 hono 4.9）；后端统一用根目录 hono 4.12.29，@hono/node-server 上移根 devDependencies；functions/api/_server.js 已用根 hono 重建
+- **本地开发脚本修复**：dev:server 入口从 server/src/app.js（不监听端口、原脚本无效）改为 server/src/index.js；新增 server:start（node server/src/index.js）
+- **文档对齐**：[client/.env.example](file:///d:/Bangmio%20v4/client/.env.example) 变量名 VITE_API_BASE_URL → VITE_API_BASE（与代码读取的 import.meta.env.VITE_API_BASE 一致）
+- **仓库卫生**：[.gitignore](file:///d:/Bangmio%20v4/.gitignore) 忽略实验性爬虫目录 ScrapyDouban-analysis/，避免误提交
+
+### 13. Detail.vue 与 Profile.vue 大文件拆分（2026-08-14，提交 9f8ce90）
+
+- **Detail.vue 1277 → 约 560 行**：拆分为 13 个 Tab 子组件（client/src/components/detail/）：TabOverview / TabEpisodes / TabCharacters / TabStaff / TabRelations / TabTalkbox / TabTopics / TabWiki / TabRating / TabDouban / TabMusic / TabStreaming / TabMoegirl；父组件仅保留 Hero 区、收藏交互、数据加载（并行 Promise.allSettled + 空闲预取）与 Tab 编排
+  - 各 Tab 逻辑随组件自包含：TabTopics 内聚发帖弹窗 + PostNewTopic，TabMoegirl 内聚搜索（多候选名/清洗回退）、iframe 嵌入、降级回退与重试
+  - cvtCareer（制作人员职业→中文）抽到共享工具 career.js；barWidth/infoValue/豆瓣卡片 computed 随组件下沉
+- **Profile.vue 1036 → 约 580 行**：拆为 client/src/components/profile/ 下的 ProfileCollections（单媒介收藏卡片）、ProfileTimelineCard（时间胶囊）、ProfileStatsPanel（统计面板，含类型筛选/6 卡统计/评分分布，内部状态自包含）；状态/时间/评分条等辅助函数抽到 profile.js；统计面板以 currentUsername 为 key，换用户时重置筛选
+- **新增组件测试**：tabs.test.js（10 个 Detail Tab 冒烟用例）+ profile.test.js（5 个 Profile 统计/时间胶囊逻辑用例）
+- **测试覆盖**：199 passed → **220 passed / 0 skipped**
+
 ---
 
 ## 七、当前已知问题与注意事项
