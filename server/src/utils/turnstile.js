@@ -26,7 +26,7 @@ const TURNSTILE_VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/sit
  * @param {string} secret - Turnstile secret key。
  * @param {string} [remoteip] - 用户 IP（可选，用于风控）。
  * @returns {Promise<{ success: boolean, skipped?: boolean, reason?: string, errorCodes?: string[] }>}
- *   验证结果对象。`skipped` 为 true 表示因未配置 secret 或 siteverify 网络异常而降级放行。
+ *   验证结果对象。`skipped` 仅用于未配置 secret 的本地开发环境。
  */
 export async function verifyTurnstile(token, secret, remoteip) {
   // 未配置 secret：跳过验证（开发环境）
@@ -54,8 +54,8 @@ export async function verifyTurnstile(token, secret, remoteip) {
       errorCodes: data['error-codes'] || []
     }
   } catch (err) {
-    // siteverify 网络异常时降级放行，避免因 Cloudflare 接口抖动导致所有登录失败
-    console.warn('[Turnstile] siteverify 网络异常，降级放行:', String(err))
-    return { success: true, skipped: true, reason: 'network-error' }
+    // 生产环境必须失败关闭，避免攻击者利用验证服务异常绕过人机校验。
+    console.warn('[Turnstile] siteverify 网络异常:', String(err))
+    return { success: false, reason: 'network-error', errorCodes: ['siteverify-unavailable'] }
   }
 }

@@ -207,8 +207,8 @@ app.get('/character/:id', async c => {
     const comments = parseTalkbox(html)
     cache.set(key, comments)
     return c.json({ data: comments })
-  } catch (err) {
-    return c.json({ error: '获取评论失败', detail: String(err) }, 500)
+  } catch {
+    return c.json({ error: '获取评论失败' }, 500)
   }
 })
 
@@ -222,8 +222,8 @@ app.get('/subject/:id', async c => {
     const comments = parseSubjectTalkbox(html)
     cache.set(key, comments)
     return c.json({ data: comments })
-  } catch (err) {
-    return c.json({ error: '获取评论失败', detail: String(err) }, 500)
+  } catch {
+    return c.json({ error: '获取评论失败' }, 500)
   }
 })
 
@@ -237,8 +237,8 @@ app.get('/subject/:id/topics', async c => {
     const topics = parseTopics(html)
     cache.set(key, topics)
     return c.json({ data: topics })
-  } catch (err) {
-    return c.json({ error: '获取讨论版失败', detail: String(err) }, 500)
+  } catch {
+    return c.json({ error: '获取讨论版失败' }, 500)
   }
 })
 
@@ -252,8 +252,8 @@ app.get('/topic/:topicId', async c => {
     const topic = parseTopicPage(html)
     cache.set(key, topic)
     return c.json({ data: topic })
-  } catch (err) {
-    return c.json({ error: '获取帖子内容失败', detail: String(err) }, 500)
+  } catch {
+    return c.json({ error: '获取帖子内容失败' }, 500)
   }
 })
 
@@ -267,8 +267,8 @@ app.get('/person/:id', async c => {
     const comments = parseTalkbox(html)
     cache.set(key, comments)
     return c.json({ data: comments })
-  } catch (err) {
-    return c.json({ error: '获取评论失败', detail: String(err) }, 500)
+  } catch {
+    return c.json({ error: '获取评论失败' }, 500)
   }
 })
 
@@ -321,10 +321,9 @@ app.post('/subject/:id/comment', async c => {
 
     if (res.status >= 300 && res.status < 400) return c.json({ success: true })
     if (res.ok) return c.json({ success: true })
-    const body = await res.text()
-    return c.json({ error: '发送失败', detail: body.slice(0, 200) }, 400)
-  } catch (err) {
-    return c.json({ error: '发送失败', detail: String(err) }, 500)
+    return c.json({ error: '发送失败' }, 400)
+  } catch {
+    return c.json({ error: '发送失败' }, 500)
   }
 })
 
@@ -366,10 +365,9 @@ app.post('/topic/:topicId/reply', async c => {
 
     if (res.status >= 300 && res.status < 400) return c.json({ success: true })
     if (res.ok) return c.json({ success: true })
-    const body = await res.text()
-    return c.json({ error: '发送失败', detail: body.slice(0, 200) }, 400)
-  } catch (err) {
-    return c.json({ error: '发送失败', detail: String(err) }, 500)
+    return c.json({ error: '发送失败' }, 400)
+  } catch {
+    return c.json({ error: '发送失败' }, 500)
   }
 })
 
@@ -411,10 +409,9 @@ app.post('/subject/:id/talkbox', async c => {
 
     if (res.status >= 300 && res.status < 400) return c.json({ success: true })
     if (res.ok) return c.json({ success: true })
-    const body = await res.text()
-    return c.json({ error: '发送失败', detail: body.slice(0, 200) }, 400)
-  } catch (err) {
-    return c.json({ error: '发送失败', detail: String(err) }, 500)
+    return c.json({ error: '发送失败' }, 400)
+  } catch {
+    return c.json({ error: '发送失败' }, 500)
   }
 })
 
@@ -460,10 +457,9 @@ app.post('/subject/:id/topic', async c => {
 
     if (res.status >= 300 && res.status < 400) return c.json({ success: true })
     if (res.ok) return c.json({ success: true })
-    const body = await res.text()
-    return c.json({ error: '发送失败', detail: body.slice(0, 200) }, 400)
-  } catch (err) {
-    return c.json({ error: '发送失败', detail: String(err) }, 500)
+    return c.json({ error: '发送失败' }, 400)
+  } catch {
+    return c.json({ error: '发送失败' }, 500)
   }
 })
 

@@ -21,7 +21,22 @@ import musicRoutes from './routes/music.js'
 
 const app = new Hono()
 
-app.use('*', cors())
+const allowedOrigins = new Set([
+  'https://bangmio.site',
+  'https://www.bangmio.site',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173'
+])
+
+app.use(
+  '*',
+  cors({
+    origin: origin => (allowedOrigins.has(origin) ? origin : ''),
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Bangumi-Username'],
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    maxAge: 86400
+  })
+)
 
 app.use('*', async (c, next) => {
   const country = c.req.header('cf-ipcountry') || ''

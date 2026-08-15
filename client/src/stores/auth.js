@@ -251,11 +251,11 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // Bangumi OAuth 回调
-  async function oauthLogin(code) {
+  async function oauthLogin(code, state) {
     loading.value = true
     error.value = ''
     try {
-      const res = await api.post('/user/oauth-callback', { code })
+      const res = await api.post('/user/oauth-callback', { code, state })
       const data = res.data?.data
       if (!data?.token || !data?.user) {
         throw new Error('授权响应异常，缺少必要信息')

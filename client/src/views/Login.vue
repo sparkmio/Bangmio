@@ -240,7 +240,7 @@ function refreshPage() {
 async function handleBangmioLogin() {
   clearLoginError()
   if (!email.value || !password.value) return
-  // Turnstile token 可能为空（widget 未渲染或失败），后端会降级处理
+  // Turnstile token 为一次性凭证；验证失败后重置 widget。
   try {
     await auth.loginWithBangmio(email.value, password.value, captchaToken.value)
   } catch (err) {

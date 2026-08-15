@@ -37,3 +37,6 @@ send_email.js
 
 # 豆瓣反爬实验项目（独立的 Scrapy 工程，不属于本仓库）
 ScrapyDouban-analysis/
+
+# 本地构建/打包缓存
+.cache/

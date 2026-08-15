@@ -63,7 +63,7 @@ onMounted(async () => {
     // 原有 Bangumi 直登流程
     statusText.value = '正在完成登录...'
     try {
-      await auth.oauthLogin(code)
+      await auth.oauthLogin(code, state)
     } catch {
       error.value = auth.error || '授权登录失败'
     }

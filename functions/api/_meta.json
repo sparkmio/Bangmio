@@ -392,9 +392,9 @@
       ],
       "format": "esm"
     },
-    "server/src/utils/turnstile.js": { "bytes": 2375, "imports": [], "format": "esm" },
+    "server/src/utils/turnstile.js": { "bytes": 2351, "imports": [], "format": "esm" },
     "server/src/utils/oauthConfig.js": {
-      "bytes": 1470,
+      "bytes": 1012,
       "imports": [
         {
           "path": "server/src/utils/logger.js",
@@ -406,7 +406,7 @@
     },
     "server/src/utils/errors.js": { "bytes": 1962, "imports": [], "format": "esm" },
     "server/src/routes/auth.js": {
-      "bytes": 14328,
+      "bytes": 13945,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -451,14 +451,41 @@
       ],
       "format": "esm"
     },
+    "node_modules/hono/dist/utils/cookie.js": {
+      "bytes": 5832,
+      "imports": [
+        {
+          "path": "node_modules/hono/dist/utils/url.js",
+          "kind": "import-statement",
+          "original": "./url.js"
+        }
+      ],
+      "format": "esm"
+    },
+    "node_modules/hono/dist/helper/cookie/index.js": {
+      "bytes": 2791,
+      "imports": [
+        {
+          "path": "node_modules/hono/dist/utils/cookie.js",
+          "kind": "import-statement",
+          "original": "../../utils/cookie.js"
+        }
+      ],
+      "format": "esm"
+    },
     "server/src/services/bangumi.js": { "bytes": 10766, "imports": [], "format": "esm" },
     "server/src/routes/user.js": {
-      "bytes": 15976,
+      "bytes": 16643,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
           "kind": "import-statement",
           "original": "hono"
+        },
+        {
+          "path": "node_modules/hono/dist/helper/cookie/index.js",
+          "kind": "import-statement",
+          "original": "hono/cookie"
         },
         {
           "path": "server/src/services/bangumi.js",
@@ -4855,7 +4882,7 @@
     },
     "server/src/utils/cache.js": { "bytes": 1717, "imports": [], "format": "esm" },
     "server/src/routes/comments.js": {
-      "bytes": 17544,
+      "bytes": 17053,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -5081,7 +5108,7 @@
       "format": "esm"
     },
     "server/src/app.js": {
-      "bytes": 3344,
+      "bytes": 3723,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -5225,12 +5252,14 @@
         "server/src/utils/email.js": { "bytesInOutput": 2721 },
         "server/src/utils/http.js": { "bytesInOutput": 3472 },
         "server/src/services/auth.js": { "bytesInOutput": 9837 },
-        "server/src/utils/turnstile.js": { "bytesInOutput": 867 },
-        "server/src/utils/oauthConfig.js": { "bytesInOutput": 488 },
+        "server/src/utils/turnstile.js": { "bytesInOutput": 863 },
+        "server/src/utils/oauthConfig.js": { "bytesInOutput": 388 },
         "server/src/utils/errors.js": { "bytesInOutput": 834 },
-        "server/src/routes/auth.js": { "bytesInOutput": 9453 },
+        "server/src/routes/auth.js": { "bytesInOutput": 9456 },
+        "node_modules/hono/dist/utils/cookie.js": { "bytesInOutput": 3747 },
+        "node_modules/hono/dist/helper/cookie/index.js": { "bytesInOutput": 1260 },
         "server/src/services/bangumi.js": { "bytesInOutput": 5574 },
-        "server/src/routes/user.js": { "bytesInOutput": 15236 },
+        "server/src/routes/user.js": { "bytesInOutput": 15895 },
         "server/src/controllers/animeController.js": { "bytesInOutput": 4411 },
         "server/src/routes/anime.js": { "bytesInOutput": 683 },
         "server/src/services/userVerify.js": { "bytesInOutput": 787 },
@@ -5300,7 +5329,7 @@
         "node_modules/linkedom/esm/interface/comment.js": { "bytesInOutput": 333 },
         "node_modules/linkedom/node_modules/boolbase/dist/index.js": { "bytesInOutput": 80 },
         "node_modules/linkedom/node_modules/css-what/dist/types.js": { "bytesInOutput": 966 },
-        "node_modules/linkedom/node_modules/css-what/dist/parse.js": { "bytesInOutput": 14267 },
+        "node_modules/linkedom/node_modules/css-what/dist/parse.js": { "bytesInOutput": 14268 },
         "node_modules/linkedom/node_modules/css-what/dist/index.js": { "bytesInOutput": 0 },
         "node_modules/linkedom/node_modules/domelementtype/dist/index.js": { "bytesInOutput": 869 },
         "node_modules/linkedom/node_modules/domhandler/dist/node.js": { "bytesInOutput": 338 },
@@ -5341,7 +5370,7 @@
           "bytesInOutput": 110
         },
         "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/filters.js": {
-          "bytesInOutput": 4868
+          "bytesInOutput": 4869
         },
         "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/pseudos.js": {
           "bytesInOutput": 2974
@@ -5353,11 +5382,11 @@
           "bytesInOutput": 2265
         },
         "node_modules/linkedom/node_modules/css-select/dist/pseudo-selectors/index.js": {
-          "bytesInOutput": 1224
+          "bytesInOutput": 1225
         },
         "node_modules/linkedom/node_modules/css-select/dist/general.js": { "bytesInOutput": 4553 },
         "node_modules/linkedom/node_modules/css-select/dist/compile.js": { "bytesInOutput": 2517 },
-        "node_modules/linkedom/node_modules/css-select/dist/index.js": { "bytesInOutput": 2403 },
+        "node_modules/linkedom/node_modules/css-select/dist/index.js": { "bytesInOutput": 2404 },
         "node_modules/linkedom/esm/shared/matches.js": { "bytesInOutput": 2571 },
         "node_modules/linkedom/esm/interface/text.js": { "bytesInOutput": 908 },
         "node_modules/linkedom/esm/mixin/parent-node.js": { "bytesInOutput": 6443 },
@@ -5459,7 +5488,7 @@
         "node_modules/linkedom/esm/shared/parse-json.js": { "bytesInOutput": 30 },
         "node_modules/linkedom/esm/index.js": { "bytesInOutput": 242 },
         "server/src/utils/cache.js": { "bytesInOutput": 906 },
-        "server/src/routes/comments.js": { "bytesInOutput": 17997 },
+        "server/src/routes/comments.js": { "bytesInOutput": 17502 },
         "server/src/services/douban.js": { "bytesInOutput": 8209 },
         "server/src/utils/edgeCache.js": { "bytesInOutput": 819 },
         "server/src/routes/douban.js": { "bytesInOutput": 12585 },
@@ -5469,9 +5498,9 @@
         "server/src/routes/groups.js": { "bytesInOutput": 13712 },
         "server/src/services/music.js": { "bytesInOutput": 3261 },
         "server/src/routes/music.js": { "bytesInOutput": 604 },
-        "server/src/app.js": { "bytesInOutput": 2087 }
+        "server/src/app.js": { "bytesInOutput": 2480 }
       },
-      "bytes": 695362
+      "bytes": 700922
     }
   }
 }

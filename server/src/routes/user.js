@@ -1,9 +1,11 @@
 import { Hono } from 'hono'
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { getClient } from '../services/bangumi.js'
 import { fetchHTML, stripTags, unescapeHtml, parseNumber, fixUrl } from '../utils/http.js'
 import { getOAuthCredentials } from '../utils/oauthConfig.js'
 
 const app = new Hono()
+const OAUTH_STATE_COOKIE = 'bangmio_oauth_state'
 
 function isChina(c) {
   return (c.env?.CF_IP_COUNTRY || '') === 'CN'
@@ -54,14 +56,28 @@ app.post('/auth', async c => {
 
 app.get('/oauth-url', c => {
   const { appId } = getOAuthCredentials(c.env, '/user/oauth-url')
-  const url = `${oauthBase(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}`
+  const state = crypto.randomUUID()
+  const secure = redirectUri(c).startsWith('https://')
+  setCookie(c, OAUTH_STATE_COOKIE, state, {
+    httpOnly: true,
+    secure,
+    sameSite: 'Lax',
+    maxAge: 10 * 60,
+    path: '/api/v1/user'
+  })
+  const url = `${oauthBase(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}&state=${encodeURIComponent(state)}`
   return c.json({ data: url })
 })
 
 app.post('/oauth-callback', async c => {
   try {
-    const { code } = await c.req.json()
-    if (!code) return c.json({ error: '缺少授权码' }, 400)
+    const { code, state } = await c.req.json()
+    if (!code || !state) return c.json({ error: '缺少授权码或 state' }, 400)
+    const expectedState = getCookie(c, OAUTH_STATE_COOKIE)
+    deleteCookie(c, OAUTH_STATE_COOKIE, { path: '/api/v1/user' })
+    if (!expectedState || state !== expectedState) {
+      return c.json({ error: '授权状态无效或已过期，请重新登录' }, 400)
+    }
     const { appId, appSecret } = getOAuthCredentials(c.env, '/user/oauth-callback')
     const params = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -78,7 +94,7 @@ app.post('/oauth-callback', async c => {
     const tokenData = await tokenRes.json()
     const accessToken = tokenData.access_token
     const refreshToken = tokenData.refresh_token
-    if (!accessToken) return c.json({ error: '获取 Token 失败', detail: tokenData }, 400)
+    if (!accessToken) return c.json({ error: '获取 Token 失败' }, 400)
     const client = getClient(accessToken, isChina(c))
     const user = await client.get('/v0/me')
     return c.json({ data: { user, token: accessToken, refreshToken: refreshToken || '' } })

@@ -942,7 +942,7 @@ var require_CSSDocumentRule = __commonJS({
 var require_parse = __commonJS({
   "node_modules/cssom/lib/parse.js"(exports) {
     var CSSOM = {};
-    CSSOM.parse = function parse5(token) {
+    CSSOM.parse = function parse6(token) {
       var i = 0;
       var state = "before-selector";
       var index;
@@ -4686,19 +4686,19 @@ async function verifyTurnstile(token, secret, remoteip) {
       errorCodes: data["error-codes"] || []
     };
   } catch (err) {
-    console.warn("[Turnstile] siteverify \u7F51\u7EDC\u5F02\u5E38\uFF0C\u964D\u7EA7\u653E\u884C:", String(err));
-    return { success: true, skipped: true, reason: "network-error" };
+    console.warn("[Turnstile] siteverify \u7F51\u7EDC\u5F02\u5E38:", String(err));
+    return { success: false, reason: "network-error", errorCodes: ["siteverify-unavailable"] };
   }
 }
 
 // server/src/utils/oauthConfig.js
 var DEFAULT_BGM_APP_ID = "bgm61416a088eff71580";
-var DEFAULT_BGM_APP_SECRET = "6b8055c0159fcc5e998059536813026f";
 function getOAuthCredentials(env, logPath = "oauth") {
   const appId = env?.BGM_APP_ID || DEFAULT_BGM_APP_ID;
-  const appSecret = env?.BGM_APP_SECRET || DEFAULT_BGM_APP_SECRET;
-  if (!env?.BGM_APP_SECRET) {
-    logError("BGM_APP_SECRET \u672A\u914D\u7F6E\uFF0C\u56DE\u9000\u5230\u5185\u7F6E\u9ED8\u8BA4\u51ED\u636E", { path: logPath });
+  const appSecret = env?.BGM_APP_SECRET;
+  if (!appSecret) {
+    logError("BGM_APP_SECRET \u672A\u914D\u7F6E", { path: logPath });
+    throw new Error("OAuth \u670D\u52A1\u672A\u914D\u7F6E");
   }
   return { appId, appSecret };
 }
@@ -4764,7 +4764,7 @@ app.post("/send-code", async (c) => {
       c.req.header("CF-Connecting-IP")
     );
     if (!turnstile.success) {
-      console.warn("[send-code] Turnstile \u9A8C\u8BC1\u5931\u8D25\uFF0C\u964D\u7EA7\u653E\u884C:", turnstile.errorCodes);
+      return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
     }
     const result = await sendVerificationCode(c.env.DB, c.env, { email, purpose });
     return c.json({ data: result, code: 200 });
@@ -4789,7 +4789,7 @@ app.post("/register", async (c) => {
         c.req.header("CF-Connecting-IP")
       );
       if (!turnstile.success) {
-        console.warn("[register] Turnstile \u9A8C\u8BC1\u5931\u8D25\uFF0C\u964D\u7EA7\u653E\u884C:", turnstile.errorCodes);
+        return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
       }
     }
     const result = await registerUser(c.env.DB, c.env, { email, password, code });
@@ -4812,7 +4812,7 @@ app.post("/login", async (c) => {
         c.req.header("CF-Connecting-IP")
       );
       if (!turnstile.success) {
-        console.warn("[Login] Turnstile \u9A8C\u8BC1\u5931\u8D25\uFF0C\u964D\u7EA7\u653E\u884C:", turnstile.errorCodes);
+        return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
       }
     }
     const result = await loginUser(c.env.DB, c.env, { email, password });
@@ -4941,7 +4941,7 @@ app.post("/forgot-password", async (c) => {
         c.req.header("CF-Connecting-IP")
       );
       if (!turnstile.success) {
-        console.warn("[forgot-password] Turnstile \u9A8C\u8BC1\u5931\u8D25\uFF0C\u964D\u7EA7\u653E\u884C:", turnstile.errorCodes);
+        return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
       }
     }
     const exists = await userExistsByEmail(c.env.DB, email);
@@ -4974,6 +4974,175 @@ app.post("/reset-password", async (c) => {
   }
 });
 var auth_default = app;
+
+// node_modules/hono/dist/utils/cookie.js
+var validCookieNameRegEx = /^[\w!#$%&'*.^`|~+-]+$/;
+var validCookieValueRegEx = /^[ !#-:<-[\]-~]*$/;
+var trimCookieWhitespace = (value) => {
+  let start = 0;
+  let end = value.length;
+  while (start < end) {
+    const charCode = value.charCodeAt(start);
+    if (charCode !== 32 && charCode !== 9) {
+      break;
+    }
+    start++;
+  }
+  while (end > start) {
+    const charCode = value.charCodeAt(end - 1);
+    if (charCode !== 32 && charCode !== 9) {
+      break;
+    }
+    end--;
+  }
+  return start === 0 && end === value.length ? value : value.slice(start, end);
+};
+var parse = (cookie, name) => {
+  if (name && cookie.indexOf(name) === -1) {
+    return {};
+  }
+  const pairs = cookie.split(";");
+  const parsedCookie = /* @__PURE__ */ Object.create(null);
+  for (const pairStr of pairs) {
+    const valueStartPos = pairStr.indexOf("=");
+    if (valueStartPos === -1) {
+      continue;
+    }
+    const cookieName = trimCookieWhitespace(pairStr.substring(0, valueStartPos));
+    if (name && name !== cookieName || !validCookieNameRegEx.test(cookieName) || cookieName in parsedCookie) {
+      continue;
+    }
+    let cookieValue = trimCookieWhitespace(pairStr.substring(valueStartPos + 1));
+    if (cookieValue.startsWith('"') && cookieValue.endsWith('"')) {
+      cookieValue = cookieValue.slice(1, -1);
+    }
+    if (validCookieValueRegEx.test(cookieValue)) {
+      parsedCookie[cookieName] = cookieValue.indexOf("%") !== -1 ? tryDecode(cookieValue, decodeURIComponent_) : cookieValue;
+      if (name) {
+        break;
+      }
+    }
+  }
+  return parsedCookie;
+};
+var _serialize = (name, value, opt = {}) => {
+  if (!validCookieNameRegEx.test(name)) {
+    throw new Error("Invalid cookie name");
+  }
+  let cookie = `${name}=${value}`;
+  if (name.startsWith("__Secure-") && !opt.secure) {
+    throw new Error("__Secure- Cookie must have Secure attributes");
+  }
+  if (name.startsWith("__Host-")) {
+    if (!opt.secure) {
+      throw new Error("__Host- Cookie must have Secure attributes");
+    }
+    if (opt.path !== "/") {
+      throw new Error('__Host- Cookie must have Path attributes with "/"');
+    }
+    if (opt.domain) {
+      throw new Error("__Host- Cookie must not have Domain attributes");
+    }
+  }
+  for (const key2 of ["domain", "path", "sameSite", "priority"]) {
+    if (opt[key2] && /[;\r\n]/.test(opt[key2])) {
+      throw new Error(`${key2} must not contain ";", "\\r", or "\\n"`);
+    }
+  }
+  if (opt && typeof opt.maxAge === "number" && opt.maxAge >= 0) {
+    if (opt.maxAge > 3456e4) {
+      throw new Error(
+        "Cookies Max-Age SHOULD NOT be greater than 400 days (34560000 seconds) in duration."
+      );
+    }
+    cookie += `; Max-Age=${opt.maxAge | 0}`;
+  }
+  if (opt.domain && opt.prefix !== "host") {
+    cookie += `; Domain=${opt.domain}`;
+  }
+  if (opt.path) {
+    cookie += `; Path=${opt.path}`;
+  }
+  if (opt.expires) {
+    if (opt.expires.getTime() - Date.now() > 3456e7) {
+      throw new Error(
+        "Cookies Expires SHOULD NOT be greater than 400 days (34560000 seconds) in the future."
+      );
+    }
+    cookie += `; Expires=${opt.expires.toUTCString()}`;
+  }
+  if (opt.httpOnly) {
+    cookie += "; HttpOnly";
+  }
+  if (opt.secure) {
+    cookie += "; Secure";
+  }
+  if (opt.sameSite) {
+    cookie += `; SameSite=${opt.sameSite.charAt(0).toUpperCase() + opt.sameSite.slice(1)}`;
+  }
+  if (opt.priority) {
+    cookie += `; Priority=${opt.priority.charAt(0).toUpperCase() + opt.priority.slice(1)}`;
+  }
+  if (opt.partitioned) {
+    if (!opt.secure) {
+      throw new Error("Partitioned Cookie must have Secure attributes");
+    }
+    cookie += "; Partitioned";
+  }
+  return cookie;
+};
+var serialize = (name, value, opt) => {
+  value = encodeURIComponent(value);
+  return _serialize(name, value, opt);
+};
+
+// node_modules/hono/dist/helper/cookie/index.js
+var getCookie = (c, key2, prefix) => {
+  const cookie = c.req.raw.headers.get("Cookie");
+  if (typeof key2 === "string") {
+    if (!cookie) {
+      return void 0;
+    }
+    let finalKey = key2;
+    if (prefix === "secure") {
+      finalKey = "__Secure-" + key2;
+    } else if (prefix === "host") {
+      finalKey = "__Host-" + key2;
+    }
+    const obj2 = parse(cookie, finalKey);
+    return obj2[finalKey];
+  }
+  if (!cookie) {
+    return {};
+  }
+  const obj = parse(cookie);
+  return obj;
+};
+var generateCookie = (name, value, opt) => {
+  let cookie;
+  if (opt?.prefix === "secure") {
+    cookie = serialize("__Secure-" + name, value, { path: "/", ...opt, secure: true });
+  } else if (opt?.prefix === "host") {
+    cookie = serialize("__Host-" + name, value, {
+      ...opt,
+      path: "/",
+      secure: true,
+      domain: void 0
+    });
+  } else {
+    cookie = serialize(name, value, { path: "/", ...opt });
+  }
+  return cookie;
+};
+var setCookie = (c, name, value, opt) => {
+  const cookie = generateCookie(name, value, opt);
+  c.header("Set-Cookie", cookie, { append: true });
+};
+var deleteCookie = (c, name, opt) => {
+  const deletedCookie = getCookie(c, name, opt?.prefix);
+  setCookie(c, name, "", { ...opt, maxAge: 0 });
+  return deletedCookie;
+};
 
 // server/src/services/bangumi.js
 var BGM_API = "https://api.bgm.tv";
@@ -5120,6 +5289,7 @@ async function getPersonSubjects(id, opts) {
 
 // server/src/routes/user.js
 var app2 = new Hono2();
+var OAUTH_STATE_COOKIE = "bangmio_oauth_state";
 function isChina2(c) {
   return (c.env?.CF_IP_COUNTRY || "") === "CN";
 }
@@ -5163,13 +5333,27 @@ app2.post("/auth", async (c) => {
 });
 app2.get("/oauth-url", (c) => {
   const { appId } = getOAuthCredentials(c.env, "/user/oauth-url");
-  const url = `${oauthBase2(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri2(c))}`;
+  const state = crypto.randomUUID();
+  const secure = redirectUri2(c).startsWith("https://");
+  setCookie(c, OAUTH_STATE_COOKIE, state, {
+    httpOnly: true,
+    secure,
+    sameSite: "Lax",
+    maxAge: 10 * 60,
+    path: "/api/v1/user"
+  });
+  const url = `${oauthBase2(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri2(c))}&state=${encodeURIComponent(state)}`;
   return c.json({ data: url });
 });
 app2.post("/oauth-callback", async (c) => {
   try {
-    const { code } = await c.req.json();
-    if (!code) return c.json({ error: "\u7F3A\u5C11\u6388\u6743\u7801" }, 400);
+    const { code, state } = await c.req.json();
+    if (!code || !state) return c.json({ error: "\u7F3A\u5C11\u6388\u6743\u7801\u6216 state" }, 400);
+    const expectedState = getCookie(c, OAUTH_STATE_COOKIE);
+    deleteCookie(c, OAUTH_STATE_COOKIE, { path: "/api/v1/user" });
+    if (!expectedState || state !== expectedState) {
+      return c.json({ error: "\u6388\u6743\u72B6\u6001\u65E0\u6548\u6216\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55" }, 400);
+    }
     const { appId, appSecret } = getOAuthCredentials(c.env, "/user/oauth-callback");
     const params = new URLSearchParams({
       grant_type: "authorization_code",
@@ -5186,7 +5370,7 @@ app2.post("/oauth-callback", async (c) => {
     const tokenData = await tokenRes.json();
     const accessToken = tokenData.access_token;
     const refreshToken = tokenData.refresh_token;
-    if (!accessToken) return c.json({ error: "\u83B7\u53D6 Token \u5931\u8D25", detail: tokenData }, 400);
+    if (!accessToken) return c.json({ error: "\u83B7\u53D6 Token \u5931\u8D25" }, 400);
     const client = getClient(accessToken, isChina2(c));
     const user = await client.get("/v0/me");
     return c.json({ data: { user, token: accessToken, refreshToken: refreshToken || "" } });
@@ -10652,7 +10836,7 @@ function isQuote(c) {
 function isWhitespace2(c) {
   return c === CharCode.Space || c === CharCode.Tab || c === CharCode.NewLine || c === CharCode.FormFeed || c === CharCode.CarriageReturn;
 }
-function parse(selector) {
+function parse2(selector) {
   const subselects2 = [];
   const endIndex = parseSelector(subselects2, `${selector}`, 0);
   if (endIndex < selector.length) {
@@ -12050,7 +12234,7 @@ function compile(parsed) {
 var whitespace = /* @__PURE__ */ new Set([9, 10, 12, 13, 32]);
 var ZERO = "0".charCodeAt(0);
 var NINE = "9".charCodeAt(0);
-function parse2(formula) {
+function parse3(formula) {
   formula = formula.trim().toLowerCase();
   switch (formula) {
     case "even": {
@@ -12111,7 +12295,7 @@ function parse2(formula) {
 
 // node_modules/linkedom/node_modules/nth-check/dist/index.js
 function nthCheck(formula) {
-  return compile(parse2(formula));
+  return compile(parse3(formula));
 }
 
 // node_modules/linkedom/node_modules/css-select/dist/helpers/cache.js
@@ -12176,7 +12360,7 @@ function compileNth(reverse, ofType) {
     const nthCheck2 = nthCheck(ofMatch ? ofMatch[1].trim() : rule);
     if (nthCheck2 === falseFunc)
       return falseFunc;
-    const ofSelector = ofMatch && compileToken2 ? compileToken2(parse(ofMatch[2].trim()), copyOptions(options), context) : void 0;
+    const ofSelector = ofMatch && compileToken2 ? compileToken2(parse2(ofMatch[2].trim()), copyOptions(options), context) : void 0;
     if (ofSelector === falseFunc)
       return falseFunc;
     if (nthCheck2 === trueFunc && !ofSelector) {
@@ -12507,7 +12691,7 @@ function compilePseudoSelector(next, selector, options, context, compileToken2) 
     if (data != null) {
       throw new Error(`Pseudo ${name} doesn't have any arguments`);
     }
-    const alias = parse(stringPseudo);
+    const alias = parse2(stringPseudo);
     return subselects["is"](next, alias, options, context, compileToken2);
   }
   if (typeof userPseudo === "function") {
@@ -12751,7 +12935,7 @@ function compile2(selector, options, context) {
   return next === falseFunc ? falseFunc : (element) => convertedOptions.adapter.isTag(element) && next(element);
 }
 function _compileUnsafe(selector, options, context) {
-  return compileToken(typeof selector === "string" ? parse(selector) : selector, convertOptionFormats(options), context);
+  return compileToken(typeof selector === "string" ? parse2(selector) : selector, convertOptionFormats(options), context);
 }
 function getSelectorFunction(searchFunction) {
   return function select(query2, elements, options) {
@@ -16399,7 +16583,7 @@ var DOMParser = class _DOMParser {
 };
 
 // node_modules/linkedom/esm/shared/parse-json.js
-var { parse: parse4 } = JSON;
+var { parse: parse5 } = JSON;
 
 // node_modules/linkedom/esm/index.js
 var parseHTML = (html, globals = null) => new DOMParser().parseFromString(
@@ -16630,8 +16814,8 @@ app5.get("/character/:id", async (c) => {
     const comments = parseTalkbox(html);
     cache.set(key2, comments);
     return c.json({ data: comments });
-  } catch (err) {
-    return c.json({ error: "\u83B7\u53D6\u8BC4\u8BBA\u5931\u8D25", detail: String(err) }, 500);
+  } catch {
+    return c.json({ error: "\u83B7\u53D6\u8BC4\u8BBA\u5931\u8D25" }, 500);
   }
 });
 app5.get("/subject/:id", async (c) => {
@@ -16644,8 +16828,8 @@ app5.get("/subject/:id", async (c) => {
     const comments = parseSubjectTalkbox(html);
     cache.set(key2, comments);
     return c.json({ data: comments });
-  } catch (err) {
-    return c.json({ error: "\u83B7\u53D6\u8BC4\u8BBA\u5931\u8D25", detail: String(err) }, 500);
+  } catch {
+    return c.json({ error: "\u83B7\u53D6\u8BC4\u8BBA\u5931\u8D25" }, 500);
   }
 });
 app5.get("/subject/:id/topics", async (c) => {
@@ -16658,8 +16842,8 @@ app5.get("/subject/:id/topics", async (c) => {
     const topics = parseTopics(html);
     cache.set(key2, topics);
     return c.json({ data: topics });
-  } catch (err) {
-    return c.json({ error: "\u83B7\u53D6\u8BA8\u8BBA\u7248\u5931\u8D25", detail: String(err) }, 500);
+  } catch {
+    return c.json({ error: "\u83B7\u53D6\u8BA8\u8BBA\u7248\u5931\u8D25" }, 500);
   }
 });
 app5.get("/topic/:topicId", async (c) => {
@@ -16672,8 +16856,8 @@ app5.get("/topic/:topicId", async (c) => {
     const topic = parseTopicPage(html);
     cache.set(key2, topic);
     return c.json({ data: topic });
-  } catch (err) {
-    return c.json({ error: "\u83B7\u53D6\u5E16\u5B50\u5185\u5BB9\u5931\u8D25", detail: String(err) }, 500);
+  } catch {
+    return c.json({ error: "\u83B7\u53D6\u5E16\u5B50\u5185\u5BB9\u5931\u8D25" }, 500);
   }
 });
 app5.get("/person/:id", async (c) => {
@@ -16686,8 +16870,8 @@ app5.get("/person/:id", async (c) => {
     const comments = parseTalkbox(html);
     cache.set(key2, comments);
     return c.json({ data: comments });
-  } catch (err) {
-    return c.json({ error: "\u83B7\u53D6\u8BC4\u8BBA\u5931\u8D25", detail: String(err) }, 500);
+  } catch {
+    return c.json({ error: "\u83B7\u53D6\u8BC4\u8BBA\u5931\u8D25" }, 500);
   }
 });
 function extractFormhash(html) {
@@ -16731,10 +16915,9 @@ app5.post("/subject/:id/comment", async (c) => {
     });
     if (res.status >= 300 && res.status < 400) return c.json({ success: true });
     if (res.ok) return c.json({ success: true });
-    const body = await res.text();
-    return c.json({ error: "\u53D1\u9001\u5931\u8D25", detail: body.slice(0, 200) }, 400);
-  } catch (err) {
-    return c.json({ error: "\u53D1\u9001\u5931\u8D25", detail: String(err) }, 500);
+    return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 400);
+  } catch {
+    return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 500);
   }
 });
 app5.post("/topic/:topicId/reply", async (c) => {
@@ -16771,10 +16954,9 @@ app5.post("/topic/:topicId/reply", async (c) => {
     });
     if (res.status >= 300 && res.status < 400) return c.json({ success: true });
     if (res.ok) return c.json({ success: true });
-    const body = await res.text();
-    return c.json({ error: "\u53D1\u9001\u5931\u8D25", detail: body.slice(0, 200) }, 400);
-  } catch (err) {
-    return c.json({ error: "\u53D1\u9001\u5931\u8D25", detail: String(err) }, 500);
+    return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 400);
+  } catch {
+    return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 500);
   }
 });
 app5.post("/subject/:id/talkbox", async (c) => {
@@ -16811,10 +16993,9 @@ app5.post("/subject/:id/talkbox", async (c) => {
     });
     if (res.status >= 300 && res.status < 400) return c.json({ success: true });
     if (res.ok) return c.json({ success: true });
-    const body = await res.text();
-    return c.json({ error: "\u53D1\u9001\u5931\u8D25", detail: body.slice(0, 200) }, 400);
-  } catch (err) {
-    return c.json({ error: "\u53D1\u9001\u5931\u8D25", detail: String(err) }, 500);
+    return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 400);
+  } catch {
+    return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 500);
   }
 });
 app5.post("/subject/:id/topic", async (c) => {
@@ -16855,10 +17036,9 @@ app5.post("/subject/:id/topic", async (c) => {
     });
     if (res.status >= 300 && res.status < 400) return c.json({ success: true });
     if (res.ok) return c.json({ success: true });
-    const body = await res.text();
-    return c.json({ error: "\u53D1\u9001\u5931\u8D25", detail: body.slice(0, 200) }, 400);
-  } catch (err) {
-    return c.json({ error: "\u53D1\u9001\u5931\u8D25", detail: String(err) }, 500);
+    return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 400);
+  } catch {
+    return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 500);
   }
 });
 var comments_default = app5;
@@ -18374,7 +18554,21 @@ var music_default = app10;
 
 // server/src/app.js
 var app11 = new Hono2();
-app11.use("*", cors());
+var allowedOrigins = /* @__PURE__ */ new Set([
+  "https://bangmio.site",
+  "https://www.bangmio.site",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173"
+]);
+app11.use(
+  "*",
+  cors({
+    origin: (origin) => allowedOrigins.has(origin) ? origin : "",
+    allowHeaders: ["Content-Type", "Authorization", "X-Bangumi-Username"],
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    maxAge: 86400
+  })
+);
 app11.use("*", async (c, next) => {
   const country = c.req.header("cf-ipcountry") || "";
   c.env = c.env || {};
