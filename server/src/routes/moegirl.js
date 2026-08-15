@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { parseHTML } from 'linkedom'
 import { createCache } from '../utils/cache.js'
-import { fetchHTML, fetchHTMLMulti, fixUrl } from '../utils/http.js'
+import { fetchHTMLMulti, fixUrl } from '../utils/http.js'
 import { edgeCacheGet, edgeCachePut } from '../utils/edgeCache.js'
 import { getMoegirlSummary } from '../services/moegirl.js'
 import { CACHE_TTL_MOEGIRL } from '../config.js'
@@ -144,7 +144,7 @@ function getMoegirlBase() {
 async function fetchMoegirlJSON(apiBase, params) {
   const url = `${apiBase}?${params}`
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 10000)
+  const timer = setTimeout(() => controller.abort(), 6000)
   try {
     const res = await fetch(url, {
       signal: controller.signal,
@@ -180,47 +180,6 @@ function parseSearchResults(json) {
   return results
 }
 
-async function fetchPageExtract(apiBase, title) {
-  // apiBase 固定为 https://zh.moegirl.org.cn/api.php
-  const base = apiBase.replace('/api.php', '')
-  const pageUrl = `${base}/${encodeURIComponent(title)}`
-
-  try {
-    const html = await fetchHTML(pageUrl, {
-      timeout: 6000,
-      headers: {
-        'User-Agent': 'Bangmio/1.0 (Mozilla/5.0; compatible)',
-        Accept: 'text/html',
-        'Accept-Language': 'zh-CN,zh;q=0.9'
-      }
-    })
-
-    // 提取 #mw-content-text 的内容
-    const contentMatch = html.match(
-      /<div id="mw-content-text"[^>]*>([\s\S]*?)<\/div>\s*(?:<div class="printfooter|<div id="catlinks|<\/body>)/i
-    )
-    if (!contentMatch) return null
-
-    let clean = contentMatch[1]
-      .replace(/<script[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[\s\S]*?<\/style>/gi, '')
-      .replace(/<!--[\s\S]*?-->/g, '')
-      .replace(/<span class="mw-editsection">[\s\S]*?<\/span>/gi, '')
-
-    // 链接绝对化
-    clean = clean.replace(/href="\/wiki\//g, `href="${base}/wiki/`)
-    clean = clean.replace(/href="\//g, `href="${base}/`)
-    clean = clean.replace(/src="\//g, `src="${base}/`)
-
-    return {
-      title,
-      html: clean
-    }
-  } catch {
-    return null
-  }
-}
-
 app.get('/search', async c => {
   try {
     const q = c.req.query('q')
@@ -234,19 +193,9 @@ app.get('/search', async c => {
     const json = await fetchMoegirlJSON(apiBase, params)
     let results = parseSearchResults(json)
 
-    let page = null
-    if (results.length) {
-      const extract = await fetchPageExtract(apiBase, results[0].title)
-      if (extract) {
-        page = {
-          title: extract.title,
-          html: extract.html,
-          url: `${getMoegirlBase()}/${encodeURIComponent(results[0].title)}`
-        }
-      }
-    }
-
-    const data = { results, page }
+    // 搜索只返回候选项；正文由 summary/page 独立请求。避免一次搜索串行抓取 HTML，
+    // 使所有条目都被完整页面请求拖到超时。
+    const data = { results, page: null }
     cache.set(cacheKey, data)
     return c.json({ data })
   } catch {

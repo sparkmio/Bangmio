@@ -188,15 +188,23 @@ export const useAuthStore = defineStore('auth', () => {
   // Bangmio 用户绑定后调用，使 Profile / 番剧功能页能正常显示
   // 失败时静默，不影响主流程
   async function fetchBgmUserProfile() {
-    if (!bangmioToken.value) return
+    if (!bangmioToken.value) return null
     bgmProfileLoading.value = true
     bgmProfileError.value = false
     try {
+      // 首次注册、换设备或 OAuth 回调后本地尚无缓存时，先取绑定 token，
+      // 避免 /user/me 因携带空 token 而失败。
+      if (!bgmToken.value) await fetchBgmToken()
+      if (!bgmToken.value) throw new Error('未绑定 Bangumi 账号')
       const res = await api.get('/user/me')
-      saveBgmUserProfile(res.data?.data || null)
+      const profile = res.data?.data || null
+      if (!profile?.username) throw new Error('未获取到 Bangumi 用户资料')
+      saveBgmUserProfile(profile)
       bgmProfileError.value = false
+      return profile
     } catch {
       bgmProfileError.value = true
+      return undefined
     } finally {
       bgmProfileLoading.value = false
     }

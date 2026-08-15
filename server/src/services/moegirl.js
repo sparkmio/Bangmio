@@ -12,6 +12,41 @@ function collapseSpace(s) {
 }
 
 /**
+ * 通过 MediaWiki API 获取纯文本导言。相比抓取完整网页，该接口不会执行页面脚本，
+ * 在 Worker 环境中更快、更稳定；失败时再回退到 HTML 提取。
+ */
+async function fetchApiExtract(name, base) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 5000)
+  try {
+    const params = new URLSearchParams({
+      action: 'query',
+      prop: 'extracts',
+      exintro: '1',
+      explaintext: '1',
+      redirects: '1',
+      format: 'json',
+      titles: name
+    })
+    const response = await fetch(`${base}/api.php?${params.toString()}`, {
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'Bangmio/1.0 (summary request)'
+      }
+    })
+    if (!response.ok) return null
+    const data = await response.json()
+    const page = Object.values(data?.query?.pages || {})[0]
+    const extract = collapseSpace(page?.extract || '')
+    return extract ? { title: page?.title || name, extract } : null
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+/**
  * 从萌娘百科页面抽取结构化摘要。
  * title 为页面名；extract 取 .mw-parser-output 中前 2-3 段非空纯文本；url 为原站链接。
  * 失败时静默返回可用字段，不抛错误。
@@ -24,8 +59,16 @@ export async function getMoegirlSummary(name, base = DEFAULT_BASE) {
   const encoded = encodeURIComponent(name)
   const result = { title: name, extract: '', url: `${base}/${encoded}` }
 
-  // 源统一为 zh.moegirl.org.cn（vector 皮肤优先，默认皮肤回退）
-  const candidates = [`${DEFAULT_BASE}/${encoded}?useskin=vector`, `${DEFAULT_BASE}/${encoded}`]
+  // 优先 API：不依赖 HTML 页面代理，避免上游 JS 检测导致所有条目超时。
+  const apiResult = await fetchApiExtract(name, base)
+  if (apiResult) {
+    result.title = apiResult.title
+    result.extract = apiResult.extract
+    return result
+  }
+
+  // API 不可用时再回退 HTML（vector 皮肤优先，默认皮肤回退）。
+  const candidates = [`${base}/${encoded}?useskin=vector`, `${base}/${encoded}`]
 
   let html = ''
   for (const url of candidates) {

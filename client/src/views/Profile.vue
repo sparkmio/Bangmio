@@ -667,12 +667,16 @@ function handleNavClick(tab) {
 
 // 并行拉取所有数据
 async function fetchAll() {
+  // 自有 Bangmio 账号首次进入时，App 的认证恢复可能尚未完成。
+  // 先确保已拿到绑定的 Bangumi profile，再发依赖 username 的请求。
+  await loadProfile()
+  if (!currentUsername.value) return
+
   const results = await Promise.allSettled([
     fetchBySubjectType(2),
     fetchBySubjectType(4),
     fetchBySubjectType(1),
     fetchBySubjectType(3),
-    loadProfile(),
     fetchAllCollectionsForStats(),
     fetchTimeline(),
     fetchIndexes(),
@@ -697,6 +701,14 @@ watch(
   () => route.params.username,
   () => {
     fetchAll()
+  }
+)
+
+// Bangmio 的 profile 是异步恢复的；恢复成功后补发此前因 username 为空而跳过的请求。
+watch(
+  () => auth.effectiveUser?.username,
+  (username, previous) => {
+    if (!route.params.username && username && username !== previous) fetchAll()
   }
 )
 </script>

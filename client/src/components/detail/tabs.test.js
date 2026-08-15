@@ -2,8 +2,15 @@
  * Detail.vue Tab 子组件冒烟测试
  * 环境：jsdom（vitest.config.js 中 environmentMatchGlobs 覆盖本目录）
  */
-import { describe, it, expect } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
+
+vi.mock('../../api/endpoints.js', () => ({
+  moegirlAPI: {
+    search: vi.fn(),
+    getSummary: vi.fn()
+  }
+}))
 import TabEpisodes from './TabEpisodes.vue'
 import TabCharacters from './TabCharacters.vue'
 import TabStaff from './TabStaff.vue'
@@ -11,7 +18,9 @@ import TabRelations from './TabRelations.vue'
 import TabWiki from './TabWiki.vue'
 import TabRating from './TabRating.vue'
 import TabDouban from './TabDouban.vue'
+import TabMoegirl from './TabMoegirl.vue'
 import TabMusic from './TabMusic.vue'
+import { moegirlAPI } from '../../api/endpoints.js'
 import TabStreaming from './TabStreaming.vue'
 import { vImagePlaceholder } from '../../directives/imagePlaceholder.js'
 
@@ -25,6 +34,9 @@ const routerTestGlobal = {
   directives: { 'image-placeholder': vImagePlaceholder }
 }
 describe('Detail Tab 子组件冒烟测试', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
   it('TabEpisodes 渲染章节与空状态', () => {
     const w = mount(TabEpisodes, {
       props: {
@@ -147,6 +159,19 @@ describe('Detail Tab 子组件冒烟测试', () => {
         },
         loading: false,
         summary: { title: '条目名', intro: '一段简介' },
+        comments: [
+          { user: '短评用户', rating: 50, time: '2026-08-15', content: '短评正文', useful: 12 }
+        ],
+        reviews: [
+          {
+            user: '长评用户',
+            rating: 40,
+            time: '2026-08-14',
+            title: '长评标题',
+            content: '长评正文',
+            useful: 8
+          }
+        ],
         searchName: '条目名'
       }
     })
@@ -154,9 +179,41 @@ describe('Detail Tab 子组件冒烟测试', () => {
     expect(w.text()).toContain('★★★★')
     expect(w.text()).toContain('2023 年')
     expect(w.text()).toContain('一段简介')
+    expect(w.text()).toContain('短评')
+    expect(w.text()).toContain('短评用户')
+    expect(w.text()).toContain('短评正文')
+    expect(w.text()).toContain('长评')
+    expect(w.text()).toContain('长评标题')
+    expect(w.text()).toContain('长评正文')
     const empty = mount(TabDouban, { props: { searchName: '测试名' } })
     expect(empty.text()).toContain('未找到豆瓣条目')
     expect(empty.find('a').attributes('href')).toContain(encodeURIComponent('测试名'))
+  })
+
+  it('TabMoegirl 优先展示 API 摘要，不等待 HTML iframe', async () => {
+    moegirlAPI.search.mockResolvedValue({
+      data: { data: { results: [{ title: '测试词条' }] } }
+    })
+    moegirlAPI.getSummary.mockResolvedValue({
+      data: {
+        data: {
+          title: '测试词条',
+          extract: '来自 MediaWiki API 的词条导言',
+          url: 'https://zh.moegirl.org.cn/%E6%B5%8B%E8%AF%95%E8%AF%8D%E6%9D%A1'
+        }
+      }
+    })
+
+    const w = mount(TabMoegirl, {
+      props: { subjectId: 1, names: ['测试番剧'], active: false }
+    })
+    await w.setProps({ active: true })
+    await flushPromises()
+
+    expect(moegirlAPI.search).toHaveBeenCalledWith('测试番剧')
+    expect(moegirlAPI.getSummary).toHaveBeenCalledWith('测试词条')
+    expect(w.text()).toContain('来自 MediaWiki API 的词条导言')
+    expect(w.find('iframe').exists()).toBe(false)
   })
 
   it('TabMusic 按关系分组渲染音乐条目', () => {

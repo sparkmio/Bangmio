@@ -61,17 +61,21 @@ function getAuthStore() {
  * @param {ReturnType<typeof useAuthStore> | null} auth
  * @returns {string | null}
  */
+/** 这些端点以 Bangumi access token 调用，需要一并携带其用户名。 */
+function isBangumiApiUrl(url) {
+  return (
+    url.startsWith('/user/') ||
+    url.startsWith('/anime') ||
+    url.startsWith('/collection') ||
+    url.startsWith('/comments')
+  )
+}
 function getAuthTokenForUrl(url, auth) {
   if (!auth) return null
   if (url.startsWith('/auth/')) {
     return auth.bangmioToken || null
   }
-  if (
-    url.startsWith('/user/') ||
-    url.startsWith('/anime') ||
-    url.startsWith('/collection') ||
-    url.startsWith('/comments')
-  ) {
+  if (isBangumiApiUrl(url)) {
     return auth.effectiveBgmToken || null
   }
   return auth.bangmioToken || auth.effectiveBgmToken || null
@@ -86,9 +90,11 @@ api.interceptors.request.use(config => {
     if (tokenForRequest) {
       config.headers.Authorization = `Bearer ${tokenForRequest}`
     }
-    // Bangumi 直登用户额外携带用户名头（兼容后端代理）
-    if (auth.isBangumiDirectUser && auth.user?.username) {
-      config.headers['X-Bangumi-Username'] = auth.user.username
+    // 收藏等 Bangumi 代理端点需要用户名。Bangmio 已绑定用户也必须携带，
+    // 否则后端会因缺少 X-Bangumi-Username 拒绝请求。
+    const bangumiUsername = auth.effectiveUser?.username || auth.user?.username
+    if (isBangumiApiUrl(url) && bangumiUsername) {
+      config.headers['X-Bangumi-Username'] = bangumiUsername
     }
   } else {
     // Pinia 未激活时回退到 localStorage
@@ -122,7 +128,7 @@ api.interceptors.response.use(
     const auth = getAuthStore()
 
     // Bangmio 用户：尝试刷新 JWT
-    if (auth?.isBangmioUser && auth.bangmioToken) {
+    if (auth?.isBangmioUser && auth.bangmioToken && url.startsWith('/auth/')) {
       originalRequest._retry = true
       if (!isRefreshing) {
         isRefreshing = true

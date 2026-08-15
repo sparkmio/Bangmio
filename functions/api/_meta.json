@@ -406,7 +406,7 @@
     },
     "server/src/utils/errors.js": { "bytes": 1962, "imports": [], "format": "esm" },
     "server/src/routes/auth.js": {
-      "bytes": 13945,
+      "bytes": 14438,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -4909,7 +4909,7 @@
       "format": "esm"
     },
     "server/src/services/douban.js": {
-      "bytes": 12090,
+      "bytes": 12046,
       "imports": [
         {
           "path": "node_modules/linkedom/esm/index.js",
@@ -4995,7 +4995,7 @@
       "format": "esm"
     },
     "server/src/services/moegirl.js": {
-      "bytes": 2924,
+      "bytes": 4295,
       "imports": [
         {
           "path": "node_modules/linkedom/esm/index.js",
@@ -5011,7 +5011,7 @@
       "format": "esm"
     },
     "server/src/routes/moegirl.js": {
-      "bytes": 12920,
+      "bytes": 11549,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -5255,7 +5255,7 @@
         "server/src/utils/turnstile.js": { "bytesInOutput": 863 },
         "server/src/utils/oauthConfig.js": { "bytesInOutput": 388 },
         "server/src/utils/errors.js": { "bytesInOutput": 834 },
-        "server/src/routes/auth.js": { "bytesInOutput": 9456 },
+        "server/src/routes/auth.js": { "bytesInOutput": 9906 },
         "node_modules/hono/dist/utils/cookie.js": { "bytesInOutput": 3747 },
         "node_modules/hono/dist/helper/cookie/index.js": { "bytesInOutput": 1260 },
         "server/src/services/bangumi.js": { "bytesInOutput": 5574 },
@@ -5489,18 +5489,18 @@
         "node_modules/linkedom/esm/index.js": { "bytesInOutput": 242 },
         "server/src/utils/cache.js": { "bytesInOutput": 906 },
         "server/src/routes/comments.js": { "bytesInOutput": 17502 },
-        "server/src/services/douban.js": { "bytesInOutput": 8209 },
+        "server/src/services/douban.js": { "bytesInOutput": 8165 },
         "server/src/utils/edgeCache.js": { "bytesInOutput": 819 },
         "server/src/routes/douban.js": { "bytesInOutput": 12585 },
         "server/src/routes/bilibili.js": { "bytesInOutput": 3024 },
-        "server/src/services/moegirl.js": { "bytesInOutput": 1916 },
-        "server/src/routes/moegirl.js": { "bytesInOutput": 9524 },
+        "server/src/services/moegirl.js": { "bytesInOutput": 2999 },
+        "server/src/routes/moegirl.js": { "bytesInOutput": 8135 },
         "server/src/routes/groups.js": { "bytesInOutput": 13712 },
         "server/src/services/music.js": { "bytesInOutput": 3261 },
         "server/src/routes/music.js": { "bytesInOutput": 604 },
         "server/src/app.js": { "bytesInOutput": 2480 }
       },
-      "bytes": 700922
+      "bytes": 701022
     }
   }
 }

@@ -4896,6 +4896,18 @@ app.post("/oauth-bind-callback", jwtAuth(), async (c) => {
     if (!code || !state) {
       return c.json({ data: null, error: "\u7F3A\u5C11\u6388\u6743\u7801\u6216 state", code: 400 }, 400);
     }
+    const currentUser = c.get("user");
+    const stateResult = await verifyOAuthBindState(c.env, state);
+    if (!stateResult.valid || stateResult.userId !== currentUser.userId) {
+      return c.json(
+        {
+          data: null,
+          error: "\u6388\u6743\u72B6\u6001\u65E0\u6548\u6216\u4E0E\u5F53\u524D\u8D26\u53F7\u4E0D\u5339\u914D\uFF0C\u8BF7\u91CD\u65B0\u53D1\u8D77\u7ED1\u5B9A",
+          code: 400
+        },
+        400
+      );
+    }
     const { appId, appSecret } = getOAuthCredentials(c.env, "/auth/oauth-bind-callback");
     const result = await bindBangumiByOAuth(c.env.DB, c.env, {
       code,
@@ -17117,13 +17129,11 @@ async function getDoubanComments(subjectId) {
   for (const start of starts) {
     try {
       const url = `${DOUBAN_API}/subject/${subjectId}/comments?start=${start}&limit=20&status=P`;
-      const res = await fetch(url, {
-        headers: {
-          "User-Agent": UA,
-          Referer: `${DOUBAN_API}/subject/${subjectId}/`,
-          Accept: "text/html",
-          "Accept-Language": "zh-CN,zh;q=0.9"
-        }
+      const res = await fetchWithTimeout(url, {
+        "User-Agent": UA,
+        Referer: `${DOUBAN_API}/subject/${subjectId}/`,
+        Accept: "text/html",
+        "Accept-Language": "zh-CN,zh;q=0.9"
       });
       if (!res.ok) continue;
       const html = await res.text();
@@ -17154,13 +17164,11 @@ async function getDoubanComments(subjectId) {
 }
 async function getDoubanReviews(subjectId) {
   const url = `${DOUBAN_API}/subject/${subjectId}/reviews`;
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": UA,
-      Referer: `${DOUBAN_API}/subject/${subjectId}/`,
-      Accept: "text/html",
-      "Accept-Language": "zh-CN,zh;q=0.9"
-    }
+  const res = await fetchWithTimeout(url, {
+    "User-Agent": UA,
+    Referer: `${DOUBAN_API}/subject/${subjectId}/`,
+    Accept: "text/html",
+    "Accept-Language": "zh-CN,zh;q=0.9"
   });
   if (!res.ok) return [];
   const html = await res.text();
@@ -17696,10 +17704,47 @@ function stripTags4(s) {
 function collapseSpace2(s) {
   return (s || "").replace(/\s+/g, " ").trim();
 }
+async function fetchApiExtract(name, base) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5e3);
+  try {
+    const params = new URLSearchParams({
+      action: "query",
+      prop: "extracts",
+      exintro: "1",
+      explaintext: "1",
+      redirects: "1",
+      format: "json",
+      titles: name
+    });
+    const response = await fetch(`${base}/api.php?${params.toString()}`, {
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "Bangmio/1.0 (summary request)"
+      }
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const page = Object.values(data?.query?.pages || {})[0];
+    const extract = collapseSpace2(page?.extract || "");
+    return extract ? { title: page?.title || name, extract } : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 async function getMoegirlSummary(name, base = DEFAULT_BASE) {
   const encoded = encodeURIComponent(name);
   const result = { title: name, extract: "", url: `${base}/${encoded}` };
-  const candidates = [`${DEFAULT_BASE}/${encoded}?useskin=vector`, `${DEFAULT_BASE}/${encoded}`];
+  const apiResult = await fetchApiExtract(name, base);
+  if (apiResult) {
+    result.title = apiResult.title;
+    result.extract = apiResult.extract;
+    return result;
+  }
+  const candidates = [`${base}/${encoded}?useskin=vector`, `${base}/${encoded}`];
   let html = "";
   for (const url of candidates) {
     try {
@@ -17837,7 +17882,7 @@ function getMoegirlBase() {
 async function fetchMoegirlJSON(apiBase, params) {
   const url = `${apiBase}?${params}`;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 1e4);
+  const timer = setTimeout(() => controller.abort(), 6e3);
   try {
     const res = await fetch(url, {
       signal: controller.signal,
@@ -17870,34 +17915,6 @@ function parseSearchResults(json) {
   });
   return results;
 }
-async function fetchPageExtract(apiBase, title) {
-  const base = apiBase.replace("/api.php", "");
-  const pageUrl = `${base}/${encodeURIComponent(title)}`;
-  try {
-    const html = await fetchHTML(pageUrl, {
-      timeout: 6e3,
-      headers: {
-        "User-Agent": "Bangmio/1.0 (Mozilla/5.0; compatible)",
-        Accept: "text/html",
-        "Accept-Language": "zh-CN,zh;q=0.9"
-      }
-    });
-    const contentMatch = html.match(
-      /<div id="mw-content-text"[^>]*>([\s\S]*?)<\/div>\s*(?:<div class="printfooter|<div id="catlinks|<\/body>)/i
-    );
-    if (!contentMatch) return null;
-    let clean = contentMatch[1].replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<!--[\s\S]*?-->/g, "").replace(/<span class="mw-editsection">[\s\S]*?<\/span>/gi, "");
-    clean = clean.replace(/href="\/wiki\//g, `href="${base}/wiki/`);
-    clean = clean.replace(/href="\//g, `href="${base}/`);
-    clean = clean.replace(/src="\//g, `src="${base}/`);
-    return {
-      title,
-      html: clean
-    };
-  } catch {
-    return null;
-  }
-}
 app8.get("/search", async (c) => {
   try {
     const q = c.req.query("q");
@@ -17909,18 +17926,7 @@ app8.get("/search", async (c) => {
     const params = `action=opensearch&search=${encodeURIComponent(q)}&limit=5&format=json`;
     const json = await fetchMoegirlJSON(apiBase, params);
     let results = parseSearchResults(json);
-    let page = null;
-    if (results.length) {
-      const extract = await fetchPageExtract(apiBase, results[0].title);
-      if (extract) {
-        page = {
-          title: extract.title,
-          html: extract.html,
-          url: `${getMoegirlBase()}/${encodeURIComponent(results[0].title)}`
-        };
-      }
-    }
-    const data = { results, page };
+    const data = { results, page: null };
     cache4.set(cacheKey, data);
     return c.json({ data });
   } catch {

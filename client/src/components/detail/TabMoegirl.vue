@@ -4,13 +4,22 @@
       <span class="loading loading-spinner loading-lg text-primary" />
     </div>
     <ExternalEmbedFallback
+      v-else-if="summary?.extract"
+      source="moegirl"
+      :title="summary.title || pageName"
+      :content="summary.extract"
+      :url="summary.url || `https://zh.moegirl.org.cn/${encodeURIComponent(pageName)}`"
+      reason="error"
+      @retry="retryContent"
+    />
+    <ExternalEmbedFallback
       v-else-if="fallback"
       source="moegirl"
-      :title="summary?.title || pageName"
-      :content="summary?.extract || ''"
-      :url="summary?.url || `https://zh.moegirl.org.cn/${encodeURIComponent(pageName)}`"
+      :title="pageName"
+      :content="''"
+      :url="`https://zh.moegirl.org.cn/${encodeURIComponent(pageName)}`"
       :reason="fallbackReason"
-      @retry="retryIframe"
+      @retry="retryContent"
     />
     <IframeEmbed
       v-else-if="pageName"
@@ -40,13 +49,9 @@ import IframeEmbed from '../IframeEmbed.vue'
 import ExternalEmbedFallback from '../ExternalEmbedFallback.vue'
 
 const props = defineProps({
-  // 用于在条目切换时重置内部状态
   subjectId: { type: [String, Number], required: true },
-  // 候选搜索名(优先 name_cn,其次 name)
   names: { type: Array, default: () => [] },
-  // 当前 Tab 是否激活(首次激活时懒加载搜索)
   active: { type: Boolean, default: false },
-  // iframe 模式(src / srcdoc)
   embedMode: { type: String, default: 'srcdoc' }
 })
 
@@ -56,57 +61,84 @@ const fallback = ref(false)
 const fallbackReason = ref('error')
 const summary = ref(null)
 const iframeRef = ref(null)
+let requestId = 0
+
+async function loadSummary(name, currentRequestId) {
+  if (!name) return
+  try {
+    const res = await moegirlAPI.getSummary(name)
+    if (currentRequestId !== requestId) return
+    const data = res.data?.data || null
+    // 摘要接口是主路径：成功时不再等待 HTML 代理/iframe 的 load 事件。
+    if (data?.extract) summary.value = data
+  } catch {
+    // HTML 代理仍可作为后备路径。
+  }
+}
 
 async function search() {
-  if (loading.value) return
+  const currentRequestId = ++requestId
+  const names = [...props.names]
   loading.value = true
+  fallback.value = false
+  fallbackReason.value = 'error'
+  summary.value = null
   try {
     let results = null
-    for (const name of props.names) {
+    for (const name of names) {
       if (!name || results?.length) break
       const res = await moegirlAPI.search(name)
-      const d = res.data?.data
-      if (d?.results?.length) results = d.results
+      const data = res.data?.data
+      if (data?.results?.length) results = data.results
     }
-    if (!results?.length && props.names[0]) {
-      const clean = props.names[0]
+    if (!results?.length && names[0]) {
+      const clean = names[0]
         .replace(/[（(].+[)）]|第[一二三四五六七八九十\d]+季|OVA|剧场版|特别篇/g, '')
         .trim()
-      if (clean && clean !== props.names[0]) {
+      if (clean && clean !== names[0]) {
         const res = await moegirlAPI.search(clean)
-        const d = res.data?.data
-        if (d?.results?.length) results = d.results
+        const data = res.data?.data
+        if (data?.results?.length) results = data.results
       }
     }
+    if (currentRequestId !== requestId) return
     pageName.value = results?.[0]?.title || ''
+    // 先请求稳定的 MediaWiki 摘要；只有没有可用摘要时才加载 HTML 代理。
+    await loadSummary(pageName.value, currentRequestId)
   } catch {
-    pageName.value = ''
+    if (currentRequestId === requestId) pageName.value = ''
+  } finally {
+    if (currentRequestId === requestId) loading.value = false
   }
-  loading.value = false
 }
 
 async function onIframeFallback(reason = 'error') {
   fallback.value = true
   fallbackReason.value = reason || 'error'
-  const name = pageName.value
-  if (!name) return
+  if (!summary.value?.extract) await loadSummary(pageName.value, requestId)
+}
+
+async function retryContent() {
+  if (!pageName.value) return
+  const currentRequestId = ++requestId
+  fallback.value = false
+  fallbackReason.value = 'error'
+  summary.value = null
+  loading.value = true
   try {
-    const res = await moegirlAPI.getSummary(name)
-    summary.value = res.data?.data || null
-  } catch {
-    summary.value = null
+    await loadSummary(pageName.value, currentRequestId)
+  } finally {
+    if (currentRequestId === requestId) loading.value = false
+  }
+
+  // 摘要仍不可用时再挂载/重试 HTML 代理。
+  if (currentRequestId === requestId && !summary.value?.extract) {
+    nextTick(() => {
+      iframeRef.value?.retry()
+    })
   }
 }
 
-function retryIframe() {
-  fallback.value = false
-  fallbackReason.value = 'error'
-  nextTick(() => {
-    iframeRef.value?.retry()
-  })
-}
-
-// 首次激活时懒加载搜索(与旧 Detail.vue 中 watch(activeTab) 的 moegirl 分支等价)
 watch(
   () => props.active,
   active => {
@@ -114,10 +146,10 @@ watch(
   }
 )
 
-// 切换条目时重置全部内部状态
 watch(
   () => props.subjectId,
   () => {
+    requestId += 1
     pageName.value = ''
     fallback.value = false
     fallbackReason.value = 'error'
@@ -126,6 +158,5 @@ watch(
   }
 )
 
-// 提供给父组件/测试的搜索名(empty state 链接用)
 const searchName = computed(() => props.names[0] || '')
 </script>

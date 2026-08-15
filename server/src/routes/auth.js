@@ -23,6 +23,7 @@ import {
   sendVerificationCode,
   getUserBgmToken,
   createOAuthBindState,
+  verifyOAuthBindState,
   bindBangumiByOAuth,
   changeUserPassword,
   resetUserPassword
@@ -315,6 +316,19 @@ app.post('/oauth-bind-callback', jwtAuth(), async c => {
     const { code, state } = body || {}
     if (!code || !state) {
       return c.json({ data: null, error: '缺少授权码或 state', code: 400 }, 400)
+    }
+    // state 既是 CSRF 防护也是绑定目标；必须与当前 JWT 的用户一致。
+    const currentUser = c.get('user')
+    const stateResult = await verifyOAuthBindState(c.env, state)
+    if (!stateResult.valid || stateResult.userId !== currentUser.userId) {
+      return c.json(
+        {
+          data: null,
+          error: '授权状态无效或与当前账号不匹配，请重新发起绑定',
+          code: 400
+        },
+        400
+      )
     }
     const { appId, appSecret } = getOAuthCredentials(c.env, '/auth/oauth-bind-callback')
     const result = await bindBangumiByOAuth(c.env.DB, c.env, {

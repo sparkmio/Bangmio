@@ -17,11 +17,76 @@
       <p v-if="doubanMeta" class="text-sm text-base-content/60 mb-4">{{ doubanMeta }}</p>
       <div
         v-if="doubanIntro"
-        class="border-l-4 border-l-amber-500/60 bg-base-100/60 rounded-r-lg p-4 mb-5 text-sm leading-relaxed text-base-content/75"
+        class="border-l-4 border-l-amber-500/60 bg-base-100/60 rounded-r-lg p-4 mb-5 text-sm leading-relaxed text-base-content/75 whitespace-pre-line"
       >
         {{ doubanIntro }}
       </div>
-      <div class="flex flex-wrap gap-2">
+
+      <section v-if="comments.length" class="mt-6">
+        <div class="flex items-center justify-between gap-3 mb-3">
+          <h3 class="font-semibold text-base-content">短评</h3>
+          <a
+            :href="`${details.url}comments?status=P`"
+            target="_blank"
+            class="link link-primary text-sm"
+            >豆瓣查看全部 →</a
+          >
+        </div>
+        <div class="space-y-3">
+          <article
+            v-for="(comment, index) in comments"
+            :key="`${comment.user || 'anonymous'}-${comment.time || index}-${index}`"
+            class="rounded-lg bg-base-100/70 p-3"
+          >
+            <div
+              class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-base-content/50 mb-1"
+            >
+              <span class="font-medium text-base-content/75">{{ comment.user || '匿名用户' }}</span>
+              <span v-if="comment.rating" class="text-amber-500">{{
+                reviewStars(comment.rating)
+              }}</span>
+              <span v-if="comment.time">{{ comment.time }}</span>
+              <span v-if="comment.useful">有用 {{ comment.useful }}</span>
+            </div>
+            <p class="text-sm leading-relaxed whitespace-pre-line break-words">
+              {{ comment.content }}
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section v-if="reviews.length" class="mt-7">
+        <div class="flex items-center justify-between gap-3 mb-3">
+          <h3 class="font-semibold text-base-content">长评</h3>
+          <a :href="`${details.url}reviews`" target="_blank" class="link link-primary text-sm"
+            >豆瓣查看全部 →</a
+          >
+        </div>
+        <div class="space-y-4">
+          <article
+            v-for="(review, index) in reviews"
+            :key="`${review.user || 'anonymous'}-${review.title || index}-${index}`"
+            class="rounded-lg bg-base-100/70 p-4"
+          >
+            <h4 v-if="review.title" class="font-medium mb-1 break-words">{{ review.title }}</h4>
+            <div
+              class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-base-content/50 mb-2"
+            >
+              <span class="font-medium text-base-content/75">{{ review.user || '匿名用户' }}</span>
+              <span v-if="review.rating" class="text-amber-500">{{
+                reviewStars(review.rating)
+              }}</span>
+              <span v-if="review.time">{{ review.time }}</span>
+              <span v-if="review.useful">有用 {{ review.useful }}</span>
+            </div>
+            <p class="text-sm leading-relaxed whitespace-pre-line break-words">
+              {{ review.content }}
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <div class="flex flex-wrap gap-2 mt-6">
         <a :href="details.url" target="_blank" class="btn btn-sm btn-primary">前往豆瓣查看 →</a>
         <a :href="`${details.url}comments?status=P`" target="_blank" class="btn btn-sm btn-outline"
           >查看短评</a
@@ -29,7 +94,7 @@
         <a :href="`${details.url}reviews`" target="_blank" class="btn btn-sm btn-ghost">查看长评</a>
       </div>
       <p class="text-xs text-base-content/30 mt-3">
-        豆瓣限制第三方页面嵌入，此处展示结构化数据摘要
+        已展示可获取的结构化短评与长评；豆瓣原站内容以原站页面为准。
       </p>
     </div>
     <div v-else class="py-10 text-center">
@@ -51,11 +116,11 @@ const props = defineProps({
   details: { type: Object, default: null },
   loading: { type: Boolean, default: false },
   summary: { type: Object, default: null },
+  comments: { type: Array, default: () => [] },
+  reviews: { type: Array, default: () => [] },
   searchName: { type: String, default: '' }
 })
 
-// 豆瓣结构化卡片（PROJECT_ISSUES 1.1）：
-// 条目页 HTML 被上游反爬强制拦截，无法 iframe 内嵌，改用 JSON 接口数据渲染卡片
 const doubanStars = computed(() => {
   const star = Math.round((parseFloat(props.details?.rate) || 0) / 2)
   return '★'.repeat(Math.min(star, 5)) + '☆'.repeat(Math.max(0, 5 - Math.min(star, 5)))
@@ -79,4 +144,9 @@ const doubanIntro = computed(() => {
       : ''
   return summaryIntro || shortComment || ''
 })
+
+function reviewStars(rating) {
+  const stars = Math.round(Number(rating) / 10)
+  return '★'.repeat(Math.min(stars, 5)) + '☆'.repeat(Math.max(0, 5 - Math.min(stars, 5)))
+}
 </script>

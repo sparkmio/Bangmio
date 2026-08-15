@@ -271,6 +271,26 @@ describe('Task 22: Bangmio 绑定后 effectiveUser 流程', () => {
     expect(auth.effectiveUser).toBeNull()
   })
 
+  it('本地缺少 Bangumi Token 时先恢复 Token，再拉取个人资料', async () => {
+    localStorage.setItem('bangmio_token', JWT_TOKEN)
+    localStorage.setItem(
+      'bangmio_user',
+      JSON.stringify({ id: 'u1', email: 'test@bangmio.com', bgmUid: '12345' })
+    )
+    const auth = useAuthStore()
+
+    api.get.mockImplementation(url => {
+      if (url === '/auth/bgm-token') return ok({ bgmToken: 'restored-bgm-token' })
+      if (url === '/user/me') return ok({ id: 12345, username: 'restored-user' })
+      return fail('unexpected call')
+    })
+
+    await expect(auth.fetchBgmUserProfile()).resolves.toMatchObject({ username: 'restored-user' })
+    expect(api.get).toHaveBeenNthCalledWith(1, '/auth/bgm-token')
+    expect(api.get).toHaveBeenNthCalledWith(2, '/user/me')
+    expect(auth.effectiveUser).toMatchObject({ username: 'restored-user' })
+  })
+
   it('OAuth 绑定成功后也调用 fetchBgmUserProfile', async () => {
     // 先设置已登录但未绑定的 Bangmio 用户
     localStorage.setItem('bangmio_token', JWT_TOKEN)

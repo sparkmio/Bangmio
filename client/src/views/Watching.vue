@@ -281,7 +281,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { collectionAPI, animeAPI } from '../api/endpoints'
 import LoadingState from '../components/LoadingState.vue'
@@ -445,4 +445,15 @@ async function retryFetchProfile() {
 }
 
 onMounted(fetchCollections)
+
+// 认证恢复完成后，Bangmio 绑定账户的 username 才会出现；此时重新加载在追列表。
+watch(currentUsername, (username, previous) => {
+  if (username && username !== previous) {
+    page.value = 0
+    collections.value = []
+    selected.value = null
+    hasMore.value = true
+    fetchCollections()
+  }
+})
 </script>

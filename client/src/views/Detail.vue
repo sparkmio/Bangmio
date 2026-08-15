@@ -197,6 +197,8 @@
           :details="doubanDetails"
           :loading="doubanLoading"
           :summary="doubanSummary"
+          :comments="doubanComments"
+          :reviews="doubanReviews"
           :search-name="anime.name_cn || anime.name"
         />
       </div>
@@ -281,6 +283,8 @@ const bilibiliLoading = ref(false)
 const topics = ref([])
 const topicLoading = ref(false)
 const doubanSummary = ref(null)
+const doubanComments = ref([])
+const doubanReviews = ref([])
 const loading = ref(true)
 const error = ref('')
 const collectionStatus = ref(0)
@@ -305,14 +309,19 @@ async function fetchDoubanDetails() {
     const res = await doubanAPI.getDetails(id, name)
     doubanDetails.value = res.data?.data || null
 
-    // 拿到豆瓣 id 后并行拉结构化摘要（补充简介 intro），卡片直接展示
+    // 豆瓣禁止第三方嵌入时，仍通过受支持的结构化接口展示可获取的简介、短评与长评。
     if (doubanDetails.value?.id) {
-      try {
-        const sRes = await doubanAPI.getSummary(doubanDetails.value.id)
-        doubanSummary.value = sRes.data?.data || null
-      } catch {
-        doubanSummary.value = null
-      }
+      const [summaryResult, commentsResult, reviewsResult] = await Promise.allSettled([
+        doubanAPI.getSummary(doubanDetails.value.id),
+        doubanAPI.getComments(doubanDetails.value.id),
+        doubanAPI.getReviews(doubanDetails.value.id)
+      ])
+      doubanSummary.value =
+        summaryResult.status === 'fulfilled' ? summaryResult.value.data?.data || null : null
+      doubanComments.value =
+        commentsResult.status === 'fulfilled' ? commentsResult.value.data?.data || [] : []
+      doubanReviews.value =
+        reviewsResult.status === 'fulfilled' ? reviewsResult.value.data?.data || [] : []
     }
   } catch {
     doubanDetails.value = null
@@ -524,6 +533,8 @@ watch(
       topics.value = []
       doubanDetails.value = null
       doubanSummary.value = null
+      doubanComments.value = []
+      doubanReviews.value = []
       bilibiliDetails.value = null
       activeTab.value = 'overview'
       fetchDetail()

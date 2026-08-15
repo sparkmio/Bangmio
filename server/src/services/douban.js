@@ -122,13 +122,11 @@ export async function getDoubanComments(subjectId) {
   for (const start of starts) {
     try {
       const url = `${DOUBAN_API}/subject/${subjectId}/comments?start=${start}&limit=20&status=P`
-      const res = await fetch(url, {
-        headers: {
-          'User-Agent': UA,
-          Referer: `${DOUBAN_API}/subject/${subjectId}/`,
-          Accept: 'text/html',
-          'Accept-Language': 'zh-CN,zh;q=0.9'
-        }
+      const res = await fetchWithTimeout(url, {
+        'User-Agent': UA,
+        Referer: `${DOUBAN_API}/subject/${subjectId}/`,
+        Accept: 'text/html',
+        'Accept-Language': 'zh-CN,zh;q=0.9'
       })
       if (!res.ok) continue
       const html = await res.text()
@@ -190,13 +188,11 @@ export async function getDoubanComments(subjectId) {
  */
 export async function getDoubanReviews(subjectId) {
   const url = `${DOUBAN_API}/subject/${subjectId}/reviews`
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': UA,
-      Referer: `${DOUBAN_API}/subject/${subjectId}/`,
-      Accept: 'text/html',
-      'Accept-Language': 'zh-CN,zh;q=0.9'
-    }
+  const res = await fetchWithTimeout(url, {
+    'User-Agent': UA,
+    Referer: `${DOUBAN_API}/subject/${subjectId}/`,
+    Accept: 'text/html',
+    'Accept-Language': 'zh-CN,zh;q=0.9'
   })
   if (!res.ok) return []
   const html = await res.text()

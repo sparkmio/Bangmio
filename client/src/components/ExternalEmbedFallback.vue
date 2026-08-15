@@ -36,7 +36,7 @@
 
     <!-- 超时提示 -->
     <div
-      v-if="reason === 'timeout'"
+      v-if="reason === 'timeout' && !content"
       class="text-sm text-base-content/70 leading-relaxed break-words"
     >
       <p class="font-medium text-base-content">加载超时</p>
