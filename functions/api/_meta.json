@@ -5059,7 +5059,7 @@
       "format": "esm"
     },
     "server/src/routes/groups.js": {
-      "bytes": 20269,
+      "bytes": 25951,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -5507,12 +5507,12 @@
         "server/src/routes/bilibili.js": { "bytesInOutput": 3024 },
         "server/src/services/moegirl.js": { "bytesInOutput": 2999 },
         "server/src/routes/moegirl.js": { "bytesInOutput": 8180 },
-        "server/src/routes/groups.js": { "bytesInOutput": 16520 },
+        "server/src/routes/groups.js": { "bytesInOutput": 21736 },
         "server/src/services/music.js": { "bytesInOutput": 3261 },
         "server/src/routes/music.js": { "bytesInOutput": 604 },
         "server/src/app.js": { "bytesInOutput": 2480 }
       },
-      "bytes": 705193
+      "bytes": 710409
     }
   }
 }

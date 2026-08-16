@@ -18222,28 +18222,7 @@ function parseGroupDetailHTML(html, id, base) {
       break;
     }
   }
-  let member_count = 0;
-  const bodyText = document.body?.textContent || "";
-  const memberMatch = bodyText.match(/([0-9,]+)\s*(?:位成员|成员|members?)/i);
-  if (memberMatch) {
-    member_count = parseNumber(memberMatch[1]);
-  } else {
-    const memberEl = firstByClassSubstring(document, "group_member") || firstByClassSubstring(document, "member") || firstByClassSubstring(document, "sub");
-    if (memberEl) {
-      member_count = parseNumber(memberEl.textContent);
-    }
-  }
-  if (!member_count) {
-    for (const strong of document.querySelectorAll("strong")) {
-      const strongText = collapseText(strong.textContent);
-      if (!/^\d[\d,]*$/.test(strongText)) continue;
-      const parentText = strong.parentElement?.textContent || "";
-      if (/(?:位成员|成员|members?)/i.test(parentText)) {
-        member_count = parseNumber(strongText);
-        break;
-      }
-    }
-  }
+  let member_count = parseMemberCount(document);
   let avatar = "";
   let node = h1?.parentElement || null;
   for (let i = 0; i < 4 && node; i++) {
@@ -18316,6 +18295,123 @@ function parseGroupDetailHTML(html, id, base) {
     avatar,
     topics,
     url: `${base}/group/${id}`
+  };
+}
+function parseMemberCount(document) {
+  const candidates = [];
+  for (const el of document.querySelectorAll(
+    '[data-member-count], [data-members], [aria-label*="\u6210\u5458"], [title*="\u6210\u5458"]'
+  )) {
+    const directCount = el.getAttribute("data-member-count") || el.getAttribute("data-members");
+    if (directCount && parseNumber(directCount) > 0) return parseNumber(directCount);
+    candidates.push(
+      el.getAttribute("aria-label") || el.getAttribute("title") || el.textContent || ""
+    );
+  }
+  candidates.push(document.body?.textContent || "");
+  for (const el of document.querySelectorAll("[class]")) {
+    const className = el.getAttribute("class") || "";
+    if (/(?:group[_-]?member|member[_-]?count|subscribers?|members?)/i.test(className)) {
+      const directText = collapseText(el.textContent);
+      if (/^[0-9][0-9,]*$/.test(directText)) return parseNumber(directText);
+      candidates.push(directText);
+    }
+  }
+  for (const text of candidates) {
+    const normalized = collapseText(text);
+    const match2 = normalized.match(/([0-9][0-9,]*)\s*(?:位?成员|人|members?|subscribers?)/i) || normalized.match(/(?:成员(?:数|人数)?|members?|subscribers?)\s*[:：]?\s*([0-9][0-9,]*)/i);
+    if (match2) {
+      const count = parseNumber(match2[1]);
+      if (count > 0) return count;
+    }
+  }
+  for (const el of document.querySelectorAll("strong, em, b, span")) {
+    const value = collapseText(el.textContent);
+    if (!/^[0-9][0-9,]*$/.test(value)) continue;
+    const context = collapseText(el.parentElement?.textContent || "");
+    if (/(?:成员|members?|subscribers?)/i.test(context)) return parseNumber(value);
+  }
+  return 0;
+}
+function parseGroupTopicHTML(html, id, base) {
+  const { document } = parseHTML(html);
+  const titleEl = document.querySelector("h1, h2.topic_title, .topic_title, .topicTitle");
+  const title = collapseText(titleEl?.textContent || "") || "\u8BDD\u9898 #" + id;
+  const groupAnchor = Array.from(document.querySelectorAll("a[href]")).find((anchor) => {
+    const href = anchor.getAttribute("href") || "";
+    return /(?:^|\/)group\/[^/?#]+/.test(href) && !/\/group\/topic\//.test(href);
+  });
+  const authorLinks = Array.from(document.querySelectorAll('a[href*="/user/"]'));
+  const rows = [];
+  const seen = /* @__PURE__ */ new Set();
+  const selectors = [
+    ".topic-reply",
+    ".reply",
+    ".row_reply",
+    ".reply_content",
+    '[class*="reply"]',
+    "li[data-item-id]"
+  ];
+  const containers = [];
+  for (const selector of selectors) {
+    for (const el of document.querySelectorAll(selector)) {
+      if (!containers.includes(el)) containers.push(el);
+    }
+  }
+  for (const container of containers) {
+    const user = container.querySelector('a[href*="/user/"]');
+    const contentEl = container.querySelector(
+      ".reply_content, .topic_content, .content, .message, p"
+    );
+    const content = collapseText(contentEl?.textContent || "");
+    if (!user || !content) continue;
+    const idMatch = (container.getAttribute("id") || "").match(/(?:reply|floor)[_-]?(\d+)/i);
+    const floorEl = container.querySelector('.floor, .reply_floor, [class*="floor"]');
+    const floorText = collapseText(floorEl?.textContent || "");
+    const floor = idMatch?.[1] || floorText.replace(/[^0-9]/g, "") || String(rows.length + 1);
+    const key2 = (user.getAttribute("href") || "") + ":" + floor + ":" + content;
+    if (seen.has(key2)) continue;
+    seen.add(key2);
+    const timeEl = container.querySelector("time, .time, .reply_time, .date, small");
+    rows.push({
+      id: id + "-" + floor,
+      floor: parseNumber(floor) || rows.length + 1,
+      author: collapseText(user.textContent),
+      content,
+      timestamp: collapseText(timeEl?.textContent || "")
+    });
+    if (rows.length >= 50) break;
+  }
+  if (!rows.length) {
+    for (const user of authorLinks.slice(0, 50)) {
+      let container = user.parentElement;
+      for (let i = 0; i < 4 && container; i++, container = container.parentElement) {
+        const text = collapseText(container.textContent);
+        if (text.length < 8) continue;
+        const content = text.replace(collapseText(user.textContent), "").trim();
+        if (content.length < 2) continue;
+        rows.push({
+          id: id + "-" + (rows.length + 1),
+          floor: rows.length + 1,
+          author: collapseText(user.textContent),
+          content: content.slice(0, 2e3),
+          timestamp: ""
+        });
+        break;
+      }
+    }
+  }
+  const bodyText = collapseText(document.body?.textContent || "");
+  const replyMatch = bodyText.match(/([0-9][0-9,]*)\s*(?:回复|repl(?:y|ies))/i);
+  return {
+    id,
+    title,
+    group_id: groupAnchor ? groupIdFromHref(groupAnchor.getAttribute("href")) || "" : "",
+    group_name: groupAnchor ? collapseText(groupAnchor.textContent) : "",
+    author: rows[0]?.author || (authorLinks[0] ? collapseText(authorLinks[0].textContent) : ""),
+    reply_count: Math.max(rows.length, replyMatch ? parseNumber(replyMatch[1]) : 0),
+    replies: rows,
+    url: base + "/group/topic/" + id
   };
 }
 function parseGroupDiscoverHTML(html, base) {
@@ -18401,6 +18497,26 @@ app9.get("/", async (c) => {
       data: FALLBACK_GROUPS.map((g) => ({ ...g, url: `${HOSTS.main}/group/${g.id}` })),
       degraded: true
     });
+  }
+});
+app9.get("/topic/:id", async (c) => {
+  try {
+    const id = c.req.param("id");
+    if (!id || !/^\d+$/.test(id)) return c.json({ data: null, degraded: true }, 400);
+    const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
+    const cacheKey = "groups_topic_" + id + "_" + (isChina7 ? "cn" : "global");
+    const cached = cache5.get(cacheKey);
+    if (cached) return c.json({ data: cached.data, degraded: cached.degraded === true });
+    const bases = getBaseUrls(isChina7);
+    const urls = bases.map((base) => base + "/group/topic/" + id);
+    const { html, url } = await fetchGroupHTMLCached(urls);
+    const baseUrl = url.replace(/\/group\/topic\/[^/]+\/?$/, "") || bases[0];
+    const topic = parseGroupTopicHTML(html, id, baseUrl);
+    const degraded = topic.title === "\u8BDD\u9898 #" + id && topic.replies.length === 0;
+    cache5.set(cacheKey, { data: topic, degraded });
+    return c.json({ data: topic, degraded });
+  } catch {
+    return c.json({ data: null, degraded: true });
   }
 });
 app9.get("/discover", async (c) => {

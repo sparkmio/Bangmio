@@ -29,4 +29,10 @@ describe('groupAPI', () => {
 
     expect(api.get).toHaveBeenCalledWith('/groups/discover', {})
   })
+
+  it('requests a group topic detail through the internal group API', () => {
+    groupAPI.getTopicDetail('123')
+
+    expect(api.get).toHaveBeenCalledWith('/groups/topic/123', {})
+  })
 })

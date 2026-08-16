@@ -40,12 +40,10 @@
       <div class="bg-base-100 rounded-xl p-6 shadow-card border border-base-300">
         <h2 class="text-lg font-semibold mb-4">最近话题</h2>
         <div v-if="group.topics?.length" class="space-y-1">
-          <a
+          <router-link
             v-for="t in group.topics"
             :key="t.id"
-            :href="`https://bangumi.lol/group/topic/${t.id}`"
-            target="_blank"
-            rel="noopener noreferrer"
+            :to="`/group/topic/${t.id}`"
             class="block p-3 hover:bg-base-200 rounded-lg transition-colors group"
           >
             <div class="flex items-center justify-between gap-2">
@@ -112,7 +110,7 @@
                 {{ getLastReply(t) }}
               </span>
             </div>
-          </a>
+          </router-link>
         </div>
         <div v-else class="py-10 text-center text-base-content/40 text-sm">
           <p>暂无抓取到话题</p>

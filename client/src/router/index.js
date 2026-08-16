@@ -119,6 +119,12 @@ const routes = [
     redirect: '/settings'
   },
   {
+    path: '/group/topic/:id',
+    name: 'GroupTopicDetail',
+    component: () =>
+      import(/* webpackChunkName: "group-topic-detail" */ '../views/GroupTopicDetail.vue')
+  },
+  {
     path: '/group/:id',
     name: 'GroupDetail',
     component: () => import(/* webpackChunkName: "group-detail" */ '../views/GroupDetail.vue')

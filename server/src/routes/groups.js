@@ -225,33 +225,9 @@ function parseGroupDetailHTML(html, id, base) {
     }
   }
 
-  // 成员数：1) 全文 "NNN 位成员"；2) class 含 group_member/member/sub 的元素；
-  //         3) <strong>NNN</strong> 后跟成员关键字
-  let member_count = 0
-  const bodyText = document.body?.textContent || ''
-  const memberMatch = bodyText.match(/([0-9,]+)\s*(?:位成员|成员|members?)/i)
-  if (memberMatch) {
-    member_count = parseNumber(memberMatch[1])
-  } else {
-    const memberEl =
-      firstByClassSubstring(document, 'group_member') ||
-      firstByClassSubstring(document, 'member') ||
-      firstByClassSubstring(document, 'sub')
-    if (memberEl) {
-      member_count = parseNumber(memberEl.textContent)
-    }
-  }
-  if (!member_count) {
-    for (const strong of document.querySelectorAll('strong')) {
-      const strongText = collapseText(strong.textContent)
-      if (!/^\d[\d,]*$/.test(strongText)) continue
-      const parentText = strong.parentElement?.textContent || ''
-      if (/(?:位成员|成员|members?)/i.test(parentText)) {
-        member_count = parseNumber(strongText)
-        break
-      }
-    }
-  }
+  // 成员数：兼容 Bangumi 新旧页面的文字、class、data 属性和 aria-label。
+  // 个人小组页只提供小组链接时，前端会再从小组详情接口补齐这个字段。
+  let member_count = parseMemberCount(document)
 
   // 头像：h1 附近（向上最多 4 层容器内）第一个 img
   let avatar = ''
@@ -343,6 +319,144 @@ function parseGroupDetailHTML(html, id, base) {
 }
 
 /**
+ * 从 Bangumi 小组页面提取成员数。不同镜像/页面版本的标记不完全一致，
+ * 不能只依赖“位成员”这一个文案，否则个人小组页会全部退化成 0。
+ * @param {Document} document
+ * @returns {number}
+ */
+function parseMemberCount(document) {
+  const candidates = []
+  for (const el of document.querySelectorAll(
+    '[data-member-count], [data-members], [aria-label*="成员"], [title*="成员"]'
+  )) {
+    const directCount = el.getAttribute('data-member-count') || el.getAttribute('data-members')
+    if (directCount && parseNumber(directCount) > 0) return parseNumber(directCount)
+    candidates.push(
+      el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent || ''
+    )
+  }
+  candidates.push(document.body?.textContent || '')
+  for (const el of document.querySelectorAll('[class]')) {
+    const className = el.getAttribute('class') || ''
+    if (/(?:group[_-]?member|member[_-]?count|subscribers?|members?)/i.test(className)) {
+      const directText = collapseText(el.textContent)
+      if (/^[0-9][0-9,]*$/.test(directText)) return parseNumber(directText)
+      candidates.push(directText)
+    }
+  }
+
+  for (const text of candidates) {
+    const normalized = collapseText(text)
+    const match =
+      normalized.match(/([0-9][0-9,]*)\s*(?:位?成员|人|members?|subscribers?)/i) ||
+      normalized.match(/(?:成员(?:数|人数)?|members?|subscribers?)\s*[:：]?\s*([0-9][0-9,]*)/i)
+    if (match) {
+      const count = parseNumber(match[1])
+      if (count > 0) return count
+    }
+  }
+
+  for (const el of document.querySelectorAll('strong, em, b, span')) {
+    const value = collapseText(el.textContent)
+    if (!/^[0-9][0-9,]*$/.test(value)) continue
+    const context = collapseText(el.parentElement?.textContent || '')
+    if (/(?:成员|members?|subscribers?)/i.test(context)) return parseNumber(value)
+  }
+  return 0
+}
+
+/**
+ * 解析小组帖子详情，供 Bangmio 内部页面展示，不把用户送回 Bangumi。
+ * @param {string} html
+ * @param {string} id
+ * @param {string} base
+ * @returns {object}
+ */
+function parseGroupTopicHTML(html, id, base) {
+  const { document } = parseHTML(html)
+  const titleEl = document.querySelector('h1, h2.topic_title, .topic_title, .topicTitle')
+  const title = collapseText(titleEl?.textContent || '') || '话题 #' + id
+  const groupAnchor = Array.from(document.querySelectorAll('a[href]')).find(anchor => {
+    const href = anchor.getAttribute('href') || ''
+    return /(?:^|\/)group\/[^/?#]+/.test(href) && !/\/group\/topic\//.test(href)
+  })
+  const authorLinks = Array.from(document.querySelectorAll('a[href*="/user/"]'))
+  const rows = []
+  const seen = new Set()
+  const selectors = [
+    '.topic-reply',
+    '.reply',
+    '.row_reply',
+    '.reply_content',
+    '[class*="reply"]',
+    'li[data-item-id]'
+  ]
+  const containers = []
+  for (const selector of selectors) {
+    for (const el of document.querySelectorAll(selector)) {
+      if (!containers.includes(el)) containers.push(el)
+    }
+  }
+
+  for (const container of containers) {
+    const user = container.querySelector('a[href*="/user/"]')
+    const contentEl = container.querySelector(
+      '.reply_content, .topic_content, .content, .message, p'
+    )
+    const content = collapseText(contentEl?.textContent || '')
+    if (!user || !content) continue
+    const idMatch = (container.getAttribute('id') || '').match(/(?:reply|floor)[_-]?(\d+)/i)
+    const floorEl = container.querySelector('.floor, .reply_floor, [class*="floor"]')
+    const floorText = collapseText(floorEl?.textContent || '')
+    const floor = idMatch?.[1] || floorText.replace(/[^0-9]/g, '') || String(rows.length + 1)
+    const key = (user.getAttribute('href') || '') + ':' + floor + ':' + content
+    if (seen.has(key)) continue
+    seen.add(key)
+    const timeEl = container.querySelector('time, .time, .reply_time, .date, small')
+    rows.push({
+      id: id + '-' + floor,
+      floor: parseNumber(floor) || rows.length + 1,
+      author: collapseText(user.textContent),
+      content,
+      timestamp: collapseText(timeEl?.textContent || '')
+    })
+    if (rows.length >= 50) break
+  }
+
+  if (!rows.length) {
+    for (const user of authorLinks.slice(0, 50)) {
+      let container = user.parentElement
+      for (let i = 0; i < 4 && container; i++, container = container.parentElement) {
+        const text = collapseText(container.textContent)
+        if (text.length < 8) continue
+        const content = text.replace(collapseText(user.textContent), '').trim()
+        if (content.length < 2) continue
+        rows.push({
+          id: id + '-' + (rows.length + 1),
+          floor: rows.length + 1,
+          author: collapseText(user.textContent),
+          content: content.slice(0, 2000),
+          timestamp: ''
+        })
+        break
+      }
+    }
+  }
+
+  const bodyText = collapseText(document.body?.textContent || '')
+  const replyMatch = bodyText.match(/([0-9][0-9,]*)\s*(?:回复|repl(?:y|ies))/i)
+  return {
+    id,
+    title,
+    group_id: groupAnchor ? groupIdFromHref(groupAnchor.getAttribute('href')) || '' : '',
+    group_name: groupAnchor ? collapseText(groupAnchor.textContent) : '',
+    author: rows[0]?.author || (authorLinks[0] ? collapseText(authorLinks[0].textContent) : ''),
+    reply_count: Math.max(rows.length, replyMatch ? parseNumber(replyMatch[1]) : 0),
+    replies: rows,
+    url: base + '/group/topic/' + id
+  }
+}
+/**
  * 解析 Bangumi「随便看看」页面中的全站热门/最新话题。
  * 页面结构以 table.topic_list 为主，兼容镜像站当前使用的 class 与相对链接。
  * @param {string} html
@@ -401,7 +515,7 @@ function parseGroupDiscoverHTML(html, base) {
   return topics.sort((a, b) => b.reply_count - a.reply_count)
 }
 // 导出解析函数供单元测试使用（fixture 驱动，不依赖上游网络）
-export { parseGroupListHTML, parseGroupDetailHTML, parseGroupDiscoverHTML }
+export { parseGroupListHTML, parseGroupDetailHTML, parseGroupDiscoverHTML, parseGroupTopicHTML }
 
 // GET /groups - 小组列表
 app.get('/', async c => {
@@ -453,6 +567,27 @@ app.get('/', async c => {
   }
 })
 
+// GET /groups/topic/:id - 小组帖子详情（由 Bangmio 代理展示）
+app.get('/topic/:id', async c => {
+  try {
+    const id = c.req.param('id')
+    if (!id || !/^\d+$/.test(id)) return c.json({ data: null, degraded: true }, 400)
+    const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
+    const cacheKey = 'groups_topic_' + id + '_' + (isChina ? 'cn' : 'global')
+    const cached = cache.get(cacheKey)
+    if (cached) return c.json({ data: cached.data, degraded: cached.degraded === true })
+    const bases = getBaseUrls(isChina)
+    const urls = bases.map(base => base + '/group/topic/' + id)
+    const { html, url } = await fetchGroupHTMLCached(urls)
+    const baseUrl = url.replace(/\/group\/topic\/[^/]+\/?$/, '') || bases[0]
+    const topic = parseGroupTopicHTML(html, id, baseUrl)
+    const degraded = topic.title === '话题 #' + id && topic.replies.length === 0
+    cache.set(cacheKey, { data: topic, degraded })
+    return c.json({ data: topic, degraded })
+  } catch {
+    return c.json({ data: null, degraded: true })
+  }
+})
 // GET /groups/discover - 全站热门帖子
 app.get('/discover', async c => {
   try {

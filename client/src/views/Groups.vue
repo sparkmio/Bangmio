@@ -51,7 +51,7 @@
               <div class="min-w-0">
                 <p class="font-semibold truncate">{{ group.name }}</p>
                 <p class="text-xs text-base-content/50 mt-1">
-                  {{ group.member_count || 0 }} 成员 · {{ group.description || '暂无简介' }}
+                  {{ memberLabel(group.member_count) }} · {{ group.description || '暂无简介' }}
                 </p>
               </div>
             </div>
@@ -65,12 +65,12 @@
 
     <template v-else>
       <!-- 登录用户自己的小组始终置顶，避免默认列表掩盖个人内容。 -->
-      <section class="mb-10" aria-labelledby="followed-groups-heading">
+      <section class="mb-8" aria-labelledby="followed-groups-heading">
         <div class="flex items-center justify-between gap-3 mb-4">
           <div>
             <h2 id="followed-groups-heading" class="text-lg font-bold">我关注的小组</h2>
             <p v-if="currentUsername" class="text-xs text-base-content/50 mt-1">
-              {{ currentUsername }} 参加的小组
+              {{ currentUsername }} 参加的小组 · 成员数来自小组详情页
             </p>
           </div>
           <button
@@ -118,7 +118,7 @@
                 <div class="min-w-0">
                   <p class="font-semibold truncate">{{ group.name }}</p>
                   <p class="text-xs text-base-content/50 mt-1">
-                    {{ group.member_count || 0 }} 成员
+                    {{ memberLabel(group.member_count) }}
                   </p>
                 </div>
               </div>
@@ -150,6 +150,57 @@
         </div>
       </section>
 
+      <!-- 每个已加入小组独立展示热门话题，避免把个人内容混进全站话题流。 -->
+      <section
+        v-if="followedGroups.length"
+        class="space-y-6 mb-10"
+        aria-labelledby="followed-group-topics-heading"
+      >
+        <div>
+          <h2 id="followed-group-topics-heading" class="text-lg font-bold">我加入的小组热门话题</h2>
+          <p class="text-xs text-base-content/50 mt-1">每个小组单独展示，按回复数排序。</p>
+        </div>
+        <article
+          v-for="group in followedGroups"
+          :key="`topics-${group.id}`"
+          class="card bg-base-100 border border-base-300 overflow-hidden"
+        >
+          <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-base-300">
+            <h3 class="font-semibold truncate">{{ group.name }}</h3>
+            <router-link
+              :to="`/group/${group.id}`"
+              class="text-xs text-primary hover:underline shrink-0"
+            >
+              查看小组
+            </router-link>
+          </div>
+          <div v-if="group.topics?.length" class="divide-y divide-base-300">
+            <router-link
+              v-for="topic in group.topics"
+              :key="`${group.id}-${topic.id}`"
+              :to="`/group/topic/${topic.id}`"
+              class="p-4 flex items-start gap-3 hover:bg-base-200/60 transition-colors"
+            >
+              <div class="min-w-0 flex-1">
+                <p class="font-medium line-clamp-1">{{ topic.title }}</p>
+                <div
+                  class="mt-1 flex items-center gap-x-2 gap-y-1 flex-wrap text-xs text-base-content/50"
+                >
+                  <span v-if="topic.author">{{ topic.author }}</span>
+                  <span v-if="topic.last_reply_time">{{ topic.last_reply_time }}</span>
+                </div>
+              </div>
+              <span class="badge badge-sm badge-primary badge-outline whitespace-nowrap">
+                {{ topic.reply_count || 0 }} 回复
+              </span>
+            </router-link>
+          </div>
+          <div v-else class="p-5 text-sm text-base-content/50">
+            暂时没有读取到这个小组的热门话题。
+          </div>
+        </article>
+      </section>
+
       <!-- 取自 Bangumi 小组发现页，按回复数排序后展示。 -->
       <section class="mb-10" aria-labelledby="hot-topics-heading">
         <div class="flex items-end justify-between gap-3 mb-4">
@@ -168,26 +219,20 @@
             <div v-for="n in 6" :key="n" class="h-12 skeleton rounded-lg" />
           </div>
           <div v-else-if="hotTopics.length" class="divide-y divide-base-300">
-            <div v-for="topic in hotTopics" :key="topic.id" class="p-4 flex items-start gap-3">
+            <router-link
+              v-for="topic in hotTopics"
+              :key="topic.id"
+              :to="`/group/topic/${topic.id}`"
+              class="p-4 flex items-start gap-3 hover:bg-base-200/60 transition-colors"
+            >
               <div class="min-w-0 flex-1">
-                <a
-                  :href="topic.url"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="font-medium hover:text-primary transition-colors line-clamp-1"
-                >
-                  {{ topic.title }}
-                </a>
+                <p class="font-medium line-clamp-1">{{ topic.title }}</p>
                 <div
                   class="mt-1 flex items-center gap-x-2 gap-y-1 flex-wrap text-xs text-base-content/50"
                 >
-                  <router-link
-                    v-if="topic.group_id"
-                    :to="`/group/${topic.group_id}`"
-                    class="hover:text-primary"
-                  >
+                  <span v-if="topic.group_id" class="text-base-content/50">
                     {{ topic.group_name || '小组' }}
-                  </router-link>
+                  </span>
                   <span v-if="topic.author">{{ topic.author }}</span>
                   <span v-if="topic.last_reply_time">{{ topic.last_reply_time }}</span>
                 </div>
@@ -195,14 +240,13 @@
               <span class="badge badge-sm badge-primary badge-outline whitespace-nowrap">
                 {{ topic.reply_count || 0 }} 回复
               </span>
-            </div>
+            </router-link>
           </div>
           <div v-else class="p-8 text-center text-sm text-base-content/50">
             {{ topicsDegraded ? '热门帖子暂时无法获取，请稍后刷新。' : '暂无热门帖子。' }}
           </div>
         </div>
       </section>
-
       <!-- 所有小组保留在最后，作为探索入口而不是首屏内容。 -->
       <section aria-labelledby="all-groups-heading">
         <div class="flex items-end justify-between gap-3 mb-4">
@@ -247,7 +291,7 @@
                 <div class="min-w-0">
                   <p class="font-semibold truncate">{{ group.name }}</p>
                   <p class="text-xs text-base-content/50 mt-1 line-clamp-1">
-                    {{ group.member_count || 0 }} 成员 · {{ group.description || '暂无简介' }}
+                    {{ memberLabel(group.member_count) }} · {{ group.description || '暂无简介' }}
                   </p>
                 </div>
               </div>
@@ -294,6 +338,11 @@ function onAvatarError(event) {
   event.target.style.display = 'none'
 }
 
+function memberLabel(count) {
+  const value = Number(count)
+  return Number.isFinite(value) && value > 0 ? `${value.toLocaleString()} 成员` : '成员数暂不可用'
+}
+
 async function loadFollowedGroups() {
   const username = currentUsername.value
   followedError.value = false
@@ -305,7 +354,30 @@ async function loadFollowedGroups() {
   followedLoading.value = true
   try {
     const response = await userAPI.getGroups(username)
-    followedGroups.value = response.data?.data || []
+    const groups = response.data?.data || []
+    // 用户小组页通常只有小组链接和头像，不带成员数/话题数据。
+    // 逐个读取小组详情，用同一份真实数据补齐成员数和热门话题。
+    followedGroups.value = await Promise.all(
+      groups.map(async group => {
+        try {
+          const detailResponse = await groupAPI.getDetail(group.id)
+          const detail = detailResponse.data?.data
+          const topics = (detail?.topics || [])
+            .slice()
+            .sort((a, b) => Number(b.reply_count || 0) - Number(a.reply_count || 0))
+            .slice(0, 8)
+          return {
+            ...group,
+            member_count:
+              Number(detail?.member_count) > 0 ? detail.member_count : group.member_count,
+            avatar: detail?.avatar || group.avatar,
+            topics
+          }
+        } catch {
+          return { ...group, topics: [] }
+        }
+      })
+    )
   } catch {
     followedGroups.value = []
     followedError.value = true

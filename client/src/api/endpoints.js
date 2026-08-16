@@ -186,6 +186,9 @@ export const groupAPI = {
   getDiscover(config = {}) {
     return api.get('/groups/discover', config)
   },
+  getTopicDetail(id, config = {}) {
+    return api.get(`/groups/topic/${id}`, config)
+  },
   search(keyword, config = {}) {
     return api.get('/groups/search', { params: { keyword }, ...config })
   },

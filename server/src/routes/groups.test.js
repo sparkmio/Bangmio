@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { parseGroupListHTML, parseGroupDetailHTML, parseGroupDiscoverHTML } from './groups.js'
+import {
+  parseGroupListHTML,
+  parseGroupDetailHTML,
+  parseGroupDiscoverHTML,
+  parseGroupTopicHTML
+} from './groups.js'
 
 const BASE = 'https://bgm.tv'
 
@@ -204,5 +209,60 @@ describe('parseGroupDiscoverHTML', () => {
 
   it('没有话题表时返回空数组', () => {
     expect(parseGroupDiscoverHTML('<h1>小组</h1>', BASE)).toEqual([])
+  })
+})
+describe('group detail enrichment', () => {
+  it('reads member counts from modern data attributes instead of falling back to zero', () => {
+    const detail = parseGroupDetailHTML(
+      '<h1>新式小组</h1><span data-member-count="12,345">成员</span>',
+      'modern',
+      BASE
+    )
+
+    expect(detail.member_count).toBe(12345)
+  })
+})
+
+describe('parseGroupTopicHTML', () => {
+  it('parses a group topic for the internal Bangmio detail page', () => {
+    const html = `
+      <h1>站内阅读的小组帖子</h1>
+      <a href="/group/anime">动画交流</a>
+      <div class="reply" id="reply_1">
+        <a href="/user/sai">sai</a>
+        <small class="time">2026-8-16 19:20</small>
+        <div class="reply_content">第一条回复</div>
+      </div>
+      <div class="reply" id="reply_2">
+        <a href="/user/admin">admin</a>
+        <div class="reply_content">第二条回复</div>
+      </div>
+      <p>2 回复</p>
+    `
+
+    expect(parseGroupTopicHTML(html, '900', BASE)).toMatchObject({
+      id: '900',
+      title: '站内阅读的小组帖子',
+      group_id: 'anime',
+      group_name: '动画交流',
+      reply_count: 2,
+      url: 'https://bgm.tv/group/topic/900'
+    })
+    expect(parseGroupTopicHTML(html, '900', BASE).replies).toEqual([
+      {
+        id: '900-1',
+        floor: 1,
+        author: 'sai',
+        content: '第一条回复',
+        timestamp: '2026-8-16 19:20'
+      },
+      {
+        id: '900-2',
+        floor: 2,
+        author: 'admin',
+        content: '第二条回复',
+        timestamp: ''
+      }
+    ])
   })
 })
