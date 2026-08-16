@@ -376,82 +376,121 @@ function parseGroupTopicHTML(html, id, base) {
   const { document } = parseHTML(html)
   const titleEl = document.querySelector('h1, h2.topic_title, .topic_title, .topicTitle')
   const title = collapseText(titleEl?.textContent || '') || '话题 #' + id
-  const groupAnchor = Array.from(document.querySelectorAll('a[href]')).find(anchor => {
+
+  // 页面导航也包含 /group/discover；优先从 h1 的面包屑中读取真正所属小组。
+  const isGroupAnchor = anchor => {
     const href = anchor.getAttribute('href') || ''
     return /(?:^|\/)group\/[^/?#]+/.test(href) && !/\/group\/topic\//.test(href)
-  })
+  }
+  const groupAnchor =
+    Array.from(titleEl?.querySelectorAll('a[href]') || []).find(isGroupAnchor) ||
+    Array.from(document.querySelectorAll('a[href]')).find(isGroupAnchor)
   const authorLinks = Array.from(document.querySelectorAll('a[href*="/user/"]'))
   const rows = []
   const seen = new Set()
-  const selectors = [
-    '.topic-reply',
-    '.reply',
-    '.row_reply',
-    '.reply_content',
-    '[class*="reply"]',
-    'li[data-item-id]'
-  ]
-  const containers = []
-  for (const selector of selectors) {
-    for (const el of document.querySelectorAll(selector)) {
-      if (!containers.includes(el)) containers.push(el)
-    }
+
+  const authorFrom = container => {
+    const anchors = Array.from(container.querySelectorAll('a[href*="/user/"]'))
+    const namedAnchor = anchors.find(anchor => collapseText(anchor.textContent))
+    // Bangumi 的第一个用户链接往往是无文字的头像链接，必须跳过它。
+    return (
+      collapseText(namedAnchor?.textContent || '') || container.getAttribute('data-item-user') || ''
+    )
   }
 
-  for (const container of containers) {
-    const user = container.querySelector('a[href*="/user/"]')
-    const contentEl = container.querySelector(
-      '.reply_content, .topic_content, .content, .message, p'
-    )
+  const appendRow = (container, fallbackFloor) => {
+    const author = authorFrom(container)
+    const contentEl =
+      container.querySelector('.topic_content > .message') ||
+      container.querySelector('.reply_content > .message') ||
+      container.querySelector('.topic_content') ||
+      container.querySelector('.reply_content') ||
+      container.querySelector('.cmt_sub_content, .sub_reply_content, .message, .content, p')
     const content = collapseText(contentEl?.textContent || '')
-    if (!user || !content) continue
-    const idMatch = (container.getAttribute('id') || '').match(/(?:reply|floor)[_-]?(\d+)/i)
-    const floorEl = container.querySelector('.floor, .reply_floor, [class*="floor"]')
-    const floorText = collapseText(floorEl?.textContent || '')
-    const floor = idMatch?.[1] || floorText.replace(/[^0-9]/g, '') || String(rows.length + 1)
-    const key = (user.getAttribute('href') || '') + ':' + floor + ':' + content
-    if (seen.has(key)) continue
+    if (!author || !content) return false
+
+    const postId = (container.getAttribute('id') || '').match(/^post_(\d+)/i)?.[1]
+    const floorAnchor = container.querySelector(
+      '.floor-anchor, .floor, .reply_floor, [class*="floor"]'
+    )
+    const floorText = collapseText(floorAnchor?.textContent || '').replace(/^#/, '')
+    const floor = /^\d+$/.test(floorText) ? parseNumber(floorText) : floorText || fallbackFloor
+    const key = `${postId || author}:${floor}:${content}`
+    if (seen.has(key)) return false
     seen.add(key)
-    const timeEl = container.querySelector('time, .time, .reply_time, .date, small')
+
+    const timeEl = container.querySelector(
+      '.post_actions.re_info small, time, .time, .reply_time, .date, small'
+    )
+    const timestamp = collapseText(timeEl?.textContent || '').replace(/^#[^\s]+\s*-?\s*/, '')
     rows.push({
-      id: id + '-' + floor,
-      floor: parseNumber(floor) || rows.length + 1,
-      author: collapseText(user.textContent),
+      id: postId ? `${id}-${postId}` : `${id}-${floor}`,
+      floor,
+      author,
       content,
-      timestamp: collapseText(timeEl?.textContent || '')
+      timestamp
     })
+    return true
+  }
+
+  // 当前 Bangumi 页面：首帖为 .postTopic，一级回复为 #comment_list > .row_reply，
+  // 楼中楼为 .topic_sub_reply > .sub_reply_bg。仅解析这些实际帖子容器，避免把
+  // .reply_content 和空白头像链接当成一条回复，从而显示为“匿名用户”。
+  const mainPost = document.querySelector('.postTopic[id^="post_"]')
+  if (mainPost) appendRow(mainPost, 1)
+
+  const replyContainers = Array.from(document.querySelectorAll('#comment_list > .row_reply'))
+  if (!replyContainers.length) {
+    replyContainers.push(...document.querySelectorAll('.row_reply, .topic-reply, .reply'))
+  }
+  for (const container of replyContainers) {
+    appendRow(container, rows.length + 1)
+    for (const subReply of container.querySelectorAll('.topic_sub_reply > .sub_reply_bg')) {
+      appendRow(subReply, rows.length + 1)
+      if (rows.length >= 50) break
+    }
     if (rows.length >= 50) break
   }
 
   if (!rows.length) {
-    for (const user of authorLinks.slice(0, 50)) {
+    // 兼容旧镜像：只在标准帖子容器完全不存在时才使用保守回退。
+    for (const user of authorLinks) {
+      const author = collapseText(user.textContent)
+      if (!author) continue
       let container = user.parentElement
       for (let i = 0; i < 4 && container; i++, container = container.parentElement) {
         const text = collapseText(container.textContent)
         if (text.length < 8) continue
-        const content = text.replace(collapseText(user.textContent), '').trim()
+        const content = text.replace(author, '').trim()
         if (content.length < 2) continue
         rows.push({
-          id: id + '-' + (rows.length + 1),
-          floor: rows.length + 1,
-          author: collapseText(user.textContent),
+          id: `${id}-${rows.length + 1}`,
+          floor: String(rows.length + 1),
+          author,
           content: content.slice(0, 2000),
           timestamp: ''
         })
         break
       }
+      if (rows.length >= 50) break
     }
   }
 
-  const bodyText = collapseText(document.body?.textContent || '')
+  const bodyText = collapseText(document.body?.textContent || html || '')
   const replyMatch = bodyText.match(/([0-9][0-9,]*)\s*(?:回复|repl(?:y|ies))/i)
   return {
     id,
     title,
     group_id: groupAnchor ? groupIdFromHref(groupAnchor.getAttribute('href')) || '' : '',
     group_name: groupAnchor ? collapseText(groupAnchor.textContent) : '',
-    author: rows[0]?.author || (authorLinks[0] ? collapseText(authorLinks[0].textContent) : ''),
-    reply_count: Math.max(rows.length, replyMatch ? parseNumber(replyMatch[1]) : 0),
+    author:
+      rows[0]?.author ||
+      authorLinks.map(link => collapseText(link.textContent)).find(Boolean) ||
+      '',
+    reply_count: Math.max(
+      Math.max(0, rows.length - 1),
+      replyMatch ? parseNumber(replyMatch[1]) : 0
+    ),
     replies: rows,
     url: base + '/group/topic/' + id
   }

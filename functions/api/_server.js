@@ -5629,7 +5629,7 @@ app2.get("/:username/groups", async (c) => {
       seen.add(id);
       const idx = m.index;
       const context = scope.slice(Math.max(0, idx - 250), Math.min(scope.length, idx + 500));
-      const memberMatch = context.match(/([0-9]+)\s*成员/i) || context.match(/<span class="group_member">([0-9]+).*?<\/span>/i) || context.match(/<span class="l">([0-9]+).*?<\/span>/i) || context.match(/<strong>([0-9]+)<\/strong>/i);
+      const memberMatch = context.match(/([0-9][0-9,]*)\s*位?\s*成员/i) || context.match(/<span class="group_member">([0-9][0-9,]*).*?<\/span>/i) || context.match(/<span class="l">([0-9][0-9,]*).*?<\/span>/i) || context.match(/<strong>([0-9][0-9,]*)<\/strong>/i);
       const member_count = memberMatch ? parseNumber(memberMatch[1]) : 0;
       const avatarMatch = context.match(/<img[^>]*src="([^"]+)"[^>]*>/i);
       const avatar = avatarMatch ? fixUrl(avatarMatch[1], base) : "";
@@ -18337,79 +18337,94 @@ function parseGroupTopicHTML(html, id, base) {
   const { document } = parseHTML(html);
   const titleEl = document.querySelector("h1, h2.topic_title, .topic_title, .topicTitle");
   const title = collapseText(titleEl?.textContent || "") || "\u8BDD\u9898 #" + id;
-  const groupAnchor = Array.from(document.querySelectorAll("a[href]")).find((anchor) => {
+  const isGroupAnchor = (anchor) => {
     const href = anchor.getAttribute("href") || "";
     return /(?:^|\/)group\/[^/?#]+/.test(href) && !/\/group\/topic\//.test(href);
-  });
+  };
+  const groupAnchor = Array.from(titleEl?.querySelectorAll("a[href]") || []).find(isGroupAnchor) || Array.from(document.querySelectorAll("a[href]")).find(isGroupAnchor);
   const authorLinks = Array.from(document.querySelectorAll('a[href*="/user/"]'));
   const rows = [];
   const seen = /* @__PURE__ */ new Set();
-  const selectors = [
-    ".topic-reply",
-    ".reply",
-    ".row_reply",
-    ".reply_content",
-    '[class*="reply"]',
-    "li[data-item-id]"
-  ];
-  const containers = [];
-  for (const selector of selectors) {
-    for (const el of document.querySelectorAll(selector)) {
-      if (!containers.includes(el)) containers.push(el);
-    }
-  }
-  for (const container of containers) {
-    const user = container.querySelector('a[href*="/user/"]');
-    const contentEl = container.querySelector(
-      ".reply_content, .topic_content, .content, .message, p"
-    );
+  const authorFrom = (container) => {
+    const anchors = Array.from(container.querySelectorAll('a[href*="/user/"]'));
+    const namedAnchor = anchors.find((anchor) => collapseText(anchor.textContent));
+    return collapseText(namedAnchor?.textContent || "") || container.getAttribute("data-item-user") || "";
+  };
+  const appendRow = (container, fallbackFloor) => {
+    const author = authorFrom(container);
+    const contentEl = container.querySelector(".topic_content > .message") || container.querySelector(".reply_content > .message") || container.querySelector(".topic_content") || container.querySelector(".reply_content") || container.querySelector(".cmt_sub_content, .sub_reply_content, .message, .content, p");
     const content = collapseText(contentEl?.textContent || "");
-    if (!user || !content) continue;
-    const idMatch = (container.getAttribute("id") || "").match(/(?:reply|floor)[_-]?(\d+)/i);
-    const floorEl = container.querySelector('.floor, .reply_floor, [class*="floor"]');
-    const floorText = collapseText(floorEl?.textContent || "");
-    const floor = idMatch?.[1] || floorText.replace(/[^0-9]/g, "") || String(rows.length + 1);
-    const key2 = (user.getAttribute("href") || "") + ":" + floor + ":" + content;
-    if (seen.has(key2)) continue;
+    if (!author || !content) return false;
+    const postId = (container.getAttribute("id") || "").match(/^post_(\d+)/i)?.[1];
+    const floorAnchor = container.querySelector(
+      '.floor-anchor, .floor, .reply_floor, [class*="floor"]'
+    );
+    const floorText = collapseText(floorAnchor?.textContent || "").replace(/^#/, "");
+    const floor = /^\d+$/.test(floorText) ? parseNumber(floorText) : floorText || fallbackFloor;
+    const key2 = `${postId || author}:${floor}:${content}`;
+    if (seen.has(key2)) return false;
     seen.add(key2);
-    const timeEl = container.querySelector("time, .time, .reply_time, .date, small");
+    const timeEl = container.querySelector(
+      ".post_actions.re_info small, time, .time, .reply_time, .date, small"
+    );
+    const timestamp = collapseText(timeEl?.textContent || "").replace(/^#[^\s]+\s*-?\s*/, "");
     rows.push({
-      id: id + "-" + floor,
-      floor: parseNumber(floor) || rows.length + 1,
-      author: collapseText(user.textContent),
+      id: postId ? `${id}-${postId}` : `${id}-${floor}`,
+      floor,
+      author,
       content,
-      timestamp: collapseText(timeEl?.textContent || "")
+      timestamp
     });
+    return true;
+  };
+  const mainPost = document.querySelector('.postTopic[id^="post_"]');
+  if (mainPost) appendRow(mainPost, 1);
+  const replyContainers = Array.from(document.querySelectorAll("#comment_list > .row_reply"));
+  if (!replyContainers.length) {
+    replyContainers.push(...document.querySelectorAll(".row_reply, .topic-reply, .reply"));
+  }
+  for (const container of replyContainers) {
+    appendRow(container, rows.length + 1);
+    for (const subReply of container.querySelectorAll(".topic_sub_reply > .sub_reply_bg")) {
+      appendRow(subReply, rows.length + 1);
+      if (rows.length >= 50) break;
+    }
     if (rows.length >= 50) break;
   }
   if (!rows.length) {
-    for (const user of authorLinks.slice(0, 50)) {
+    for (const user of authorLinks) {
+      const author = collapseText(user.textContent);
+      if (!author) continue;
       let container = user.parentElement;
       for (let i = 0; i < 4 && container; i++, container = container.parentElement) {
         const text = collapseText(container.textContent);
         if (text.length < 8) continue;
-        const content = text.replace(collapseText(user.textContent), "").trim();
+        const content = text.replace(author, "").trim();
         if (content.length < 2) continue;
         rows.push({
-          id: id + "-" + (rows.length + 1),
-          floor: rows.length + 1,
-          author: collapseText(user.textContent),
+          id: `${id}-${rows.length + 1}`,
+          floor: String(rows.length + 1),
+          author,
           content: content.slice(0, 2e3),
           timestamp: ""
         });
         break;
       }
+      if (rows.length >= 50) break;
     }
   }
-  const bodyText = collapseText(document.body?.textContent || "");
+  const bodyText = collapseText(document.body?.textContent || html || "");
   const replyMatch = bodyText.match(/([0-9][0-9,]*)\s*(?:回复|repl(?:y|ies))/i);
   return {
     id,
     title,
     group_id: groupAnchor ? groupIdFromHref(groupAnchor.getAttribute("href")) || "" : "",
     group_name: groupAnchor ? collapseText(groupAnchor.textContent) : "",
-    author: rows[0]?.author || (authorLinks[0] ? collapseText(authorLinks[0].textContent) : ""),
-    reply_count: Math.max(rows.length, replyMatch ? parseNumber(replyMatch[1]) : 0),
+    author: rows[0]?.author || authorLinks.map((link) => collapseText(link.textContent)).find(Boolean) || "",
+    reply_count: Math.max(
+      Math.max(0, rows.length - 1),
+      replyMatch ? parseNumber(replyMatch[1]) : 0
+    ),
     replies: rows,
     url: base + "/group/topic/" + id
   };

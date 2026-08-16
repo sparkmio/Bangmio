@@ -70,7 +70,7 @@
           <div>
             <h2 id="followed-groups-heading" class="text-lg font-bold">我关注的小组</h2>
             <p v-if="currentUsername" class="text-xs text-base-content/50 mt-1">
-              {{ currentUsername }} 参加的小组 · 成员数来自小组详情页
+              {{ currentUsername }} 参加的小组 · 成员数来自 Bangumi 的个人小组列表
             </p>
           </div>
           <button

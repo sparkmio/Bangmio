@@ -301,10 +301,10 @@ app.get('/:username/groups', async c => {
       const context = scope.slice(Math.max(0, idx - 250), Math.min(scope.length, idx + 500))
 
       const memberMatch =
-        context.match(/([0-9]+)\s*成员/i) ||
-        context.match(/<span class="group_member">([0-9]+).*?<\/span>/i) ||
-        context.match(/<span class="l">([0-9]+).*?<\/span>/i) ||
-        context.match(/<strong>([0-9]+)<\/strong>/i)
+        context.match(/([0-9][0-9,]*)\s*位?\s*成员/i) ||
+        context.match(/<span class="group_member">([0-9][0-9,]*).*?<\/span>/i) ||
+        context.match(/<span class="l">([0-9][0-9,]*).*?<\/span>/i) ||
+        context.match(/<strong>([0-9][0-9,]*)<\/strong>/i)
       const member_count = memberMatch ? parseNumber(memberMatch[1]) : 0
 
       const avatarMatch = context.match(/<img[^>]*src="([^"]+)"[^>]*>/i)

@@ -266,3 +266,56 @@ describe('parseGroupTopicHTML', () => {
     ])
   })
 })
+
+it('跳过无文字头像链接，保留当前页面中的真实用户名、楼层与楼中楼内容', () => {
+  const html = `
+      <h1><a href="/group/forum">站务论坛</a> » 测试话题</h1>
+      <div id="post_1" class="postTopic" data-item-user="sai">
+        <div class="post_actions re_info"><small>#1 - 2026-8-16 20:00</small></div>
+        <a href="/user/sai" class="avatar"><span></span></a>
+        <div class="inner"><strong><a href="/user/sai">Sai</a></strong><div class="topic_content"><div class="message">首帖内容</div></div></div>
+      </div>
+      <div id="comment_list">
+        <div id="post_2" class="row_reply" data-item-user="user2">
+          <div class="post_actions re_info"><small><a class="floor-anchor">#2</a> - 2026-8-16 20:01</small></div>
+          <a href="/user/user2" class="avatar"><span></span></a>
+          <div class="inner">
+            <strong><a href="/user/user2">用户二</a></strong>
+            <div class="reply_content"><div class="message">一级回复</div><div class="topic_sub_reply">
+              <div id="post_3" class="sub_reply_bg" data-item-user="user3">
+                <div class="post_actions re_info"><small><a class="floor-anchor">#2-1</a> - 2026-8-16 20:02</small></div>
+                <a href="/user/user3" class="avatar"><span></span></a>
+                <div class="inner"><strong><a href="/user/user3">用户三</a></strong><div class="cmt_sub_content">楼中楼回复</div></div>
+              </div>
+            </div></div>
+          </div>
+        </div>
+      </div>
+    `
+
+  const topic = parseGroupTopicHTML(html, '901', BASE)
+  expect(topic).toMatchObject({ group_id: 'forum', group_name: '站务论坛', author: 'Sai' })
+  expect(topic.replies).toEqual([
+    {
+      id: '901-1',
+      floor: 1,
+      author: 'Sai',
+      content: '首帖内容',
+      timestamp: '2026-8-16 20:00'
+    },
+    {
+      id: '901-2',
+      floor: 2,
+      author: '用户二',
+      content: '一级回复',
+      timestamp: '2026-8-16 20:01'
+    },
+    {
+      id: '901-3',
+      floor: '2-1',
+      author: '用户三',
+      content: '楼中楼回复',
+      timestamp: '2026-8-16 20:02'
+    }
+  ])
+})

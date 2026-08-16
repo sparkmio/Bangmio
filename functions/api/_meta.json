@@ -491,7 +491,7 @@
     },
     "server/src/services/bangumi.js": { "bytes": 10766, "imports": [], "format": "esm" },
     "server/src/routes/user.js": {
-      "bytes": 18403,
+      "bytes": 18434,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -5059,7 +5059,7 @@
       "format": "esm"
     },
     "server/src/routes/groups.js": {
-      "bytes": 25951,
+      "bytes": 27690,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -5271,7 +5271,7 @@
         "node_modules/hono/dist/utils/cookie.js": { "bytesInOutput": 3747 },
         "node_modules/hono/dist/helper/cookie/index.js": { "bytesInOutput": 1260 },
         "server/src/services/bangumi.js": { "bytesInOutput": 5574 },
-        "server/src/routes/user.js": { "bytesInOutput": 17276 },
+        "server/src/routes/user.js": { "bytesInOutput": 17307 },
         "server/src/controllers/animeController.js": { "bytesInOutput": 4411 },
         "server/src/routes/anime.js": { "bytesInOutput": 683 },
         "server/src/services/userVerify.js": { "bytesInOutput": 787 },
@@ -5507,12 +5507,12 @@
         "server/src/routes/bilibili.js": { "bytesInOutput": 3024 },
         "server/src/services/moegirl.js": { "bytesInOutput": 2999 },
         "server/src/routes/moegirl.js": { "bytesInOutput": 8180 },
-        "server/src/routes/groups.js": { "bytesInOutput": 21736 },
+        "server/src/routes/groups.js": { "bytesInOutput": 22837 },
         "server/src/services/music.js": { "bytesInOutput": 3261 },
         "server/src/routes/music.js": { "bytesInOutput": 604 },
         "server/src/app.js": { "bytesInOutput": 2480 }
       },
-      "bytes": 710409
+      "bytes": 711541
     }
   }
 }
