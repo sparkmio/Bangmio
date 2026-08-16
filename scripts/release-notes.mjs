@@ -62,11 +62,15 @@ function isReleaseCommit(subject) {
   return /^(?:release(?:\([^)]*\))?|chore\(release\))!?:\s/i.test(subject.trim())
 }
 
+function isRetiredFeatureCommit(subject) {
+  return /跳一跳|jump\s*game/i.test(subject)
+}
+
 export function categorizeCommits(commits) {
   const result = new Map(categories.map(([name]) => [name, []]))
   result.set('Other Changes', [])
   for (const commit of commits) {
-    if (!commit.subject || isReleaseCommit(commit.subject)) continue
+    if (!commit.subject || isReleaseCommit(commit.subject) || isRetiredFeatureCommit(commit.subject)) continue
     const parsed = commit.parsed ?? parseConventionalCommit(commit.subject)
     const category = categories.find(([, types]) => types.has(parsed.type))?.[0] ?? 'Other Changes'
     result.get(category).push({ ...commit, parsed })
