@@ -342,8 +342,66 @@ function parseGroupDetailHTML(html, id, base) {
   }
 }
 
+/**
+ * 解析 Bangumi「随便看看」页面中的全站热门/最新话题。
+ * 页面结构以 table.topic_list 为主，兼容镜像站当前使用的 class 与相对链接。
+ * @param {string} html
+ * @param {string} base
+ * @returns {Array<object>}
+ */
+function parseGroupDiscoverHTML(html, base) {
+  const { document } = parseHTML(html)
+  const topics = []
+  const seen = new Set()
+  const table = document.querySelector('table.topic_list')
+  if (!table) return topics
+
+  for (const row of table.querySelectorAll('tr')) {
+    const topicAnchor = Array.from(row.querySelectorAll('a[href]')).find(anchor =>
+      /\/group\/topic\/[^/?#]+/.test(anchor.getAttribute('href') || '')
+    )
+    if (!topicAnchor) continue
+
+    const topicMatch = (topicAnchor.getAttribute('href') || '').match(/\/group\/topic\/([^/?#]+)/)
+    if (!topicMatch) continue
+    const id = decodeURIComponent(topicMatch[1])
+    if (seen.has(id)) continue
+    seen.add(id)
+
+    const groupAnchor = Array.from(row.querySelectorAll('a[href]')).find(anchor => {
+      const href = anchor.getAttribute('href') || ''
+      return /(?:^|\/)group\/[^/?#]+/.test(href) && !/\/group\/topic\//.test(href)
+    })
+    const authorAnchor = Array.from(row.querySelectorAll('a[href]')).find(anchor =>
+      /(?:^|\/)user\/[^/?#]+/.test(anchor.getAttribute('href') || '')
+    )
+
+    const rowText = collapseText(row.textContent)
+    const replyMatch = rowText.match(/\(\s*\+?([0-9][0-9,]*)\s*\)/)
+    const dateMatch = rowText.match(/\b\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:\s+\d{1,2}:\d{2})?\b/)
+    const groupId = groupAnchor ? groupIdFromHref(groupAnchor.getAttribute('href')) : ''
+    const title = collapseText(topicAnchor.textContent)
+    if (!title) continue
+
+    topics.push({
+      id,
+      title,
+      group_id: groupId || '',
+      group_name: groupAnchor ? collapseText(groupAnchor.textContent) : '',
+      author: authorAnchor ? collapseText(authorAnchor.textContent) : '',
+      reply_count: replyMatch ? parseNumber(replyMatch[1]) : 0,
+      last_reply_time: dateMatch ? dateMatch[0] : '',
+      url: `${base}/group/topic/${id}`
+    })
+
+    if (topics.length >= 30) break
+  }
+
+  // 源站按时间展示；这里按回复数优先，保证“热门帖子”而不是随机小组列表。
+  return topics.sort((a, b) => b.reply_count - a.reply_count)
+}
 // 导出解析函数供单元测试使用（fixture 驱动，不依赖上游网络）
-export { parseGroupListHTML, parseGroupDetailHTML }
+export { parseGroupListHTML, parseGroupDetailHTML, parseGroupDiscoverHTML }
 
 // GET /groups - 小组列表
 app.get('/', async c => {
@@ -395,6 +453,26 @@ app.get('/', async c => {
   }
 })
 
+// GET /groups/discover - 全站热门帖子
+app.get('/discover', async c => {
+  try {
+    const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
+    const cacheKey = `groups_discover_${isChina ? 'cn' : 'global'}`
+    const cached = cache.get(cacheKey)
+    if (cached) return c.json({ data: cached.data, degraded: cached.degraded === true })
+
+    const bases = getBaseUrls(isChina)
+    const urls = bases.map(base => `${base}/group/discover`)
+    const { html, url } = await fetchGroupHTMLCached(urls)
+    const baseUrl = url.replace(/\/group\/discover\/?$/, '') || bases[0]
+    const topics = parseGroupDiscoverHTML(html, baseUrl)
+    const degraded = topics.length === 0
+    cache.set(cacheKey, { data: topics, degraded })
+    return c.json({ data: topics, degraded })
+  } catch {
+    return c.json({ data: [], degraded: true })
+  }
+})
 // GET /groups/search - 服务端搜索小组
 app.get('/search', async c => {
   try {

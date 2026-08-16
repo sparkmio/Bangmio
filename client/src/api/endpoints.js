@@ -183,6 +183,9 @@ export const groupAPI = {
     // Cloudflare Pages treats /groups/ as a distinct path and returns 404.
     return api.get('/groups', config)
   },
+  getDiscover(config = {}) {
+    return api.get('/groups/discover', config)
+  },
   search(keyword, config = {}) {
     return api.get('/groups/search', { params: { keyword }, ...config })
   },

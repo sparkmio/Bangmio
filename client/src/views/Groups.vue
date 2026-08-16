@@ -1,334 +1,391 @@
 <template>
   <div class="container mx-auto px-4 py-6 max-w-5xl">
-    <div class="flex items-center justify-between mb-6 gap-2 flex-wrap">
-      <h1 class="text-2xl font-bold">小组</h1>
+    <div class="flex items-center justify-between mb-8 gap-3 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold">小组</h1>
+        <p class="text-sm text-base-content/50 mt-1">先看你关注的小组，再看看全站正在讨论什么。</p>
+      </div>
       <div class="flex items-center gap-2">
         <input
           v-model="searchQuery"
-          type="text"
+          type="search"
           placeholder="搜索小组..."
           class="input input-sm input-bordered w-48"
           @keyup.enter="searchGroups"
         />
-        <button class="btn btn-sm btn-primary" @click="searchGroups">搜索</button>
+        <button class="btn btn-sm btn-primary" :disabled="searchLoading" @click="searchGroups">
+          {{ searchLoading ? '搜索中' : '搜索' }}
+        </button>
       </div>
     </div>
 
-    <!-- 加载中：骨架屏 -->
-    <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div
-        v-for="n in 8"
-        :key="n"
-        class="card bg-base-100 rounded-xl shadow-card border border-base-300"
-      >
-        <div class="card-body p-4">
-          <div class="flex items-center gap-3">
-            <div class="skeleton w-12 h-12 rounded-full shrink-0" />
-            <div class="flex-1 space-y-2">
-              <div class="skeleton h-4 w-1/2" />
-              <div class="skeleton h-3 w-full" />
-              <div class="skeleton h-3 w-3/4" />
-            </div>
-          </div>
-        </div>
+    <section v-if="isSearching" aria-labelledby="group-search-heading">
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="group-search-heading" class="text-lg font-bold">搜索结果</h2>
+        <button class="btn btn-xs btn-ghost" @click="clearSearch">返回小组首页</button>
       </div>
-    </div>
-
-    <!-- 网络错误（仅在非降级时显示，降级数据仍可展示） -->
-    <div v-else-if="errorType === 'network' && !degraded" class="py-20 text-center">
-      <p class="text-base-content/60 mb-4">网络连接失败，请检查网络</p>
-      <button class="btn btn-sm btn-primary" @click="retry">重试</button>
-    </div>
-
-    <!-- 接口异常（仅在非降级时显示：真正无法获取数据才提示服务不可用） -->
-    <div v-else-if="errorType === 'server' && !degraded" class="py-20 text-center">
-      <p class="text-base-content/60 mb-4">服务暂不可用，请稍后再试</p>
-      <button class="btn btn-sm btn-primary" @click="retry">重试</button>
-    </div>
-
-    <!-- 占位数据提示：与列表同时展示 -->
-    <div
-      v-if="errorType === 'placeholder'"
-      class="mb-4 p-4 rounded-xl bg-warning/10 border border-warning/20 text-sm text-base-content/80"
-    >
-      <p class="font-medium">小组信息暂不可用</p>
-      <p class="mt-1">
-        Bangumi 上游数据暂时无法获取，当前展示兜底小组。你可以稍后再试或前往 Bangumi 查看。
-      </p>
-      <div class="flex items-center gap-3 mt-3">
-        <button class="btn btn-xs btn-primary" @click="retry">重试</button>
-        <a
-          href="https://bgm.tv/group"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="inline-flex items-center gap-1 text-primary hover:underline"
+      <div v-if="searchLoading" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div v-for="n in 6" :key="n" class="h-24 rounded-xl skeleton" />
+      </div>
+      <div v-else-if="searchResults.length" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <router-link
+          v-for="group in searchResults"
+          :key="group.id"
+          :to="`/group/${group.id}`"
+          class="card bg-base-100 border border-base-300 hover:shadow-hover transition-shadow"
         >
-          前往 Bangumi 小组首页 →
-        </a>
-      </div>
-    </div>
-
-    <!-- 降级数据温和提示：后端返回 degraded: true 时与列表同时展示 -->
-    <div
-      v-if="degraded && !loading"
-      class="mb-4 p-3 rounded-xl bg-warning/10 border border-warning/20 text-sm text-base-content/70 flex items-center justify-between gap-3 flex-wrap"
-    >
-      <span>部分小组数据为缓存展示，可能非最新</span>
-      <button class="btn btn-xs btn-ghost" @click="retry">刷新</button>
-    </div>
-
-    <!-- 列表展示（至少 50 个，后端返回的全部展示，前端无需分页） -->
-    <div v-if="groups.length" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <router-link
-        v-for="g in groups"
-        :key="g.id"
-        :to="`/group/${g.id}`"
-        class="card bg-base-100 rounded-xl hover:shadow-hover transition-shadow duration-300 border border-base-300"
-      >
-        <div class="card-body p-4">
-          <div class="flex items-start gap-3">
-            <!-- 头像（如有） -->
-            <div
-              class="shrink-0 w-12 h-12 rounded-full overflow-hidden bg-base-200 flex items-center justify-center"
-            >
-              <img
-                v-if="g.icon || g.avatar"
-                v-image-placeholder
-                :src="g.icon || g.avatar"
-                :alt="g.name"
-                class="w-full h-full object-cover"
-                loading="lazy"
-                decoding="async"
-                @error="onAvatarError($event)"
-              />
-              <svg
-                v-else
-                xmlns="http://www.w3.org/2000/svg"
-                class="w-6 h-6 text-base-content/30"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4z"
+          <div class="card-body p-4">
+            <div class="flex items-center gap-3">
+              <div class="w-11 h-11 rounded-full overflow-hidden bg-base-200 shrink-0">
+                <img
+                  v-if="group.avatar || group.icon"
+                  v-image-placeholder
+                  :src="group.avatar || group.icon"
+                  :alt="group.name"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                  @error="onAvatarError($event)"
                 />
-              </svg>
-            </div>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 flex-wrap">
-                <h3 class="font-semibold text-base-content truncate">
-                  {{ g.name }}
-                </h3>
-                <!-- 成员数 badge -->
-                <span
-                  v-if="g.member_count != null || g.members != null"
-                  class="badge badge-sm badge-ghost"
-                >
-                  {{ g.member_count ?? g.members }} 成员
-                </span>
               </div>
-              <p class="text-sm text-base-content/60 line-clamp-2 mt-1">
-                {{ g.description || '暂无简介' }}
-              </p>
+              <div class="min-w-0">
+                <p class="font-semibold truncate">{{ group.name }}</p>
+                <p class="text-xs text-base-content/50 mt-1">
+                  {{ group.member_count || 0 }} 成员 · {{ group.description || '暂无简介' }}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      </router-link>
-    </div>
+        </router-link>
+      </div>
+      <div v-else class="py-16 text-center text-base-content/50">
+        {{ searchError ? '搜索小组失败，请稍后重试' : '未找到匹配的小组' }}
+      </div>
+    </section>
 
-    <!-- 空状态 -->
-    <div v-else class="py-20 text-center text-base-content/40">
-      <!-- 数据为空：展示兜底推荐小组 -->
-      <template v-if="errorType === 'empty'">
-        <p class="text-base-content/60">暂无小组数据</p>
-        <p class="text-sm mt-2 mb-6">以下为您推荐的 Bangumi 热门小组</p>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto px-4 text-left">
+    <template v-else>
+      <!-- 登录用户自己的小组始终置顶，避免默认列表掩盖个人内容。 -->
+      <section class="mb-10" aria-labelledby="followed-groups-heading">
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 id="followed-groups-heading" class="text-lg font-bold">我关注的小组</h2>
+            <p v-if="currentUsername" class="text-xs text-base-content/50 mt-1">
+              {{ currentUsername }} 参加的小组
+            </p>
+          </div>
+          <button
+            class="btn btn-xs btn-ghost"
+            :disabled="followedLoading"
+            @click="loadFollowedGroups"
+          >
+            刷新
+          </button>
+        </div>
+
+        <div v-if="followedLoading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div v-for="n in 3" :key="n" class="h-24 rounded-xl skeleton" />
+        </div>
+        <div
+          v-else-if="followedGroups.length"
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+        >
           <router-link
-            v-for="g in RECOMMENDED_GROUPS"
-            :key="g.id"
-            :to="`/group/${g.id}`"
-            class="card bg-base-100 rounded-xl hover:shadow-hover transition-shadow duration-300 border border-base-300"
+            v-for="group in followedGroups"
+            :key="group.id"
+            :to="`/group/${group.id}`"
+            class="card bg-base-100 border border-primary/20 hover:border-primary/50 hover:shadow-hover transition-all"
           >
             <div class="card-body p-4">
-              <div class="flex items-center gap-2 flex-wrap">
-                <h3 class="font-semibold text-base-content truncate">{{ g.name }}</h3>
-                <span v-if="g.member_count != null" class="badge badge-sm badge-ghost">
-                  {{ g.member_count }} 成员
-                </span>
+              <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-full overflow-hidden bg-base-200 shrink-0">
+                  <img
+                    v-if="group.avatar"
+                    v-image-placeholder
+                    :src="group.avatar"
+                    :alt="group.name"
+                    class="w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                    @error="onAvatarError($event)"
+                  />
+                  <div
+                    v-else
+                    class="w-full h-full flex items-center justify-center text-base-content/40"
+                  >
+                    {{ group.name?.[0] || '?' }}
+                  </div>
+                </div>
+                <div class="min-w-0">
+                  <p class="font-semibold truncate">{{ group.name }}</p>
+                  <p class="text-xs text-base-content/50 mt-1">
+                    {{ group.member_count || 0 }} 成员
+                  </p>
+                </div>
               </div>
-              <p class="text-sm text-base-content/60 line-clamp-2 mt-1">
-                {{ g.description || '暂无简介' }}
-              </p>
             </div>
           </router-link>
         </div>
-      </template>
-      <template v-else-if="searchQuery.trim()">
-        <p>未找到匹配的小组</p>
-        <a
-          href="https://bgm.tv/group"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="text-sm text-primary hover:underline mt-2 inline-block"
-          >前往 Bangumi 小组首页</a
+        <div
+          v-else
+          class="rounded-xl border border-dashed border-base-300 bg-base-100/60 p-5 text-sm text-base-content/60"
         >
-      </template>
-      <template v-else>
-        <p>暂无小组数据</p>
-        <p class="text-xs mt-2">Bangumi 小组页面结构可能变化，抓取失败时显示空</p>
-      </template>
-    </div>
+          <template v-if="!isAuthenticated">
+            登录并绑定 Bangumi 账号后，这里会显示你关注的小组。
+            <router-link
+              :to="{ path: '/login', query: { redirect: '/groups' } }"
+              class="text-primary hover:underline ml-1"
+            >
+              去登录
+            </router-link>
+          </template>
+          <template v-else-if="!currentUsername">
+            绑定 Bangumi 账号后，才能读取你关注的小组。
+            <router-link to="/bind-bangumi" class="text-primary hover:underline ml-1"
+              >去绑定</router-link
+            >
+          </template>
+          <template v-else>
+            {{ followedError ? '关注的小组暂时加载失败，请刷新重试。' : '暂未找到你关注的小组。' }}
+          </template>
+        </div>
+      </section>
+
+      <!-- 取自 Bangumi 小组发现页，按回复数排序后展示。 -->
+      <section class="mb-10" aria-labelledby="hot-topics-heading">
+        <div class="flex items-end justify-between gap-3 mb-4">
+          <div>
+            <h2 id="hot-topics-heading" class="text-lg font-bold">所有小组的热门帖子</h2>
+            <p class="text-xs text-base-content/50 mt-1">
+              来自 Bangumi 小组发现页，按当前回复数排序。
+            </p>
+          </div>
+          <button class="btn btn-xs btn-ghost" :disabled="topicsLoading" @click="loadHotTopics">
+            刷新
+          </button>
+        </div>
+        <div class="card bg-base-100 border border-base-300 overflow-hidden">
+          <div v-if="topicsLoading" class="p-4 space-y-3">
+            <div v-for="n in 6" :key="n" class="h-12 skeleton rounded-lg" />
+          </div>
+          <div v-else-if="hotTopics.length" class="divide-y divide-base-300">
+            <div v-for="topic in hotTopics" :key="topic.id" class="p-4 flex items-start gap-3">
+              <div class="min-w-0 flex-1">
+                <a
+                  :href="topic.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="font-medium hover:text-primary transition-colors line-clamp-1"
+                >
+                  {{ topic.title }}
+                </a>
+                <div
+                  class="mt-1 flex items-center gap-x-2 gap-y-1 flex-wrap text-xs text-base-content/50"
+                >
+                  <router-link
+                    v-if="topic.group_id"
+                    :to="`/group/${topic.group_id}`"
+                    class="hover:text-primary"
+                  >
+                    {{ topic.group_name || '小组' }}
+                  </router-link>
+                  <span v-if="topic.author">{{ topic.author }}</span>
+                  <span v-if="topic.last_reply_time">{{ topic.last_reply_time }}</span>
+                </div>
+              </div>
+              <span class="badge badge-sm badge-primary badge-outline whitespace-nowrap">
+                {{ topic.reply_count || 0 }} 回复
+              </span>
+            </div>
+          </div>
+          <div v-else class="p-8 text-center text-sm text-base-content/50">
+            {{ topicsDegraded ? '热门帖子暂时无法获取，请稍后刷新。' : '暂无热门帖子。' }}
+          </div>
+        </div>
+      </section>
+
+      <!-- 所有小组保留在最后，作为探索入口而不是首屏内容。 -->
+      <section aria-labelledby="all-groups-heading">
+        <div class="flex items-end justify-between gap-3 mb-4">
+          <div>
+            <h2 id="all-groups-heading" class="text-lg font-bold">全部小组</h2>
+            <p class="text-xs text-base-content/50 mt-1">继续探索其他小组。</p>
+          </div>
+          <button class="btn btn-xs btn-ghost" :disabled="allGroupsLoading" @click="loadAllGroups">
+            刷新
+          </button>
+        </div>
+        <div v-if="allGroupsLoading" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div v-for="n in 8" :key="n" class="h-24 rounded-xl skeleton" />
+        </div>
+        <div v-else-if="allGroups.length" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <router-link
+            v-for="group in allGroups"
+            :key="group.id"
+            :to="`/group/${group.id}`"
+            class="card bg-base-100 border border-base-300 hover:shadow-hover transition-shadow"
+          >
+            <div class="card-body p-4">
+              <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-full overflow-hidden bg-base-200 shrink-0">
+                  <img
+                    v-if="group.avatar || group.icon"
+                    v-image-placeholder
+                    :src="group.avatar || group.icon"
+                    :alt="group.name"
+                    class="w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                    @error="onAvatarError($event)"
+                  />
+                  <div
+                    v-else
+                    class="w-full h-full flex items-center justify-center text-base-content/40"
+                  >
+                    {{ group.name?.[0] || '?' }}
+                  </div>
+                </div>
+                <div class="min-w-0">
+                  <p class="font-semibold truncate">{{ group.name }}</p>
+                  <p class="text-xs text-base-content/50 mt-1 line-clamp-1">
+                    {{ group.member_count || 0 }} 成员 · {{ group.description || '暂无简介' }}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </router-link>
+        </div>
+        <div
+          v-else
+          class="rounded-xl border border-dashed border-base-300 p-8 text-center text-sm text-base-content/50"
+        >
+          {{ allGroupsDegraded ? '全部小组暂时无法获取，请稍后刷新。' : '暂无小组数据。' }}
+        </div>
+      </section>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
-import { groupAPI } from '../api/endpoints'
-import { useToastStore } from '../stores/toast'
+import { computed, onMounted, ref, watch } from 'vue'
+import { groupAPI, userAPI } from '../api/endpoints'
+import { useAuthStore } from '../stores/auth'
 
-const toast = useToastStore()
-// allGroups 存全量，groups 存过滤后的结果
+const auth = useAuthStore()
+const followedGroups = ref([])
+const hotTopics = ref([])
 const allGroups = ref([])
-const groups = ref([])
-const loading = ref(true)
+const searchResults = ref([])
 const searchQuery = ref('')
-// 是否为兜底降级数据（后端返回 degraded: true 时置位）
-const degraded = ref(false)
-// 错误分类: null | 'network' | 'server' | 'empty' | 'placeholder'
-const errorType = ref(null)
-// 防抖句柄
-let debounceTimer = null
+const followedLoading = ref(false)
+const topicsLoading = ref(false)
+const allGroupsLoading = ref(false)
+const searchLoading = ref(false)
+const followedError = ref(false)
+const topicsDegraded = ref(false)
+const allGroupsDegraded = ref(false)
+const searchError = ref(false)
+let searchTimer = null
 
-// 前端兜底推荐小组（Bangumi 官方活跃小组）
-const RECOMMENDED_GROUPS = [
-  {
-    id: 'bgm38',
-    name: 'Bangumi 新番组',
-    description: '新番讨论、资讯与推荐',
-    member_count: 3800
-  },
-  {
-    id: 'acg',
-    name: 'ACG 综合讨论',
-    description: '动画、漫画、游戏综合交流',
-    member_count: 5600
-  },
-  { id: 'a', name: '动画', description: '动画讨论小组', member_count: 4200 },
-  { id: 'c', name: '漫画', description: '漫画讨论小组', member_count: 3100 },
-  { id: 'g', name: '游戏', description: '游戏讨论小组', member_count: 2800 },
-  {
-    id: 'touhou',
-    name: '东方 Project',
-    description: '东方 Project 讨论小组',
-    member_count: 1700
-  }
-].map(g => ({ ...g, url: `https://bgm.tv/group/${g.id}` }))
+const currentUsername = computed(() => auth.effectiveUser?.username || '')
+const isAuthenticated = computed(() => auth.isAuthenticated)
+const isSearching = computed(() => searchQuery.value.trim().length > 0)
 
-// 根据 axios 错误对象分类错误类型
-function classifyError(err) {
-  if (!err) return 'server'
-  // 网络错误：无 response（请求未送达）或超时/断网
-  if (!err.response) return 'network'
-  if (err.code === 'ECONNABORTED' || err.code === 'ERR_NETWORK') return 'network'
-  // 5xx 服务端错误视为接口异常
-  if (err.response.status >= 500) return 'server'
-  return 'server'
+function onAvatarError(event) {
+  event.target.style.display = 'none'
 }
 
-// 头像加载失败时隐藏 img，避免破图
-function onAvatarError(e) {
-  e.target.style.display = 'none'
-}
-
-// 根据当前 searchQuery 过滤 allGroups，结果写入 groups
-function applyFilter() {
-  const q = searchQuery.value.trim().toLowerCase()
-  if (!q) {
-    groups.value = allGroups.value
+async function loadFollowedGroups() {
+  const username = currentUsername.value
+  followedError.value = false
+  if (!username) {
+    followedGroups.value = []
     return
   }
-  groups.value = allGroups.value.filter(
-    g => (g.name || '').toLowerCase().includes(q) || (g.description || '').toLowerCase().includes(q)
-  )
-}
 
-// 加载全量小组列表
-async function loadGroups() {
-  loading.value = true
-  errorType.value = null
-  degraded.value = false
+  followedLoading.value = true
   try {
-    const res = await groupAPI.getList()
-    const list = res.data?.data || []
-    degraded.value = res.data?.degraded === true
-    allGroups.value = list
-    if (list.length === 0) {
-      errorType.value = 'empty'
-      groups.value = []
-    } else if (degraded.value) {
-      // 后端返回降级标识：兜底数据与列表同时展示，并通过提示条告知用户
-      errorType.value = null
-      applyFilter()
-    } else if (list.every(g => g.id && g.name === g.id)) {
-      // 后端未返回 degraded 但数据为占位（name === id），提示用户上游不可用
-      errorType.value = 'placeholder'
-      groups.value = list
-    } else {
-      errorType.value = null
-      applyFilter()
-    }
-  } catch (err) {
-    allGroups.value = []
-    groups.value = []
-    degraded.value = false
-    errorType.value = classifyError(err)
-  }
-  loading.value = false
-}
-
-// 修复异步 bug：先 await loadGroups() 再过滤；空搜索恢复原列表
-async function searchGroups() {
-  if (!searchQuery.value.trim()) {
-    // 搜索框清空时恢复全量
-    applyFilter()
-    return
-  }
-  loading.value = true
-  degraded.value = false
-  try {
-    const res = await groupAPI.search(searchQuery.value)
-    groups.value = res.data?.data || []
-    degraded.value = res.data?.degraded === true
+    const response = await userAPI.getGroups(username)
+    followedGroups.value = response.data?.data || []
   } catch {
-    toast.error('搜索小组失败')
+    followedGroups.value = []
+    followedError.value = true
   } finally {
-    loading.value = false
+    followedLoading.value = false
   }
 }
 
-// 重试按钮：重新发起请求
-function retry() {
-  loadGroups()
+async function loadHotTopics() {
+  topicsLoading.value = true
+  topicsDegraded.value = false
+  try {
+    const response = await groupAPI.getDiscover()
+    hotTopics.value = response.data?.data || []
+    topicsDegraded.value = response.data?.degraded === true
+  } catch {
+    hotTopics.value = []
+    topicsDegraded.value = true
+  } finally {
+    topicsLoading.value = false
+  }
 }
 
-// 输入框防抖（300ms），空值立即清空
-watch(searchQuery, val => {
-  if (debounceTimer) clearTimeout(debounceTimer)
-  if (!val.trim()) {
-    applyFilter()
+async function loadAllGroups() {
+  allGroupsLoading.value = true
+  allGroupsDegraded.value = false
+  try {
+    const response = await groupAPI.getList()
+    allGroups.value = response.data?.data || []
+    allGroupsDegraded.value = response.data?.degraded === true
+  } catch {
+    allGroups.value = []
+    allGroupsDegraded.value = true
+  } finally {
+    allGroupsLoading.value = false
+  }
+}
+
+async function searchGroups() {
+  const keyword = searchQuery.value.trim()
+  if (!keyword) {
+    searchResults.value = []
+    searchError.value = false
     return
   }
-  debounceTimer = setTimeout(() => {
-    applyFilter()
-  }, 300)
+
+  searchLoading.value = true
+  searchError.value = false
+  try {
+    const response = await groupAPI.search(keyword)
+    searchResults.value = response.data?.data || []
+  } catch {
+    searchResults.value = []
+    searchError.value = true
+  } finally {
+    searchLoading.value = false
+  }
+}
+
+function clearSearch() {
+  searchQuery.value = ''
+  searchResults.value = []
+  searchError.value = false
+}
+
+watch(searchQuery, value => {
+  if (searchTimer) clearTimeout(searchTimer)
+  if (!value.trim()) {
+    searchResults.value = []
+    searchError.value = false
+    return
+  }
+  searchTimer = setTimeout(searchGroups, 300)
 })
 
-onBeforeUnmount(() => {
-  if (debounceTimer) clearTimeout(debounceTimer)
-})
+watch(currentUsername, loadFollowedGroups)
 
-onMounted(loadGroups)
+onMounted(() => {
+  loadFollowedGroups()
+  loadHotTopics()
+  loadAllGroups()
+})
 </script>

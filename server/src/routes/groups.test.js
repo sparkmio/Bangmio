@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseGroupListHTML, parseGroupDetailHTML } from './groups.js'
+import { parseGroupListHTML, parseGroupDetailHTML, parseGroupDiscoverHTML } from './groups.js'
 
 const BASE = 'https://bgm.tv'
 
@@ -156,5 +156,53 @@ describe('parseGroupDetailHTML', () => {
       author: 'u1',
       reply_count: 3
     })
+  })
+})
+
+describe('parseGroupDiscoverHTML', () => {
+  it('解析所有小组的热门话题，并按回复数排序', () => {
+    const html = `
+<table class="topic_list">
+  <tr><th>话题</th></tr>
+  <tr>
+    <td><a href="/group/topic/101" class="l">新番讨论</a> <small>(+9)</small></td>
+    <td><a href="/group/anime">动画交流</a></td>
+    <td><a href="/user/sai">sai</a></td>
+    <td><small>2026-8-16 18:51</small></td>
+  </tr>
+  <tr>
+    <td><a href="/group/topic/102" class="l">游戏闲聊</a> <small>(+42)</small></td>
+    <td><a href="/group/game">游戏</a></td>
+    <td><a href="/user/admin">admin</a></td>
+    <td><small>2026-8-16 18:49</small></td>
+  </tr>
+</table>`
+
+    expect(parseGroupDiscoverHTML(html, BASE)).toEqual([
+      {
+        id: '102',
+        title: '游戏闲聊',
+        group_id: 'game',
+        group_name: '游戏',
+        author: 'admin',
+        reply_count: 42,
+        last_reply_time: '2026-8-16 18:49',
+        url: 'https://bgm.tv/group/topic/102'
+      },
+      {
+        id: '101',
+        title: '新番讨论',
+        group_id: 'anime',
+        group_name: '动画交流',
+        author: 'sai',
+        reply_count: 9,
+        last_reply_time: '2026-8-16 18:51',
+        url: 'https://bgm.tv/group/topic/101'
+      }
+    ])
+  })
+
+  it('没有话题表时返回空数组', () => {
+    expect(parseGroupDiscoverHTML('<h1>小组</h1>', BASE)).toEqual([])
   })
 })

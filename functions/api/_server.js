@@ -5611,10 +5611,11 @@ app2.get("/:username/groups", async (c) => {
     const username = c.req.param("username");
     if (!username) return c.json({ data: [] });
     const base = oauthBase2(c);
-    const html = await fetchHTML(`${base}/user/${username}/group`);
+    let html = await fetchHTML(`${base}/user/${username}/groups`);
+    if (!html) html = await fetchHTML(`${base}/user/${username}/group`);
     if (!html) return c.json({ data: [] });
     let scope = html;
-    const blockMatch = html.match(/id="group"[\s\S]*?<ul[\s\S]*?<\/ul>/i) || html.match(/class="[^"]*groups[^"]*"[\s\S]*?<ul[\s\S]*?<\/ul>/i) || html.match(/<h2[^>]*>小组[\s\S]*?<ul[\s\S]*?<\/ul>/i);
+    const blockMatch = html.match(/<ul[^>]*id="memberGroupList"[^>]*>[\s\S]*?<\/ul>/i) || html.match(/id="group"[\s\S]*?<ul[\s\S]*?<\/ul>/i) || html.match(/class="[^"]*groups[^"]*"[\s\S]*?<ul[\s\S]*?<\/ul>/i) || html.match(/<h2[^>]*>小组[\s\S]*?<ul[\s\S]*?<\/ul>/i);
     if (blockMatch) scope = blockMatch[0];
     const groups = [];
     const seen = /* @__PURE__ */ new Set();
@@ -5622,7 +5623,7 @@ app2.get("/:username/groups", async (c) => {
     let m;
     while ((m = linkRegex.exec(scope)) !== null) {
       const id = m[1];
-      if (seen.has(id)) continue;
+      if (id === "all" || id === "discover" || id === "topic" || seen.has(id)) continue;
       const name = unescapeHtml(stripTags(m[2])).trim();
       if (!name || /^\d+$/.test(name)) continue;
       seen.add(id);
@@ -18317,6 +18318,49 @@ function parseGroupDetailHTML(html, id, base) {
     url: `${base}/group/${id}`
   };
 }
+function parseGroupDiscoverHTML(html, base) {
+  const { document } = parseHTML(html);
+  const topics = [];
+  const seen = /* @__PURE__ */ new Set();
+  const table = document.querySelector("table.topic_list");
+  if (!table) return topics;
+  for (const row of table.querySelectorAll("tr")) {
+    const topicAnchor = Array.from(row.querySelectorAll("a[href]")).find(
+      (anchor) => /\/group\/topic\/[^/?#]+/.test(anchor.getAttribute("href") || "")
+    );
+    if (!topicAnchor) continue;
+    const topicMatch = (topicAnchor.getAttribute("href") || "").match(/\/group\/topic\/([^/?#]+)/);
+    if (!topicMatch) continue;
+    const id = decodeURIComponent(topicMatch[1]);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const groupAnchor = Array.from(row.querySelectorAll("a[href]")).find((anchor) => {
+      const href = anchor.getAttribute("href") || "";
+      return /(?:^|\/)group\/[^/?#]+/.test(href) && !/\/group\/topic\//.test(href);
+    });
+    const authorAnchor = Array.from(row.querySelectorAll("a[href]")).find(
+      (anchor) => /(?:^|\/)user\/[^/?#]+/.test(anchor.getAttribute("href") || "")
+    );
+    const rowText = collapseText(row.textContent);
+    const replyMatch = rowText.match(/\(\s*\+?([0-9][0-9,]*)\s*\)/);
+    const dateMatch = rowText.match(/\b\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:\s+\d{1,2}:\d{2})?\b/);
+    const groupId = groupAnchor ? groupIdFromHref(groupAnchor.getAttribute("href")) : "";
+    const title = collapseText(topicAnchor.textContent);
+    if (!title) continue;
+    topics.push({
+      id,
+      title,
+      group_id: groupId || "",
+      group_name: groupAnchor ? collapseText(groupAnchor.textContent) : "",
+      author: authorAnchor ? collapseText(authorAnchor.textContent) : "",
+      reply_count: replyMatch ? parseNumber(replyMatch[1]) : 0,
+      last_reply_time: dateMatch ? dateMatch[0] : "",
+      url: `${base}/group/topic/${id}`
+    });
+    if (topics.length >= 30) break;
+  }
+  return topics.sort((a, b) => b.reply_count - a.reply_count);
+}
 app9.get("/", async (c) => {
   try {
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
@@ -18357,6 +18401,24 @@ app9.get("/", async (c) => {
       data: FALLBACK_GROUPS.map((g) => ({ ...g, url: `${HOSTS.main}/group/${g.id}` })),
       degraded: true
     });
+  }
+});
+app9.get("/discover", async (c) => {
+  try {
+    const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
+    const cacheKey = `groups_discover_${isChina7 ? "cn" : "global"}`;
+    const cached = cache5.get(cacheKey);
+    if (cached) return c.json({ data: cached.data, degraded: cached.degraded === true });
+    const bases = getBaseUrls(isChina7);
+    const urls = bases.map((base) => `${base}/group/discover`);
+    const { html, url } = await fetchGroupHTMLCached(urls);
+    const baseUrl = url.replace(/\/group\/discover\/?$/, "") || bases[0];
+    const topics = parseGroupDiscoverHTML(html, baseUrl);
+    const degraded = topics.length === 0;
+    cache5.set(cacheKey, { data: topics, degraded });
+    return c.json({ data: topics, degraded });
+  } catch {
+    return c.json({ data: [], degraded: true });
   }
 });
 app9.get("/search", async (c) => {

@@ -272,12 +272,15 @@ app.get('/:username/groups', async c => {
     const username = c.req.param('username')
     if (!username) return c.json({ data: [] })
     const base = oauthBase(c)
-    const html = await fetchHTML(`${base}/user/${username}/group`)
+    // Bangumi 当前页面路径是 /groups；保留 /group 作为旧镜像兼容回退。
+    let html = await fetchHTML(`${base}/user/${username}/groups`)
+    if (!html) html = await fetchHTML(`${base}/user/${username}/group`)
     if (!html) return c.json({ data: [] })
 
     // 优先从 #group 或 .groups 区块提取，避免全页导航链接受污染
     let scope = html
     const blockMatch =
+      html.match(/<ul[^>]*id="memberGroupList"[^>]*>[\s\S]*?<\/ul>/i) ||
       html.match(/id="group"[\s\S]*?<ul[\s\S]*?<\/ul>/i) ||
       html.match(/class="[^"]*groups[^"]*"[\s\S]*?<ul[\s\S]*?<\/ul>/i) ||
       html.match(/<h2[^>]*>小组[\s\S]*?<ul[\s\S]*?<\/ul>/i)
@@ -289,7 +292,7 @@ app.get('/:username/groups', async c => {
     let m
     while ((m = linkRegex.exec(scope)) !== null) {
       const id = m[1]
-      if (seen.has(id)) continue
+      if (id === 'all' || id === 'discover' || id === 'topic' || seen.has(id)) continue
       const name = unescapeHtml(stripTags(m[2])).trim()
       if (!name || /^\d+$/.test(name)) continue
       seen.add(id)

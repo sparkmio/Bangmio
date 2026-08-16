@@ -23,4 +23,10 @@ describe('groupAPI', () => {
 
     expect(api.get).toHaveBeenCalledWith('/groups', config)
   })
+
+  it('requests all-group hot topics from the discover route', () => {
+    groupAPI.getDiscover()
+
+    expect(api.get).toHaveBeenCalledWith('/groups/discover', {})
+  })
 })
