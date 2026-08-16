@@ -179,7 +179,9 @@ export const musicAPI = {
 
 export const groupAPI = {
   getList(config = {}) {
-    return api.get('/groups/', config)
+    // Hono mounts the list endpoint at /groups (without a trailing slash).
+    // Cloudflare Pages treats /groups/ as a distinct path and returns 404.
+    return api.get('/groups', config)
   },
   search(keyword, config = {}) {
     return api.get('/groups/search', { params: { keyword }, ...config })
