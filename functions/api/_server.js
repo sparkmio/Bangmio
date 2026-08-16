@@ -5408,7 +5408,9 @@ function oauthCookieOptions(c, overrides = {}) {
     secure: callbackUrl.startsWith("https://"),
     sameSite: "Lax",
     maxAge: 10 * 60,
-    path: "/api/v1/user",
+    // The callback is initiated from /login/callback and then posts to the
+    // API. Keep the cookie available regardless of Pages' function rewrite.
+    path: "/",
     ...domain ? { domain } : {},
     ...overrides
   };
@@ -17188,7 +17190,10 @@ var MOBILE_HEADERS = {
 async function fetchMobileJson(path) {
   try {
     const separator = path.includes("?") ? "&" : "?";
-    const res = await fetchWithTimeout(`${MOBILE_API}/${path}${separator}for_mobile=1`, MOBILE_HEADERS);
+    const res = await fetchWithTimeout(
+      `${MOBILE_API}/${path}${separator}for_mobile=1`,
+      MOBILE_HEADERS
+    );
     if (!res.ok) return null;
     const contentType = res.headers.get("content-type") || "";
     if (!contentType.includes("json")) return null;
@@ -17222,9 +17227,7 @@ function parseMobileSearch(json) {
 }
 async function searchDouban(name) {
   if (!name) return [];
-  const data = await fetchMobileJson(
-    `search?q=${encodeURIComponent(name)}&start=0&count=10`
-  );
+  const data = await fetchMobileJson(`search?q=${encodeURIComponent(name)}&start=0&count=10`);
   return parseMobileSearch(data);
 }
 async function getDoubanAbstract(subjectId) {

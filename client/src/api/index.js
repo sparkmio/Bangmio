@@ -7,7 +7,10 @@ const baseURL = import.meta.env.VITE_API_BASE || '/api/v1'
 
 const api = axios.create({
   baseURL,
-  timeout: 15000
+  timeout: 15000,
+  // OAuth starts on the site, returns to the site, and relies on the
+  // HttpOnly state cookie during the callback request.
+  withCredentials: true
 })
 
 /**

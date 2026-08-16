@@ -40,3 +40,6 @@ ScrapyDouban-analysis/
 
 # 本地构建/打包缓存
 .cache/
+
+# Temporary verification build output
+client/.codex-build-verify/

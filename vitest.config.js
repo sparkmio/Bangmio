@@ -22,13 +22,7 @@ export default defineConfig({
     include: ['**/*.test.js'],
     // 组件测试需要 DOM 环境，其余（纯函数/后端）保持 node 环境
     environmentMatchGlobs: [['client/src/components/**/*.test.js', 'jsdom']],
-    // 允许 client/src 下的 .test.js 被执行；仅排除 client 构建产物与 node_modules
-    exclude: [
-      '**/node_modules/**',
-      'functions/**',
-      'dist/**',
-      'client/dist/**',
-      'client/node_modules/**'
-    ]
+    // 允许 client/src 与 Pages Functions 下的 .test.js 被执行；仅排除构建产物与 node_modules
+    exclude: ['**/node_modules/**', 'dist/**', 'client/dist/**', 'client/node_modules/**']
   }
 })

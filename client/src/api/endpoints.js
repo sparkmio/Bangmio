@@ -10,8 +10,8 @@ export const userAPI = {
   getOAuthUrl(config = {}) {
     return api.get('/user/oauth-url', config)
   },
-  oauthCallback(code, config = {}) {
-    return api.post('/user/oauth-callback', { code }, config)
+  oauthCallback(code, state, config = {}) {
+    return api.post('/user/oauth-callback', { code, state }, config)
   },
   getUser(username, config = {}) {
     return api.get(`/user/${username}`, config)

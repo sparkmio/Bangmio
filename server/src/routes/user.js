@@ -44,7 +44,9 @@ function oauthCookieOptions(c, overrides = {}) {
     secure: callbackUrl.startsWith('https://'),
     sameSite: 'Lax',
     maxAge: 10 * 60,
-    path: '/api/v1/user',
+    // The callback is initiated from /login/callback and then posts to the
+    // API. Keep the cookie available regardless of Pages' function rewrite.
+    path: '/',
     ...(domain ? { domain } : {}),
     ...overrides
   }
