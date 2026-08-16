@@ -7,12 +7,13 @@ import { getMoegirlSummary } from '../services/moegirl.js'
 import { CACHE_TTL_MOEGIRL } from '../config.js'
 
 const app = new Hono()
-// 源统一为 zh.moegirl.org.cn（uk/mzh 镜像不稳定，已按用户要求移除）
+// 主站用于搜索与摘要；正文代理同时使用主站与移动站以缩短失败路径。
 const MOEGIRL_CN = 'https://zh.moegirl.org.cn/api.php'
 
 const cache = createCache(CACHE_TTL_MOEGIRL)
 
 const MOEGIRL_CN_BASE = 'https://zh.moegirl.org.cn'
+const MOEGIRL_MOBILE_BASE = 'https://mzh.moegirl.org.cn'
 
 /** 注入萌娘百科清洗后页面的响应式基础 CSS（含表格与图片适配） */
 const MOEGIRL_BASE_CSS = `
@@ -272,7 +273,7 @@ app.get('/:name/summary', async c => {
  * 萌娘百科页面代理。
  * 抓取指定页面名的萌娘百科页面，仅保留 .mw-parser-output 内容（不存在则保留整个 body），
  * 移除导航/页脚/侧栏/编辑按钮/脚本/样式/广告后返回清洗的 HTML 片段。
- * 源统一为 zh.moegirl.org.cn（vector 皮肤优先，默认皮肤回退）；
+ * 同时并发抓取主站 vector 页面与 mzh 移动站；两者任一成功即返回，
  * 使用 30 分钟内存缓存 + 1 小时 Cache API 边缘缓存（跨实例共享，重复加载秒开）。
  * 抓取失败时返回 200 + 降级 HTML（直达链接），而非 502，保证前端 iframe 正常展示。
  *
@@ -306,16 +307,18 @@ app.get('/page/:name', async c => {
   }
 
   const encoded = encodeURIComponent(name)
+  // .uk 镜像已经失效；主站与 mzh 移动站目前均可访问。并发取首个成功响应，
+  // 避免主站偶发慢响应时把整页拖到 iframe 超时。
   const candidates = [
-    `https://zh.moegirl.org.cn/${encoded}?useskin=vector`,
-    `https://zh.moegirl.org.cn/${encoded}`
+    `${MOEGIRL_CN_BASE}/${encoded}?useskin=vector`,
+    `${MOEGIRL_MOBILE_BASE}/${encoded}`
   ]
 
   try {
     const { html, url } = await fetchHTMLMulti(candidates, {
-      timeout: 8000,
-      overallTimeout: 15000,
-      retries: 1,
+      timeout: 9000,
+      overallTimeout: 10000,
+      retries: 0,
       headers: {
         Referer: 'https://zh.moegirl.org.cn/',
         'Cache-Control': 'no-cache'

@@ -17165,211 +17165,140 @@ var comments_default = app5;
 
 // server/src/services/douban.js
 var DOUBAN_API = "https://movie.douban.com";
-var SEARCH_SUGGEST_API = "https://www.douban.com";
-var UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
-function stripTags2(s) {
-  return (s || "").replace(/<[^>]+>/g, "").trim();
-}
+var MOBILE_API = "https://m.douban.com/rexxar/api/v2";
+var MOBILE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1";
 function collapseSpace(s) {
   return (s || "").replace(/\s+/g, " ").trim();
 }
 async function fetchWithTimeout(url, headers2 = {}) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 6e3);
+  const timer = setTimeout(() => controller.abort(), 8e3);
   try {
-    return await fetch(url, { headers: headers2, signal: controller.signal });
+    return await fetch(url, { headers: headers2, signal: controller.signal, redirect: "follow" });
   } finally {
     clearTimeout(timer);
   }
 }
-function parseSearchSuggest(json) {
-  const cards = json?.cards || [];
-  return cards.filter((c) => c?.url).map((c) => {
-    const m = String(c.url || "").match(/\/subject\/(\d+)\//);
-    const rateMatch = String(c.card_subtitle || "").match(/([\d.]+)分/);
+var MOBILE_HEADERS = {
+  "User-Agent": MOBILE_UA,
+  Referer: "https://m.douban.com/",
+  Accept: "application/json, text/plain, */*",
+  "Accept-Language": "zh-CN,zh;q=0.9"
+};
+async function fetchMobileJson(path) {
+  try {
+    const separator = path.includes("?") ? "&" : "?";
+    const res = await fetchWithTimeout(`${MOBILE_API}/${path}${separator}for_mobile=1`, MOBILE_HEADERS);
+    if (!res.ok) return null;
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("json")) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+function getRating(data) {
+  const value = Number(data?.rating?.value);
+  return Number.isFinite(value) ? value.toFixed(1).replace(/\.0$/, "") : "0";
+}
+function getStar(data) {
+  const starCount = Number(data?.rating?.star_count);
+  return Number.isFinite(starCount) ? starCount * 2 : 0;
+}
+function parseMobileSearch(json) {
+  const items = json?.subjects?.items || [];
+  return items.filter((item) => ["movie", "tv"].includes(item?.target_type) && item?.target?.id).map((item) => {
+    const target = item.target;
     return {
-      id: m ? m[1] : "",
-      title: c.title || "",
-      year: c.year || "",
-      rate: rateMatch ? rateMatch[1] : "",
-      cover: c.cover_url || ""
+      id: String(target.id),
+      title: target.title || "",
+      year: target.year || "",
+      rate: getRating(target),
+      star: getStar(target),
+      cover: target.cover_url || "",
+      type: item.target_type
     };
-  }).filter((c) => c.id);
+  });
 }
 async function searchDouban(name) {
-  try {
-    const res2 = await fetchWithTimeout(
-      `${SEARCH_SUGGEST_API}/j/search_suggest?q=${encodeURIComponent(name)}`,
-      {
-        "User-Agent": UA,
-        Referer: "https://www.douban.com/",
-        Accept: "application/json, text/plain, */*",
-        "Accept-Language": "zh-CN,zh;q=0.9"
-      }
-    );
-    if (res2.ok) {
-      const data2 = await res2.json();
-      const parsed = parseSearchSuggest(data2);
-      if (parsed.length) return parsed;
-    }
-  } catch {
-  }
-  const url = `${DOUBAN_API}/j/subject_suggest?q=${encodeURIComponent(name)}`;
-  const res = await fetchWithTimeout(url, {
-    "User-Agent": UA,
-    Referer: "https://movie.douban.com/"
-  });
-  const data = await res.json();
-  return data || [];
+  if (!name) return [];
+  const data = await fetchMobileJson(
+    `search?q=${encodeURIComponent(name)}&start=0&count=10`
+  );
+  return parseMobileSearch(data);
 }
 async function getDoubanAbstract(subjectId) {
-  const url = `${DOUBAN_API}/j/subject_abstract?subject_id=${subjectId}`;
-  const res = await fetchWithTimeout(url, {
-    "User-Agent": UA,
-    Referer: `https://movie.douban.com/subject/${subjectId}/`
-  });
-  const data = await res.json();
-  return data?.subject || data || null;
+  if (!subjectId) return null;
+  const data = await fetchMobileJson(`movie/${encodeURIComponent(subjectId)}`);
+  if (!data?.id) return null;
+  return {
+    id: String(data.id),
+    title: data.title || "",
+    rate: getRating(data),
+    star: getStar(data),
+    episodes_count: Number(data.episodes_count) || 0,
+    release_year: data.year || "",
+    types: Array.isArray(data.genres) ? data.genres : [],
+    region: Array.isArray(data.countries) ? data.countries.join(" / ") : "",
+    directors: (data.directors || []).map((person) => person?.name).filter(Boolean),
+    actors: (data.actors || []).map((person) => person?.name).filter(Boolean),
+    duration: Array.isArray(data.durations) ? data.durations.join(" / ") : "",
+    intro: collapseSpace(data.intro || ""),
+    short_comment: null,
+    url: `${DOUBAN_API}/subject/${data.id}/`
+  };
 }
 async function getDoubanComments(subjectId) {
-  const allComments = [];
-  const starts = [0, 20];
-  for (const start of starts) {
-    try {
-      const url = `${DOUBAN_API}/subject/${subjectId}/comments?start=${start}&limit=20&status=P`;
-      const res = await fetchWithTimeout(url, {
-        "User-Agent": UA,
-        Referer: `${DOUBAN_API}/subject/${subjectId}/`,
-        Accept: "text/html",
-        "Accept-Language": "zh-CN,zh;q=0.9"
-      });
-      if (!res.ok) continue;
-      const html = await res.text();
-      const parts = html.split(/(?=<div class="comment-item)/i);
-      for (const part of parts) {
-        if (!/comment-item/i.test(part)) continue;
-        const userMatch = part.match(/<a[^>]*href="[^"]*\/people\/[^"]+"[^>]*>([^<]+)<\/a>/i);
-        const user = userMatch ? userMatch[1].trim() : "\u533F\u540D";
-        const ratingMatch = part.match(/allstar(\d{2})/i) || part.match(/rating["\s]*([\d-]+)/i);
-        let rating = 0;
-        if (ratingMatch) rating = parseInt(ratingMatch[1]) || 0;
-        const timeMatch = part.match(/<span class="comment-time[^"]*"[^>]*>([^<]+)<\/span>/i);
-        const time = timeMatch ? timeMatch[1].trim() : "";
-        const contentMatch = part.match(/<p class="[^"]*"[^>]*>([\s\S]*?)<\/p>/i);
-        let content = contentMatch ? contentMatch[1].replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").trim() : "";
-        const usefulMatch = part.match(/<span class="votes vote-count">(\d+)<\/span>/i) || part.match(/<span class="vote-count"[^>]*>(\d+)<\/span>/i) || part.match(/class="[^"]*vote-count[^"]*"[^>]*>(\d+)/i);
-        const useful = usefulMatch ? parseInt(usefulMatch[1]) : 0;
-        if (content) {
-          allComments.push({ user, rating, time, content, useful });
-        }
-        if (allComments.length >= 40) break;
-      }
-    } catch {
-    }
-    if (allComments.length >= 40) break;
-  }
-  return allComments;
+  if (!subjectId) return [];
+  const data = await fetchMobileJson(
+    `movie/${encodeURIComponent(subjectId)}/interests?start=0&count=30&order=hot&status=done`
+  );
+  if (!Array.isArray(data?.interests)) return [];
+  return data.interests.map((item) => ({
+    user: item?.user?.name || "\u533F\u540D\u7528\u6237",
+    rating: Math.round(Number(item?.rating?.star_count) || 0) * 10,
+    time: item?.create_time || "",
+    content: String(item?.comment || "").trim(),
+    useful: Number(item?.vote_count) || 0
+  })).filter((item) => item.content);
 }
 async function getDoubanReviews(subjectId) {
-  const url = `${DOUBAN_API}/subject/${subjectId}/reviews`;
-  const res = await fetchWithTimeout(url, {
-    "User-Agent": UA,
-    Referer: `${DOUBAN_API}/subject/${subjectId}/`,
-    Accept: "text/html",
-    "Accept-Language": "zh-CN,zh;q=0.9"
-  });
-  if (!res.ok) return [];
-  const html = await res.text();
-  const reviews = [];
-  const parts = html.split(/(?=<div class="review-item)/i);
-  for (const part of parts.slice(0, 25)) {
-    if (!/review-item/i.test(part)) continue;
-    const userMatch = part.match(/<a[^>]*href="[^"]*\/people\/[^"]+"[^>]*>([^<]+)<\/a>/i);
-    const user = userMatch ? userMatch[1].trim() : "\u533F\u540D";
-    const ratingMatch = part.match(/allstar(\d{2})/i);
-    const rating = ratingMatch ? parseInt(ratingMatch[1]) : 0;
-    const timeMatch = part.match(/<span class="date"[^>]*>([^<]+)<\/span>/i);
-    const time = timeMatch ? timeMatch[1].trim() : "";
-    const titleMatch = part.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
-    const title = titleMatch ? stripTags2(titleMatch[1]) : "";
-    const contentMatch = part.match(/<div class="review-content"[^>]*>([\s\S]*?)<\/div>/i);
-    let content = contentMatch ? contentMatch[1].replace(/<a[^>]*>\(展开\)<\/a>/gi, "").replace(/<a[^>]*>展开<\/a>/gi, "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").trim() : "";
-    if (content.length > 500) content = content.slice(0, 500) + "...";
-    const usefulMatch = part.match(/<span class="num"[^>]*>(\d+)<\/span>/i) || part.match(/class="[^"]*action-btn[^"]*up[^"]*"[^>]*>[\s\S]*?(\d+)/i) || part.match(/class="[^"]*vote-count[^"]*"[^>]*>(\d+)/i);
-    const useful = usefulMatch ? parseInt(usefulMatch[1]) : 0;
-    reviews.push({ user, rating, time, title, content, useful });
-    if (reviews.length >= 20) break;
-  }
-  return reviews;
-}
-function parseDoubanInfo(document) {
-  const infoEl = document.querySelector("#info");
-  if (!infoEl) return {};
-  const result = {};
-  const pls = Array.from(infoEl.querySelectorAll(".pl"));
-  pls.forEach((pl, i) => {
-    const key2 = collapseSpace(pl.textContent).replace(/[:：\s]/g, "");
-    const nextPl = pls[i + 1];
-    let value = "";
-    let node = pl.nextSibling;
-    while (node && node !== nextPl) {
-      if (node.nodeType === 1 && node.classList?.contains("pl")) break;
-      value += node.textContent || "";
-      node = node.nextSibling;
-    }
-    value = collapseSpace(value).replace(/^[:：]\s*/, "");
-    if (key2 && value) result[key2] = value;
-  });
-  return result;
+  if (!subjectId) return [];
+  const data = await fetchMobileJson(
+    `movie/${encodeURIComponent(subjectId)}/reviews?start=0&count=15`
+  );
+  if (!Array.isArray(data?.reviews)) return [];
+  return data.reviews.map((item) => ({
+    user: item?.user?.name || "\u533F\u540D\u7528\u6237",
+    rating: Math.round(Number(item?.rating?.star_count) || 0) * 10,
+    time: item?.create_time || "",
+    title: item?.title || "",
+    content: String(item?.abstract || "").trim(),
+    useful: Number(item?.useful_count) || 0,
+    url: item?.url || ""
+  })).filter((item) => item.content);
 }
 async function getDoubanSummary(id) {
+  const abstract = await getDoubanAbstract(id);
   const url = `${DOUBAN_API}/subject/${id}/`;
-  let abstract = null;
-  try {
-    abstract = await getDoubanAbstract(id);
-  } catch {
-    abstract = null;
+  if (!abstract) {
+    return { title: "", rate: "0", star: 0, url, intro: "", keyInfo: {} };
   }
-  const result = {
-    title: abstract?.title || "",
-    rate: abstract?.rate || "0",
-    star: abstract?.star || 0,
-    url,
-    intro: "",
-    keyInfo: {}
+  const keyInfo = {};
+  if (abstract.directors?.length) keyInfo["\u5BFC\u6F14"] = abstract.directors.join(" / ");
+  if (abstract.actors?.length) keyInfo["\u4E3B\u6F14"] = abstract.actors.join(" / ");
+  if (abstract.types?.length) keyInfo["\u7C7B\u578B"] = abstract.types.join(" / ");
+  if (abstract.region) keyInfo["\u5236\u7247\u56FD\u5BB6/\u5730\u533A"] = abstract.region;
+  if (abstract.release_year) keyInfo["\u9996\u64AD"] = abstract.release_year;
+  if (abstract.duration) keyInfo["\u5355\u96C6\u7247\u957F"] = abstract.duration;
+  return {
+    title: abstract.title,
+    rate: abstract.rate,
+    star: abstract.star,
+    url: abstract.url || url,
+    intro: abstract.intro,
+    keyInfo
   };
-  try {
-    const html = await fetchHTML(url, {
-      headers: {
-        "User-Agent": UA,
-        Referer: `${DOUBAN_API}/`,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
-      }
-    });
-    if (html && html.length >= 500) {
-      const { document } = parseHTML(html);
-      const introEl = document.querySelector("#link-report .all") || document.querySelector("#link-report") || document.querySelector('[property="v:summary"]');
-      if (introEl) {
-        result.intro = collapseSpace(stripTags2(introEl.innerHTML));
-      }
-      result.keyInfo = parseDoubanInfo(document);
-      if (!result.title) {
-        const titleEl = document.querySelector("h1 span") || document.querySelector("title");
-        if (titleEl) {
-          result.title = collapseSpace(stripTags2(titleEl.innerHTML)).replace(
-            /\s*\(\s*豆瓣\s*\)$/i,
-            ""
-          );
-        }
-      }
-    }
-    if (!result.intro && abstract?.short_comment?.content) {
-      result.intro = collapseSpace(stripTags2(String(abstract.short_comment.content)));
-    }
-  } catch {
-  }
-  return result;
 }
 
 // server/src/utils/edgeCache.js
@@ -17736,7 +17665,7 @@ var cache3 = createCache(CACHE_TTL_BILIBILI);
 function isChina6(c) {
   return (c.env?.CF_IP_COUNTRY || "") === "CN";
 }
-function stripTags3(s) {
+function stripTags2(s) {
   return (s || "").replace(/<[^>]+>/g, "").trim();
 }
 async function searchBilibiliBangumi(name) {
@@ -17749,7 +17678,7 @@ async function searchBilibiliBangumi(name) {
   const result = json.data?.result?.[0];
   if (!result) return null;
   return {
-    title: stripTags3(result.title),
+    title: stripTags2(result.title),
     season_id: result.season_id,
     media_id: result.media_id,
     url: result.link || `https://www.bilibili.com/bangumi/media/md${result.media_id}`,
@@ -17806,7 +17735,7 @@ var bilibili_default = app7;
 
 // server/src/services/moegirl.js
 var DEFAULT_BASE = "https://zh.moegirl.org.cn";
-function stripTags4(s) {
+function stripTags3(s) {
   return (s || "").replace(/<[^>]+>/g, "").trim();
 }
 function collapseSpace2(s) {
@@ -17890,7 +17819,7 @@ async function getMoegirlSummary(name, base = DEFAULT_BASE) {
     if (!paragraphs.length) {
       paragraphs = Array.from(clone.querySelectorAll("div, section, li"));
     }
-    const extract = paragraphs.slice(0, 3).map((p) => collapseSpace2(stripTags4(p.innerHTML))).filter(Boolean).join("\n\n");
+    const extract = paragraphs.slice(0, 3).map((p) => collapseSpace2(stripTags3(p.innerHTML))).filter(Boolean).join("\n\n");
     result.extract = extract;
   } catch {
   }
@@ -17902,6 +17831,7 @@ var app8 = new Hono2();
 var MOEGIRL_CN = "https://zh.moegirl.org.cn/api.php";
 var cache4 = createCache(CACHE_TTL_MOEGIRL);
 var MOEGIRL_CN_BASE = "https://zh.moegirl.org.cn";
+var MOEGIRL_MOBILE_BASE = "https://mzh.moegirl.org.cn";
 var MOEGIRL_BASE_CSS = `
 * { box-sizing: border-box; }
 html { font-size: 16px; }
@@ -18105,14 +18035,14 @@ app8.get("/page/:name", async (c) => {
   }
   const encoded = encodeURIComponent(name);
   const candidates = [
-    `https://zh.moegirl.org.cn/${encoded}?useskin=vector`,
-    `https://zh.moegirl.org.cn/${encoded}`
+    `${MOEGIRL_CN_BASE}/${encoded}?useskin=vector`,
+    `${MOEGIRL_MOBILE_BASE}/${encoded}`
   ];
   try {
     const { html, url } = await fetchHTMLMulti(candidates, {
-      timeout: 8e3,
-      overallTimeout: 15e3,
-      retries: 1,
+      timeout: 9e3,
+      overallTimeout: 1e4,
+      retries: 0,
       headers: {
         Referer: "https://zh.moegirl.org.cn/",
         "Cache-Control": "no-cache"

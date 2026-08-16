@@ -190,7 +190,7 @@ describe('Detail Tab 子组件冒烟测试', () => {
     expect(empty.find('a').attributes('href')).toContain(encodeURIComponent('测试名'))
   })
 
-  it('TabMoegirl 优先展示 API 摘要，不等待 HTML iframe', async () => {
+  it('TabMoegirl 展示摘要的同时继续加载完整正文 iframe', async () => {
     moegirlAPI.search.mockResolvedValue({
       data: { data: { results: [{ title: '测试词条' }] } }
     })
@@ -205,7 +205,13 @@ describe('Detail Tab 子组件冒烟测试', () => {
     })
 
     const w = mount(TabMoegirl, {
-      props: { subjectId: 1, names: ['测试番剧'], active: false }
+      props: { subjectId: 1, names: ['测试番剧'], active: false },
+      global: {
+        stubs: {
+          IframeEmbed: { template: '<iframe data-testid="moegirl-full-page" />' },
+          ExternalEmbedFallback: { template: '<div />' }
+        }
+      }
     })
     await w.setProps({ active: true })
     await flushPromises()
@@ -213,7 +219,7 @@ describe('Detail Tab 子组件冒烟测试', () => {
     expect(moegirlAPI.search).toHaveBeenCalledWith('测试番剧')
     expect(moegirlAPI.getSummary).toHaveBeenCalledWith('测试词条')
     expect(w.text()).toContain('来自 MediaWiki API 的词条导言')
-    expect(w.find('iframe').exists()).toBe(false)
+    expect(w.find('[data-testid="moegirl-full-page"]').exists()).toBe(true)
   })
 
   it('TabMusic 按关系分组渲染音乐条目', () => {

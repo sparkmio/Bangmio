@@ -3,33 +3,46 @@
     <div v-if="loading" class="flex justify-center py-10">
       <span class="loading loading-spinner loading-lg text-primary" />
     </div>
-    <ExternalEmbedFallback
-      v-else-if="summary?.extract"
-      source="moegirl"
-      :title="summary.title || pageName"
-      :content="summary.extract"
-      :url="summary.url || `https://zh.moegirl.org.cn/${encodeURIComponent(pageName)}`"
-      reason="error"
-      @retry="retryContent"
-    />
-    <ExternalEmbedFallback
-      v-else-if="fallback"
-      source="moegirl"
-      :title="pageName"
-      :content="''"
-      :url="`https://zh.moegirl.org.cn/${encodeURIComponent(pageName)}`"
-      :reason="fallbackReason"
-      @retry="retryContent"
-    />
-    <IframeEmbed
-      v-else-if="pageName"
-      ref="iframeRef"
-      :src="`/api/v1/moegirl/page/${encodeURIComponent(pageName)}`"
-      :mode="embedMode"
-      title="萌娘百科"
-      loading-text="正在加载萌娘百科..."
-      @fallback="onIframeFallback"
-    />
+
+    <div v-else-if="pageName" class="space-y-4">
+      <!-- 摘要只作为首屏补充，不能再短路完整正文代理。 -->
+      <section v-if="summary?.extract" class="rounded-box border border-base-300 bg-base-100 p-4">
+        <div class="mb-2 flex items-center justify-between gap-3">
+          <h3 class="font-semibold">{{ summary.title || pageName }}</h3>
+          <a
+            :href="summary.url || `https://zh.moegirl.org.cn/${encodeURIComponent(pageName)}`"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="link link-primary text-sm"
+            >原站词条 ↗</a
+          >
+        </div>
+        <p class="whitespace-pre-line text-sm leading-7 text-base-content/75">
+          {{ summary.extract }}
+        </p>
+      </section>
+
+      <ExternalEmbedFallback
+        v-if="fallback"
+        source="moegirl"
+        :title="summary?.title || pageName"
+        :content="summary?.extract || ''"
+        :url="summary?.url || `https://zh.moegirl.org.cn/${encodeURIComponent(pageName)}`"
+        :reason="fallbackReason"
+        @retry="retryContent"
+      />
+      <IframeEmbed
+        v-else
+        ref="iframeRef"
+        :src="`/api/v1/moegirl/page/${encodeURIComponent(pageName)}`"
+        :mode="embedMode"
+        :timeout-ms="12000"
+        title="萌娘百科完整正文"
+        loading-text="正在加载萌娘百科完整正文..."
+        @fallback="onIframeFallback"
+      />
+    </div>
+
     <div v-else class="py-10 text-center">
       <p class="text-base-content/40 text-sm mb-3">未找到萌娘百科条目</p>
       <a
@@ -69,10 +82,9 @@ async function loadSummary(name, currentRequestId) {
     const res = await moegirlAPI.getSummary(name)
     if (currentRequestId !== requestId) return
     const data = res.data?.data || null
-    // 摘要接口是主路径：成功时不再等待 HTML 代理/iframe 的 load 事件。
     if (data?.extract) summary.value = data
   } catch {
-    // HTML 代理仍可作为后备路径。
+    // 正文代理独立运行；摘要失败不影响完整词条加载。
   }
 }
 
@@ -83,6 +95,7 @@ async function search() {
   fallback.value = false
   fallbackReason.value = 'error'
   summary.value = null
+
   try {
     let results = null
     for (const name of names) {
@@ -103,8 +116,8 @@ async function search() {
     }
     if (currentRequestId !== requestId) return
     pageName.value = results?.[0]?.title || ''
-    // 先请求稳定的 MediaWiki 摘要；只有没有可用摘要时才加载 HTML 代理。
-    await loadSummary(pageName.value, currentRequestId)
+    // 让完整正文在同一渲染周期开始加载；摘要仅异步补充首屏信息。
+    void loadSummary(pageName.value, currentRequestId)
   } catch {
     if (currentRequestId === requestId) pageName.value = ''
   } finally {
@@ -112,10 +125,10 @@ async function search() {
   }
 }
 
-async function onIframeFallback(reason = 'error') {
+function onIframeFallback(reason = 'error') {
   fallback.value = true
   fallbackReason.value = reason || 'error'
-  if (!summary.value?.extract) await loadSummary(pageName.value, requestId)
+  if (!summary.value?.extract) void loadSummary(pageName.value, requestId)
 }
 
 async function retryContent() {
@@ -123,20 +136,10 @@ async function retryContent() {
   const currentRequestId = ++requestId
   fallback.value = false
   fallbackReason.value = 'error'
-  summary.value = null
-  loading.value = true
-  try {
-    await loadSummary(pageName.value, currentRequestId)
-  } finally {
-    if (currentRequestId === requestId) loading.value = false
-  }
-
-  // 摘要仍不可用时再挂载/重试 HTML 代理。
-  if (currentRequestId === requestId && !summary.value?.extract) {
-    nextTick(() => {
-      iframeRef.value?.retry()
-    })
-  }
+  // 保留已取得的摘要，避免用户在重试时看到内容闪烁。
+  void loadSummary(pageName.value, currentRequestId)
+  await nextTick()
+  iframeRef.value?.retry()
 }
 
 watch(

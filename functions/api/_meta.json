@@ -4934,22 +4934,7 @@
       ],
       "format": "esm"
     },
-    "server/src/services/douban.js": {
-      "bytes": 12046,
-      "imports": [
-        {
-          "path": "node_modules/linkedom/esm/index.js",
-          "kind": "import-statement",
-          "original": "linkedom"
-        },
-        {
-          "path": "server/src/utils/http.js",
-          "kind": "import-statement",
-          "original": "../utils/http.js"
-        }
-      ],
-      "format": "esm"
-    },
+    "server/src/services/douban.js": { "bytes": 7071, "imports": [], "format": "esm" },
     "server/src/utils/edgeCache.js": { "bytes": 1728, "imports": [], "format": "esm" },
     "server/src/routes/douban.js": {
       "bytes": 15811,
@@ -5037,7 +5022,7 @@
       "format": "esm"
     },
     "server/src/routes/moegirl.js": {
-      "bytes": 11549,
+      "bytes": 11791,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -5516,18 +5501,18 @@
         "node_modules/linkedom/esm/index.js": { "bytesInOutput": 242 },
         "server/src/utils/cache.js": { "bytesInOutput": 906 },
         "server/src/routes/comments.js": { "bytesInOutput": 17502 },
-        "server/src/services/douban.js": { "bytesInOutput": 8165 },
+        "server/src/services/douban.js": { "bytesInOutput": 5233 },
         "server/src/utils/edgeCache.js": { "bytesInOutput": 819 },
         "server/src/routes/douban.js": { "bytesInOutput": 12585 },
         "server/src/routes/bilibili.js": { "bytesInOutput": 3024 },
         "server/src/services/moegirl.js": { "bytesInOutput": 2999 },
-        "server/src/routes/moegirl.js": { "bytesInOutput": 8135 },
+        "server/src/routes/moegirl.js": { "bytesInOutput": 8180 },
         "server/src/routes/groups.js": { "bytesInOutput": 13712 },
         "server/src/services/music.js": { "bytesInOutput": 3261 },
         "server/src/routes/music.js": { "bytesInOutput": 604 },
         "server/src/app.js": { "bytesInOutput": 2480 }
       },
-      "bytes": 704926
+      "bytes": 702039
     }
   }
 }

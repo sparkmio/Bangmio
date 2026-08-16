@@ -1,347 +1,201 @@
-import { parseHTML } from 'linkedom'
-import { fetchHTML } from '../utils/http.js'
-
 const DOUBAN_API = 'https://movie.douban.com'
-const SEARCH_SUGGEST_API = 'https://www.douban.com'
-const UA =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
-
-function stripTags(s) {
-  return (s || '').replace(/<[^>]+>/g, '').trim()
-}
+const MOBILE_API = 'https://m.douban.com/rexxar/api/v2'
+const MOBILE_UA =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
 
 function collapseSpace(s) {
   return (s || '').replace(/\s+/g, ' ').trim()
 }
 
 /**
- * 带超时的 fetch（6s）。豆瓣 JSON 接口偶发连接挂起，
- * 无超时会导致路由整体超过前端 iframe 的 15s 预算。
+ * 带超时的 fetch。豆瓣上游偶发连接挂起；必须给每次请求明确预算，
+ * 以便页面能稳定降级而不是无限等待。
  * @param {string} url
  * @param {Record<string, string>} headers
  * @returns {Promise<Response>}
  */
 async function fetchWithTimeout(url, headers = {}) {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 6000)
+  const timer = setTimeout(() => controller.abort(), 8000)
   try {
-    return await fetch(url, { headers, signal: controller.signal })
+    return await fetch(url, { headers, signal: controller.signal, redirect: 'follow' })
   } finally {
     clearTimeout(timer)
   }
 }
 
+/** 豆瓣移动端公开 JSON 端点的公共请求头。 */
+const MOBILE_HEADERS = {
+  'User-Agent': MOBILE_UA,
+  Referer: 'https://m.douban.com/',
+  Accept: 'application/json, text/plain, */*',
+  'Accept-Language': 'zh-CN,zh;q=0.9'
+}
+
 /**
- * 解析 www.douban.com/j/search_suggest 的返回结构。
- * cards[].card_subtitle 形如 "9.0分 / 2022 / 日本 / 动画 音乐 / 斋藤圭一郎 / 青山吉能 铃代纱弓"。
- * @param {object} json - search_suggest 原始 JSON。
- * @returns {Array<{ id: string, title: string, year: string, rate: string, cover: string }>}
+ * 调用豆瓣移动端 rexxar 接口并保证非 JSON/异常响应不会泄漏到路由层。
+ * 豆瓣会将 movie/{id} 自动跳转到 tv/{id}；fetch 的 redirect: follow
+ * 使电影与动画都可用同一个入口。
  */
-function parseSearchSuggest(json) {
-  const cards = json?.cards || []
-  return cards
-    .filter(c => c?.url)
-    .map(c => {
-      const m = String(c.url || '').match(/\/subject\/(\d+)\//)
-      const rateMatch = String(c.card_subtitle || '').match(/([\d.]+)分/)
+async function fetchMobileJson(path) {
+  try {
+    const separator = path.includes('?') ? '&' : '?'
+    const res = await fetchWithTimeout(
+      `${MOBILE_API}/${path}${separator}for_mobile=1`,
+      MOBILE_HEADERS
+    )
+    if (!res.ok) return null
+    const contentType = res.headers.get('content-type') || ''
+    if (!contentType.includes('json')) return null
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
+function getRating(data) {
+  const value = Number(data?.rating?.value)
+  return Number.isFinite(value) ? value.toFixed(1).replace(/\.0$/, '') : '0'
+}
+
+function getStar(data) {
+  const starCount = Number(data?.rating?.star_count)
+  // 旧组件的 star 字段是 10 分制；移动端 star_count 是 5 分制。
+  return Number.isFinite(starCount) ? starCount * 2 : 0
+}
+
+/**
+ * 将移动端搜索响应转换为本站统一候选格式。
+ * 只保留电影/电视剧（动画在豆瓣通常归 tv），排除同名图书和小组内容。
+ */
+function parseMobileSearch(json) {
+  const items = json?.subjects?.items || []
+  return items
+    .filter(item => ['movie', 'tv'].includes(item?.target_type) && item?.target?.id)
+    .map(item => {
+      const target = item.target
       return {
-        id: m ? m[1] : '',
-        title: c.title || '',
-        year: c.year || '',
-        rate: rateMatch ? rateMatch[1] : '',
-        cover: c.cover_url || ''
+        id: String(target.id),
+        title: target.title || '',
+        year: target.year || '',
+        rate: getRating(target),
+        star: getStar(target),
+        cover: target.cover_url || '',
+        type: item.target_type
       }
     })
-    .filter(c => c.id)
 }
 
 /**
  * 在豆瓣搜索条目（番剧→豆瓣关联匹配）。
- * 优先 www.douban.com/j/search_suggest（自带评分摘要），失败或为空时回退
- * movie.douban.com/j/subject_suggest（旧接口）。
- * @param {string} name - 搜索关键词（番剧名等）。
- * @returns {Promise<Array<Object>>} 候选条目数组，可能为空。
+ * 桌面 suggest 和网页抓取会频繁进入 sec.douban.com 验证；移动端搜索实际返回
+ * 结构化结果，因此将其作为唯一主路径。失败时返回空数组，路由可正常降级。
  */
 export async function searchDouban(name) {
-  // 优先 search_suggest
-  try {
-    const res = await fetchWithTimeout(
-      `${SEARCH_SUGGEST_API}/j/search_suggest?q=${encodeURIComponent(name)}`,
-      {
-        'User-Agent': UA,
-        Referer: 'https://www.douban.com/',
-        Accept: 'application/json, text/plain, */*',
-        'Accept-Language': 'zh-CN,zh;q=0.9'
-      }
-    )
-    if (res.ok) {
-      const data = await res.json()
-      const parsed = parseSearchSuggest(data)
-      if (parsed.length) return parsed
-    }
-  } catch {
-    // 回退到 subject_suggest
-  }
-
-  const url = `${DOUBAN_API}/j/subject_suggest?q=${encodeURIComponent(name)}`
-  const res = await fetchWithTimeout(url, {
-    'User-Agent': UA,
-    Referer: 'https://movie.douban.com/'
-  })
-  const data = await res.json()
-  return data || []
+  if (!name) return []
+  const data = await fetchMobileJson(`search?q=${encodeURIComponent(name)}&start=0&count=10`)
+  return parseMobileSearch(data)
 }
 
 /**
- * 获取豆瓣条目的摘要信息（基于豆瓣 subject_abstract JSON 接口）。
+ * 获取豆瓣条目的结构化详情（移动端 movie/tv 接口）。
  * @param {string|number} subjectId - 豆瓣条目 ID。
- * @returns {Promise<Object|null>} 条目摘要对象；接口未返回 subject 时回退为整个 data，仍无则返回 null。
+ * @returns {Promise<Object|null>} 与旧 subject_abstract 兼容的字段集合。
  */
 export async function getDoubanAbstract(subjectId) {
-  const url = `${DOUBAN_API}/j/subject_abstract?subject_id=${subjectId}`
-  const res = await fetchWithTimeout(url, {
-    'User-Agent': UA,
-    Referer: `https://movie.douban.com/subject/${subjectId}/`
-  })
-  const data = await res.json()
-  return data?.subject || data || null
+  if (!subjectId) return null
+  const data = await fetchMobileJson(`movie/${encodeURIComponent(subjectId)}`)
+  if (!data?.id) return null
+
+  return {
+    id: String(data.id),
+    title: data.title || '',
+    rate: getRating(data),
+    star: getStar(data),
+    episodes_count: Number(data.episodes_count) || 0,
+    release_year: data.year || '',
+    types: Array.isArray(data.genres) ? data.genres : [],
+    region: Array.isArray(data.countries) ? data.countries.join(' / ') : '',
+    directors: (data.directors || []).map(person => person?.name).filter(Boolean),
+    actors: (data.actors || []).map(person => person?.name).filter(Boolean),
+    duration: Array.isArray(data.durations) ? data.durations.join(' / ') : '',
+    intro: collapseSpace(data.intro || ''),
+    short_comment: null,
+    url: `${DOUBAN_API}/subject/${data.id}/`
+  }
 }
 
 /**
- * 抓取豆瓣条目的短评（HTML 抓取，分 2 页共约 40 条）。
- * 单页失败会被跳过，不影响其他页结果。
+ * 获取豆瓣短评（移动端 interests JSON）。不再抓会触发风控的桌面 comments HTML。
  * @param {string|number} subjectId - 豆瓣条目 ID。
- * @returns {Promise<Array<{ user: string, rating: number, time: string, content: string, useful: number }>>}
- *   短评对象数组，字段：user（用户名）、rating（评分 0/10/20/30/40/50）、time（日期）、content（内容）、useful（有用数）。
  */
 export async function getDoubanComments(subjectId) {
-  const allComments = []
-  // 抓 2 页，共 40 条短评
-  const starts = [0, 20]
+  if (!subjectId) return []
+  const data = await fetchMobileJson(
+    `movie/${encodeURIComponent(subjectId)}/interests?start=0&count=30&order=hot&status=done`
+  )
+  if (!Array.isArray(data?.interests)) return []
 
-  for (const start of starts) {
-    try {
-      const url = `${DOUBAN_API}/subject/${subjectId}/comments?start=${start}&limit=20&status=P`
-      const res = await fetchWithTimeout(url, {
-        'User-Agent': UA,
-        Referer: `${DOUBAN_API}/subject/${subjectId}/`,
-        Accept: 'text/html',
-        'Accept-Language': 'zh-CN,zh;q=0.9'
-      })
-      if (!res.ok) continue
-      const html = await res.text()
-
-      // 按 comment-item 分割逐条解析
-      const parts = html.split(/(?=<div class="comment-item)/i)
-      for (const part of parts) {
-        if (!/comment-item/i.test(part)) continue
-
-        // 用户名
-        const userMatch = part.match(/<a[^>]*href="[^"]*\/people\/[^"]+"[^>]*>([^<]+)<\/a>/i)
-        const user = userMatch ? userMatch[1].trim() : '匿名'
-
-        // 评分：allstar50 -> 50, allstar40 -> 40 等
-        const ratingMatch = part.match(/allstar(\d{2})/i) || part.match(/rating["\s]*([\d-]+)/i)
-        let rating = 0
-        if (ratingMatch) rating = parseInt(ratingMatch[1]) || 0
-
-        // 日期
-        const timeMatch = part.match(/<span class="comment-time[^"]*"[^>]*>([^<]+)<\/span>/i)
-        const time = timeMatch ? timeMatch[1].trim() : ''
-
-        // 内容
-        const contentMatch = part.match(/<p class="[^"]*"[^>]*>([\s\S]*?)<\/p>/i)
-        let content = contentMatch
-          ? contentMatch[1]
-              .replace(/<br\s*\/?>/gi, '\n')
-              .replace(/<[^>]+>/g, '')
-              .trim()
-          : ''
-
-        // 有用数
-        const usefulMatch =
-          part.match(/<span class="votes vote-count">(\d+)<\/span>/i) ||
-          part.match(/<span class="vote-count"[^>]*>(\d+)<\/span>/i) ||
-          part.match(/class="[^"]*vote-count[^"]*"[^>]*>(\d+)/i)
-        const useful = usefulMatch ? parseInt(usefulMatch[1]) : 0
-
-        if (content) {
-          allComments.push({ user, rating, time, content, useful })
-        }
-        if (allComments.length >= 40) break
-      }
-    } catch {
-      // 跳过该页错误，继续下一页
-    }
-    if (allComments.length >= 40) break
-  }
-
-  return allComments
+  return data.interests
+    .map(item => ({
+      user: item?.user?.name || '匿名用户',
+      rating: Math.round(Number(item?.rating?.star_count) || 0) * 10,
+      time: item?.create_time || '',
+      content: String(item?.comment || '').trim(),
+      useful: Number(item?.vote_count) || 0
+    }))
+    .filter(item => item.content)
 }
 
 /**
- * 抓取豆瓣条目的长评（HTML 抓取，最多 20 条）。
- * 内容超过 500 字会被截断并以 '...' 结尾。
+ * 获取豆瓣长评（移动端 reviews JSON）。abstract 是接口提供的可展示正文，不做人为 500 字截断。
  * @param {string|number} subjectId - 豆瓣条目 ID。
- * @returns {Promise<Array<{ user: string, rating: number, time: string, title: string, content: string, useful: number }>>}
- *   长评对象数组，字段：user、rating、time、title（标题）、content（内容，最多约 500 字）、useful。
  */
 export async function getDoubanReviews(subjectId) {
-  const url = `${DOUBAN_API}/subject/${subjectId}/reviews`
-  const res = await fetchWithTimeout(url, {
-    'User-Agent': UA,
-    Referer: `${DOUBAN_API}/subject/${subjectId}/`,
-    Accept: 'text/html',
-    'Accept-Language': 'zh-CN,zh;q=0.9'
-  })
-  if (!res.ok) return []
-  const html = await res.text()
+  if (!subjectId) return []
+  const data = await fetchMobileJson(
+    `movie/${encodeURIComponent(subjectId)}/reviews?start=0&count=15`
+  )
+  if (!Array.isArray(data?.reviews)) return []
 
-  const reviews = []
-  // 按 review-item 分割逐条解析
-  const parts = html.split(/(?=<div class="review-item)/i)
-
-  for (const part of parts.slice(0, 25)) {
-    if (!/review-item/i.test(part)) continue
-
-    // 用户名
-    const userMatch = part.match(/<a[^>]*href="[^"]*\/people\/[^"]+"[^>]*>([^<]+)<\/a>/i)
-    const user = userMatch ? userMatch[1].trim() : '匿名'
-
-    // 评分：allstar50 -> 50, allstar40 -> 40, allstar30 -> 30, allstar20 -> 20, allstar10 -> 10
-    const ratingMatch = part.match(/allstar(\d{2})/i)
-    const rating = ratingMatch ? parseInt(ratingMatch[1]) : 0
-
-    // 时间
-    const timeMatch = part.match(/<span class="date"[^>]*>([^<]+)<\/span>/i)
-    const time = timeMatch ? timeMatch[1].trim() : ''
-
-    // 标题
-    const titleMatch = part.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i)
-    const title = titleMatch ? stripTags(titleMatch[1]) : ''
-
-    // 内容：截断 500 字
-    const contentMatch = part.match(/<div class="review-content"[^>]*>([\s\S]*?)<\/div>/i)
-    let content = contentMatch
-      ? contentMatch[1]
-          .replace(/<a[^>]*>\(展开\)<\/a>/gi, '')
-          .replace(/<a[^>]*>展开<\/a>/gi, '')
-          .replace(/<br\s*\/?>/gi, '\n')
-          .replace(/<[^>]+>/g, '')
-          .trim()
-      : ''
-    if (content.length > 500) content = content.slice(0, 500) + '...'
-
-    // 有用数
-    const usefulMatch =
-      part.match(/<span class="num"[^>]*>(\d+)<\/span>/i) ||
-      part.match(/class="[^"]*action-btn[^"]*up[^"]*"[^>]*>[\s\S]*?(\d+)/i) ||
-      part.match(/class="[^"]*vote-count[^"]*"[^>]*>(\d+)/i)
-    const useful = usefulMatch ? parseInt(usefulMatch[1]) : 0
-
-    reviews.push({ user, rating, time, title, content, useful })
-    if (reviews.length >= 20) break
-  }
-
-  return reviews
+  return data.reviews
+    .map(item => ({
+      user: item?.user?.name || '匿名用户',
+      rating: Math.round(Number(item?.rating?.star_count) || 0) * 10,
+      time: item?.create_time || '',
+      title: item?.title || '',
+      content: String(item?.abstract || '').trim(),
+      useful: Number(item?.useful_count) || 0,
+      url: item?.url || ''
+    }))
+    .filter(item => item.content)
 }
 
 /**
- * 解析豆瓣条目页 #info 区块，提取导演、编剧、类型、首播等键值对。
- * @param {Document} document - linkedom 解析后的 document。
- * @returns {Record<string, string>}
- */
-function parseDoubanInfo(document) {
-  const infoEl = document.querySelector('#info')
-  if (!infoEl) return {}
-
-  const result = {}
-  const pls = Array.from(infoEl.querySelectorAll('.pl'))
-  pls.forEach((pl, i) => {
-    const key = collapseSpace(pl.textContent).replace(/[:：\s]/g, '')
-    const nextPl = pls[i + 1]
-    let value = ''
-    let node = pl.nextSibling
-    while (node && node !== nextPl) {
-      if (node.nodeType === 1 && node.classList?.contains('pl')) break
-      value += node.textContent || ''
-      node = node.nextSibling
-    }
-    value = collapseSpace(value).replace(/^[:：]\s*/, '')
-    if (key && value) result[key] = value
-  })
-
-  return result
-}
-
-/**
- * 获取豆瓣条目的结构化摘要。
- * 优先复用 getDoubanAbstract 的 title/rate/star，再从条目页 HTML 中抽取 intro 与 keyInfo。
- * 任一环节失败时返回已获取的可用字段，不抛错误。
- *
- * @param {string|number} id - 豆瓣条目 ID。
- * @returns {Promise<{ title: string, rate: string, star: number, url: string, intro: string, keyInfo: Record<string, string> }>}
+ * 获取豆瓣条目的结构化摘要。移动端详情接口已提供简介、导演、演员和类型，
+ * 所以不再以桌面 subject 页 HTML 作为必要依赖。
  */
 export async function getDoubanSummary(id) {
+  const abstract = await getDoubanAbstract(id)
   const url = `${DOUBAN_API}/subject/${id}/`
-  let abstract = null
-  try {
-    abstract = await getDoubanAbstract(id)
-  } catch {
-    abstract = null
+  if (!abstract) {
+    return { title: '', rate: '0', star: 0, url, intro: '', keyInfo: {} }
   }
 
-  const result = {
-    title: abstract?.title || '',
-    rate: abstract?.rate || '0',
-    star: abstract?.star || 0,
-    url,
-    intro: '',
-    keyInfo: {}
+  const keyInfo = {}
+  if (abstract.directors?.length) keyInfo['导演'] = abstract.directors.join(' / ')
+  if (abstract.actors?.length) keyInfo['主演'] = abstract.actors.join(' / ')
+  if (abstract.types?.length) keyInfo['类型'] = abstract.types.join(' / ')
+  if (abstract.region) keyInfo['制片国家/地区'] = abstract.region
+  if (abstract.release_year) keyInfo['首播'] = abstract.release_year
+  if (abstract.duration) keyInfo['单集片长'] = abstract.duration
+
+  return {
+    title: abstract.title,
+    rate: abstract.rate,
+    star: abstract.star,
+    url: abstract.url || url,
+    intro: abstract.intro,
+    keyInfo
   }
-
-  try {
-    const html = await fetchHTML(url, {
-      headers: {
-        'User-Agent': UA,
-        Referer: `${DOUBAN_API}/`,
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
-      }
-    })
-    if (html && html.length >= 500) {
-      const { document } = parseHTML(html)
-
-      // 简介：优先展开版 .all，其次 #link-report，最后 property="v:summary"
-      const introEl =
-        document.querySelector('#link-report .all') ||
-        document.querySelector('#link-report') ||
-        document.querySelector('[property="v:summary"]')
-      if (introEl) {
-        result.intro = collapseSpace(stripTags(introEl.innerHTML))
-      }
-
-      result.keyInfo = parseDoubanInfo(document)
-
-      // 若 abstract 未拿到 title，尝试从页面 title/h1 补充
-      if (!result.title) {
-        const titleEl = document.querySelector('h1 span') || document.querySelector('title')
-        if (titleEl) {
-          result.title = collapseSpace(stripTags(titleEl.innerHTML)).replace(
-            /\s*\(\s*豆瓣\s*\)$/i,
-            ''
-          )
-        }
-      }
-    }
-
-    // 条目页 HTML 被反爬拦截时 intro 为空：用 subject_abstract 的热门短评兜底
-    if (!result.intro && abstract?.short_comment?.content) {
-      result.intro = collapseSpace(stripTags(String(abstract.short_comment.content)))
-    }
-  } catch {
-    // 静默忽略，返回已有字段
-  }
-
-  return result
 }

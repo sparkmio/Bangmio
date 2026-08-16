@@ -259,7 +259,7 @@ describe('GET /page/:name', () => {
     expect(html).toContain('https://zh.moegirl.org.cn/FailPage')
     expect(html).not.toContain('moegirl.uk')
 
-    // 两源尝试：vector 皮肤 + 默认皮肤（统一 zh.moegirl.org.cn）
+    // 两源尝试：主站 vector 页面 + mzh 移动站。
     expect(fetchHTML).toHaveBeenCalledTimes(2)
     expect(fetchHTML).toHaveBeenNthCalledWith(
       1,
@@ -268,7 +268,7 @@ describe('GET /page/:name', () => {
     )
     expect(fetchHTML).toHaveBeenNthCalledWith(
       2,
-      'https://zh.moegirl.org.cn/FailPage',
+      'https://mzh.moegirl.org.cn/FailPage',
       expect.objectContaining({ headers: expect.any(Object) })
     )
   })

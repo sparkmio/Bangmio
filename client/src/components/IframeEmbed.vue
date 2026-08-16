@@ -155,38 +155,41 @@ async function fetchHtml(url) {
 }
 
 /**
- * 将 HTML 片段包装为完整 HTML 文档，并注入高度同步脚本。
- * @param {string} fragment - HTML 片段。
- * @returns {string} 完整 HTML 文档。
+ * 将代理内容规范化为完整 HTML 文档。
+ * 后端清洗器有时会返回完整文档（例如萌娘百科），有时仅返回片段。完整文档
+ * 不能再包进第二个 body，否则浏览器会重排节点而导致正文或样式丢失。
+ * @param {string} content - HTML 片段或完整文档。
+ * @returns {string} 可安全放入 iframe 的完整 HTML 文档。
  */
-function buildFullDocument(fragment) {
-  return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<base target="_blank">
-<style>
-body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.6;padding:0.5rem;margin:0;color:#333;background:transparent}
-img{max-width:100%;height:auto}
-a{color:#3b82f6;text-decoration:none}
-a:hover{text-decoration:underline}
-table{border-collapse:collapse;width:100%;font-size:0.875rem}
-td,th{border:1px solid #ddd;padding:0.4rem 0.6rem}
-th{background:#f5f5f5}
-h2{font-size:1.1rem;font-weight:600;margin:1rem 0 0.5rem}
-h3{font-size:1rem;font-weight:600;margin:0.8rem 0 0.4rem}
-p{margin:0.6rem 0}
-ul,ol{padding-left:1.5rem;margin:0.5rem 0}
-</style>
-</head>
-<body>
-${fragment}
-${HEIGHT_SYNC_SCRIPT}
-</body>
-</html>`
-}
+function buildFullDocument(content) {
+  const headInjection =
+    '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+    '<base target="_blank">' +
+    '<style>' +
+    'body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.6;padding:0.5rem;margin:0;color:#333;background:transparent}' +
+    'img{max-width:100%;height:auto}' +
+    'a{color:#3b82f6;text-decoration:none}' +
+    'a:hover{text-decoration:underline}' +
+    'table{border-collapse:collapse;width:100%;font-size:0.875rem}' +
+    'td,th{border:1px solid #ddd;padding:0.4rem 0.6rem}' +
+    'th{background:#f5f5f5}' +
+    '</style>'
 
+  if (/<html[\s>]/i.test(content)) {
+    let documentHtml = content
+    if (/<head[\s>]/i.test(documentHtml)) {
+      documentHtml = documentHtml.replace(/<head([^>]*)>/i, `<head$1>${headInjection}`)
+    } else {
+      documentHtml = documentHtml.replace(/<html([^>]*)>/i, `<html$1><head>${headInjection}</head>`)
+    }
+    if (/<\/body\s*>/i.test(documentHtml)) {
+      return documentHtml.replace(/<\/body\s*>/i, `${HEIGHT_SYNC_SCRIPT}</body>`)
+    }
+    return `${documentHtml}${HEIGHT_SYNC_SCRIPT}`
+  }
+
+  return BASE_DOC + content + HEIGHT_SYNC_SCRIPT + BASE_DOC_END
+}
 /**
  * 创建 src 模式使用的 blob URL，并释放旧的 blob URL。
  * @param {string} html - 完整 HTML 文档。
@@ -219,11 +222,13 @@ async function load({ isRetry = false } = {}) {
   try {
     const html = await fetchHtml(props.src)
     if (props.mode === 'srcdoc') {
-      htmlContent.value = BASE_DOC + html + BASE_DOC_END
+      htmlContent.value = buildFullDocument(html)
     } else {
       setSrcHtml(buildFullDocument(html))
     }
-    // 保持 loading=true，等待 iframe load 事件触发 onLoad
+    // HTML 准备后必须先挂载 iframe；此前保持 loading=true 会让 v-if 隐藏 iframe，
+    // 导致 load 事件永远不会发生并最终误报超时。
+    loading.value = false
   } catch (e) {
     handleError(e?.message || '加载失败')
   }
