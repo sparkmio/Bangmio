@@ -91,7 +91,8 @@ function createMockD1() {
       bgmTokenEncrypted: row.bgm_token_encrypted,
       bgmTokenIv: row.bgm_token_iv,
       createdAt: row.created_at,
-      updatedAt: row.updated_at
+      updatedAt: row.updated_at,
+      sessionVersion: row.session_version ?? 0
     }
   }
 
@@ -158,6 +159,7 @@ function createMockD1() {
                 email,
                 password_hash: passwordHash,
                 salt,
+                session_version: 0,
                 bgm_uid: null,
                 bgm_token_encrypted: null,
                 bgm_token_iv: null,

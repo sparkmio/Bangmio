@@ -17,6 +17,20 @@ function extractUsername(c) {
   return c.req.header('X-Bangumi-Username') || ''
 }
 
+const COLLECTION_STATUS = new Set([1, 2, 3, 4, 5])
+
+function parseBoundedInteger(value, { min, max, fallback = null }) {
+  if (value === undefined || value === null || value === '') return fallback
+  const parsed = Number(value)
+  if (!Number.isSafeInteger(parsed) || parsed < min || (max !== undefined && parsed > max))
+    return null
+  return parsed
+}
+
+function parseAnimeId(value) {
+  return parseBoundedInteger(value, { min: 1, max: Number.MAX_SAFE_INTEGER })
+}
+
 /**
  * 验证直登请求 username 与 token 的绑定关系（PROJECT_ISSUES 7.2，
  * 防止伪造 X-Bangumi-Username 头读取他人收藏）。
@@ -37,14 +51,20 @@ app.get('/list', async c => {
     const guard = await guardUsername(c, token, username)
     if (guard) return guard
     const client = getClient(token, isChina(c))
-    const params = {
-      offset: Number(c.req.query('offset')) || 0,
-      limit: Number(c.req.query('limit')) || 30
+    const offset = parseBoundedInteger(c.req.query('offset'), {
+      min: 0,
+      max: 10000000,
+      fallback: 0
+    })
+    const limit = parseBoundedInteger(c.req.query('limit'), { min: 1, max: 100, fallback: 30 })
+    const subjectType = parseBoundedInteger(c.req.query('subject_type'), { min: 1, max: 7 })
+    const type = parseBoundedInteger(c.req.query('type'), { min: 1, max: 5 })
+    if (offset === null || limit === null || subjectType === null || type === null) {
+      return c.json({ error: '收藏列表参数不合法' }, 400)
     }
-    const st = c.req.query('subject_type')
-    const t = c.req.query('type')
-    if (st) params.subject_type = Number(st)
-    if (t) params.type = Number(t)
+    const params = { offset, limit }
+    if (c.req.query('subject_type') !== undefined) params.subject_type = subjectType
+    if (c.req.query('type') !== undefined) params.type = type
     const data = await client.get(`/v0/users/${username}/collections`, params)
     return c.json({ data: data.data || [], total: data.total || 0 })
   } catch (err) {
@@ -98,10 +118,10 @@ app.get('/:animeId', async c => {
     if (!username) return c.json({ error: '缺少用户名' }, 400)
     const guard = await guardUsername(c, token, username)
     if (guard) return guard
+    const animeId = parseAnimeId(c.req.param('animeId'))
+    if (animeId === null) return c.json({ error: '番剧 ID 不合法' }, 400)
     const client = getClient(token, isChina(c))
-    const collection = await client.get(
-      `/v0/users/${username}/collections/${c.req.param('animeId')}`
-    )
+    const collection = await client.get(`/v0/users/${username}/collections/${animeId}`)
     return c.json({
       data: {
         anime_id: collection.subject_id,
@@ -129,21 +149,38 @@ app.post('/:animeId', async c => {
       const guard = await guardUsername(c, token, username)
       if (guard) return guard
     }
+    const animeId = parseAnimeId(c.req.param('animeId'))
+    if (animeId === null) return c.json({ error: '番剧 ID 不合法' }, 400)
     const client = getClient(token, isChina(c))
-    const body = await c.req.json()
+    const body = await c.req.json().catch(() => ({}))
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return c.json({ error: '请求参数不合法' }, 400)
+    }
 
     const payload = {}
-    if (body.status !== undefined && body.status >= 1) payload.type = Number(body.status)
-    if (body.rating !== undefined) payload.rate = Number(body.rating)
-    if (body.comment !== undefined && body.comment !== null) payload.comment = String(body.comment)
+    if (body.status !== undefined) {
+      const status = parseBoundedInteger(body.status, { min: 1, max: 5 })
+      if (status === null || !COLLECTION_STATUS.has(status)) {
+        return c.json({ error: '收藏状态不合法' }, 400)
+      }
+      payload.type = status
+    }
+    if (body.rating !== undefined) {
+      const rating = parseBoundedInteger(body.rating, { min: 0, max: 10 })
+      if (rating === null) return c.json({ error: '评分必须是 0 到 10 的整数' }, 400)
+      payload.rate = rating
+    }
+    if (body.comment !== undefined && body.comment !== null) {
+      const comment = String(body.comment)
+      if (comment.length > 2000) return c.json({ error: '评论不能超过 2000 个字符' }, 400)
+      payload.comment = comment
+    }
 
     if (!payload.type) {
       // status 未显式提供：尝试获取当前状态以保留原值
       if (username) {
         try {
-          const current = await client.get(
-            `/v0/users/${username}/collections/${c.req.param('animeId')}`
-          )
+          const current = await client.get(`/v0/users/${username}/collections/${animeId}`)
           if (current?.type) {
             payload.type = current.type
           } else {
@@ -163,13 +200,11 @@ app.post('/:animeId', async c => {
         return c.json({ error: '请先选择收藏状态' }, 400)
       }
     }
-    await client.post(`/v0/users/-/collections/${c.req.param('animeId')}`, payload)
+    await client.post(`/v0/users/-/collections/${animeId}`, payload)
 
     if (username) {
       try {
-        const collection = await client.get(
-          `/v0/users/${username}/collections/${c.req.param('animeId')}`
-        )
+        const collection = await client.get(`/v0/users/${username}/collections/${animeId}`)
         return c.json({
           data: {
             anime_id: collection.subject_id,
@@ -211,8 +246,10 @@ app.delete('/:animeId', async c => {
   try {
     const token = extractToken(c)
     if (!token) return c.json({ error: '未登录' }, 401)
+    const animeId = parseAnimeId(c.req.param('animeId'))
+    if (animeId === null) return c.json({ error: '番剧 ID 不合法' }, 400)
     const client = getClient(token, isChina(c))
-    await client.delete(`/v0/users/-/collections/${c.req.param('animeId')}`)
+    await client.delete(`/v0/users/-/collections/${animeId}`)
     return c.json({ message: '已删除' })
   } catch (err) {
     const r = upstreamError(err.response?.status, err.response?.data, '删除收藏失败')

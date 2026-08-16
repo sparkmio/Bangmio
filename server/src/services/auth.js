@@ -45,12 +45,30 @@ import { sendEmail, buildVerificationEmailHTML } from '../utils/email.js'
 import { fetchHTML } from '../utils/http.js'
 import { exchangeBangumiOAuthCode } from './oauth.js'
 import { logError, logInfo } from '../utils/logger.js'
+import { normalizeEmail } from '../utils/emailAddress.js'
 
 /** Bangumi `/v0/me` 接口地址，用于验证 Access Token 有效性 */
 const BGM_ME_API = 'https://api.bgm.tv/v0/me'
 
 /** OAuth 绑定流程 state JWT 有效期：5 分钟 */
 const OAUTH_BIND_STATE_TTL = 5 * 60
+
+function sessionVersionOf(user) {
+  const version = Number(user?.sessionVersion ?? 0)
+  return Number.isSafeInteger(version) && version >= 0 ? version : 0
+}
+
+async function issueUserToken(env, user, { includeBgmUid = true } = {}) {
+  return signJwt(
+    {
+      userId: user.id,
+      email: user.email,
+      ...(includeBgmUid ? { bgmUid: user.bgmUid ?? null } : {}),
+      sessionVersion: sessionVersionOf(user)
+    },
+    env.JWT_SECRET
+  )
+}
 
 /**
  * 构造一个带 `status` 属性的 Error，供路由层根据 status 决定响应码。
@@ -80,7 +98,8 @@ function httpError(status, message) {
  * @throws {Error} 当邮件服务未配置或发送失败时抛出 httpError。
  */
 export async function sendVerificationCode(db, env, { email, purpose = 'register' }) {
-  const latest = await getLatestCode(db, email, purpose)
+  const normalizedEmail = normalizeEmail(email)
+  const latest = await getLatestCode(db, normalizedEmail, purpose)
   if (!canResend(latest)) {
     return { sent: false, cooldownSeconds: resendCooldownSeconds(latest) }
   }
@@ -88,18 +107,22 @@ export async function sendVerificationCode(db, env, { email, purpose = 'register
     throw httpError(500, '邮件服务未配置（缺少 RESEND_API_KEY）')
   }
   const code = generateNumericCode()
-  await createCode(db, { email, code, purpose })
+  await createCode(db, { email: normalizedEmail, code, purpose })
   try {
     await sendEmail(
-      { to: email, subject: `Bangmio验证码是${code}`, html: buildVerificationEmailHTML(code) },
+      {
+        to: normalizedEmail,
+        subject: `Bangmio验证码是${code}`,
+        html: buildVerificationEmailHTML(code)
+      },
       env.RESEND_API_KEY,
       env.RESEND_FROM
     )
   } catch (err) {
-    logError('验证码邮件发送失败', { email, error: String(err) })
+    logError('验证码邮件发送失败', { email: normalizedEmail, error: String(err) })
     throw httpError(500, '验证码发送失败，请稍后重试')
   }
-  logInfo('验证码已发送', { email, purpose })
+  logInfo('验证码已发送', { email: normalizedEmail, purpose })
   return { sent: true, cooldownSeconds: 0 }
 }
 
@@ -122,7 +145,8 @@ export async function sendVerificationCode(db, env, { email, purpose = 'register
  * @throws {Error} 当邮箱已存在、验证码错误或入库失败时抛出 httpError。
  */
 export async function registerUser(db, env, { email, password, code }) {
-  const exists = await userExistsByEmail(db, email)
+  const normalizedEmail = normalizeEmail(email)
+  const exists = await userExistsByEmail(db, normalizedEmail)
   if (exists) {
     throw httpError(409, '邮箱已注册')
   }
@@ -131,7 +155,7 @@ export async function registerUser(db, env, { email, password, code }) {
     if (!code) {
       throw httpError(400, '请输入邮箱验证码')
     }
-    const codeOk = await verifyCode(db, email, String(code), 'register')
+    const codeOk = await verifyCode(db, normalizedEmail, String(code), 'register')
     if (!codeOk) {
       throw httpError(400, '验证码错误或已过期')
     }
@@ -139,8 +163,8 @@ export async function registerUser(db, env, { email, password, code }) {
   const salt = generateSalt()
   const passwordHash = await hashPassword(password, salt)
   const userId = crypto.randomUUID()
-  const user = await createUser(db, { id: userId, email, passwordHash, salt })
-  const token = await signJwt({ userId: user.id, email: user.email }, env.JWT_SECRET)
+  const user = await createUser(db, { id: userId, email: normalizedEmail, passwordHash, salt })
+  const token = await issueUserToken(env, user, { includeBgmUid: false })
   logInfo('用户注册成功', { userId: user.id, email })
   return { token, user: { id: user.id, email: user.email, bgmUid: null } }
 }
@@ -161,7 +185,8 @@ export async function registerUser(db, env, { email, password, code }) {
  * @throws {Error} 当邮箱不存在或密码错误时抛出 httpError(401)。
  */
 export async function loginUser(db, env, { email, password }) {
-  const user = await getUserByEmail(db, email)
+  const normalizedEmail = normalizeEmail(email)
+  const user = await getUserByEmail(db, normalizedEmail)
   if (!user) {
     throw httpError(401, '邮箱或密码错误')
   }
@@ -169,10 +194,7 @@ export async function loginUser(db, env, { email, password }) {
   if (!ok) {
     throw httpError(401, '邮箱或密码错误')
   }
-  const token = await signJwt(
-    { userId: user.id, email: user.email, bgmUid: user.bgmUid },
-    env.JWT_SECRET
-  )
+  const token = await issueUserToken(env, user)
   logInfo('用户登录成功', { userId: user.id, email })
   return { token, user: { id: user.id, email: user.email, bgmUid: user.bgmUid } }
 }
@@ -217,10 +239,7 @@ export async function bindBangumi(db, env, userId, bangumiToken) {
   if (!updated) {
     throw httpError(404, '用户不存在')
   }
-  const token = await signJwt(
-    { userId: updated.id, email: updated.email, bgmUid: updated.bgmUid },
-    env.JWT_SECRET
-  )
+  const token = await issueUserToken(env, updated)
   logInfo('Bangumi 绑定成功', { userId, bgmUid: String(bgmUid) })
   return {
     token,
@@ -271,10 +290,10 @@ export async function refreshJwt(db, env, oldToken) {
   if (!user) {
     throw httpError(404, '用户不存在')
   }
-  const token = await signJwt(
-    { userId: user.id, email: user.email, bgmUid: user.bgmUid },
-    env.JWT_SECRET
-  )
+  if (Number(payload.sessionVersion ?? 0) !== sessionVersionOf(user)) {
+    throw httpError(401, 'Token 已失效，请重新登录')
+  }
+  const token = await issueUserToken(env, user)
   return {
     token,
     user: { id: user.id, email: user.email, bgmUid: user.bgmUid }
@@ -440,10 +459,7 @@ export async function bindBangumiByOAuth(
   if (!updated) {
     throw httpError(404, '用户不存在')
   }
-  const token = await signJwt(
-    { userId: updated.id, email: updated.email, bgmUid: updated.bgmUid },
-    env.JWT_SECRET
-  )
+  const token = await issueUserToken(env, updated)
   logInfo('OAuth 绑定成功', { userId, bgmUid: String(bgmUid) })
   return {
     token,
@@ -506,20 +522,21 @@ export async function changeUserPassword(db, env, userId, currentPassword, newPa
  * @throws {Error} 当新密码过短、验证码错误、用户不存在或更新失败时抛出 httpError。
  */
 export async function resetUserPassword(db, env, { email, code, newPassword }) {
+  const normalizedEmail = normalizeEmail(email)
   if (!newPassword || String(newPassword).length < 8) {
     throw httpError(400, '新密码至少 8 位')
   }
-  const codeOk = await verifyCode(db, email, String(code), 'reset')
+  const codeOk = await verifyCode(db, normalizedEmail, String(code), 'reset')
   if (!codeOk) {
     throw httpError(400, '验证码错误或已过期')
   }
-  const user = await getUserByEmail(db, email)
+  const user = await getUserByEmail(db, normalizedEmail)
   if (!user) {
     throw httpError(404, '用户不存在')
   }
   const salt = generateSalt()
   const passwordHash = await hashPassword(newPassword, salt)
   await updateUserPassword(db, user.id, passwordHash, salt)
-  logInfo('用户重置密码成功', { userId: user.id, email })
+  logInfo('用户重置密码成功', { userId: user.id, email: normalizedEmail })
   return { success: true }
 }

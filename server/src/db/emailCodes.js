@@ -11,6 +11,8 @@
  * - 过期未使用的记录由后台清理（这里只提供查询与插入，不做自动清理）
  */
 
+import { normalizeEmail } from '../utils/emailAddress.js'
+
 /** 验证码有效期（毫秒）：10 分钟 */
 const CODE_TTL_MS = 10 * 60 * 1000
 
@@ -42,6 +44,7 @@ export function generateNumericCode() {
  *   最新记录或 null。
  */
 export async function getLatestCode(db, email, purpose) {
+  const normalizedEmail = normalizeEmail(email)
   try {
     const row = await db
       .prepare(
@@ -51,7 +54,7 @@ export async function getLatestCode(db, email, purpose) {
           ORDER BY created_at DESC
           LIMIT 1`
       )
-      .bind(email, purpose)
+      .bind(normalizedEmail, purpose)
       .first()
     return row || null
   } catch {
@@ -68,6 +71,7 @@ export async function getLatestCode(db, email, purpose) {
  * @throws {Error} 当 D1 写入失败时抛出。
  */
 export async function createCode(db, { email, code, purpose }) {
+  const normalizedEmail = normalizeEmail(email)
   const id = crypto.randomUUID()
   const now = Date.now()
   const expiresAt = now + CODE_TTL_MS
@@ -77,11 +81,13 @@ export async function createCode(db, { email, code, purpose }) {
         `INSERT INTO email_codes (id, email, code, purpose, expires_at, consumed, created_at)
          VALUES (?, ?, ?, ?, ?, 0, ?)`
       )
-      .bind(id, email, code, purpose, expiresAt, now)
+      .bind(id, normalizedEmail, code, purpose, expiresAt, now)
       .run()
     if (!result.success) throw new Error('D1 run() 返回 success=false')
   } catch (err) {
-    throw new Error(`createCode: 写入失败 (email=${email}, purpose=${purpose})`, { cause: err })
+    throw new Error(`createCode: 写入失败 (email=${normalizedEmail}, purpose=${purpose})`, {
+      cause: err
+    })
   }
   return { id, expiresAt }
 }
@@ -107,21 +113,33 @@ export async function verifyCode(db, email, code, purpose) {
   const record = await getLatestCode(db, email, purpose)
   if (!record) return false
   if (record.consumed) return false
-  if (Date.now() > record.expiresAt) return false
+  const now = Date.now()
+  if (now > record.expiresAt) return false
+  const inputCode = String(code ?? '')
+  const storedCode = String(record.code ?? '')
   // 常量时间比较，防止时序攻击
-  if (record.code.length !== code.length) return false
+  if (storedCode.length !== inputCode.length) return false
   let diff = 0
-  for (let i = 0; i < code.length; i++) {
-    diff |= record.code.charCodeAt(i) ^ code.charCodeAt(i)
+  for (let i = 0; i < inputCode.length; i++) {
+    diff |= storedCode.charCodeAt(i) ^ inputCode.charCodeAt(i)
   }
   if (diff !== 0) return false
-  // 标记已消费
+
+  // 带条件的原子消费：并发请求中只有一个请求可以把 consumed 从 0 改成 1。
   try {
-    await db.prepare('UPDATE email_codes SET consumed = 1 WHERE id = ?').bind(record.id).run()
+    const result = await db
+      .prepare(
+        'UPDATE email_codes SET consumed = 1 WHERE id = ? AND consumed = 0 AND expires_at > ? AND code = ?'
+      )
+      .bind(record.id, now, storedCode)
+      .run()
+    if (result?.success === false) return false
+    const changes = result?.meta?.changes ?? result?.changes
+    return typeof changes === 'number' ? changes === 1 : false
   } catch {
-    // 标记失败不影响验证结果（已通过校验）
+    // 消费失败必须视为验证失败，不能让验证码在未落库时被接受。
+    return false
   }
-  return true
 }
 
 /**

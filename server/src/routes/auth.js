@@ -33,6 +33,7 @@ import { userExistsByEmail } from '../db/users.js'
 import { logError } from '../utils/logger.js'
 import { getOAuthCredentials } from '../utils/oauthConfig.js'
 import { errorResponse } from '../utils/errors.js'
+import { normalizeEmail } from '../utils/emailAddress.js'
 
 const app = new Hono()
 
@@ -101,8 +102,9 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 app.post('/send-code', async c => {
   try {
     const body = await c.req.json().catch(() => ({}))
-    const { email, captchaToken, purpose = 'register' } = body || {}
-    if (!email || !EMAIL_REGEX.test(String(email))) {
+    const { email: rawEmail, captchaToken, purpose = 'register' } = body || {}
+    const email = normalizeEmail(rawEmail)
+    if (!email || !EMAIL_REGEX.test(email)) {
       return c.json({ data: null, error: '邮箱格式不正确', code: 400 }, 400)
     }
     // 生产环境失败关闭；未配置 secret 时仅作为本地开发跳过。
@@ -113,6 +115,9 @@ app.post('/send-code', async c => {
     )
     if (!turnstile.success) {
       return c.json({ data: null, error: '人机验证失败，请重试', code: 400 }, 400)
+    }
+    if (!['register', 'reset'].includes(purpose)) {
+      return c.json({ data: null, error: '验证码用途不合法', code: 400 }, 400)
     }
     const result = await sendVerificationCode(c.env.DB, c.env, { email, purpose })
     return c.json({ data: result, code: 200 })
@@ -133,7 +138,7 @@ app.post('/register', async c => {
   try {
     const body = await c.req.json().catch(() => ({}))
     const { email, password, code, captchaToken } = body || {}
-    if (!email || !EMAIL_REGEX.test(String(email))) {
+    if (!email || !EMAIL_REGEX.test(email)) {
       return c.json({ data: null, error: '邮箱格式不正确', code: 400 }, 400)
     }
     if (!password || String(password).length < 8) {
@@ -383,8 +388,9 @@ app.post('/change-password', jwtAuth(), async c => {
 app.post('/forgot-password', async c => {
   try {
     const body = await c.req.json().catch(() => ({}))
-    const { email, captchaToken } = body || {}
-    if (!email || !EMAIL_REGEX.test(String(email))) {
+    const { email: rawEmail, captchaToken } = body || {}
+    const email = normalizeEmail(rawEmail)
+    if (!email || !EMAIL_REGEX.test(email)) {
       return c.json({ data: null, error: '邮箱格式不正确', code: 400 }, 400)
     }
     // Turnstile 校验：失败时降级放行（记录日志）。
@@ -424,8 +430,9 @@ app.post('/forgot-password', async c => {
 app.post('/reset-password', async c => {
   try {
     const body = await c.req.json().catch(() => ({}))
-    const { email, code, newPassword } = body || {}
-    if (!email || !EMAIL_REGEX.test(String(email))) {
+    const { email: rawEmail, code, newPassword } = body || {}
+    const email = normalizeEmail(rawEmail)
+    if (!email || !EMAIL_REGEX.test(email)) {
       return c.json({ data: null, error: '邮箱格式不正确', code: 400 }, 400)
     }
     if (!code || !newPassword) {

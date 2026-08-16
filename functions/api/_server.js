@@ -3771,29 +3771,68 @@ function logWarn(msg, meta = {}) {
 
 // server/src/utils/rateLimit.js
 function rateLimit(windowMs, max) {
-  const store = /* @__PURE__ */ new Map();
+  const localStore = /* @__PURE__ */ new Map();
+  const keyPrefix = `rate:${windowMs}:${max}`;
   return async (c, next) => {
     const ip = c.req.header("cf-connecting-ip") || c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
     const now = Date.now();
-    if (store.size > 1e4) {
-      for (const [key2, entry2] of store) {
-        if (now > entry2.resetTime) store.delete(key2);
+    const d1 = c.env?.DB;
+    let count;
+    let resetTime;
+    if (d1?.prepare) {
+      try {
+        const row = await d1.prepare(
+          `INSERT INTO rate_limits (key, count, reset_at)
+             VALUES (?, 1, ?)
+             ON CONFLICT(key) DO UPDATE SET
+               count = CASE WHEN rate_limits.reset_at <= ? THEN 1 ELSE rate_limits.count + 1 END,
+               reset_at = CASE WHEN rate_limits.reset_at <= ? THEN ? ELSE rate_limits.reset_at END
+             RETURNING count, reset_at`
+        ).bind(`${keyPrefix}:${ip}`, now + windowMs, now, now, now + windowMs).first();
+        count = Number(row?.count);
+        resetTime = Number(row?.reset_at);
+        if (!Number.isFinite(count) || !Number.isFinite(resetTime)) throw new Error("D1 returned invalid rate-limit row");
+      } catch (err) {
+        localStoreCleanup(localStore, now);
+        const entry = localStore.get(ip);
+        if (!entry || now > entry.resetTime) {
+          localStore.set(ip, { count: 1, resetTime: now + windowMs });
+        } else {
+          entry.count += 1;
+        }
+        const fallback = localStore.get(ip);
+        count = fallback.count;
+        resetTime = fallback.resetTime;
+        if (err?.message && !String(err.message).includes("invalid rate-limit row")) {
+          logWarn("D1 \u901F\u7387\u9650\u5236\u4E0D\u53EF\u7528\uFF0C\u5DF2\u56DE\u9000\u5185\u5B58\u8BA1\u6570", { error: String(err) });
+        }
       }
+    } else {
+      localStoreCleanup(localStore, now);
+      const entry = localStore.get(ip);
+      if (!entry || now > entry.resetTime) {
+        localStore.set(ip, { count: 1, resetTime: now + windowMs });
+      } else {
+        entry.count += 1;
+      }
+      const fallback = localStore.get(ip);
+      count = fallback.count;
+      resetTime = fallback.resetTime;
     }
-    let entry = store.get(ip);
-    if (!entry || now > entry.resetTime) {
-      entry = { count: 0, resetTime: now + windowMs };
-      store.set(ip, entry);
-    }
-    entry.count++;
-    if (entry.count > max) {
-      const retryAfter = Math.ceil((entry.resetTime - now) / 1e3);
-      logWarn("\u901F\u7387\u9650\u5236\u89E6\u53D1", { ip, count: entry.count, max, path: c.req.path });
+    if (count > max) {
+      const retryAfter = Math.max(1, Math.ceil((resetTime - now) / 1e3));
+      logWarn("\u901F\u7387\u9650\u5236\u89E6\u53D1", { ip, count, max, path: c.req.path });
       c.header("Retry-After", String(retryAfter));
       return c.json({ data: null, error: "\u8BF7\u6C42\u8FC7\u4E8E\u9891\u7E41", code: 429 }, 429);
     }
     await next();
   };
+}
+function localStoreCleanup(store, now) {
+  if (store.size <= 1e4) return;
+  for (const [key2, entry] of store) {
+    if (now > entry.resetTime) store.delete(key2);
+  }
 }
 
 // server/src/middleware/security.js
@@ -3919,6 +3958,161 @@ async function verifyJwt(token, secret) {
   return { valid: true, payload };
 }
 
+// server/src/utils/emailAddress.js
+function normalizeEmail(email) {
+  return String(email ?? "").trim().toLowerCase();
+}
+
+// server/src/db/users.js
+var USER_COLUMNS_FULL = `
+  id,
+  email,
+  password_hash AS passwordHash,
+  salt,
+  bgm_uid AS bgmUid,
+  bgm_token_encrypted AS bgmTokenEncrypted,
+  bgm_token_iv AS bgmTokenIv,
+  created_at AS createdAt,
+  updated_at AS updatedAt,
+  session_version AS sessionVersion
+`;
+var USER_COLUMNS_PUBLIC = `
+  id,
+  email,
+  bgm_uid AS bgmUid,
+  created_at AS createdAt,
+  updated_at AS updatedAt,
+  session_version AS sessionVersion
+`;
+async function createUser(db, { id, email, passwordHash, salt }) {
+  const normalizedEmail = normalizeEmail(email);
+  const now = Date.now();
+  try {
+    const result = await db.prepare(
+      `INSERT INTO users
+           (id, email, password_hash, salt, session_version, bgm_uid, bgm_token_encrypted, bgm_token_iv, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 0, NULL, NULL, NULL, ?, ?)`
+    ).bind(id, normalizedEmail, passwordHash, salt, now, now).run();
+    if (!result.success) {
+      throw new Error("D1 run() \u8FD4\u56DE success=false");
+    }
+  } catch (err) {
+    throw new Error(`createUser: \u5199\u5165\u5931\u8D25 (email=${normalizedEmail})`, { cause: err });
+  }
+  const created = await getUserById(db, id);
+  if (!created) {
+    throw new Error(`createUser: \u5199\u5165\u540E\u56DE\u67E5\u5931\u8D25 (id=${id})`);
+  }
+  return created;
+}
+async function getUserByEmail(db, email) {
+  const normalizedEmail = normalizeEmail(email);
+  try {
+    const row = await db.prepare(`SELECT ${USER_COLUMNS_FULL} FROM users WHERE email = ?`).bind(normalizedEmail).first();
+    return row || null;
+  } catch {
+    return null;
+  }
+}
+async function getUserById(db, id) {
+  try {
+    const row = await db.prepare(`SELECT ${USER_COLUMNS_PUBLIC} FROM users WHERE id = ?`).bind(id).first();
+    return row || null;
+  } catch {
+    return null;
+  }
+}
+async function updateUserBgmBinding(db, id, bgmUid, bgmTokenEncrypted, bgmTokenIv) {
+  const now = Date.now();
+  try {
+    const result = await db.prepare(
+      `UPDATE users
+           SET bgm_uid = ?, bgm_token_encrypted = ?, bgm_token_iv = ?, updated_at = ?
+         WHERE id = ?`
+    ).bind(bgmUid, bgmTokenEncrypted, bgmTokenIv, now, id).run();
+    if (!result.success) {
+      throw new Error("D1 run() \u8FD4\u56DE success=false");
+    }
+  } catch (err) {
+    throw new Error(`updateUserBgmBinding: \u66F4\u65B0\u5931\u8D25 (id=${id})`, { cause: err });
+  }
+  return getUserById(db, id);
+}
+async function clearUserBgmBinding(db, id) {
+  const now = Date.now();
+  try {
+    const result = await db.prepare(
+      `UPDATE users
+           SET bgm_uid = NULL, bgm_token_encrypted = NULL, bgm_token_iv = NULL, updated_at = ?
+         WHERE id = ?`
+    ).bind(now, id).run();
+    if (!result.success) {
+      throw new Error("D1 run() \u8FD4\u56DE success=false");
+    }
+  } catch (err) {
+    throw new Error(`clearUserBgmBinding: \u66F4\u65B0\u5931\u8D25 (id=${id})`, { cause: err });
+  }
+}
+async function getUserBgmBinding(db, id) {
+  try {
+    const row = await db.prepare(
+      `SELECT bgm_uid AS bgmUid,
+                bgm_token_encrypted AS bgmTokenEncrypted,
+                bgm_token_iv AS bgmTokenIv
+           FROM users
+          WHERE id = ?`
+    ).bind(id).first();
+    if (!row) return null;
+    return {
+      bgmUid: row.bgmUid,
+      bgmTokenEncrypted: row.bgmTokenEncrypted,
+      bgmTokenIv: row.bgmTokenIv
+    };
+  } catch {
+    return null;
+  }
+}
+async function getUserCredentialsById(db, id) {
+  try {
+    const row = await db.prepare(`SELECT ${USER_COLUMNS_FULL} FROM users WHERE id = ?`).bind(id).first();
+    return row || null;
+  } catch {
+    return null;
+  }
+}
+async function updateUserPassword(db, id, passwordHash, salt) {
+  const now = Date.now();
+  try {
+    const result = await db.prepare(
+      `UPDATE users
+           SET password_hash = ?, salt = ?, session_version = session_version + 1, updated_at = ?
+         WHERE id = ?`
+    ).bind(passwordHash, salt, now, id).run();
+    if (!result.success) {
+      throw new Error("D1 run() \u8FD4\u56DE success=false");
+    }
+  } catch (err) {
+    throw new Error(`updateUserPassword: \u66F4\u65B0\u5931\u8D25 (id=${id})`, { cause: err });
+  }
+}
+async function getUserSessionVersion(db, id) {
+  try {
+    const row = await db.prepare("SELECT session_version AS sessionVersion FROM users WHERE id = ?").bind(id).first();
+    return row ? Number(row.sessionVersion ?? 0) : null;
+  } catch {
+    return null;
+  }
+}
+async function userExistsByEmail(db, email) {
+  const normalizedEmail = normalizeEmail(email);
+  try {
+    const row = await db.prepare("SELECT 1 FROM users WHERE email = ? LIMIT 1").bind(normalizedEmail).first();
+    return row !== null;
+  } catch {
+    return false;
+  }
+}
+
 // server/src/middleware/jwtAuth.js
 function jwtAuth() {
   return async (c, next) => {
@@ -3930,8 +4124,12 @@ function jwtAuth() {
     const token = match2[1];
     const secret = c.env?.JWT_SECRET;
     const { valid, payload } = await verifyJwt(token, secret);
-    if (!valid || !payload) {
+    if (!valid || !payload || !payload.userId) {
       return c.json({ data: null, error: "\u672A\u767B\u5F55", code: 401 }, 401);
+    }
+    const sessionVersion = await getUserSessionVersion(c.env?.DB, payload.userId);
+    if (sessionVersion === null || Number(payload.sessionVersion ?? 0) !== sessionVersion) {
+      return c.json({ data: null, error: "\u767B\u5F55\u72B6\u6001\u5DF2\u5931\u6548\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55", code: 401 }, 401);
     }
     c.set("user", {
       userId: payload.userId,
@@ -4038,143 +4236,6 @@ async function decryptToken(encryptedHex, ivHex, secret) {
   return dec.decode(plaintext);
 }
 
-// server/src/db/users.js
-var USER_COLUMNS_FULL = `
-  id,
-  email,
-  password_hash AS passwordHash,
-  salt,
-  bgm_uid AS bgmUid,
-  bgm_token_encrypted AS bgmTokenEncrypted,
-  bgm_token_iv AS bgmTokenIv,
-  created_at AS createdAt,
-  updated_at AS updatedAt
-`;
-var USER_COLUMNS_PUBLIC = `
-  id,
-  email,
-  bgm_uid AS bgmUid,
-  created_at AS createdAt,
-  updated_at AS updatedAt
-`;
-async function createUser(db, { id, email, passwordHash, salt }) {
-  const now = Date.now();
-  try {
-    const result = await db.prepare(
-      `INSERT INTO users
-           (id, email, password_hash, salt, bgm_uid, bgm_token_encrypted, bgm_token_iv, created_at, updated_at)
-         VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?)`
-    ).bind(id, email, passwordHash, salt, now, now).run();
-    if (!result.success) {
-      throw new Error("D1 run() \u8FD4\u56DE success=false");
-    }
-  } catch (err) {
-    throw new Error(`createUser: \u5199\u5165\u5931\u8D25 (email=${email})`, { cause: err });
-  }
-  const created = await getUserById(db, id);
-  if (!created) {
-    throw new Error(`createUser: \u5199\u5165\u540E\u56DE\u67E5\u5931\u8D25 (id=${id})`);
-  }
-  return created;
-}
-async function getUserByEmail(db, email) {
-  try {
-    const row = await db.prepare(`SELECT ${USER_COLUMNS_FULL} FROM users WHERE email = ?`).bind(email).first();
-    return row || null;
-  } catch {
-    return null;
-  }
-}
-async function getUserById(db, id) {
-  try {
-    const row = await db.prepare(`SELECT ${USER_COLUMNS_PUBLIC} FROM users WHERE id = ?`).bind(id).first();
-    return row || null;
-  } catch {
-    return null;
-  }
-}
-async function updateUserBgmBinding(db, id, bgmUid, bgmTokenEncrypted, bgmTokenIv) {
-  const now = Date.now();
-  try {
-    const result = await db.prepare(
-      `UPDATE users
-           SET bgm_uid = ?, bgm_token_encrypted = ?, bgm_token_iv = ?, updated_at = ?
-         WHERE id = ?`
-    ).bind(bgmUid, bgmTokenEncrypted, bgmTokenIv, now, id).run();
-    if (!result.success) {
-      throw new Error("D1 run() \u8FD4\u56DE success=false");
-    }
-  } catch (err) {
-    throw new Error(`updateUserBgmBinding: \u66F4\u65B0\u5931\u8D25 (id=${id})`, { cause: err });
-  }
-  return getUserById(db, id);
-}
-async function clearUserBgmBinding(db, id) {
-  const now = Date.now();
-  try {
-    const result = await db.prepare(
-      `UPDATE users
-           SET bgm_uid = NULL, bgm_token_encrypted = NULL, bgm_token_iv = NULL, updated_at = ?
-         WHERE id = ?`
-    ).bind(now, id).run();
-    if (!result.success) {
-      throw new Error("D1 run() \u8FD4\u56DE success=false");
-    }
-  } catch (err) {
-    throw new Error(`clearUserBgmBinding: \u66F4\u65B0\u5931\u8D25 (id=${id})`, { cause: err });
-  }
-}
-async function getUserBgmBinding(db, id) {
-  try {
-    const row = await db.prepare(
-      `SELECT bgm_uid AS bgmUid,
-                bgm_token_encrypted AS bgmTokenEncrypted,
-                bgm_token_iv AS bgmTokenIv
-           FROM users
-          WHERE id = ?`
-    ).bind(id).first();
-    if (!row) return null;
-    return {
-      bgmUid: row.bgmUid,
-      bgmTokenEncrypted: row.bgmTokenEncrypted,
-      bgmTokenIv: row.bgmTokenIv
-    };
-  } catch {
-    return null;
-  }
-}
-async function getUserCredentialsById(db, id) {
-  try {
-    const row = await db.prepare(`SELECT ${USER_COLUMNS_FULL} FROM users WHERE id = ?`).bind(id).first();
-    return row || null;
-  } catch {
-    return null;
-  }
-}
-async function updateUserPassword(db, id, passwordHash, salt) {
-  const now = Date.now();
-  try {
-    const result = await db.prepare(
-      `UPDATE users
-           SET password_hash = ?, salt = ?, updated_at = ?
-         WHERE id = ?`
-    ).bind(passwordHash, salt, now, id).run();
-    if (!result.success) {
-      throw new Error("D1 run() \u8FD4\u56DE success=false");
-    }
-  } catch (err) {
-    throw new Error(`updateUserPassword: \u66F4\u65B0\u5931\u8D25 (id=${id})`, { cause: err });
-  }
-}
-async function userExistsByEmail(db, email) {
-  try {
-    const row = await db.prepare("SELECT 1 FROM users WHERE email = ? LIMIT 1").bind(email).first();
-    return row !== null;
-  } catch {
-    return false;
-  }
-}
-
 // server/src/db/emailCodes.js
 var CODE_TTL_MS = 10 * 60 * 1e3;
 var CODE_RESEND_INTERVAL_MS = 60 * 1e3;
@@ -4187,6 +4248,7 @@ function generateNumericCode() {
   return code;
 }
 async function getLatestCode(db, email, purpose) {
+  const normalizedEmail = normalizeEmail(email);
   try {
     const row = await db.prepare(
       `SELECT id, code, expires_at AS expiresAt, consumed, created_at AS createdAt
@@ -4194,13 +4256,14 @@ async function getLatestCode(db, email, purpose) {
           WHERE email = ? AND purpose = ?
           ORDER BY created_at DESC
           LIMIT 1`
-    ).bind(email, purpose).first();
+    ).bind(normalizedEmail, purpose).first();
     return row || null;
   } catch {
     return null;
   }
 }
 async function createCode(db, { email, code, purpose }) {
+  const normalizedEmail = normalizeEmail(email);
   const id = crypto.randomUUID();
   const now = Date.now();
   const expiresAt = now + CODE_TTL_MS;
@@ -4208,10 +4271,10 @@ async function createCode(db, { email, code, purpose }) {
     const result = await db.prepare(
       `INSERT INTO email_codes (id, email, code, purpose, expires_at, consumed, created_at)
          VALUES (?, ?, ?, ?, ?, 0, ?)`
-    ).bind(id, email, code, purpose, expiresAt, now).run();
+    ).bind(id, normalizedEmail, code, purpose, expiresAt, now).run();
     if (!result.success) throw new Error("D1 run() \u8FD4\u56DE success=false");
   } catch (err) {
-    throw new Error(`createCode: \u5199\u5165\u5931\u8D25 (email=${email}, purpose=${purpose})`, { cause: err });
+    throw new Error(`createCode: \u5199\u5165\u5931\u8D25 (email=${normalizedEmail}, purpose=${purpose})`, { cause: err });
   }
   return { id, expiresAt };
 }
@@ -4219,18 +4282,26 @@ async function verifyCode(db, email, code, purpose) {
   const record = await getLatestCode(db, email, purpose);
   if (!record) return false;
   if (record.consumed) return false;
-  if (Date.now() > record.expiresAt) return false;
-  if (record.code.length !== code.length) return false;
+  const now = Date.now();
+  if (now > record.expiresAt) return false;
+  const inputCode = String(code ?? "");
+  const storedCode = String(record.code ?? "");
+  if (storedCode.length !== inputCode.length) return false;
   let diff = 0;
-  for (let i = 0; i < code.length; i++) {
-    diff |= record.code.charCodeAt(i) ^ code.charCodeAt(i);
+  for (let i = 0; i < inputCode.length; i++) {
+    diff |= storedCode.charCodeAt(i) ^ inputCode.charCodeAt(i);
   }
   if (diff !== 0) return false;
   try {
-    await db.prepare("UPDATE email_codes SET consumed = 1 WHERE id = ?").bind(record.id).run();
+    const result = await db.prepare(
+      "UPDATE email_codes SET consumed = 1 WHERE id = ? AND consumed = 0 AND expires_at > ? AND code = ?"
+    ).bind(record.id, now, storedCode).run();
+    if (result?.success === false) return false;
+    const changes = result?.meta?.changes ?? result?.changes;
+    return typeof changes === "number" ? changes === 1 : false;
   } catch {
+    return false;
   }
-  return true;
 }
 function canResend(latest) {
   if (!latest) return true;
@@ -4468,13 +4539,29 @@ async function exchangeBangumiOAuthCode({
 // server/src/services/auth.js
 var BGM_ME_API = "https://api.bgm.tv/v0/me";
 var OAUTH_BIND_STATE_TTL = 5 * 60;
+function sessionVersionOf(user) {
+  const version = Number(user?.sessionVersion ?? 0);
+  return Number.isSafeInteger(version) && version >= 0 ? version : 0;
+}
+async function issueUserToken(env, user, { includeBgmUid = true } = {}) {
+  return signJwt(
+    {
+      userId: user.id,
+      email: user.email,
+      ...includeBgmUid ? { bgmUid: user.bgmUid ?? null } : {},
+      sessionVersion: sessionVersionOf(user)
+    },
+    env.JWT_SECRET
+  );
+}
 function httpError(status, message) {
   const err = new Error(message);
   err.status = status;
   return err;
 }
 async function sendVerificationCode(db, env, { email, purpose = "register" }) {
-  const latest = await getLatestCode(db, email, purpose);
+  const normalizedEmail = normalizeEmail(email);
+  const latest = await getLatestCode(db, normalizedEmail, purpose);
   if (!canResend(latest)) {
     return { sent: false, cooldownSeconds: resendCooldownSeconds(latest) };
   }
@@ -4482,22 +4569,23 @@ async function sendVerificationCode(db, env, { email, purpose = "register" }) {
     throw httpError(500, "\u90AE\u4EF6\u670D\u52A1\u672A\u914D\u7F6E\uFF08\u7F3A\u5C11 RESEND_API_KEY\uFF09");
   }
   const code = generateNumericCode();
-  await createCode(db, { email, code, purpose });
+  await createCode(db, { email: normalizedEmail, code, purpose });
   try {
     await sendEmail(
-      { to: email, subject: `Bangmio\u9A8C\u8BC1\u7801\u662F${code}`, html: buildVerificationEmailHTML(code) },
+      { to: normalizedEmail, subject: `Bangmio\u9A8C\u8BC1\u7801\u662F${code}`, html: buildVerificationEmailHTML(code) },
       env.RESEND_API_KEY,
       env.RESEND_FROM
     );
   } catch (err) {
-    logError("\u9A8C\u8BC1\u7801\u90AE\u4EF6\u53D1\u9001\u5931\u8D25", { email, error: String(err) });
+    logError("\u9A8C\u8BC1\u7801\u90AE\u4EF6\u53D1\u9001\u5931\u8D25", { email: normalizedEmail, error: String(err) });
     throw httpError(500, "\u9A8C\u8BC1\u7801\u53D1\u9001\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
   }
-  logInfo("\u9A8C\u8BC1\u7801\u5DF2\u53D1\u9001", { email, purpose });
+  logInfo("\u9A8C\u8BC1\u7801\u5DF2\u53D1\u9001", { email: normalizedEmail, purpose });
   return { sent: true, cooldownSeconds: 0 };
 }
 async function registerUser(db, env, { email, password, code }) {
-  const exists = await userExistsByEmail(db, email);
+  const normalizedEmail = normalizeEmail(email);
+  const exists = await userExistsByEmail(db, normalizedEmail);
   if (exists) {
     throw httpError(409, "\u90AE\u7BB1\u5DF2\u6CE8\u518C");
   }
@@ -4505,7 +4593,7 @@ async function registerUser(db, env, { email, password, code }) {
     if (!code) {
       throw httpError(400, "\u8BF7\u8F93\u5165\u90AE\u7BB1\u9A8C\u8BC1\u7801");
     }
-    const codeOk = await verifyCode(db, email, String(code), "register");
+    const codeOk = await verifyCode(db, normalizedEmail, String(code), "register");
     if (!codeOk) {
       throw httpError(400, "\u9A8C\u8BC1\u7801\u9519\u8BEF\u6216\u5DF2\u8FC7\u671F");
     }
@@ -4513,13 +4601,14 @@ async function registerUser(db, env, { email, password, code }) {
   const salt = generateSalt();
   const passwordHash = await hashPassword(password, salt);
   const userId = crypto.randomUUID();
-  const user = await createUser(db, { id: userId, email, passwordHash, salt });
-  const token = await signJwt({ userId: user.id, email: user.email }, env.JWT_SECRET);
+  const user = await createUser(db, { id: userId, email: normalizedEmail, passwordHash, salt });
+  const token = await issueUserToken(env, user, { includeBgmUid: false });
   logInfo("\u7528\u6237\u6CE8\u518C\u6210\u529F", { userId: user.id, email });
   return { token, user: { id: user.id, email: user.email, bgmUid: null } };
 }
 async function loginUser(db, env, { email, password }) {
-  const user = await getUserByEmail(db, email);
+  const normalizedEmail = normalizeEmail(email);
+  const user = await getUserByEmail(db, normalizedEmail);
   if (!user) {
     throw httpError(401, "\u90AE\u7BB1\u6216\u5BC6\u7801\u9519\u8BEF");
   }
@@ -4527,10 +4616,7 @@ async function loginUser(db, env, { email, password }) {
   if (!ok) {
     throw httpError(401, "\u90AE\u7BB1\u6216\u5BC6\u7801\u9519\u8BEF");
   }
-  const token = await signJwt(
-    { userId: user.id, email: user.email, bgmUid: user.bgmUid },
-    env.JWT_SECRET
-  );
+  const token = await issueUserToken(env, user);
   logInfo("\u7528\u6237\u767B\u5F55\u6210\u529F", { userId: user.id, email });
   return { token, user: { id: user.id, email: user.email, bgmUid: user.bgmUid } };
 }
@@ -4557,10 +4643,7 @@ async function bindBangumi(db, env, userId, bangumiToken) {
   if (!updated) {
     throw httpError(404, "\u7528\u6237\u4E0D\u5B58\u5728");
   }
-  const token = await signJwt(
-    { userId: updated.id, email: updated.email, bgmUid: updated.bgmUid },
-    env.JWT_SECRET
-  );
+  const token = await issueUserToken(env, updated);
   logInfo("Bangumi \u7ED1\u5B9A\u6210\u529F", { userId, bgmUid: String(bgmUid) });
   return {
     token,
@@ -4585,10 +4668,10 @@ async function refreshJwt(db, env, oldToken) {
   if (!user) {
     throw httpError(404, "\u7528\u6237\u4E0D\u5B58\u5728");
   }
-  const token = await signJwt(
-    { userId: user.id, email: user.email, bgmUid: user.bgmUid },
-    env.JWT_SECRET
-  );
+  if (Number(payload.sessionVersion ?? 0) !== sessionVersionOf(user)) {
+    throw httpError(401, "Token \u5DF2\u5931\u6548\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55");
+  }
+  const token = await issueUserToken(env, user);
   return {
     token,
     user: { id: user.id, email: user.email, bgmUid: user.bgmUid }
@@ -4683,10 +4766,7 @@ async function bindBangumiByOAuth(db, env, { code, state, oauthBase: oauthBase3,
   if (!updated) {
     throw httpError(404, "\u7528\u6237\u4E0D\u5B58\u5728");
   }
-  const token = await signJwt(
-    { userId: updated.id, email: updated.email, bgmUid: updated.bgmUid },
-    env.JWT_SECRET
-  );
+  const token = await issueUserToken(env, updated);
   logInfo("OAuth \u7ED1\u5B9A\u6210\u529F", { userId, bgmUid: String(bgmUid) });
   return {
     token,
@@ -4713,21 +4793,22 @@ async function changeUserPassword(db, env, userId, currentPassword, newPassword)
   return { success: true };
 }
 async function resetUserPassword(db, env, { email, code, newPassword }) {
+  const normalizedEmail = normalizeEmail(email);
   if (!newPassword || String(newPassword).length < 8) {
     throw httpError(400, "\u65B0\u5BC6\u7801\u81F3\u5C11 8 \u4F4D");
   }
-  const codeOk = await verifyCode(db, email, String(code), "reset");
+  const codeOk = await verifyCode(db, normalizedEmail, String(code), "reset");
   if (!codeOk) {
     throw httpError(400, "\u9A8C\u8BC1\u7801\u9519\u8BEF\u6216\u5DF2\u8FC7\u671F");
   }
-  const user = await getUserByEmail(db, email);
+  const user = await getUserByEmail(db, normalizedEmail);
   if (!user) {
     throw httpError(404, "\u7528\u6237\u4E0D\u5B58\u5728");
   }
   const salt = generateSalt();
   const passwordHash = await hashPassword(newPassword, salt);
   await updateUserPassword(db, user.id, passwordHash, salt);
-  logInfo("\u7528\u6237\u91CD\u7F6E\u5BC6\u7801\u6210\u529F", { userId: user.id, email });
+  logInfo("\u7528\u6237\u91CD\u7F6E\u5BC6\u7801\u6210\u529F", { userId: user.id, email: normalizedEmail });
   return { success: true };
 }
 
@@ -4836,8 +4917,9 @@ var EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 app.post("/send-code", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
-    const { email, captchaToken, purpose = "register" } = body || {};
-    if (!email || !EMAIL_REGEX.test(String(email))) {
+    const { email: rawEmail, captchaToken, purpose = "register" } = body || {};
+    const email = normalizeEmail(rawEmail);
+    if (!email || !EMAIL_REGEX.test(email)) {
       return c.json({ data: null, error: "\u90AE\u7BB1\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
     }
     const turnstile = await verifyTurnstile(
@@ -4847,6 +4929,9 @@ app.post("/send-code", async (c) => {
     );
     if (!turnstile.success) {
       return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
+    }
+    if (!["register", "reset"].includes(purpose)) {
+      return c.json({ data: null, error: "\u9A8C\u8BC1\u7801\u7528\u9014\u4E0D\u5408\u6CD5", code: 400 }, 400);
     }
     const result = await sendVerificationCode(c.env.DB, c.env, { email, purpose });
     return c.json({ data: result, code: 200 });
@@ -4858,7 +4943,7 @@ app.post("/register", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
     const { email, password, code, captchaToken } = body || {};
-    if (!email || !EMAIL_REGEX.test(String(email))) {
+    if (!email || !EMAIL_REGEX.test(email)) {
       return c.json({ data: null, error: "\u90AE\u7BB1\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
     }
     if (!password || String(password).length < 8) {
@@ -5024,8 +5109,9 @@ app.post("/change-password", jwtAuth(), async (c) => {
 app.post("/forgot-password", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
-    const { email, captchaToken } = body || {};
-    if (!email || !EMAIL_REGEX.test(String(email))) {
+    const { email: rawEmail, captchaToken } = body || {};
+    const email = normalizeEmail(rawEmail);
+    if (!email || !EMAIL_REGEX.test(email)) {
       return c.json({ data: null, error: "\u90AE\u7BB1\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
     }
     if (c.env?.TURNSTILE_SECRET_KEY) {
@@ -5054,8 +5140,9 @@ app.post("/forgot-password", async (c) => {
 app.post("/reset-password", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
-    const { email, code, newPassword } = body || {};
-    if (!email || !EMAIL_REGEX.test(String(email))) {
+    const { email: rawEmail, code, newPassword } = body || {};
+    const email = normalizeEmail(rawEmail);
+    if (!email || !EMAIL_REGEX.test(email)) {
       return c.json({ data: null, error: "\u90AE\u7BB1\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
     }
     if (!code || !newPassword) {
@@ -5988,6 +6075,16 @@ function extractToken(c) {
 function extractUsername(c) {
   return c.req.header("X-Bangumi-Username") || "";
 }
+var COLLECTION_STATUS = /* @__PURE__ */ new Set([1, 2, 3, 4, 5]);
+function parseBoundedInteger(value, { min, max, fallback = null }) {
+  if (value === void 0 || value === null || value === "") return fallback;
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < min || max !== void 0 && parsed > max) return null;
+  return parsed;
+}
+function parseAnimeId(value) {
+  return parseBoundedInteger(value, { min: 1, max: Number.MAX_SAFE_INTEGER });
+}
 async function guardUsername(c, token, username) {
   const ok = await verifyBangumiUsername(token, username, isChina4(c));
   if (!ok) return c.json({ error: "\u7528\u6237\u540D\u4E0E\u4EE4\u724C\u4E0D\u5339\u914D" }, 403);
@@ -6002,14 +6099,16 @@ app4.get("/list", async (c) => {
     const guard = await guardUsername(c, token, username);
     if (guard) return guard;
     const client = getClient(token, isChina4(c));
-    const params = {
-      offset: Number(c.req.query("offset")) || 0,
-      limit: Number(c.req.query("limit")) || 30
-    };
-    const st = c.req.query("subject_type");
-    const t = c.req.query("type");
-    if (st) params.subject_type = Number(st);
-    if (t) params.type = Number(t);
+    const offset = parseBoundedInteger(c.req.query("offset"), { min: 0, max: 1e7, fallback: 0 });
+    const limit = parseBoundedInteger(c.req.query("limit"), { min: 1, max: 100, fallback: 30 });
+    const subjectType = parseBoundedInteger(c.req.query("subject_type"), { min: 1, max: 7 });
+    const type = parseBoundedInteger(c.req.query("type"), { min: 1, max: 5 });
+    if (offset === null || limit === null || subjectType === null || type === null) {
+      return c.json({ error: "\u6536\u85CF\u5217\u8868\u53C2\u6570\u4E0D\u5408\u6CD5" }, 400);
+    }
+    const params = { offset, limit };
+    if (c.req.query("subject_type") !== void 0) params.subject_type = subjectType;
+    if (c.req.query("type") !== void 0) params.type = type;
     const data = await client.get(`/v0/users/${username}/collections`, params);
     return c.json({ data: data.data || [], total: data.total || 0 });
   } catch (err) {
@@ -6057,9 +6156,11 @@ app4.get("/:animeId", async (c) => {
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
     const guard = await guardUsername(c, token, username);
     if (guard) return guard;
+    const animeId = parseAnimeId(c.req.param("animeId"));
+    if (animeId === null) return c.json({ error: "\u756A\u5267 ID \u4E0D\u5408\u6CD5" }, 400);
     const client = getClient(token, isChina4(c));
     const collection = await client.get(
-      `/v0/users/${username}/collections/${c.req.param("animeId")}`
+      `/v0/users/${username}/collections/${animeId}`
     );
     return c.json({
       data: {
@@ -6087,17 +6188,36 @@ app4.post("/:animeId", async (c) => {
       const guard = await guardUsername(c, token, username);
       if (guard) return guard;
     }
+    const animeId = parseAnimeId(c.req.param("animeId"));
+    if (animeId === null) return c.json({ error: "\u756A\u5267 ID \u4E0D\u5408\u6CD5" }, 400);
     const client = getClient(token, isChina4(c));
-    const body = await c.req.json();
+    const body = await c.req.json().catch(() => ({}));
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return c.json({ error: "\u8BF7\u6C42\u53C2\u6570\u4E0D\u5408\u6CD5" }, 400);
+    }
     const payload = {};
-    if (body.status !== void 0 && body.status >= 1) payload.type = Number(body.status);
-    if (body.rating !== void 0) payload.rate = Number(body.rating);
-    if (body.comment !== void 0 && body.comment !== null) payload.comment = String(body.comment);
+    if (body.status !== void 0) {
+      const status = parseBoundedInteger(body.status, { min: 1, max: 5 });
+      if (status === null || !COLLECTION_STATUS.has(status)) {
+        return c.json({ error: "\u6536\u85CF\u72B6\u6001\u4E0D\u5408\u6CD5" }, 400);
+      }
+      payload.type = status;
+    }
+    if (body.rating !== void 0) {
+      const rating = parseBoundedInteger(body.rating, { min: 0, max: 10 });
+      if (rating === null) return c.json({ error: "\u8BC4\u5206\u5FC5\u987B\u662F 0 \u5230 10 \u7684\u6574\u6570" }, 400);
+      payload.rate = rating;
+    }
+    if (body.comment !== void 0 && body.comment !== null) {
+      const comment = String(body.comment);
+      if (comment.length > 2e3) return c.json({ error: "\u8BC4\u8BBA\u4E0D\u80FD\u8D85\u8FC7 2000 \u4E2A\u5B57\u7B26" }, 400);
+      payload.comment = comment;
+    }
     if (!payload.type) {
       if (username) {
         try {
           const current = await client.get(
-            `/v0/users/${username}/collections/${c.req.param("animeId")}`
+            `/v0/users/${username}/collections/${animeId}`
           );
           if (current?.type) {
             payload.type = current.type;
@@ -6114,11 +6234,11 @@ app4.post("/:animeId", async (c) => {
         return c.json({ error: "\u8BF7\u5148\u9009\u62E9\u6536\u85CF\u72B6\u6001" }, 400);
       }
     }
-    await client.post(`/v0/users/-/collections/${c.req.param("animeId")}`, payload);
+    await client.post(`/v0/users/-/collections/${animeId}`, payload);
     if (username) {
       try {
         const collection = await client.get(
-          `/v0/users/${username}/collections/${c.req.param("animeId")}`
+          `/v0/users/${username}/collections/${animeId}`
         );
         return c.json({
           data: {
@@ -6160,8 +6280,10 @@ app4.delete("/:animeId", async (c) => {
   try {
     const token = extractToken(c);
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
+    const animeId = parseAnimeId(c.req.param("animeId"));
+    if (animeId === null) return c.json({ error: "\u756A\u5267 ID \u4E0D\u5408\u6CD5" }, 400);
     const client = getClient(token, isChina4(c));
-    await client.delete(`/v0/users/-/collections/${c.req.param("animeId")}`);
+    await client.delete(`/v0/users/-/collections/${animeId}`);
     return c.json({ message: "\u5DF2\u5220\u9664" });
   } catch (err) {
     const r = upstreamError(err.response?.status, err.response?.data, "\u5220\u9664\u6536\u85CF\u5931\u8D25");

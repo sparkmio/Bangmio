@@ -11,6 +11,7 @@
  *   const { userId, email, bgmUid } = c.get('user')
  */
 import { verifyJwt } from '../utils/jwt.js'
+import { getUserSessionVersion } from '../db/users.js'
 
 /**
  * 创建 JWT 认证中间件。
@@ -33,8 +34,12 @@ export function jwtAuth() {
     const token = match[1]
     const secret = c.env?.JWT_SECRET
     const { valid, payload } = await verifyJwt(token, secret)
-    if (!valid || !payload) {
+    if (!valid || !payload || !payload.userId) {
       return c.json({ data: null, error: '未登录', code: 401 }, 401)
+    }
+    const sessionVersion = await getUserSessionVersion(c.env?.DB, payload.userId)
+    if (sessionVersion === null || Number(payload.sessionVersion ?? 0) !== sessionVersion) {
+      return c.json({ data: null, error: '登录状态已失效，请重新登录', code: 401 }, 401)
     }
     c.set('user', {
       userId: payload.userId,

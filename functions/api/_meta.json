@@ -312,7 +312,7 @@
     },
     "server/src/utils/logger.js": { "bytes": 1418, "imports": [], "format": "esm" },
     "server/src/utils/rateLimit.js": {
-      "bytes": 1424,
+      "bytes": 3216,
       "imports": [
         {
           "path": "server/src/utils/logger.js",
@@ -325,20 +325,46 @@
     "server/src/middleware/security.js": { "bytes": 909, "imports": [], "format": "esm" },
     "server/src/config.js": { "bytes": 1739, "imports": [], "format": "esm" },
     "server/src/utils/jwt.js": { "bytes": 5255, "imports": [], "format": "esm" },
+    "server/src/utils/emailAddress.js": { "bytes": 171, "imports": [], "format": "esm" },
+    "server/src/db/users.js": {
+      "bytes": 10045,
+      "imports": [
+        {
+          "path": "server/src/utils/emailAddress.js",
+          "kind": "import-statement",
+          "original": "../utils/emailAddress.js"
+        }
+      ],
+      "format": "esm"
+    },
     "server/src/middleware/jwtAuth.js": {
-      "bytes": 1612,
+      "bytes": 1969,
       "imports": [
         {
           "path": "server/src/utils/jwt.js",
           "kind": "import-statement",
           "original": "../utils/jwt.js"
+        },
+        {
+          "path": "server/src/db/users.js",
+          "kind": "import-statement",
+          "original": "../db/users.js"
         }
       ],
       "format": "esm"
     },
     "server/src/utils/crypto.js": { "bytes": 6860, "imports": [], "format": "esm" },
-    "server/src/db/users.js": { "bytes": 9446, "imports": [], "format": "esm" },
-    "server/src/db/emailCodes.js": { "bytes": 4928, "imports": [], "format": "esm" },
+    "server/src/db/emailCodes.js": {
+      "bytes": 5635,
+      "imports": [
+        {
+          "path": "server/src/utils/emailAddress.js",
+          "kind": "import-statement",
+          "original": "../utils/emailAddress.js"
+        }
+      ],
+      "format": "esm"
+    },
     "server/src/utils/email.js": { "bytes": 3818, "imports": [], "format": "esm" },
     "server/src/utils/http.js": {
       "bytes": 7852,
@@ -363,7 +389,7 @@
       "format": "esm"
     },
     "server/src/services/auth.js": {
-      "bytes": 19388,
+      "bytes": 20071,
       "imports": [
         {
           "path": "server/src/utils/crypto.js",
@@ -404,6 +430,11 @@
           "path": "server/src/utils/logger.js",
           "kind": "import-statement",
           "original": "../utils/logger.js"
+        },
+        {
+          "path": "server/src/utils/emailAddress.js",
+          "kind": "import-statement",
+          "original": "../utils/emailAddress.js"
         }
       ],
       "format": "esm"
@@ -422,7 +453,7 @@
     },
     "server/src/utils/errors.js": { "bytes": 2232, "imports": [], "format": "esm" },
     "server/src/routes/auth.js": {
-      "bytes": 14438,
+      "bytes": 14768,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -463,6 +494,11 @@
           "path": "server/src/utils/errors.js",
           "kind": "import-statement",
           "original": "../utils/errors.js"
+        },
+        {
+          "path": "server/src/utils/emailAddress.js",
+          "kind": "import-statement",
+          "original": "../utils/emailAddress.js"
         }
       ],
       "format": "esm"
@@ -575,7 +611,7 @@
       "format": "esm"
     },
     "server/src/routes/collection.js": {
-      "bytes": 7514,
+      "bytes": 9398,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -5252,22 +5288,23 @@
         "node_modules/hono/dist/hono.js": { "bytesInOutput": 343 },
         "node_modules/hono/dist/middleware/cors/index.js": { "bytesInOutput": 2570 },
         "server/src/utils/logger.js": { "bytesInOutput": 383 },
-        "server/src/utils/rateLimit.js": { "bytesInOutput": 965 },
+        "server/src/utils/rateLimit.js": { "bytesInOutput": 2661 },
         "server/src/middleware/security.js": { "bytesInOutput": 685 },
         "server/src/config.js": { "bytesInOutput": 383 },
         "server/src/utils/jwt.js": { "bytesInOutput": 2942 },
-        "server/src/middleware/jwtAuth.js": { "bytesInOutput": 671 },
+        "server/src/utils/emailAddress.js": { "bytesInOutput": 86 },
+        "server/src/db/users.js": { "bytesInOutput": 4658 },
+        "server/src/middleware/jwtAuth.js": { "bytesInOutput": 1014 },
         "server/src/utils/crypto.js": { "bytesInOutput": 2925 },
-        "server/src/db/users.js": { "bytesInOutput": 4072 },
-        "server/src/db/emailCodes.js": { "bytesInOutput": 2239 },
+        "server/src/db/emailCodes.js": { "bytesInOutput": 2758 },
         "server/src/utils/email.js": { "bytesInOutput": 2721 },
         "server/src/utils/http.js": { "bytesInOutput": 3472 },
         "server/src/services/oauth.js": { "bytesInOutput": 2152 },
-        "server/src/services/auth.js": { "bytesInOutput": 10126 },
+        "server/src/services/auth.js": { "bytesInOutput": 10781 },
         "server/src/utils/turnstile.js": { "bytesInOutput": 863 },
         "server/src/utils/oauthConfig.js": { "bytesInOutput": 454 },
         "server/src/utils/errors.js": { "bytesInOutput": 1153 },
-        "server/src/routes/auth.js": { "bytesInOutput": 9906 },
+        "server/src/routes/auth.js": { "bytesInOutput": 10206 },
         "node_modules/hono/dist/utils/cookie.js": { "bytesInOutput": 3747 },
         "node_modules/hono/dist/helper/cookie/index.js": { "bytesInOutput": 1260 },
         "server/src/services/bangumi.js": { "bytesInOutput": 5574 },
@@ -5275,7 +5312,7 @@
         "server/src/controllers/animeController.js": { "bytesInOutput": 4411 },
         "server/src/routes/anime.js": { "bytesInOutput": 683 },
         "server/src/services/userVerify.js": { "bytesInOutput": 787 },
-        "server/src/routes/collection.js": { "bytesInOutput": 7141 },
+        "server/src/routes/collection.js": { "bytesInOutput": 9206 },
         "node_modules/linkedom/esm/shared/symbols.js": { "bytesInOutput": 1096 },
         "node_modules/htmlparser2/dist/esm/index.js": { "bytesInOutput": 1277 },
         "node_modules/htmlparser2/node_modules/entities/dist/esm/decode-codepoint.js": {
@@ -5512,7 +5549,7 @@
         "server/src/routes/music.js": { "bytesInOutput": 604 },
         "server/src/app.js": { "bytesInOutput": 2480 }
       },
-      "bytes": 711541
+      "bytes": 717828
     }
   }
 }

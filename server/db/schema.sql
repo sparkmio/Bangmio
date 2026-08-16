@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
   salt TEXT NOT NULL,
+  session_version INTEGER NOT NULL DEFAULT 0,
   bgm_uid TEXT,
   bgm_token_encrypted TEXT,
   bgm_token_iv TEXT,
@@ -14,6 +15,14 @@ CREATE TABLE IF NOT EXISTS users (
 );
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_bgm_uid ON users(bgm_uid);
+
+-- 分布式速率限制计数（Cloudflare D1；本地无 D1 时回退到进程内计数）
+CREATE TABLE IF NOT EXISTS rate_limits (
+  key TEXT PRIMARY KEY,
+  count INTEGER NOT NULL,
+  reset_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_reset_at ON rate_limits(reset_at);
 
 -- 邮箱验证码表（注册/找回密码等场景）
 -- 同一邮箱 + purpose 1 分钟内仅允许 1 条有效记录（应用层控制）
