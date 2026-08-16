@@ -51,6 +51,25 @@ Bangumi (bgm.tv) 第三方客户端。支持 OAuth 登录、动画浏览与搜�
 
 修改 Production 变量后请重新部署一次，再从 `https://bangmio.site` 发起登录。不要使用 `www` 或 `pages.dev` 地址测试 OAuth。授权返回后如果仍失败，页面会区分显示：配置错误、回调地址/授权码错误，或 Bangumi 上游暂时不可用。
 
+## 自动发布 Release
+
+项目通过 GitHub Actions 自动创建 Release。发布前先把 `package.json` 中的版本号更新为目标版本并提交，然后创建并推送同名的语义化版本标签，例如：
+
+```bash
+git tag v1.1.0
+git push origin v1.1.0
+```
+
+标签版本必须与 `package.json` 的 `version` 完全一致。发布管线会依次执行 Lint、测试和生产构建，再由 `scripts/release-notes.mjs` 按 Conventional Commits 自动整理更新日志并创建 GitHub Release。`feat`、`fix`、`security`、`docs` 等提交会分别归类，并附带对应提交链接。
+
+本地可以提前预览将要发布的更新日志：
+
+```bash
+npm run release:notes -- --from v1.0.0 --to HEAD
+```
+
+如果仓库还没有语义化版本标签，可以省略 `--from`，脚本会从仓库最早的提交开始生成。
+
 ## 相关链接
 
 - 网站：https://bangmio.site

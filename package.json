@@ -17,7 +17,8 @@
     "lint:fix": "eslint . --ext .js,.vue --fix",
     "format": "prettier --write \"**/*.{js,vue,json,css,md}\"",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "release:notes": "node scripts/release-notes.mjs"
   },
   "devDependencies": {
     "@hono/node-server": "^1.17.0",
@@ -47,5 +48,10 @@
     "*.{json,css,md}": [
       "prettier --write"
     ]
+  },
+  "releaseName": "Bangmio",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sparkmio/Bangmio"
   }
 }

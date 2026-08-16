@@ -1,0 +1,194 @@
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const packageFile = path.join(rootDir, 'package.json')
+const conventionalCommit =
+  /^(?<type>[a-z]+)(?:\((?<scope>[^)]+)\))?(?<breaking>!)?:\s+(?<subject>.+)$/i
+const versionTag = /^v?(?<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)$/
+
+export const categories = [
+  ['Features', new Set(['feat'])],
+  ['Bug Fixes', new Set(['fix'])],
+  ['Security', new Set(['security'])],
+  ['Documentation', new Set(['docs'])],
+  ['Maintenance', new Set(['refactor', 'perf', 'test', 'build', 'ci', 'chore'])]
+]
+
+function runGit(args) {
+  return execFileSync('git', args, { cwd: rootDir, encoding: 'utf8' }).trim()
+}
+
+export function parseArgs(argv) {
+  const options = {
+    from: undefined,
+    to: 'HEAD',
+    version: undefined,
+    output: undefined,
+    help: false
+  }
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index]
+    if (arg === '--help' || arg === '-h') {
+      options.help = true
+      continue
+    }
+    if (arg === '--from' || arg === '--to' || arg === '--version' || arg === '--output') {
+      const value = argv[index + 1]
+      if (!value || value.startsWith('--')) throw new Error(`${arg} requires a value`)
+      options[arg.slice(2)] = value
+      index += 1
+      continue
+    }
+    throw new Error(`Unknown argument: ${arg}`)
+  }
+  return options
+}
+
+export function parseConventionalCommit(subject) {
+  const match = subject.trim().match(conventionalCommit)
+  if (!match) return { type: 'other', scope: undefined, breaking: false, subject: subject.trim() }
+  return {
+    type: match.groups.type.toLowerCase(),
+    scope: match.groups.scope,
+    breaking: Boolean(match.groups.breaking),
+    subject: match.groups.subject.trim()
+  }
+}
+
+function isReleaseCommit(subject) {
+  return /^(?:release(?:\([^)]*\))?|chore\(release\))!?:\s/i.test(subject.trim())
+}
+
+export function categorizeCommits(commits) {
+  const result = new Map(categories.map(([name]) => [name, []]))
+  result.set('Other Changes', [])
+  for (const commit of commits) {
+    if (!commit.subject || isReleaseCommit(commit.subject)) continue
+    const parsed = commit.parsed ?? parseConventionalCommit(commit.subject)
+    const category = categories.find(([, types]) => types.has(parsed.type))?.[0] ?? 'Other Changes'
+    result.get(category).push({ ...commit, parsed })
+  }
+  return result
+}
+
+export function semverTagValue(tag) {
+  const match = String(tag).trim().match(versionTag)
+  return match ? match.groups.version : undefined
+}
+
+export function selectPreviousTag(tags, toRef) {
+  return tags
+    .map(tag => String(tag).trim())
+    .filter(tag => semverTagValue(tag) && tag !== toRef)
+    .at(0)
+}
+
+function commitUrl(hash, repositoryUrl) {
+  const match = repositoryUrl?.match(/github\.com[/:](.+?)(?:\.git)?$/i)
+  return match ? `https://github.com/${match[1]}/commit/${hash}` : undefined
+}
+
+export function parseGitLog(raw) {
+  return raw
+    .split('\x1e')
+    .map(record => record.trim())
+    .filter(Boolean)
+    .map(record => {
+      const [hash = '', subject = '', author = '', email = ''] = record.split('\x1f')
+      return { hash, subject, author, email }
+    })
+}
+
+function readGitLog(from, to, git = runGit) {
+  const range = from ? `${from}..${to}` : to
+  const raw = git(['log', '--no-merges', '--format=%H%x1f%s%x1f%an%x1f%ae%x1e', range])
+  return parseGitLog(raw)
+}
+
+function previousVersionTag(to, git = runGit) {
+  const tags = git(['tag', '--merged', to, '--sort=-version:refname'])
+    .split(/\r?\n/)
+    .filter(Boolean)
+  return selectPreviousTag(tags, to)
+}
+
+export function formatReleaseNotes({ packageName, version, from, commits, repositoryUrl }) {
+  const grouped = categorizeCommits(commits)
+  const lines = [`## ${packageName} v${version}`, '']
+  if (from) lines.push(`Changes since \`${from}\``)
+  else lines.push('Changes since the beginning of the repository')
+  lines.push('')
+
+  let hasChanges = false
+  for (const [category, entries] of grouped) {
+    if (!entries.length) continue
+    hasChanges = true
+    lines.push(`### ${category}`, '')
+    for (const entry of entries) {
+      const parsed = entry.parsed ?? parseConventionalCommit(entry.subject)
+      const scope = parsed.scope ? `**${parsed.scope}:** ` : ''
+      const breaking = parsed.breaking ? ' **BREAKING**' : ''
+      const url = commitUrl(entry.hash, repositoryUrl)
+      const reference = url ? `[${entry.hash.slice(0, 7)}](${url})` : entry.hash.slice(0, 7)
+      lines.push(`- ${scope}${parsed.subject}${breaking} (${reference})`)
+    }
+    lines.push('')
+  }
+  if (!hasChanges) lines.push('No user-facing changes were found in this range.', '')
+  lines.push('<!-- Generated by scripts/release-notes.mjs. -->')
+  return `${lines.join('\n').trimEnd()}\n`
+}
+
+export async function generateReleaseNotes({ argv = process.argv.slice(2), git = runGit } = {}) {
+  const options = parseArgs(argv)
+  if (options.help) return { help: true, text: usage() }
+  const packageJson = JSON.parse(await fs.readFile(packageFile, 'utf8'))
+  const version = options.version ?? packageJson.version
+  if (version !== packageJson.version) {
+    throw new Error(
+      `Version mismatch: package.json is ${packageJson.version}, but --version is ${version}`
+    )
+  }
+  const from = options.from ?? previousVersionTag(options.to, git)
+  const commits = readGitLog(from, options.to, git)
+  const text = formatReleaseNotes({
+    packageName: packageJson.releaseName ?? packageJson.name,
+    version,
+    from,
+    commits,
+    repositoryUrl: packageJson.repository?.url
+  })
+  if (options.output) {
+    const output = path.resolve(process.cwd(), options.output)
+    await fs.mkdir(path.dirname(output), { recursive: true })
+    await fs.writeFile(output, text, 'utf8')
+  }
+  return { ...options, from, version, text }
+}
+
+function usage() {
+  return [
+    'Usage: node scripts/release-notes.mjs [options]',
+    '',
+    'Options:',
+    '  --from <git-ref>   Start after this ref (defaults to the previous semver tag)',
+    '  --to <git-ref>     End ref (defaults to HEAD)',
+    '  --version <value>  Release version; must match package.json',
+    '  --output <file>    Write notes to a file instead of only stdout'
+  ].join('\n')
+}
+
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+if (isMain) {
+  try {
+    const result = await generateReleaseNotes()
+    if (result.help) console.log(result.text)
+    else process.stdout.write(result.text)
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error)
+    process.exitCode = 1
+  }
+}
