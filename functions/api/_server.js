@@ -4902,7 +4902,7 @@ function oauthBase(c) {
   return isChina(c) ? "https://bangumi.lol" : "https://bgm.tv";
 }
 function redirectUri(c) {
-  return c.env?.OAUTH_REDIRECT_URI || "http://localhost:5173/login/callback";
+  return c.env?.OAUTH_REDIRECT_URI || "http://localhost:3001/login/callback";
 }
 app.use("*", async (c, next) => {
   if (c.req.method === "POST" && (!c.env?.DB || !c.env?.JWT_SECRET)) {
@@ -17251,6 +17251,44 @@ app5.post("/subject/:id/talkbox", async (c) => {
     return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 500);
   }
 });
+app5.post("/person/:id/talkbox", async (c) => {
+  try {
+    const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
+    const base = getBase(isChina7);
+    const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
+    if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
+    const { content } = await c.req.json();
+    if (!content) return c.json({ error: "\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A" }, 400);
+    if (content.length > MAX_CONTENT_LENGTH)
+      return c.json({ data: null, error: "\u5185\u5BB9\u8FC7\u957F", code: 400 }, 400);
+    const personId = c.req.param("id");
+    const pageHtml = await fetchHTML(`${base}/person/${personId}/talkbox`, {
+      headers: { Authorization: `Bearer ${token}`, Cookie: `chii_auth=${token}` }
+    });
+    const formhash = extractFormhash(pageHtml);
+    if (!formhash) return c.json({ error: "\u65E0\u6CD5\u83B7\u53D6\u8868\u5355 token\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55" }, 400);
+    const params = new URLSearchParams();
+    params.append("formhash", formhash);
+    params.append("content", content);
+    params.append("submit", "submit");
+    const res = await fetch(`${base}/person/${personId}/talkbox`, {
+      method: "POST",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Content-Type": "application/x-www-form-urlencoded",
+        Cookie: extractChiiAuth(token),
+        Referer: `${base}/person/${personId}/talkbox`
+      },
+      body: params.toString(),
+      redirect: "manual"
+    });
+    if (res.status >= 300 && res.status < 400) return c.json({ success: true });
+    if (res.ok) return c.json({ success: true });
+    return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 400);
+  } catch {
+    return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 500);
+  }
+});
 app5.post("/subject/:id/topic", async (c) => {
   try {
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
@@ -18928,7 +18966,9 @@ var allowedOrigins = /* @__PURE__ */ new Set([
   "https://bangmio.site",
   "https://www.bangmio.site",
   "http://localhost:5173",
-  "http://127.0.0.1:5173"
+  "http://127.0.0.1:5173",
+  "http://localhost:3001",
+  "http://127.0.0.1:3001"
 ]);
 app11.use(
   "*",

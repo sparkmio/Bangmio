@@ -415,6 +415,48 @@ app.post('/subject/:id/talkbox', async c => {
   }
 })
 
+app.post('/person/:id/talkbox', async c => {
+  try {
+    const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
+    const base = getBase(isChina)
+    const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
+    if (!token) return c.json({ error: '未登录' }, 401)
+    const { content } = await c.req.json()
+    if (!content) return c.json({ error: '内容不能为空' }, 400)
+    if (content.length > MAX_CONTENT_LENGTH)
+      return c.json({ data: null, error: '内容过长', code: 400 }, 400)
+
+    const personId = c.req.param('id')
+    const pageHtml = await fetchHTML(`${base}/person/${personId}/talkbox`, {
+      headers: { Authorization: `Bearer ${token}`, Cookie: `chii_auth=${token}` }
+    })
+    const formhash = extractFormhash(pageHtml)
+    if (!formhash) return c.json({ error: '无法获取表单 token，请重新登录' }, 400)
+
+    const params = new URLSearchParams()
+    params.append('formhash', formhash)
+    params.append('content', content)
+    params.append('submit', 'submit')
+
+    const res = await fetch(`${base}/person/${personId}/talkbox`, {
+      method: 'POST',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Cookie: extractChiiAuth(token),
+        Referer: `${base}/person/${personId}/talkbox`
+      },
+      body: params.toString(),
+      redirect: 'manual'
+    })
+
+    if (res.status >= 300 && res.status < 400) return c.json({ success: true })
+    if (res.ok) return c.json({ success: true })
+    return c.json({ error: '发送失败' }, 400)
+  } catch {
+    return c.json({ error: '发送失败' }, 500)
+  }
+})
 app.post('/subject/:id/topic', async c => {
   try {
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'

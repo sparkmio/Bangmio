@@ -61,7 +61,7 @@ function oauthBase(c) {
  * @returns {string}
  */
 function redirectUri(c) {
-  return c.env?.OAUTH_REDIRECT_URI || 'http://localhost:5173/login/callback'
+  return c.env?.OAUTH_REDIRECT_URI || 'http://localhost:3001/login/callback'
 }
 
 /**

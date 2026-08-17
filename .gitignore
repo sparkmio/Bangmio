@@ -43,3 +43,7 @@ ScrapyDouban-analysis/
 
 # Temporary verification build output
 client/.codex-build-verify/
+# Next.js build output
+.next/
+.open-next/
+tsconfig.tsbuildinfo

@@ -453,7 +453,7 @@
     },
     "server/src/utils/errors.js": { "bytes": 2232, "imports": [], "format": "esm" },
     "server/src/routes/auth.js": {
-      "bytes": 14768,
+      "bytes": 14769,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -611,7 +611,7 @@
       "format": "esm"
     },
     "server/src/routes/collection.js": {
-      "bytes": 9679,
+      "bytes": 9685,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -4944,7 +4944,7 @@
     },
     "server/src/utils/cache.js": { "bytes": 1717, "imports": [], "format": "esm" },
     "server/src/routes/comments.js": {
-      "bytes": 17053,
+      "bytes": 18745,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -5155,7 +5155,7 @@
       "format": "esm"
     },
     "server/src/app.js": {
-      "bytes": 3723,
+      "bytes": 3778,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -5537,7 +5537,7 @@
         "node_modules/linkedom/esm/shared/parse-json.js": { "bytesInOutput": 30 },
         "node_modules/linkedom/esm/index.js": { "bytesInOutput": 242 },
         "server/src/utils/cache.js": { "bytesInOutput": 906 },
-        "server/src/routes/comments.js": { "bytesInOutput": 17502 },
+        "server/src/routes/comments.js": { "bytesInOutput": 19315 },
         "server/src/services/douban.js": { "bytesInOutput": 5243 },
         "server/src/utils/edgeCache.js": { "bytesInOutput": 819 },
         "server/src/routes/douban.js": { "bytesInOutput": 12585 },
@@ -5547,9 +5547,9 @@
         "server/src/routes/groups.js": { "bytesInOutput": 22837 },
         "server/src/services/music.js": { "bytesInOutput": 3261 },
         "server/src/routes/music.js": { "bytesInOutput": 604 },
-        "server/src/app.js": { "bytesInOutput": 2480 }
+        "server/src/app.js": { "bytesInOutput": 2534 }
       },
-      "bytes": 717956
+      "bytes": 719823
     }
   }
 }

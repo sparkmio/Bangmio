@@ -1,0 +1,1 @@
+export default function NotFound() { return <div className="panel empty-state"><div className="empty-icon">404</div><h3>页面没有找到</h3><p>这个页面可能已经移动，或者链接本身不存在。</p><a className="button primary" href="/">回到首页</a></div> }
