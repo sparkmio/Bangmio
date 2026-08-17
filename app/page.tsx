@@ -6,34 +6,56 @@ import type { Subject } from '@/lib/types'
 
 export const revalidate = 300
 
+type CalendarEntry = Subject & {
+  subject?: Subject
+  weekday?: { cn?: string; en?: string }
+}
+
 export default async function HomePage() {
   const [hot, calendar] = await Promise.all([
     safeApiFetch<Subject[]>('/anime/browse?sort=heat&type=2&limit=12'),
-    safeApiFetch<Subject[]>('/anime/calendar')
+    safeApiFetch<CalendarEntry[]>('/anime/calendar')
   ])
   const hotList = Array.isArray(hot?.data) ? hot.data : []
   const calendarList = Array.isArray(calendar?.data) ? calendar.data : []
+
   return <>
-    <section className="hero">
+    <section className="welcome-panel">
       <div>
-        <div className="eyebrow">A calmer way to follow anime</div>
-        <h1>把喜欢的番，<span>好好记下来。</span></h1>
-        <p>发现新番、整理收藏、记录进度，也和同好聊聊每一集的感受。Bangmio 把分散的追番记录，整理成属于你的番组空间。</p>
-        <div className="hero-actions"><Link className="button primary" href="/anime">开始找番</Link><Link className="button ghost" href="/groups">看看小组</Link></div>
+        <div className="eyebrow">Bangmio 番组空间</div>
+        <h1>今天也来看看喜欢的作品吧</h1>
+        <p>找新番、记进度、逛小组。熟悉的 Bangmio，只是把页面结构重新整理得更清楚。</p>
       </div>
-      <div className="hero-orbit" aria-hidden="true"><div className="orbit-core">B</div></div>
+      <div className="welcome-actions">
+        <Link className="button primary" href="/watching">查看在追</Link>
+        <Link className="button ghost" href="/anime">搜索番组</Link>
+      </div>
     </section>
+
     <section>
-      <SectionHeading eyebrow="Community pulse" title="大家最近在看什么" description="根据 Bangumi 热度整理的条目。" href="/trending" action="查看趋势" />
+      <SectionHeading title="热门新番" description="大家最近关注的动画条目" href="/trending" action="查看全部" />
       <AnimeGrid subjects={hotList} empty="暂时没有热门条目" />
     </section>
+
     <section>
-      <SectionHeading eyebrow="Weekly calendar" title="本周放送" description="按放送日快速找到正在更新的作品。" />
-      {calendarList.length ? <div className="list-grid">{calendarList.slice(0, 10).map((item: any) => { const subject = item.subject || item; return <Link className="list-card" href={`/anime/${subject.id}`} key={subject.id}><img className="list-cover" src={subject.images?.medium || subject.images?.common || ''} alt="" /><div><h3>{subject.name_cn || subject.name}</h3><p>{item.weekday?.en || item.weekday?.cn || subject.date || '近期放送'}</p></div></Link> })}</div> : <div className="panel empty-state"><h3>放送日历暂时不可用</h3><p>稍后刷新，或者直接去搜索条目。</p></div>}
+      <SectionHeading title="新番时间表" description="按放送日快速查看本周更新" href="/trending" action="完整时间表" />
+      {calendarList.length ? <div className="schedule-grid">{calendarList.slice(0, 12).map((entry, index) => {
+        const subject = entry.subject || entry
+        return <Link className="schedule-item" href={`/anime/${subject.id}`} key={`${subject.id}-${index}`}>
+          {subject.images?.medium || subject.images?.common ? <img src={subject.images.medium || subject.images.common} alt="" /> : <span className="schedule-placeholder">B</span>}
+          <span className="schedule-copy"><strong>{subject.name_cn || subject.name}</strong><small>{entry.weekday?.cn || entry.weekday?.en || subject.date || '近期放送'}</small></span>
+          <span className="schedule-arrow">›</span>
+        </Link>
+      })}</div> : <div className="panel empty-state"><h3>放送日历暂时不可用</h3><p>稍后刷新，或者直接去搜索条目。</p></div>}
     </section>
+
     <section>
-      <SectionHeading title="一个更舒服的番组空间" description="从发现到记录，每一步都保持简单。" />
-      <div className="feature-grid"><div className="panel feature"><div className="feature-icon">✦</div><h3>找到值得看的</h3><p>用热度、标签和日历快速探索作品，不再在信息流里迷路。</p></div><div className="panel feature"><div className="feature-icon">◌</div><h3>状态一目了然</h3><p>想看、在看、看过、搁置和抛弃，状态含义和 Bangumi 保持一致。</p></div><div className="panel feature"><div className="feature-icon">⌁</div><h3>和同好聊起来</h3><p>在条目、小组和话题里留下你的观点，把追番变成持续的社区体验。</p></div></div>
+      <SectionHeading title="在 Bangmio 可以做什么" />
+      <div className="feature-grid">
+        <Link className="panel feature" href="/watching"><span className="feature-icon">✓</span><div><h3>记录在追</h3><p>随时查看正在看的作品和当前进度。</p></div></Link>
+        <Link className="panel feature" href="/anime"><span className="feature-icon">⌕</span><div><h3>发现作品</h3><p>从 Bangumi 条目中搜索下一部想看的番。</p></div></Link>
+        <Link className="panel feature" href="/groups"><span className="feature-icon">#</span><div><h3>参与讨论</h3><p>浏览小组和话题，找到同好一起聊。</p></div></Link>
+      </div>
     </section>
   </>
 }

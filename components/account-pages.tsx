@@ -64,6 +64,7 @@ export function WatchingPage() {
   const { isAuthenticated, request } = useAuth()
   const [collections, setCollections] = useState<Collection[]>([])
   const [subjectType, setSubjectType] = useState(0)
+  const [selectedId, setSelectedId] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [offset, setOffset] = useState(0)
@@ -72,21 +73,96 @@ export function WatchingPage() {
 
   async function load(nextOffset = 0, append = false) {
     if (!isAuthenticated) return
-    setLoading(true); setError('')
+    setLoading(true)
+    setError('')
     try {
       const type = subjectType ? `&subject_type=${subjectType}` : ''
       const payload = await request<Collection[]>(`/collection/list?offset=${nextOffset}&limit=${limit}&type=3${type}`)
       const data = asList(payload.data).filter(item => Number(item.subject?.type || item.subject_type || 0) !== 4)
       setCollections(current => append ? [...current, ...data] : data)
-      setOffset(nextOffset + data.length); setHasMore(data.length >= limit)
-    } catch (value) { setError(value instanceof Error ? value.message : '在追列表加载失败') } finally { setLoading(false) }
+      if (!append) setSelectedId(data.length ? collectionId(data[0]) : 0)
+      setOffset(nextOffset + data.length)
+      setHasMore(data.length >= limit)
+    } catch (value) {
+      setError(value instanceof Error ? value.message : '在追列表加载失败')
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { void load(0, false) }, [isAuthenticated, subjectType]) // status=3 is deliberately fixed: Bangumi 的“在看”。
 
-  return <RequireAuth><div className="section-heading"><div><div className="eyebrow">Watching now</div><h1>在追</h1><p>此页始终查询 Bangumi 收藏状态 <b>type=3（在看）</b>；<b>type=2</b> 是看过，不会混用。</p></div></div><div className="toolbar filter-toolbar"><label>媒介类型<select className="input" value={subjectType} onChange={event => setSubjectType(Number(event.target.value))}><option value={0}>全部</option><option value={2}>动画</option><option value={6}>三次元</option><option value={1}>书籍</option></select></label></div>{error ? <div className="error-state"><strong>加载失败</strong><span>{error}</span></div> : null}{loading && !collections.length ? <div className="panel empty-state"><h3>正在加载在追列表…</h3></div> : collections.length ? <><div className="list-grid">{collections.map(collection => <CollectionCard collection={collection} controls key={collectionId(collection)} onSaved={next => setCollections(current => current.map(item => collectionId(item) === collectionId(next) ? { ...item, ...next } : item))} />)}</div>{hasMore ? <button className="button ghost load-more" disabled={loading} onClick={() => load(offset, true)} type="button">{loading ? '加载中…' : '加载更多'}</button> : null}</> : <div className="panel empty-state"><h3>还没有在追条目</h3><p>把作品标为“在看”后，会显示在这里。</p></div>}</RequireAuth>
-}
+  const selected = useMemo(() => collections.find(item => collectionId(item) === selectedId) || collections[0] || null, [collections, selectedId])
+  const selectedSubject = selected?.subject || null
+  const totalEpisodes = Number(selectedSubject?.eps || selectedSubject?.eps_count || selectedSubject?.total_episodes || 0)
+  const watchedEpisodes = Number(selected?.ep_status || selected?.episode || 0)
+  const episodeCount = Math.min(totalEpisodes || Math.max(watchedEpisodes, 12), 24)
 
+  function mergeSaved(id: number, next: Collection) {
+    setCollections(current => current.map(item => collectionId(item) === id ? {
+      ...item,
+      ...next,
+      type: Number(next.type || next.status || item.type || 3),
+      ep_status: Number(next.ep_status || next.episode || item.ep_status || 0),
+      subject: next.subject || item.subject
+    } : item))
+  }
+
+  const tabs = [
+    { value: 0, label: '全部' },
+    { value: 2, label: '动画' },
+    { value: 6, label: '三次元' },
+    { value: 1, label: '书籍' }
+  ]
+
+  return <RequireAuth>
+    <div className="watching-heading">
+      <div><h1>在追</h1><p>正在看的作品与观看进度</p></div>
+      <Link className="text-link" href="/profile">查看全部收藏 →</Link>
+    </div>
+    <div className="watching-tabs" role="tablist" aria-label="媒介类型">
+      {tabs.map(tab => <button key={tab.value} className={subjectType === tab.value ? 'active' : ''} type="button" onClick={() => setSubjectType(tab.value)}>{tab.label}</button>)}
+    </div>
+
+    {error ? <div className="error-state"><strong>在追列表加载失败</strong><span>{error}</span><button className="button ghost compact" type="button" onClick={() => void load(0, false)}>重试</button></div> : null}
+    {loading && !collections.length ? <div className="panel empty-state"><h3>正在加载在追列表…</h3></div> : null}
+    {!loading && !error && !collections.length ? <div className="panel empty-state"><h3>还没有在追条目</h3><p>把作品标为“在看”后，会显示在这里。</p><Link className="button primary" href="/anime">去找番</Link></div> : null}
+
+    {collections.length ? <div className="watching-layout">
+      <aside className="watching-list" aria-label="在追列表">
+        {collections.map(collection => {
+          const subject = collection.subject || {} as Subject
+          const id = collectionId(collection)
+          const image = imageUrl(subject.images)
+          const total = Number(subject.eps || subject.eps_count || subject.total_episodes || 0)
+          return <button className={id === collectionId(selected || {} as Collection) ? 'watching-list-item active' : 'watching-list-item'} key={id} type="button" onClick={() => setSelectedId(id)}>
+            {image ? <img src={image} alt="" /> : <span className="watching-list-placeholder">B</span>}
+            <span><strong>{displayName(subject) || `条目 #${id}`}</strong><small>[{Number(collection.ep_status || collection.episode || 0)}/{total || '?'}]</small></span>
+          </button>
+        })}
+        {hasMore ? <button className="watching-load-more" disabled={loading} onClick={() => void load(offset, true)} type="button">{loading ? '加载中…' : '加载更多'}</button> : null}
+      </aside>
+
+      {selected && selectedSubject ? <article className="watching-detail">
+        <div className="watching-detail-main">
+          {imageUrl(selectedSubject.images) ? <img className="watching-detail-cover" src={imageUrl(selectedSubject.images)} alt="" /> : <div className="watching-detail-cover cover-placeholder">B</div>}
+          <div className="watching-detail-copy">
+            <div className="watching-detail-title"><div><h2>{displayName(selectedSubject)}</h2>{selectedSubject.name && selectedSubject.name_cn && selectedSubject.name !== selectedSubject.name_cn ? <p>{selectedSubject.name}</p> : null}</div><CollectionButton animeId={collectionId(selected)} initialStatus={Number(selected.type || 3)} onSaved={next => mergeSaved(collectionId(selected), next)} /></div>
+            <div className="watching-links"><Link href={`/anime/${collectionId(selected)}/topics`}>参与讨论</Link><Link href={`/anime/${collectionId(selected)}/talkbox`}>观吐槽</Link><Link href={`/anime/${collectionId(selected)}`}>详情页</Link></div>
+            {selected.comment ? <p className="watching-comment">“{selected.comment}”</p> : null}
+          </div>
+        </div>
+        <div className="episode-progress">
+          <p>播放进度 · 已看 {watchedEpisodes} / {totalEpisodes || '?'}</p>
+          <div className="episode-buttons">
+            {Array.from({ length: episodeCount }, (_, index) => index + 1).map(episode => <span className={episode <= watchedEpisodes ? 'watched' : ''} key={episode}>{String(episode).padStart(2, '0')}</span>)}
+          </div>
+          {totalEpisodes > 24 ? <small className="episode-note">这里只展示前 24 集，完整信息请进入详情页。</small> : null}
+        </div>
+      </article> : <div className="watching-detail empty-state"><h3>选择一部作品查看详情</h3></div>}
+    </div> : null}
+  </RequireAuth>
+}
 export function SettingsPage() {
   const { account, isBangmioUser, fetchBgmUserProfile, logout, request } = useAuth()
   const [currentPassword, setCurrentPassword] = useState('')
