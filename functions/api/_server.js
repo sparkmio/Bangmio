@@ -3791,7 +3791,8 @@ function rateLimit(windowMs, max) {
         ).bind(`${keyPrefix}:${ip}`, now + windowMs, now, now, now + windowMs).first();
         count = Number(row?.count);
         resetTime = Number(row?.reset_at);
-        if (!Number.isFinite(count) || !Number.isFinite(resetTime)) throw new Error("D1 returned invalid rate-limit row");
+        if (!Number.isFinite(count) || !Number.isFinite(resetTime))
+          throw new Error("D1 returned invalid rate-limit row");
       } catch (err) {
         localStoreCleanup(localStore, now);
         const entry = localStore.get(ip);
@@ -4274,7 +4275,9 @@ async function createCode(db, { email, code, purpose }) {
     ).bind(id, normalizedEmail, code, purpose, expiresAt, now).run();
     if (!result.success) throw new Error("D1 run() \u8FD4\u56DE success=false");
   } catch (err) {
-    throw new Error(`createCode: \u5199\u5165\u5931\u8D25 (email=${normalizedEmail}, purpose=${purpose})`, { cause: err });
+    throw new Error(`createCode: \u5199\u5165\u5931\u8D25 (email=${normalizedEmail}, purpose=${purpose})`, {
+      cause: err
+    });
   }
   return { id, expiresAt };
 }
@@ -4572,7 +4575,11 @@ async function sendVerificationCode(db, env, { email, purpose = "register" }) {
   await createCode(db, { email: normalizedEmail, code, purpose });
   try {
     await sendEmail(
-      { to: normalizedEmail, subject: `Bangmio\u9A8C\u8BC1\u7801\u662F${code}`, html: buildVerificationEmailHTML(code) },
+      {
+        to: normalizedEmail,
+        subject: `Bangmio\u9A8C\u8BC1\u7801\u662F${code}`,
+        html: buildVerificationEmailHTML(code)
+      },
       env.RESEND_API_KEY,
       env.RESEND_FROM
     );
@@ -6079,7 +6086,8 @@ var COLLECTION_STATUS = /* @__PURE__ */ new Set([1, 2, 3, 4, 5]);
 function parseBoundedInteger(value, { min, max, fallback = null }) {
   if (value === void 0 || value === null || value === "") return fallback;
   const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed) || parsed < min || max !== void 0 && parsed > max) return null;
+  if (!Number.isSafeInteger(parsed) || parsed < min || max !== void 0 && parsed > max)
+    return null;
   return parsed;
 }
 function parseAnimeId(value) {
@@ -6099,16 +6107,22 @@ app4.get("/list", async (c) => {
     const guard = await guardUsername(c, token, username);
     if (guard) return guard;
     const client = getClient(token, isChina4(c));
-    const offset = parseBoundedInteger(c.req.query("offset"), { min: 0, max: 1e7, fallback: 0 });
+    const offset = parseBoundedInteger(c.req.query("offset"), {
+      min: 0,
+      max: 1e7,
+      fallback: 0
+    });
     const limit = parseBoundedInteger(c.req.query("limit"), { min: 1, max: 100, fallback: 30 });
-    const subjectType = parseBoundedInteger(c.req.query("subject_type"), { min: 1, max: 7 });
-    const type = parseBoundedInteger(c.req.query("type"), { min: 1, max: 5 });
+    const subjectTypeRaw = c.req.query("subject_type");
+    const typeRaw = c.req.query("type");
+    const subjectType = subjectTypeRaw === void 0 ? void 0 : parseBoundedInteger(subjectTypeRaw, { min: 1, max: 7 });
+    const type = typeRaw === void 0 ? void 0 : parseBoundedInteger(typeRaw, { min: 1, max: 5 });
     if (offset === null || limit === null || subjectType === null || type === null) {
       return c.json({ error: "\u6536\u85CF\u5217\u8868\u53C2\u6570\u4E0D\u5408\u6CD5" }, 400);
     }
     const params = { offset, limit };
-    if (c.req.query("subject_type") !== void 0) params.subject_type = subjectType;
-    if (c.req.query("type") !== void 0) params.type = type;
+    if (subjectType !== void 0) params.subject_type = subjectType;
+    if (type !== void 0) params.type = type;
     const data = await client.get(`/v0/users/${username}/collections`, params);
     return c.json({ data: data.data || [], total: data.total || 0 });
   } catch (err) {
@@ -6159,9 +6173,7 @@ app4.get("/:animeId", async (c) => {
     const animeId = parseAnimeId(c.req.param("animeId"));
     if (animeId === null) return c.json({ error: "\u756A\u5267 ID \u4E0D\u5408\u6CD5" }, 400);
     const client = getClient(token, isChina4(c));
-    const collection = await client.get(
-      `/v0/users/${username}/collections/${animeId}`
-    );
+    const collection = await client.get(`/v0/users/${username}/collections/${animeId}`);
     return c.json({
       data: {
         anime_id: collection.subject_id,
@@ -6216,9 +6228,7 @@ app4.post("/:animeId", async (c) => {
     if (!payload.type) {
       if (username) {
         try {
-          const current = await client.get(
-            `/v0/users/${username}/collections/${animeId}`
-          );
+          const current = await client.get(`/v0/users/${username}/collections/${animeId}`);
           if (current?.type) {
             payload.type = current.type;
           } else {
@@ -6237,9 +6247,7 @@ app4.post("/:animeId", async (c) => {
     await client.post(`/v0/users/-/collections/${animeId}`, payload);
     if (username) {
       try {
-        const collection = await client.get(
-          `/v0/users/${username}/collections/${animeId}`
-        );
+        const collection = await client.get(`/v0/users/${username}/collections/${animeId}`);
         return c.json({
           data: {
             anime_id: collection.subject_id,

@@ -57,14 +57,22 @@ app.get('/list', async c => {
       fallback: 0
     })
     const limit = parseBoundedInteger(c.req.query('limit'), { min: 1, max: 100, fallback: 30 })
-    const subjectType = parseBoundedInteger(c.req.query('subject_type'), { min: 1, max: 7 })
-    const type = parseBoundedInteger(c.req.query('type'), { min: 1, max: 5 })
+    // subject_type 和 type 是可选筛选项。此前缺省值被当成非法值，导致
+    // 任一不带这两个筛选项之一的列表请求直接返回 400。
+    const subjectTypeRaw = c.req.query('subject_type')
+    const typeRaw = c.req.query('type')
+    const subjectType =
+      subjectTypeRaw === undefined
+        ? undefined
+        : parseBoundedInteger(subjectTypeRaw, { min: 1, max: 7 })
+    const type =
+      typeRaw === undefined ? undefined : parseBoundedInteger(typeRaw, { min: 1, max: 5 })
     if (offset === null || limit === null || subjectType === null || type === null) {
       return c.json({ error: '收藏列表参数不合法' }, 400)
     }
     const params = { offset, limit }
-    if (c.req.query('subject_type') !== undefined) params.subject_type = subjectType
-    if (c.req.query('type') !== undefined) params.type = type
+    if (subjectType !== undefined) params.subject_type = subjectType
+    if (type !== undefined) params.type = type
     const data = await client.get(`/v0/users/${username}/collections`, params)
     return c.json({ data: data.data || [], total: data.total || 0 })
   } catch (err) {
