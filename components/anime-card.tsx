@@ -7,15 +7,13 @@ export function AnimeCard({ subject, compact = false }: { subject: Subject; comp
   return (
     <Link className={compact ? 'anime-card compact' : 'anime-card'} href={`/anime/${subject.id}`}>
       <div className="anime-cover">
-        {image ? <img src={image} alt="" loading="lazy" /> : <div className="cover-placeholder">B</div>}
+        {image ? <img src={image} alt={displayName(subject)} loading="lazy" width={200} height={280} /> : <div className="cover-placeholder">暂无封面</div>}
+        <div className="anime-cover-gradient" />
         {subject.rating?.score ? <span className="score-badge">{Number(subject.rating.score).toFixed(1)}</span> : null}
-      </div>
-      <div className="anime-card-body">
-        <h3>{displayName(subject)}</h3>
-        {subject.name && subject.name_cn && subject.name !== subject.name_cn ? <p>{subject.name}</p> : null}
-        <div className="anime-meta">
-          {subject.date || subject.air_date ? <span>{String(subject.date || subject.air_date).slice(0, 4)}</span> : null}
-          {subject.eps || subject.eps_count ? <span>{subject.eps || subject.eps_count} 话</span> : null}
+        {subject.rank ? <span className="rank-badge">#{String(subject.rank)}</span> : null}
+        <div className="anime-overlay-copy">
+          <h3>{displayName(subject)}</h3>
+          {subject.name && subject.name_cn ? <p>{subject.name}</p> : null}
         </div>
       </div>
     </Link>

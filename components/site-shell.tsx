@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from './auth-provider'
+import { avatarUrl } from '@/lib/api'
 
 type IconName = 'home' | 'calendar' | 'search' | 'groups' | 'about' | 'settings'
 
@@ -28,11 +29,11 @@ function NavIcon({ name }: { name: IconName }) {
 }
 
 function BrandMark() {
-  return <span className="brand-mark" aria-hidden="true"><svg viewBox="0 0 36 36" fill="none"><rect x="5" y="8" width="26" height="21" rx="8" stroke="currentColor" strokeWidth="2.2" /><path d="m12 5 4 4m8-4-4 4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /><circle cx="14" cy="18" r="1.5" fill="currentColor" /><path d="m23.5 15.5-3 2.5 3 2.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><path d="M16 23c1.6 1.5 3.4 1.5 5 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg></span>
+  return <span className="brand-mark" aria-hidden="true"><img src="/logo.png" alt="" /></span>
 }
 
 function isActive(pathname: string, href: string) {
-  if (href === '/') return pathname === '/' || pathname === '/watching'
+  if (href === '/') return pathname === '/'
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
@@ -40,29 +41,30 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { user, isAuthenticated, logout } = useAuth()
   const name = user?.nickname || user?.username || '我的空间'
+  const avatar = avatarUrl(user || undefined)
 
   return (
     <div className="site-root">
       <aside className="desktop-sidebar">
-        <Link className="brand" href="/" aria-label="Bangmio 首页"><BrandMark /><span>Bangmio</span></Link>
+        <div className="brand-row"><Link className="brand" href="/" aria-label="Bangmio 首页"><BrandMark /><span>Bangmio</span></Link></div>
         <nav className="desktop-nav" aria-label="主导航">
-          {links.map(link => <Link key={link.href} className={isActive(pathname, link.href) ? 'nav-link active' : 'nav-link'} href={link.href}><NavIcon name={link.icon} /><span>{link.label}</span></Link>)}
+          {links.map(link => <Link key={link.href} className={isActive(pathname, link.href) ? 'nav-link active' : 'nav-link'} href={link.href}><span>{link.label}</span></Link>)}
         </nav>
         <div className="sidebar-account">
           {isAuthenticated ? <>
             <Link className="avatar-chip" href="/profile">
-              <span className="avatar">{name.slice(0, 1)}</span>
+              <span className="avatar">{avatar ? <img src={avatar} alt="" /> : name.slice(0, 1)}</span>
               <span className="account-copy"><strong>{name}</strong><small>查看主页</small></span>
             </Link>
             <button className="sidebar-logout" onClick={logout} type="button">退出登录</button>
           </> : <Link className="button primary sidebar-login" href="/login">登录 Bangmio</Link>}
-          <span className="theme-note" aria-hidden="true">◔&nbsp; 浅色模式</span>
+          <span className="theme-note" aria-hidden="true">☾&nbsp; 深色模式</span>
         </div>
       </aside>
 
       <header className="mobile-topbar">
         <Link className="brand" href="/"><BrandMark /><span>Bangmio</span></Link>
-        {isAuthenticated ? <Link className="avatar" href="/profile">{name.slice(0, 1)}</Link> : <Link className="button primary compact" href="/login">登录</Link>}
+        {isAuthenticated ? <Link className="avatar" href="/profile">{avatar ? <img src={avatar} alt="" /> : name.slice(0, 1)}</Link> : <Link className="button primary compact" href="/login">登录</Link>}
       </header>
 
       <main className="page-content">{children}</main>
