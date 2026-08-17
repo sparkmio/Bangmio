@@ -72,8 +72,15 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: gh release create "$RELEASE_TAG" --verify-tag --title "Bangmio ${RELEASE_TAG}" --notes-file release-notes.md
 
-      - name: Upload desktop executable
+      - name: Upload desktop executable when available
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release upload "$RELEASE_TAG" release-assets/Bangmio-${RELEASE_TAG#v}.exe --clobber
+        shell: bash
+        run: |
+          asset="release-assets/Bangmio-${RELEASE_TAG#v}.exe"
+          if [[ -f "$asset" ]]; then
+            gh release upload "$RELEASE_TAG" "$asset" --clobber
+          else
+            echo "No desktop executable found at $asset; publishing the web release without it."
+          fi

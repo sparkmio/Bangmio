@@ -3,10 +3,10 @@ import { Providers } from '@/components/providers'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: { default: 'Bangmio · 你的番组空间', template: '%s · Bangmio' },
-  description: '发现番组、管理收藏、记录自己的观看轨迹。'
+  title: { default: 'Bangmio', template: '%s · Bangmio' },
+  description: 'Bangmio - 一站式追番社区，聚合 Bangumi、豆瓣、B站、萌娘百科多平台数据。'
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="zh-CN"><body><Providers>{children}</Providers></body></html>
+  return <html lang="zh-CN" data-theme="light"><head><link rel="stylesheet" href="/legacy.css" /></head><body><Providers>{children}</Providers></body></html>
 }
