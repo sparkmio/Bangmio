@@ -93,7 +93,7 @@ describe('subjectType utility', () => {
       const options = getStatusOptions(2)
       expect(options).toHaveLength(5)
       expect(options.map(o => o.value)).toEqual([1, 2, 3, 4, 5])
-      expect(options.map(o => o.label)).toEqual(['想看', '在看', '看过', '搁置', '抛弃'])
+      expect(options.map(o => o.label)).toEqual(['想看', '看过', '在看', '搁置', '抛弃'])
     })
 
     it('每个选项包含 value 与 label 字段', () => {
@@ -115,8 +115,8 @@ describe('subjectType utility', () => {
       const labels = getStatusLabels(2)
       const options = getStatusOptions(2)
       expect(options[0].label).toBe(labels.wish)
-      expect(options[1].label).toBe(labels.collect)
-      expect(options[2].label).toBe(labels.do)
+      expect(options[1].label).toBe(labels.do)
+      expect(options[2].label).toBe(labels.collect)
       expect(options[3].label).toBe(labels.on_hold)
       expect(options[4].label).toBe(labels.dropped)
     })
@@ -124,12 +124,12 @@ describe('subjectType utility', () => {
     it('未知 type 返回默认动画选项', () => {
       const options = getStatusOptions(999)
       expect(options).toHaveLength(5)
-      expect(options.map(o => o.label)).toEqual(['想看', '在看', '看过', '搁置', '抛弃'])
+      expect(options.map(o => o.label)).toEqual(['想看', '看过', '在看', '搁置', '抛弃'])
     })
 
     it('subjectType=4 (游戏) label 对应游戏用语', () => {
       const options = getStatusOptions(4)
-      expect(options.map(o => o.label)).toEqual(['想玩', '在玩', '玩过', '搁置', '抛弃'])
+      expect(options.map(o => o.label)).toEqual(['想玩', '玩过', '在玩', '搁置', '抛弃'])
     })
   })
 

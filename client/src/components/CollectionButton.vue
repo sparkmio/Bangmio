@@ -71,7 +71,7 @@ const open = ref(false)
 const pendingValue = ref(props.modelValue)
 
 // 上次同步到后端的状态快照
-// type: Bangumi collection type (1=wish, 2=collect, 3=do, 4=on_hold, 5=dropped)
+// type: Bangumi collection type (1=wish, 2=completed, 3=doing, 4=on_hold, 5=dropped)
 const lastSyncedState = ref({
   type: props.modelValue,
   ep_status: props.epStatus,

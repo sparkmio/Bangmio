@@ -49,6 +49,17 @@ describe('CollectionButton / 状态同步逻辑', () => {
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
   })
 
+  it('type=2 显示看过、type=3 显示在看，并发送对应 Bangumi 状态值', async () => {
+    wrapper = mount(CollectionButton, { props: makeProps({ modelValue: 2 }) })
+    expect(wrapper.find('button.btn-sm').text()).toContain('看过')
+
+    await wrapper.setProps({ modelValue: 3 })
+    expect(wrapper.find('button.btn-sm').text()).toContain('在看')
+
+    await openMenuAndClickOption(wrapper, 1) // 看过 -> type=2
+    vi.advanceTimersByTime(500)
+    expect(wrapper.emitted('update:modelValue')).toEqual([[2]])
+  })
   it('修改 type 触发 emit update:modelValue', async () => {
     wrapper = mount(CollectionButton, { props: makeProps({ modelValue: 0 }) })
     // 点击「想看」(statusOptions[0], value=1)

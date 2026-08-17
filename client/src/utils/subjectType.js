@@ -17,7 +17,7 @@ export const SUBJECT_TYPE_NAMES = {
 
 /**
  * 各条目类型对应的状态用语映射
- * Bangumi collection type: 1=wish, 2=collect, 3=do, 4=on_hold, 5=dropped
+ * Bangumi collection type: 1=wish, 2=completed, 3=doing, 4=on_hold, 5=dropped
  * @type {Record<number, {wish:string,collect:string,do:string,on_hold:string,dropped:string}>}
  */
 export const STATUS_LABELS_BY_TYPE = {
@@ -49,8 +49,8 @@ export function getStatusOptions(subjectType) {
   const labels = getStatusLabels(subjectType)
   return [
     { value: 1, label: labels.wish },
-    { value: 2, label: labels.collect },
-    { value: 3, label: labels.do },
+    { value: 2, label: labels.do },
+    { value: 3, label: labels.collect },
     { value: 4, label: labels.on_hold },
     { value: 5, label: labels.dropped }
   ]
