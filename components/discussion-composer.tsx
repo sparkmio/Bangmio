@@ -44,8 +44,8 @@ export function DiscussionComposer({ subjectId, topicId, mode = 'comment' }: { s
   }
 
   return <form className="panel composer" onSubmit={submit}>
-    {isTopic ? <input className="input" value={title} onChange={event => setTitle(event.target.value)} placeholder="话题标题" maxLength={120} /> : null}
-    <textarea className="input" value={content} onChange={event => setContent(event.target.value)} placeholder={mode === 'reply' ? '写下回复…' : '分享你的想法…'} rows={4} maxLength={20000} required />
+    {isTopic ? <input className="bangmio-input" value={title} onChange={event => setTitle(event.target.value)} placeholder="话题标题" maxLength={120} /> : null}
+    <textarea className="bangmio-input" value={content} onChange={event => setContent(event.target.value)} placeholder={mode === 'reply' ? '写下回复…' : '分享你的想法…'} rows={4} maxLength={20000} required />
     <div className="composer-footer"><span>{message}</span><button className="button primary" type="submit" disabled={busy}>{busy ? '发布中…' : isTopic ? '发布话题' : '发布'}</button></div>
   </form>
 }

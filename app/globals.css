@@ -778,7 +778,7 @@ a.feature:hover {
   border-radius: 13px;
   background: var(--surface-soft);
 }
-.toolbar .input {
+.toolbar .bangmio-input {
   flex: 1;
 }
 .filter-toolbar {
@@ -787,7 +787,7 @@ a.feature:hover {
 .filter-toolbar label {
   min-width: 210px;
 }
-.input {
+.bangmio-input {
   width: 100%;
   min-height: 42px;
   padding: 9px 12px;
@@ -800,11 +800,11 @@ a.feature:hover {
     border-color 0.16s ease,
     box-shadow 0.16s ease;
 }
-.input:focus {
+.bangmio-input:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(232, 137, 153, 0.12);
 }
-textarea.input {
+textarea.bangmio-input {
   resize: vertical;
 }
 .form-card {
@@ -836,6 +836,27 @@ textarea.input {
   gap: 12px;
   color: var(--muted);
   font-size: 0.84rem;
+}
+.auth-form-footer {
+  display: grid;
+  gap: 9px;
+  margin-top: 20px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+.auth-form-footer a,
+.auth-form-footer .text-button {
+  width: fit-content;
+}
+.reply-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.reply-list .list-card {
+  align-items: flex-start;
 }
 .inline-field {
   display: flex;
@@ -1052,14 +1073,33 @@ a.list-card:hover {
   gap: 6px;
 }
 .rating-bar {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 8px;
+  min-height: 18px;
+}
+.rating-bar > span,
+.rating-bar > em {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-style: normal;
+  line-height: 1;
+}
+.rating-bar > em {
+  text-align: right;
+}
+.rating-bar > i {
+  display: block;
   height: 7px;
   overflow: hidden;
   border-radius: 99px;
   background: #f0edef;
 }
-.rating-bar span {
+.rating-bar > i > b {
   display: block;
   height: 100%;
+  border-radius: inherit;
   background: var(--primary);
 }
 .people-strip {
