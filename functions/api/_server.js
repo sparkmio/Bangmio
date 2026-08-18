@@ -4872,7 +4872,7 @@ function errorResponse(err, fallbackMessage = "\u670D\u52A1\u5668\u5185\u90E8\u9
     return Response.json(
       {
         data: null,
-        error: "\u670D\u52A1\u5668\u672A\u914D\u7F6E BGM_APP_SECRET\uFF0C\u8BF7\u5728 Cloudflare Pages Production \u73AF\u5883\u53D8\u91CF\u4E2D\u6DFB\u52A0",
+        error: "\u670D\u52A1\u5668\u672A\u914D\u7F6E BGM_APP_SECRET\uFF0C\u8BF7\u5728 Cloudflare Worker \u73AF\u5883\u53D8\u91CF\u4E2D\u6DFB\u52A0",
         code: 503
       },
       { status: 503 }
@@ -5593,7 +5593,7 @@ app2.post("/oauth-callback", async (c) => {
     }
     if (err?.message === "OAuth \u670D\u52A1\u672A\u914D\u7F6E") {
       return c.json(
-        { error: "\u670D\u52A1\u5668\u672A\u914D\u7F6E BGM_APP_SECRET\uFF0C\u8BF7\u5728 Cloudflare Pages Production \u73AF\u5883\u53D8\u91CF\u4E2D\u6DFB\u52A0" },
+        { error: "\u670D\u52A1\u5668\u672A\u914D\u7F6E BGM_APP_SECRET\uFF0C\u8BF7\u5728 Cloudflare Worker \u73AF\u5883\u53D8\u91CF\u4E2D\u6DFB\u52A0" },
         503
       );
     }

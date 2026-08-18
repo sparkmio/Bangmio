@@ -10,7 +10,7 @@ Bangumi (bgm.tv) 第三方客户端。支持 OAuth 登录、动画浏览与搜�
 
 **这是一个高中生好玩做的 VibeCoding 项目**，主要是用 DeepSeek V4 Pro 和 MiMo-V2.5-Pro 做的（二遍：改用glm5.2和kimi2.7code了），用了快 2亿 tokens（二遍：早就用了十亿tokens了），要不是 Deepseek 便宜根本负担不起......
 
-本项目使用了 [Bangumi](https://bgm.tv) 的 API，前端用了 Vue 3 + Vite 。国内没啥合适的平台所以部署在 Cloudflare Pages。因为国内已经访问不了bangumi的域名了，所以替换了部分接口改为桜色大佬做的镜像站bangumi.lol(详见https://bgm.tv/group/topic/462456)
+本项目使用了 [Bangumi](https://bgm.tv) 的 API，前端使用 Next.js，后端由 Hono 提供 API。当前通过 OpenNext 部署到 Cloudflare Workers。因为国内已经访问不了bangumi的域名了，所以替换了部分接口改为桜色大佬做的镜像站bangumi.lol(详见https://bgm.tv/group/topic/462456)
 
 这是一个几乎不懂 CSS 的人用 AI 做的网站，各位可以提出批评，但也别骂的太狠。也感谢 Bangumi 现在还活着，给我提供了一个这么全的数据库，只让我做了点前端工作。**这个项目虽然没啥人关注，但我会尽我所能持续进行维护和更新。**
 
@@ -34,22 +34,33 @@ Bangumi (bgm.tv) 第三方客户端。支持 OAuth 登录、动画浏览与搜�
 
 ## 技术栈
 
-| 层   | 技术                                                |
-| ---- | --------------------------------------------------- |
-| 前端 | Vue 3 + Vite + Pinia + TailwindCSS + DaisyUI + GSAP |
-| 后端 | Hono（Cloudflare Pages Functions）                  |
-| API  | 代理 Bangumi API v0 + 网页抓取第三方平台            |
-| 部署 | Cloudflare Pages                                    |
+| 层   | 技术                                     |
+| ---- | ---------------------------------------- |
+| 前端 | Next.js + React + TailwindCSS + DaisyUI  |
+| 后端 | Hono（集成到 Next.js API 路由）          |
+| API  | 代理 Bangumi API v0 + 网页抓取第三方平台 |
+| 部署 | Cloudflare Workers（OpenNext）           |
 
-## Cloudflare Pages OAuth 配置
+## Cloudflare Workers OAuth 配置
 
-生产环境的 Bangumi OAuth 需要在 Cloudflare Pages 项目 `bangmio` 的 **Settings → Variables and Secrets → Production** 中配置：
+生产环境的 Bangumi OAuth 需要在 Cloudflare Worker `bangmio-next` 的 **Settings → Variables and Secrets** 中配置：
 
 - `BGM_APP_SECRET`：从 Bangumi OAuth 应用复制的 Secret，类型选择 **Secret**（必填）；
 - `BGM_APP_ID`：可选，默认使用仓库中的公开 App ID；如果填写，必须和 `BGM_APP_SECRET` 属于同一个 OAuth 应用；
 - `OAUTH_REDIRECT_URI`：`https://bangmio.site/login/callback`，必须与 Bangumi 应用后台完全一致。
 
-修改 Production 变量后请重新部署一次，再从 `https://bangmio.site` 发起登录。不要使用 `www` 或 `pages.dev` 地址测试 OAuth。授权返回后如果仍失败，页面会区分显示：配置错误、回调地址/授权码错误，或 Bangumi 上游暂时不可用。
+修改 Worker 变量后请重新部署一次，再从 `https://bangmio.site` 发起登录。不要使用 `www` 或 `pages.dev` 地址测试 OAuth。授权返回后如果仍失败，页面会区分显示：配置错误、回调地址/授权码错误，或 Bangumi 上游暂时不可用。
+
+## Cloudflare Workers 部署
+
+当前项目使用根目录的 `wrangler.toml` 和 OpenNext 配置，不再使用旧版 Pages 的 `client/dist` 静态目录。先执行 dry-run 检查，再部署：
+
+```bash
+npm run next:dry-run
+npm run next:deploy
+```
+
+Cloudflare 的 Git 构建项目应使用 **Workers Builds**，部署命令填写 `npm run next:deploy`；不要再把项目配置为 Cloudflare Pages 的 `client/dist` 输出目录。
 
 ## 自动发布 Release
 

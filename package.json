@@ -24,10 +24,11 @@
     "typecheck": "tsc --noEmit",
     "next:start": "next start",
     "next:open": "opennextjs-cloudflare build",
-    "next:deploy": "opennextjs-cloudflare build && wrangler deploy --config wrangler.next.toml",
+    "next:deploy": "opennextjs-cloudflare build && wrangler deploy",
     "dev:vue": "npm run dev --prefix client",
     "build:vue": "cd client && npm install --no-audit --no-fund && npm run build",
-    "lint:vue": "eslint . --ext .js,.vue"
+    "lint:vue": "eslint . --ext .js,.vue",
+    "next:dry-run": "opennextjs-cloudflare build && wrangler deploy --dry-run"
   },
   "devDependencies": {
     "@hono/node-server": "^1.17.0",

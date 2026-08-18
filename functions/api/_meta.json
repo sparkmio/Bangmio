@@ -451,9 +451,9 @@
       ],
       "format": "esm"
     },
-    "server/src/utils/errors.js": { "bytes": 2232, "imports": [], "format": "esm" },
+    "server/src/utils/errors.js": { "bytes": 2222, "imports": [], "format": "esm" },
     "server/src/routes/auth.js": {
-      "bytes": 14769,
+      "bytes": 14768,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -527,7 +527,7 @@
     },
     "server/src/services/bangumi.js": { "bytes": 10766, "imports": [], "format": "esm" },
     "server/src/routes/user.js": {
-      "bytes": 18434,
+      "bytes": 18424,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -5155,7 +5155,7 @@
       "format": "esm"
     },
     "server/src/app.js": {
-      "bytes": 3778,
+      "bytes": 3777,
       "imports": [
         {
           "path": "node_modules/hono/dist/index.js",
@@ -5303,12 +5303,12 @@
         "server/src/services/auth.js": { "bytesInOutput": 10811 },
         "server/src/utils/turnstile.js": { "bytesInOutput": 863 },
         "server/src/utils/oauthConfig.js": { "bytesInOutput": 454 },
-        "server/src/utils/errors.js": { "bytesInOutput": 1153 },
+        "server/src/utils/errors.js": { "bytesInOutput": 1143 },
         "server/src/routes/auth.js": { "bytesInOutput": 10206 },
         "node_modules/hono/dist/utils/cookie.js": { "bytesInOutput": 3747 },
         "node_modules/hono/dist/helper/cookie/index.js": { "bytesInOutput": 1260 },
         "server/src/services/bangumi.js": { "bytesInOutput": 5574 },
-        "server/src/routes/user.js": { "bytesInOutput": 17307 },
+        "server/src/routes/user.js": { "bytesInOutput": 17297 },
         "server/src/controllers/animeController.js": { "bytesInOutput": 4411 },
         "server/src/routes/anime.js": { "bytesInOutput": 683 },
         "server/src/services/userVerify.js": { "bytesInOutput": 787 },
@@ -5549,7 +5549,7 @@
         "server/src/routes/music.js": { "bytesInOutput": 604 },
         "server/src/app.js": { "bytesInOutput": 2534 }
       },
-      "bytes": 719823
+      "bytes": 719803
     }
   }
 }
