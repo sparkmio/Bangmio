@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AnimeGrid } from '@/components/anime-card'
+import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { displayName, imageUrl } from '@/lib/api'
 import type { Collection, Subject } from '@/lib/types'
 import { useAuth } from './auth-provider'
@@ -15,6 +15,17 @@ function collectionSubject(collection: Collection): WatchingSubject | null {
   const id = Number(collection.subject_id || subject?.id || collection.anime_id || 0)
   if (!id) return null
   return { ...(subject || {}), id, ep_status: Number(collection.ep_status || 0), total_episodes: Number(subject?.eps || subject?.eps_count || 0) }
+}
+
+function Arrow() { return <span aria-hidden="true">→</span> }
+
+function HomeCover({ subject }: { subject: Subject }) {
+  const image = imageUrl(subject.images)
+  return <div className="cover">
+    {image ? <img src={image} alt={displayName(subject)} loading="lazy" decoding="async" /> : <div className="cover-fallback"><span>Bangmio</span></div>}
+    <div className="cover-orbit" />
+    <strong className="cover-mark">{subject.rank ? `#${subject.rank}` : 'ANIME'}</strong>
+  </div>
 }
 
 function WatchingPanel() {
@@ -40,36 +51,59 @@ function WatchingPanel() {
         setWatchingList(next)
         setSelectedId(next[0]?.id || 0)
       })
-      .catch(() => { if (alive) setWatchingError('加载失败') })
+      .catch(() => { if (alive) setWatchingError('加载在追列表失败') })
       .finally(() => { if (alive) setWatchingLoading(false) })
     return () => { alive = false }
   }, [isAuthenticated, request, retry, watchingType])
 
-  const selectedWatching = useMemo(() => watchingList.find(item => item.id === selectedId) || watchingList[0] || null, [selectedId, watchingList])
-  const watched = Number(selectedWatching?.ep_status || 0)
-  const total = Number(selectedWatching?.total_episodes || 0)
+  const selected = useMemo(() => watchingList.find(item => item.id === selectedId) || watchingList[0] || null, [selectedId, watchingList])
+  const watched = Number(selected?.ep_status || 0)
+  const total = Number(selected?.total_episodes || 0)
   const episodeCount = Math.min(total || Math.max(watched, 12), 24)
 
-  return <section className="mb-10">
-    <div className="flex items-center justify-between mb-4"><h2 className="text-xl font-semibold text-base-content">在追</h2><Link href="/watching" className="text-sm text-primary hover-underline-wipe">查看全部 →</Link></div>
-    <div className="flex gap-1.5 mb-5 overflow-x-auto scrollbar-hide">{typeTabs.map(tab => <button key={tab.value} className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300 ${watchingType === tab.value ? 'bg-primary text-primary-content shadow-sm' : 'bg-base-200/60 text-base-content/60 hover:bg-base-200'}`} onClick={() => setWatchingType(tab.value)} type="button">{tab.label}</button>)}</div>
-    {watchingLoading ? <div className="py-12 text-center text-base-content/30 text-sm rounded-xl bg-base-200/30">正在加载在追内容…</div> : null}
-    {watchingError ? <div className="py-12 text-center text-error text-sm rounded-xl bg-base-200/30">{watchingError}<button className="btn btn-ghost btn-sm ml-2" type="button" onClick={() => setRetry(value => value + 1)}>重试</button></div> : null}
-    {!watchingLoading && !watchingError && watchingList.length ? <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-start">
-      <div className="lg:col-span-3"><div className="space-y-1 overflow-y-auto pr-1 scrollbar-hide -mx-1 px-1" style={{ maxHeight: 'min(420px, 45vh)' }}>{watchingList.map(item => { const image = imageUrl(item.images); const itemTotal = Number(item.total_episodes || 0); return <button key={item.id} className={`w-full flex items-center gap-3 p-2 sm:p-2.5 rounded-lg text-left transition-all duration-200 min-h-[48px] ${selectedWatching?.id === item.id ? 'bg-primary/10 border-l-2 border-primary pl-3' : 'hover:bg-base-200/60 border-l-2 border-transparent'}`} onClick={() => setSelectedId(item.id)} type="button">{image ? <img src={image} alt={displayName(item)} className="w-10 h-14 sm:w-11 sm:h-[60px] rounded object-cover flex-shrink-0" loading="lazy" decoding="async" /> : null}<div className="min-w-0 flex-1"><p className="text-[13px] sm:text-sm font-medium text-base-content line-clamp-1 hover:text-primary transition-colors cursor-pointer">{displayName(item)}</p><p className="text-xs text-primary font-semibold mt-0.5">[{Number(item.ep_status || 0)}/{itemTotal || '?'}]</p></div></button> })}</div></div>
-      <div className="lg:col-span-9">{selectedWatching ? <div className="rounded-xl bg-base-200/40 p-5"><div className="flex gap-5 mb-4">{imageUrl(selectedWatching.images) ? <img src={imageUrl(selectedWatching.images)} alt={displayName(selectedWatching)} className="w-24 h-32 sm:w-28 sm:h-40 rounded-lg object-cover shadow-md flex-shrink-0" /> : null}<div className="min-w-0 flex-1"><h3 className="text-lg font-semibold text-base-content mb-1">{displayName(selectedWatching)}</h3>{selectedWatching.name && selectedWatching.name_cn && selectedWatching.name !== selectedWatching.name_cn ? <p className="text-sm text-base-content/50 mb-3">{selectedWatching.name}</p> : null}<div className="flex gap-3 text-sm"><Link href={`/anime/${selectedWatching.id}/topics`} className="text-primary hover-underline-wipe">参与讨论</Link><Link href={`/anime/${selectedWatching.id}/talkbox`} className="text-primary hover-underline-wipe">观吐槽</Link><Link href={`/anime/${selectedWatching.id}`} className="text-primary hover-underline-wipe">详情页</Link></div></div></div><div className="mt-4"><p className="text-xs text-base-content/40 mb-2">播放进度 · 已看 {watched} / {total || '?'}</p><div className="flex flex-wrap gap-1.5">{Array.from({ length: episodeCount }, (_, index) => index + 1).map(ep => <button key={ep} className={`min-w-10 min-h-9 px-1 rounded-lg text-xs font-bold flex items-center justify-center transition-all hover:scale-110 cursor-pointer ${ep <= watched ? 'bg-primary text-white' : 'bg-base-300 text-base-content/40 hover:bg-base-300/80'}`} type="button">{String(ep).padStart(2, '0')}</button>)}</div></div></div> : <div className="py-12 text-center text-base-content/30 text-sm rounded-xl bg-base-200/30">选择左侧的番剧查看详情</div>}</div>
+  return <section className="content-section watching-section">
+    <div className="section-heading"><div><p className="eyebrow">YOUR LIBRARY</p><h2>正在追番</h2></div><Link className="text-link" href="/watching">查看全部 <Arrow /></Link></div>
+    <div className="filter-row">{typeTabs.map(tab => <button key={tab.value} className={`filter-button ${watchingType === tab.value ? 'active' : ''}`} onClick={() => setWatchingType(tab.value)} type="button">{tab.label}</button>)}</div>
+    {watchingLoading ? <div className="page-panel async-state">正在加载你的追番列表…</div> : null}
+    {watchingError ? <div className="page-panel async-state error-text">{watchingError}<button className="soft-button" type="button" onClick={() => setRetry(value => value + 1)}>重试</button></div> : null}
+    {!watchingLoading && !watchingError && watchingList.length ? <div className="watching-layout page-panel">
+      <div className="watching-list">{watchingList.map(item => { const image = imageUrl(item.images); return <button key={item.id} className={`watching-item ${selected?.id === item.id ? 'active' : ''}`} onClick={() => setSelectedId(item.id)} type="button">{image ? <img src={image} alt="" /> : <span className="watching-placeholder">✦</span>}<span><strong>{displayName(item)}</strong><small>已看 {Number(item.ep_status || 0)} / {Number(item.total_episodes || 0) || '?'}</small></span></button> })}</div>
+      {selected ? <article className="watching-detail"><div className="watching-heading">{imageUrl(selected.images) ? <img src={imageUrl(selected.images)} alt={displayName(selected)} /> : null}<div><p className="eyebrow">CONTINUE WATCHING</p><h3>{displayName(selected)}</h3>{selected.name && selected.name !== selected.name_cn ? <p>{selected.name}</p> : null}<Link className="text-link" href={`/anime/${selected.id}`}>进入详情 <Arrow /></Link></div></div><div className="progress-copy">播放进度 <strong>{watched}</strong> / {total || '?'}</div><div className="episode-grid">{Array.from({ length: episodeCount }, (_, index) => index + 1).map(ep => <span className={ep <= watched ? 'watched' : ''} key={ep}>{String(ep).padStart(2, '0')}</span>)}</div></article> : null}
     </div> : null}
-    {!watchingLoading && !watchingError && !watchingList.length ? <div className="text-center py-10 rounded-xl bg-base-200/30"><p className="text-sm text-base-content/40">还没有在追的内容</p><Link href="/anime" className="text-sm text-primary mt-1 inline-block hover-underline-wipe">去探索</Link></div> : null}
+    {!watchingLoading && !watchingError && !watchingList.length ? <div className="page-panel async-state"><p>还没有在追的内容</p><Link className="text-link" href="/anime">去探索番剧 <Arrow /></Link></div> : null}
   </section>
 }
 
-function GuestHome() {
-  return <section className="mb-10"><div className="rounded-2xl bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 border border-primary/20 p-8 sm:p-12 text-center"><h1 className="text-3xl sm:text-4xl font-black text-primary mb-3">Bangmio</h1><p className="text-base-content/60 text-sm sm:text-base mb-6 max-w-md mx-auto">发现、记录、分享你的番剧世界</p><div className="flex items-center justify-center gap-3"><Link href="/login" className="btn btn-primary rounded-full px-6">登录 Bangmio</Link><Link href="/register" className="btn btn-outline rounded-full px-6">注册</Link></div></div></section>
+function GuestHero() {
+  return <section className="welcome-card">
+    <div className="welcome-orb orb-one" /><div className="welcome-orb orb-two" /><div className="welcome-grid" />
+    <div className="welcome-copy"><span className="pill">✦ 一站式追番社区</span><h2>你的下一部<br /><em>心动番剧</em>，从这里开始。</h2><p>聚合 Bangumi、豆瓣、B 站等平台数据，在这里发现作品、管理收藏，也和同好一起讨论。</p><div className="welcome-actions"><Link className="primary-button" href="/anime">开始探索 <Arrow /></Link><Link className="ghost-button" href="/register">创建账号</Link></div></div>
+    <div className="welcome-visual" aria-hidden="true"><div className="visual-card card-back"><span>ANIME</span></div><div className="visual-card card-mid"><span>LIST</span></div><div className="visual-card card-front"><strong>把喜欢的作品<br />都收进来</strong><small>收藏 · 评分 · 吐槽</small></div><div className="floating-note">✦ 今日推荐</div></div>
+  </section>
+}
+
+function QuickLinks() {
+  const links = [{ href: '/anime', icon: '⌕', tone: 'pink', title: '找一部番', description: '搜索动画、书籍和作品' }, { href: '/trending', icon: '◷', tone: 'purple', title: '新番时间表', description: '看看本季正在播什么' }, { href: '/groups', icon: '◎', tone: 'blue', title: '加入小组', description: '和同好聊喜欢的作品' }]
+  return <section className="quick-section"><div className="section-heading"><div><p className="eyebrow">EXPLORE</p><h2>从这里开始</h2></div><Link className="text-link" href="/about">了解 Bangmio <Arrow /></Link></div><div className="quick-grid">{links.map(link => <Link className="quick-card" href={link.href} key={link.href}><span className={`quick-icon ${link.tone}`}>{link.icon}</span><span className="quick-text"><strong>{link.title}</strong><small>{link.description}</small></span><span className="quick-arrow">→</span></Link>)}</div></section>
+}
+
+function SearchBar() {
+  const router = useRouter()
+  const [query, setQuery] = useState('')
+  function submit(event: React.FormEvent) { event.preventDefault(); if (query.trim()) router.push(`/anime?q=${encodeURIComponent(query.trim())}`); else router.push('/anime') }
+  return <form className="search-box" onSubmit={submit}><span aria-hidden="true">⌕</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索番剧、人物或小组" aria-label="搜索番剧、人物或小组" /><kbd>⌘ K</kbd></form>
 }
 
 export function HomeClient({ initialHot }: { initialHot: Subject[] }) {
   const { ready, isAuthenticated } = useAuth()
   const [hot, setHot] = useState(initialHot)
   useEffect(() => { if (initialHot.length) return; let alive = true; void fetch('/api/v1/anime/browse?sort=heat&type=2&limit=12').then(response => response.json()).then(payload => { if (alive && Array.isArray(payload?.data)) setHot(payload.data) }).catch(() => undefined); return () => { alive = false } }, [initialHot.length])
-  return <div>{ready && isAuthenticated ? <WatchingPanel /> : <GuestHome />}<section className="mb-10"><div className="flex items-center justify-between mb-4"><h2 className="text-xl font-semibold text-base-content">热门新番</h2><Link href="/trending" className="text-sm text-primary hover-underline-wipe">查看全部 →</Link></div><AnimeGrid subjects={hot.slice(0, 8)} empty="暂时没有热门条目" /></section>{!isAuthenticated ? <section className="mb-10"><div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><Link href="/trending" className="card bg-base-100 border border-base-300 hover:shadow-card transition-all p-5 rounded-xl"><h3 className="text-base font-bold text-base-content mb-1">新番时间表</h3><p className="text-sm text-base-content/50">查看本季所有新番播放时间</p></Link><Link href="/anime" className="card bg-base-100 border border-base-300 hover:shadow-card transition-all p-5 rounded-xl"><h3 className="text-base font-bold text-base-content mb-1">搜索番剧</h3><p className="text-sm text-base-content/50">探索更多动画、书籍、音乐</p></Link></div></section> : null}</div>
+  return <>
+    <div className="topbar"><div><p className="eyebrow">WELCOME BACK</p><h1>发现、记录、分享你的番剧世界</h1></div><div className="top-actions"><SearchBar />{!isAuthenticated ? <Link className="login-button" href="/login">登录</Link> : <Link className="login-button" href="/profile">我的主页</Link>}</div></div>
+    {ready && isAuthenticated ? <WatchingPanel /> : <GuestHero />}
+    <QuickLinks />
+    <section className="content-section"><div className="section-heading"><div><p className="eyebrow">TRENDING NOW</p><h2>大家都在看</h2></div><Link className="text-link" href="/trending">探索更多 <Arrow /></Link></div>{hot.length ? <div className="anime-grid">{hot.slice(0, 8).map(subject => <Link className="anime-card" href={`/anime/${subject.id}`} key={subject.id}><HomeCover subject={subject} /><div className="anime-info"><strong>{displayName(subject)}</strong>{subject.name && subject.name !== subject.name_cn ? <small>{subject.name}</small> : <small>热门作品</small>}<span>{subject.rating?.score ? `★ ${Number(subject.rating.score).toFixed(1)}` : '查看详情 →'}</span></div></Link>)}</div> : <div className="empty-search">暂时没有热门作品</div>}</section>
+    <section className="schedule-section"><div className="section-heading"><div><p className="eyebrow">ON AIR</p><h2>新番时间表</h2></div><Link className="text-link" href="/trending">完整时间表 <Arrow /></Link></div><div className="schedule-grid"><div className="schedule-day today"><div className="day-head"><span>今天</span><small>正在播出</small></div><Link className="schedule-item" href="/trending"><span className="schedule-dot" />查看今日更新 <span>→</span></Link><Link className="schedule-item" href="/anime"><span className="schedule-dot" />探索更多新番 <span>→</span></Link></div><div className="schedule-day"><div className="day-head"><span>本周</span><small>番剧推荐</small></div><Link className="schedule-item" href="/trending"><span className="schedule-dot" />本季热门作品 <span>→</span></Link><Link className="schedule-item" href="/anime"><span className="schedule-dot" />按类型浏览 <span>→</span></Link></div><div className="schedule-day"><div className="day-head"><span>社区</span><small>一起讨论</small></div><Link className="schedule-item" href="/groups"><span className="schedule-dot" />最新小组话题 <span>→</span></Link><Link className="schedule-item" href="/groups"><span className="schedule-dot" />寻找同好 <span>→</span></Link></div><div className="schedule-day schedule-tip"><div className="day-head"><span>小贴士</span><small>Bangmio</small></div><p>登录后可以同步收藏和追番进度。</p><Link className="text-link" href={isAuthenticated ? '/profile' : '/login'}>{isAuthenticated ? '查看我的资料' : '登录开始'} <Arrow /></Link></div></div></section>
+    <footer><span>© 2026 Bangmio</span><span>聚合多平台数据 · 让追番更简单</span><span className="footer-links"><Link href="/about">关于我们</Link><Link href="/groups">社区</Link></span></footer>
+  </>
 }

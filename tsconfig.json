@@ -29,5 +29,5 @@
     "**/*.tsx",
     ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "client"]
+  "exclude": ["node_modules", "client", "bangmio-site-clone"]
 }

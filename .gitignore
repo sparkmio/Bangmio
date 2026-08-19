@@ -47,3 +47,6 @@ client/.codex-build-verify/
 .next/
 .open-next/
 tsconfig.tsbuildinfo
+
+# 本地 UI 参考工程，不纳入主项目
+/bangmio-site-clone/
