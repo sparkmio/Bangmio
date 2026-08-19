@@ -6,6 +6,12 @@ function authorName(comment: any) {
   return comment.user?.nickname || comment.user?.username || comment.creator?.nickname || comment.creator?.username || '社区成员'
 }
 
+function commentDate(comment: any, index: number) {
+  const value = comment.created_at || comment.date
+  if (typeof value === 'string' || typeof value === 'number') return String(value)
+  return `第 ${index + 1} 条吐槽`
+}
+
 export default async function SubjectTalkboxPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const response = await safeApiFetch<any[]>(`/comments/subject/${id}`)
@@ -16,7 +22,7 @@ export default async function SubjectTalkboxPage({ params }: { params: Promise<{
     <DiscussionComposer subjectId={Number(id)} mode="talkbox" />
     {comments.length ? <section className="comment-thread" aria-label="吐槽列表">{comments.map((comment: any, index: number) => {
       const author = authorName(comment)
-      return <article className="panel comment-card" key={comment.id || index}><span className="avatar">{author.slice(0, 1)}</span><div><div className="comment-card-head"><strong>{author}</strong><small>{comment.created_at || comment.date || `第 ${index + 1} 条吐槽`}</small></div><p>{comment.content || comment.comment || '暂无内容。'}</p></div></article>
+      return <article className="panel comment-card" key={comment.id || index}><span className="avatar">{author.slice(0, 1)}</span><div><div className="comment-card-head"><strong>{author}</strong><small>{commentDate(comment, index)}</small></div><p>{comment.content || comment.comment || '暂无内容。'}</p></div></article>
     })}</section> : <div className="panel empty-state"><div className="empty-icon">✦</div><h3>还没有吐槽</h3><p>看完之后，留下你的第一句话。</p></div>}
   </div>
 }

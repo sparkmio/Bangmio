@@ -10,6 +10,15 @@ function topicHref(topic: any) {
   return `/group/topic/${topic.id || topic.topic_id}`
 }
 
+function countValue(value: unknown, fallback = 0) {
+  if (typeof value === 'number' || typeof value === 'string') return value
+  if (Array.isArray(value)) return value.length
+  if (value && typeof value === 'object') {
+    const candidate = (value as any).count ?? (value as any).total ?? (value as any).length
+    if (typeof candidate === 'number' || typeof candidate === 'string') return candidate
+  }
+  return fallback
+}
 export default async function GroupDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const response = await safeApiFetch<any>(`/groups/${id}`)
@@ -29,9 +38,9 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
         <p>{description}</p>
       </div>
       <div className="group-detail-stats" aria-label="小组数据">
-        <span><b>{group.member_count || group.members || 0}</b><small>成员</small></span>
-        <span><b>{group.topic_count || topics.length}</b><small>话题</small></span>
-        <span><b>{group.created_at?.slice?.(0, 10) || '公开'}</b><small>{group.created_at ? '创建于' : '访问权限'}</small></span>
+        <span><b>{countValue(group.member_count ?? group.members)}</b><small>成员</small></span>
+        <span><b>{countValue(group.topic_count, topics.length)}</b><small>话题</small></span>
+        <span><b>{typeof group.created_at === 'string' ? group.created_at.slice(0, 10) : '公开'}</b><small>{typeof group.created_at === 'string' ? '创建于' : '访问权限'}</small></span>
       </div>
     </header>
 
@@ -40,7 +49,7 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
       {topics.length ? <div className="topic-list panel">
         {topics.map((topic: any, index: number) => <Link className="topic-row" href={topicHref(topic)} key={topic.id || topic.topic_id || index}>
           <span className="topic-avatar">话</span>
-          <span className="topic-row-copy"><strong>{topic.title || topic.name || '未命名话题'}</strong><small>{topic.creator?.nickname || topic.creator?.username || '社区成员'} · {topic.replies || topic.reply_count || 0} 条回复</small></span>
+          <span className="topic-row-copy"><strong>{topic.title || topic.name || '未命名话题'}</strong><small>{topic.creator?.nickname || topic.creator?.username || '社区成员'} · {countValue(topic.replies ?? topic.reply_count)} 条回复</small></span>
           <span className="topic-row-arrow" aria-hidden="true">→</span>
         </Link>)}
       </div> : <div className="panel empty-state"><div className="empty-icon">✦</div><h3>暂无话题</h3><p>来发起小组的第一个讨论吧。</p></div>}
