@@ -1,8 +1,11 @@
-import Link from 'next/link'
 import { safeApiFetch } from '@/lib/api'
+import { TopicThread } from '@/components/topic-thread'
+
 export default async function GroupTopicPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params; const response = await safeApiFetch<any>(`/groups/topic/${id}`); const topic = response?.data
+  const { id } = await params
+  const response = await safeApiFetch<any>(`/groups/topic/${id}`)
+  const topic = response?.data
   if (!topic) return <div className="panel empty-state"><h3>话题暂时不可用</h3><p>请稍后再试。</p></div>
   const replies = Array.isArray(topic.replies) ? topic.replies : []
-  return <><article className="panel form-card" style={{ width: '100%', margin: 0 }}><div className="eyebrow">Topic</div><h1>{topic.title}</h1><p className="detail-summary">{topic.content || topic.body || '暂无正文。'}</p><p className="form-footer">{topic.creator?.nickname || topic.creator?.username || '社区成员'} · {topic.created_at || ''}</p></article><section><h2>回复 {replies.length ? `(${replies.length})` : ''}</h2><div className="reply-list">{replies.map((reply: any, index: number) => <div className="list-card" key={reply.id || index}><div className="avatar">{(reply.creator?.nickname || '友').slice(0, 1)}</div><div><h3>{reply.creator?.nickname || reply.creator?.username || '社区成员'}</h3><p>{reply.content || reply.body || ''}</p></div></div>)}</div></section><Link className="text-link" href="/groups">← 返回小组</Link></>
+  return <TopicThread topic={topic} replies={replies} backHref="/groups" backLabel="返回小组" />
 }

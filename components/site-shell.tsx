@@ -45,6 +45,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const [dark, setDark] = useState(false)
   const name = user?.nickname || user?.username || 'Bangmio 用户'
   const avatar = avatarUrl(user || undefined)
+  const isAuthRoute = ['/login', '/register', '/forgot-password', '/reset-password', '/bind-bangumi'].some(route => pathname === route || pathname.startsWith(route + '/'))
 
   useEffect(() => {
     const saved = window.localStorage.getItem('theme') === 'dark'
@@ -61,6 +62,15 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     window.localStorage.setItem('theme', next ? 'dark' : 'light')
   }
 
+  if (isAuthRoute) {
+    return <div className={`auth-shell ${dark ? 'dark' : ''}`}>
+      <header className="auth-header">
+        <Link className="brand" href="/"><img src="/logo.png" alt="Bangmio" /><span>Bangmio</span></Link>
+        <button className="icon-button" onClick={toggleTheme} aria-label="切换主题" type="button">{dark ? '☀' : '☾'}</button>
+      </header>
+      {children}
+    </div>
+  }
   return <div className={`site-shell ${dark ? 'dark' : ''}`}>
     <aside className={`sidebar ${menuOpen ? 'open' : ''}`}>
       <div className="brand-row">

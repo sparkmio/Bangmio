@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="zh-CN" data-theme="light"><head><link rel="stylesheet" href="/legacy.css" /></head><body><Providers>{children}</Providers></body></html>
+  return <html lang="zh-CN" data-theme="light"><body><Providers>{children}</Providers></body></html>
 }
