@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Collection } from '@/lib/types'
@@ -80,5 +81,10 @@ export function CollectionEditor({ animeId }: { animeId: number }) {
     } catch (error) { setMessage(error instanceof Error ? error.message : '保存失败') } finally { setBusy(false) }
   }
 
-  return <section className="panel collection-editor"><div><div className="eyebrow">My collection</div><h2>我的收藏</h2><p>状态值已严格对应 Bangumi：<b>看过 = 2</b>，<b>在看 = 3</b>。</p></div><div className="collection-editor-actions"><CollectionButton animeId={animeId} initialStatus={Number(collection?.type || 0)} onSaved={next => setCollection(next)} /></div><form className="form-stack collection-details" onSubmit={saveDetails}><label>评分（0 为未评分）<select className="bangmio-input" value={rating} onChange={event => setRating(Number(event.target.value))}>{Array.from({ length: 11 }, (_, value) => <option value={value} key={value}>{value === 0 ? '未评分' : `${value} 分`}</option>)}</select></label><label>短评<textarea className="bangmio-input" rows={3} maxLength={2000} value={comment} onChange={event => setComment(event.target.value)} placeholder="写点观后感…" /></label><button className="button ghost" type="submit" disabled={busy}>{busy ? '保存中…' : '保存评分与短评'}</button></form>{message ? <p className="action-message">{message}</p> : null}</section>
+  return <section className="panel collection-editor">
+    <div><div className="eyebrow">My collection</div><h2>我的收藏</h2><p>状态值已严格对应 Bangumi：<b>看过 = 2</b>，<b>在看 = 3</b>。</p></div>
+    <div className="collection-editor-actions"><CollectionButton animeId={animeId} initialStatus={Number(collection?.type || 0)} onSaved={next => setCollection(next)} /></div>
+    {isAuthenticated ? <form className="form-stack collection-details" onSubmit={saveDetails}><label>评分（0 为未评分）<select className="bangmio-input" value={rating} onChange={event => setRating(Number(event.target.value))}>{Array.from({ length: 11 }, (_, value) => <option value={value} key={value}>{value === 0 ? '未评分' : `${value} 分`}</option>)}</select></label><label>短评<textarea className="bangmio-input" rows={3} maxLength={2000} value={comment} onChange={event => setComment(event.target.value)} placeholder="写点观后感…" /></label><button className="button ghost" type="submit" disabled={busy}>{busy ? '保存中…' : '保存评分与短评'}</button></form> : <div className="collection-guest-hint"><span>登录后可以记录进度、评分和短评。</span><Link className="text-link" href={`/login?redirect=/anime/${animeId}`}>登录后继续 →</Link></div>}
+    {message ? <p className="action-message">{message}</p> : null}
+  </section>
 }
