@@ -49,7 +49,7 @@ export function CollectionButton({ animeId, initialStatus = 0, onSaved }: { anim
   }
 
   const label = useMemo(() => collectionStatusLabel(status), [status])
-  return <div className="collection-control"><button className="button primary" type="button" onClick={() => setOpen(value => !value)} disabled={saving}>{saving ? '保存中…' : label} <span className="chevron">⌄</span></button>{open ? <div className="collection-menu" role="menu">{options.map(([value, text]) => <button key={value} className={value === status ? 'selected' : ''} onClick={() => select(value)} type="button" role="menuitem">{text}{value === status ? ' ✓' : ''}</button>)}</div> : null}{message ? <div className="action-message">{message}</div> : null}</div>
+  return <div className="relative inline-block"><button className="btn btn-primary" type="button" onClick={() => setOpen(value => !value)} disabled={saving}>{saving ? '保存中…' : label} <span aria-hidden="true">⌄</span></button>{open ? <div className="absolute left-0 top-full z-20 mt-1 w-32 rounded-lg border border-base-300 bg-base-100 p-1 shadow-xl" role="menu">{options.map(([value, text]) => <button key={value} className={value === status ? 'w-full rounded-md px-3 py-2 text-left text-sm bg-primary/10 text-primary' : 'w-full rounded-md px-3 py-2 text-left text-sm hover:bg-base-200'} onClick={() => select(value)} type="button" role="menuitem">{text}{value === status ? ' ✓' : ''}</button>)}</div> : null}{message ? <div className="text-xs text-error mt-1">{message}</div> : null}</div>
 }
 
 export function CollectionEditor({ animeId }: { animeId: number }) {
@@ -81,10 +81,10 @@ export function CollectionEditor({ animeId }: { animeId: number }) {
     } catch (error) { setMessage(error instanceof Error ? error.message : '保存失败') } finally { setBusy(false) }
   }
 
-  return <section className="panel collection-editor">
-    <div><div className="eyebrow">My collection</div><h2>我的收藏</h2><p>状态值已严格对应 Bangumi：<b>看过 = 2</b>，<b>在看 = 3</b>。</p></div>
-    <div className="collection-editor-actions"><CollectionButton animeId={animeId} initialStatus={Number(collection?.type || 0)} onSaved={next => setCollection(next)} /></div>
-    {isAuthenticated ? <form className="form-stack collection-details" onSubmit={saveDetails}><label>评分（0 为未评分）<select className="bangmio-input" value={rating} onChange={event => setRating(Number(event.target.value))}>{Array.from({ length: 11 }, (_, value) => <option value={value} key={value}>{value === 0 ? '未评分' : `${value} 分`}</option>)}</select></label><label>短评<textarea className="bangmio-input" rows={3} maxLength={2000} value={comment} onChange={event => setComment(event.target.value)} placeholder="写点观后感…" /></label><button className="button ghost" type="submit" disabled={busy}>{busy ? '保存中…' : '保存评分与短评'}</button></form> : <div className="collection-guest-hint"><span>登录后可以记录进度、评分和短评。</span><Link className="text-link" href={`/login?redirect=/anime/${animeId}`}>登录后继续 →</Link></div>}
-    {message ? <p className="action-message">{message}</p> : null}
+  return <section className="rounded-xl bg-base-200/40 p-5">
+    <div><h2 className="text-sm font-semibold mb-3 text-base-content/80">我的收藏</h2><p className="text-xs text-base-content/50">状态值已严格对应 Bangumi：<b>看过 = 2</b>，<b>在看 = 3</b>。</p></div>
+    <div className="mt-4"><CollectionButton animeId={animeId} initialStatus={Number(collection?.type || 0)} onSaved={next => setCollection(next)} /></div>
+    {isAuthenticated ? <form className="flex flex-col gap-3 mt-4" onSubmit={saveDetails}><label>评分（0 为未评分）<select className="select select-bordered w-full" value={rating} onChange={event => setRating(Number(event.target.value))}>{Array.from({ length: 11 }, (_, value) => <option value={value} key={value}>{value === 0 ? '未评分' : `${value} 分`}</option>)}</select></label><label>短评<textarea className="textarea textarea-bordered w-full" rows={3} maxLength={2000} value={comment} onChange={event => setComment(event.target.value)} placeholder="写点观后感…" /></label><button className="btn btn-outline" type="submit" disabled={busy}>{busy ? '保存中…' : '保存评分与短评'}</button></form> : <div className="flex items-center justify-between gap-3 mt-4 text-sm text-base-content/60"><span>登录后可以记录进度、评分和短评。</span><Link className="link link-primary" href={`/login?redirect=/anime/${animeId}`}>登录后继续 →</Link></div>}
+    {message ? <p className="text-sm text-primary mt-3">{message}</p> : null}
   </section>
 }

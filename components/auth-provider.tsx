@@ -24,6 +24,10 @@ type AuthContextValue = {
   isAuthenticated: boolean
   isBangmioUser: boolean
   isBound: boolean
+  showBindModal: boolean
+  setShowBindModal: (visible: boolean) => void
+  bindBangumi: (bangumiToken: string) => Promise<void>
+  getOAuthBindUrl: () => Promise<string>
   setAuth: (token: string, user: User, kind?: AuthKind) => void
   refreshBangmioToken: () => Promise<string | null>
   fetchBgmToken: () => Promise<string | null>
@@ -60,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [account, setAccount] = useState<User | null>(null)
   const [kind, setKind] = useState<AuthKind | null>(null)
+  const [showBindModal, setShowBindModal] = useState(false)
   const refreshPromise = useRef<Promise<string | null> | null>(null)
 
   const persistBgmToken = useCallback((nextToken: string) => {
@@ -166,10 +171,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const bindBangumi = useCallback(async (bangumiToken: string) => {
+    const jwt = localStorage.getItem(KEYS.bangmioToken) || ''
+    if (!jwt) throw new Error('请先登录 Bangmio 账号')
+    const response = await fetch(apiPath('/auth/bind-bangumi'), {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+      body: JSON.stringify({ bangumiToken })
+    })
+    const payload = await response.json().catch(() => ({})) as ApiResult<{ token?: string; user?: User }>
+    if (!response.ok || !payload.data?.token || !payload.data.user) throw new Error(payload.error || '绑定失败')
+    localStorage.setItem(KEYS.bangmioToken, payload.data.token)
+    localStorage.setItem(KEYS.bangmioUser, JSON.stringify(payload.data.user))
+    persistBgmToken(bangumiToken)
+    setToken(payload.data.token)
+    setAccount(payload.data.user)
+    setKind('bangmio')
+    await fetchBgmUserProfile()
+  }, [fetchBgmUserProfile, persistBgmToken])
+
+  const getOAuthBindUrl = useCallback(async () => {
+    const jwt = localStorage.getItem(KEYS.bangmioToken) || ''
+    if (!jwt) throw new Error('请先登录 Bangmio 账号')
+    const response = await fetch(apiPath('/auth/oauth-bind-url'), { headers: { Accept: 'application/json', Authorization: `Bearer ${jwt}` } })
+    const payload = await response.json().catch(() => ({})) as ApiResult<{ url?: string }>
+    if (!response.ok || !payload.data?.url) throw new Error(payload.error || '无法发起 Bangumi 授权')
+    return payload.data.url
+  }, [])
   const logout = useCallback(() => {
     Object.values(KEYS).forEach(key => localStorage.removeItem(key))
     localStorage.removeItem('bangmio_oauth_flow')
-    setToken(''); setBgmToken(''); setUser(null); setAccount(null); setKind(null)
+    setToken(''); setBgmToken(''); setUser(null); setAccount(null); setKind(null); setShowBindModal(false)
   }, [])
 
   useEffect(() => {
@@ -190,8 +222,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchBgmToken, fetchBgmUserProfile])
 
   const value = useMemo<AuthContextValue>(() => ({
-    ready, token, bgmToken, user, account, kind, isAuthenticated: Boolean(token), isBangmioUser: kind === 'bangmio', isBound: kind === 'bangumi' || Boolean(account?.bgmUid || bgmToken), setAuth, refreshBangmioToken, fetchBgmToken, fetchBgmUserProfile, request, logout
-  }), [account, bgmToken, fetchBgmToken, fetchBgmUserProfile, kind, logout, ready, refreshBangmioToken, request, setAuth, token, user])
+    ready, token, bgmToken, user, account, kind, isAuthenticated: Boolean(token), isBangmioUser: kind === 'bangmio', isBound: kind === 'bangumi' || Boolean(account?.bgmUid || bgmToken), showBindModal, setShowBindModal, bindBangumi, getOAuthBindUrl, setAuth, refreshBangmioToken, fetchBgmToken, fetchBgmUserProfile, request, logout
+  }), [account, bgmToken, bindBangumi, fetchBgmToken, fetchBgmUserProfile, getOAuthBindUrl, kind, logout, ready, refreshBangmioToken, request, setAuth, showBindModal, token, user])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
