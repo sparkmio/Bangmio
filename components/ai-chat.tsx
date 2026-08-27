@@ -1,11 +1,13 @@
 'use client'
 
 import { FormEvent, useEffect, useRef, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import type { ApiResult } from '@/lib/types'
 
 type Message = { role: 'user' | 'assistant'; content: string }
 
 export function AiChat({ context }: { context?: string }) {
+  const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -42,6 +44,9 @@ export function AiChat({ context }: { context?: string }) {
     }
   }
 
+  const authRoutes = ['/login', '/register', '/forgot-password', '/reset-password', '/bind-bangumi']
+  if (authRoutes.some(route => pathname === route || pathname.startsWith(`${route}/`))) return null
+
   return <>
     {open ? <section className="fixed bottom-20 right-4 z-[60] flex h-[min(36rem,calc(100vh-6rem))] w-[min(25rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-base-300 bg-base-100 shadow-2xl md:bottom-6 md:right-6">
       <header className="flex items-center justify-between border-b border-base-300 px-4 py-3">
@@ -57,8 +62,9 @@ export function AiChat({ context }: { context?: string }) {
         <div className="flex gap-2"><textarea className="textarea textarea-bordered min-h-0 flex-1 resize-none" rows={2} value={input} maxLength={2000} onChange={event => setInput(event.target.value)} placeholder="问点什么…" /><button className="btn btn-primary self-end" type="submit" disabled={busy || !input.trim()}>发送</button></div>
       </form>
     </section> : null}
-    <button className="btn btn-primary btn-circle fixed bottom-20 right-4 z-[60] shadow-lg shadow-primary/30 md:bottom-6 md:right-6" type="button" onClick={() => setOpen(value => !value)} aria-label="打开 AI 对话" title="Bangmio AI">
+    {!open ? <button className="btn btn-primary fixed bottom-20 right-4 z-[60] min-h-11 rounded-full px-4 shadow-lg shadow-primary/30 md:bottom-6 md:right-6" type="button" onClick={() => setOpen(true)} aria-label="打开 AI 助手" title="Bangmio AI 助手">
       <span className="text-lg" aria-hidden="true">✦</span>
-    </button>
+      <span className="text-sm font-semibold">AI 助手</span>
+    </button> : null}
   </>
 }

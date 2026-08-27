@@ -3,6 +3,14 @@ compatibility_date = "2026-08-18"
 compatibility_flags = ["nodejs_compat"]
 main = ".open-next/worker.js"
 
+[[routes]]
+pattern = "bangmio.site/*"
+zone_name = "bangmio.site"
+
+[[routes]]
+pattern = "www.bangmio.site/*"
+zone_name = "bangmio.site"
+
 [assets]
 directory = ".open-next/assets"
 binding = "ASSETS"
@@ -10,7 +18,8 @@ binding = "ASSETS"
 [vars]
 BANGMIO_API_ORIGIN = 'https://bangmio.site'
 OAUTH_REDIRECT_URI = "https://bangmio.site/login/callback"
-TURNSTILE_HOSTNAMES = "bangmio.site,www.bangmio.site"
+TURNSTILE_HOSTNAMES = "bangmio.site,www.bangmio.site,bangmio-next.sparkmio.workers.dev"
+TURNSTILE_SITE_KEY = "0x4AAAAAAEd1MmT7-jbdtWBA"
 VITE_REQUIRE_EMAIL_CODE = "true"
 RESEND_FROM = "Bangmio <signup@bangmio.site>"
 
