@@ -72,9 +72,16 @@ function turnstileOptions(c, action) {
   return { action, hostnames }
 }
 
+function turnstileConfig(c) {
+  const siteKey = String(c.env?.TURNSTILE_SITE_KEY || '').trim()
+  const secretKey = String(c.env?.TURNSTILE_SECRET_KEY || '').trim()
+  const enabled = Boolean(siteKey && secretKey)
+  return { enabled, siteKey: enabled ? siteKey : null, secretKey: enabled ? secretKey : null }
+}
+
 function publicTurnstileConfig(c) {
-  const siteKey = String(c.env?.TURNSTILE_SITE_KEY || c.env?.VITE_TURNSTILE_SITE_KEY || '').trim()
-  return { required: Boolean(c.env?.TURNSTILE_SECRET_KEY), siteKey: siteKey || null }
+  const { enabled, siteKey } = turnstileConfig(c)
+  return { required: enabled, siteKey }
 }
 
 /**
@@ -127,9 +134,10 @@ app.post('/send-code', async c => {
       return c.json({ data: null, error: '邮箱格式不正确', code: 400 }, 400)
     }
     // 生产环境失败关闭；未配置 secret 时仅作为本地开发跳过。
+    const { enabled: turnstileEnabled, secretKey } = turnstileConfig(c)
     const turnstile = await verifyTurnstile(
       captchaToken,
-      c.env?.TURNSTILE_SECRET_KEY,
+      turnstileEnabled ? secretKey : null,
       c.req.header('CF-Connecting-IP'),
       turnstileOptions(c, purpose === 'reset' ? 'reset_password' : 'register')
     )
@@ -166,10 +174,11 @@ app.post('/register', async c => {
       return c.json({ data: null, error: '密码至少 8 位', code: 400 }, 400)
     }
     // 若配置了 Turnstile secret，验证失败必须拒绝请求。
-    if (c.env?.TURNSTILE_SECRET_KEY) {
+    const { enabled: turnstileEnabled, secretKey } = turnstileConfig(c)
+    if (turnstileEnabled) {
       const turnstile = await verifyTurnstile(
         captchaToken,
-        c.env.TURNSTILE_SECRET_KEY,
+        secretKey,
         c.req.header('CF-Connecting-IP'),
         turnstileOptions(c, 'register')
       )
@@ -200,10 +209,11 @@ app.post('/login', async c => {
       return c.json({ data: null, error: '邮箱或密码不能为空', code: 400 }, 400)
     }
     // 若配置了 Turnstile secret，验证失败必须拒绝请求。
-    if (c.env?.TURNSTILE_SECRET_KEY) {
+    const { enabled: turnstileEnabled, secretKey } = turnstileConfig(c)
+    if (turnstileEnabled) {
       const turnstile = await verifyTurnstile(
         captchaToken,
-        c.env.TURNSTILE_SECRET_KEY,
+        secretKey,
         c.req.header('CF-Connecting-IP'),
         turnstileOptions(c, 'login')
       )
@@ -420,10 +430,11 @@ app.post('/forgot-password', async c => {
     }
     // Turnstile 校验：失败时降级放行（记录日志）。
     // 忘记密码对未注册邮箱静默返回 200，且有发码冷却 + 5 次/分钟限流兜底
-    if (c.env?.TURNSTILE_SECRET_KEY) {
+    const { enabled: turnstileEnabled, secretKey } = turnstileConfig(c)
+    if (turnstileEnabled) {
       const turnstile = await verifyTurnstile(
         captchaToken,
-        c.env.TURNSTILE_SECRET_KEY,
+        secretKey,
         c.req.header('CF-Connecting-IP'),
         turnstileOptions(c, 'reset_password')
       )

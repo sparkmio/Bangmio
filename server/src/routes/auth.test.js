@@ -83,6 +83,27 @@ describe('POST /oauth-bind-callback', () => {
 })
 
 describe('GET /config', () => {
+  it('站点密钥或私钥不完整时禁用 Turnstile', async () => {
+    const siteOnly = await app.request(
+      '/config',
+      { method: 'GET' },
+      { TURNSTILE_SITE_KEY: 'public-site-key' }
+    )
+    await expect(siteOnly.json()).resolves.toEqual({
+      data: { required: false, siteKey: null },
+      code: 200
+    })
+
+    const secretOnly = await app.request(
+      '/config',
+      { method: 'GET' },
+      { TURNSTILE_SECRET_KEY: 'private-secret' }
+    )
+    await expect(secretOnly.json()).resolves.toEqual({
+      data: { required: false, siteKey: null },
+      code: 200
+    })
+  })
   it('只返回登录页面需要的公开 Turnstile 配置', async () => {
     const res = await app.request(
       '/config',

@@ -105,8 +105,8 @@ export function TurnstileWidget({
   }, [resetSignal])
 
   if (!siteKey) return null
-  return <div className="rounded-lg border border-base-300 bg-base-200/30 p-3">
-    <div ref={containerRef} className="min-h-[65px]" />
-    {loading ? <p className="mt-1 text-xs text-base-content/45">正在加载人机验证…</p> : null}
+  return <div className="bm-turnstile">
+    <div ref={containerRef} className="bm-turnstile-frame" />
+    {loading ? <p className="bm-turnstile-status">正在加载人机验证…</p> : null}
   </div>
 }

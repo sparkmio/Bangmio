@@ -200,44 +200,73 @@ export function VueAnimeDetail({ subject, relations, characters, persons, episod
   const musicRelations = useMemo(() => relations.filter(item => item.type === 3), [relations])
   const nonMusicRelations = useMemo(() => relations.filter(item => item.type !== 3), [relations])
   const infoboxItems = importantInfobox(infobox)
-  return <div className="pb-8">
-    <div className="-mx-4 md:-mx-8 -mt-6 relative overflow-hidden border-b border-base-300/50">
-      <div className="absolute inset-0 overflow-hidden">{image ? <img src={image} alt="" className="w-full h-full object-cover scale-110 blur-3xl opacity-25" /> : null}<div className="absolute inset-0 bg-gradient-to-b from-base-100/55 via-base-100/90 to-base-100" /></div>
-      <div className="relative max-w-6xl mx-auto px-4 md:px-8 py-7 md:py-10">
-        <Link href="/anime" className="btn btn-ghost btn-sm text-primary/80 mb-4">← 返回条目</Link>
-        <div className="flex flex-col sm:flex-row gap-5 md:gap-7 items-center sm:items-start">
-          <div className="w-32 sm:w-40 md:w-44 shrink-0">{image ? <img src={image} alt={title} className="w-full rounded-2xl shadow-xl ring-1 ring-white/10" loading="eager" decoding="async" /> : <div className="w-full aspect-[2/3] rounded-2xl bg-base-300 flex items-center justify-center">暂无封面</div>}</div>
-          <div className="flex-1 min-w-0 self-stretch text-center sm:text-left flex flex-col justify-center">
-            <p className="text-xs font-medium tracking-[0.18em] text-primary/70 uppercase mb-2">{typeLabel}</p>
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight break-words">{title}</h1>
-            {subject.name_cn && subject.name && subject.name_cn !== subject.name ? <p className="text-sm md:text-base text-base-content/50 mt-2 break-words">{subject.name}</p> : null}
-            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-4">{subject.rating?.score ? <span className="badge badge-lg gap-1.5 font-bold border-0 bg-amber-500/15 text-amber-500">★ {Number(subject.rating.score).toFixed(1)}<span className="text-xs font-normal text-base-content/45">{subject.rating.total || 0} 人</span></span> : null}{subject.rating?.rank ? <span className="badge badge-lg font-bold border-0 bg-primary/15 text-primary">#{subject.rating.rank}</span> : null}{subject.eps || subject.eps_count ? <span className="badge badge-lg badge-ghost">{subject.eps || subject.eps_count} 话</span> : null}</div>
-            <div className="mt-5 flex justify-center sm:justify-start"><CollectionButton animeId={subject.id} /></div>
+  const primaryMeta = [
+    ['类型', typeLabel],
+    ['首播', subject.air_date || subject.date || '未知'],
+    ['集数', subject.eps || subject.eps_count || '未知'],
+    ['排名', subject.rating?.rank ? `#${subject.rating.rank}` : '暂无']
+  ]
+
+  return <div className="bm-detail-page">
+    <section className="bm-detail-hero">
+      <div className="bm-detail-backdrop">{image ? <img src={image} alt="" /> : null}<span /></div>
+      <div className="bm-detail-hero-inner">
+        <Link href="/anime" className="bm-detail-back">← 返回条目</Link>
+        <div className="bm-detail-hero-grid">
+          <div className="bm-detail-poster">{image ? <img src={image} alt={title} loading="eager" decoding="async" /> : <div>暂无封面</div>}</div>
+          <div className="bm-detail-summary">
+            <span className="bm-detail-eyebrow">ANIME DETAIL · {typeLabel.toUpperCase()}</span>
+            <h1>{title}</h1>
+            {subject.name_cn && subject.name && subject.name_cn !== subject.name ? <p className="bm-detail-original">{subject.name}</p> : null}
+            <div className="bm-detail-rating-row">
+              {subject.rating?.score ? <strong>★ {Number(subject.rating.score).toFixed(1)}</strong> : <strong>暂无评分</strong>}
+              <span>{subject.rating?.total || 0} 人评分</span>
+              {subject.rating?.rank ? <span>全站 #{subject.rating.rank}</span> : null}
+            </div>
+            <p className="bm-detail-summary-copy">{subject.summary || '暂无简介。'}</p>
+            <div className="bm-detail-actions"><CollectionButton animeId={subject.id} /></div>
           </div>
         </div>
       </div>
-    </div>
-    <div className="sticky top-0 z-30 bg-base-100/80 backdrop-blur-md border-b border-base-300/50"><div className="max-w-6xl mx-auto px-4 md:px-8 flex gap-1 overflow-x-auto scrollbar-hide">{tabs.map(([key, label]) => <button key={key} className={`px-3 py-3 min-h-[44px] text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeTab === key ? 'border-primary text-primary' : 'border-transparent text-base-content/60 hover:text-base-content'}`} type="button" onClick={() => setActiveTab(key)}>{label}</button>)}</div></div>
-    <div className="max-w-6xl mx-auto px-4 md:px-8 py-5 md:py-6">
-      {activeTab === 'overview' ? <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_20rem] gap-5 xl:gap-6">
-        <div className="space-y-5 min-w-0">
-          <section className="rounded-2xl border border-base-300/70 bg-base-100/70 p-4 sm:p-5"><SectionTitle>简介</SectionTitle><p className="text-sm leading-7 text-base-content/75 whitespace-pre-line">{subject.summary || '暂无简介。'}</p>{subject.tags?.length ? <div className="flex flex-wrap gap-1.5 mt-4 pt-4 border-t border-base-300/60">{subject.tags.slice(0, 12).map(tag => <span key={tag.name} className="badge badge-sm badge-ghost">{tag.name}</span>)}</div> : null}</section>
-          <section className="rounded-2xl border border-base-300/70 bg-base-100/70 p-4 sm:p-5"><SectionTitle>条目信息</SectionTitle><div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{[['类型', typeLabel], ['首播', subject.air_date || subject.date || '未知'], ['集数', subject.eps || subject.eps_count || '未知'], ['排名', subject.rating?.rank ? `#${subject.rating.rank}` : '暂无']].map(([label, value]) => <div key={label} className="rounded-xl bg-base-200/50 p-3"><p className="text-xs text-base-content/50">{label}</p><p className="text-sm mt-1 break-words">{value}</p></div>)}</div>{infoboxItems.length ? <div className="mt-5 pt-5 border-t border-base-300/60"><h3 className="text-sm font-semibold mb-3 text-base-content/75">制作信息</h3><div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">{infoboxItems.map((item, index) => <div key={`${item.key}-${index}`} className="rounded-xl bg-base-200/35 px-3 py-2.5"><p className="text-xs text-base-content/50">{item.key}</p><p className="text-sm mt-1 leading-6 break-words text-base-content/80">{valueText(item.value)}</p></div>)}</div></div> : null}</section>
-          <div className="rounded-2xl border border-base-300/70 bg-base-100/70 p-4 sm:p-5"><ExternalLinks subject={subject} /></div>
+    </section>
+
+    <nav className="bm-detail-tabs" aria-label="条目资料导航">
+      <div>{tabs.map(([key, label]) => <button key={key} className={activeTab === key ? 'is-active' : ''} type="button" onClick={() => setActiveTab(key)}>{label}</button>)}</div>
+    </nav>
+
+    <div className="bm-detail-content">
+      {activeTab === 'overview' ? <div className="bm-detail-layout">
+        <div className="bm-detail-main-column">
+          <section className="bm-detail-panel bm-detail-intro-panel">
+            <div className="bm-detail-panel-heading"><div><span className="bm-detail-eyebrow">OVERVIEW</span><h2>作品简介</h2></div><span className="bm-detail-source">Bangumi</span></div>
+            <p className="bm-detail-long-copy">{subject.summary || '暂无简介。'}</p>
+            {subject.tags?.length ? <div className="bm-detail-tags">{subject.tags.slice(0, 12).map(tag => <span key={tag.name}>{tag.name}</span>)}</div> : null}
+          </section>
+
+          <section className="bm-detail-panel">
+            <div className="bm-detail-panel-heading"><div><span className="bm-detail-eyebrow">FACTS</span><h2>条目信息</h2></div></div>
+            <dl className="bm-detail-facts">{primaryMeta.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+            {infoboxItems.length ? <div className="bm-detail-production"><h3>制作信息</h3><dl>{infoboxItems.map((item, index) => <div key={`${item.key}-${index}`}><dt>{item.key || '资料'}</dt><dd>{valueText(item.value)}</dd></div>)}</dl></div> : null}
+          </section>
+
+          <section className="bm-detail-panel"><ExternalLinks subject={subject} /></section>
         </div>
-        <aside className="space-y-5"><section><SectionTitle>评分与收藏</SectionTitle><div className="space-y-3"><RatingChart subject={subject} /><CollectionChart subject={subject} /></div></section><CollectionEditor animeId={subject.id} /></aside>
+        <aside className="bm-detail-side-column">
+          <section className="bm-detail-panel"><div className="bm-detail-panel-heading"><div><span className="bm-detail-eyebrow">COMMUNITY DATA</span><h2>评分与收藏</h2></div></div><div className="bm-detail-charts"><RatingChart subject={subject} /><CollectionChart subject={subject} /></div></section>
+          <CollectionEditor animeId={subject.id} />
+        </aside>
       </div>
-        : activeTab === 'episodes' ? <div><SectionTitle>章节</SectionTitle>{episodes.length ? <div className="divide-y divide-base-300 rounded-xl bg-base-200/30">{episodes.map((episode, index) => <div className="flex items-center gap-4 p-3" key={episode.id || index}><span className="text-sm font-bold text-primary w-8">{String(episode.sort || index + 1).padStart(2, '0')}</span><div className="min-w-0 flex-1"><p className="text-sm">{episode.name_cn || episode.name || `第${episode.sort || index + 1}话`}</p><p className="text-xs text-base-content/50">{episode.airdate || '播出日期未知'}</p></div><span className="text-xs text-base-content/50">{episode.duration || ''}</span></div>)}</div> : <Empty>暂无章节</Empty>}</div>
-        : activeTab === 'characters' ? <div><SectionTitle>角色</SectionTitle><Credits items={characters} kind="character" /></div>
-        : activeTab === 'staff' ? <div><SectionTitle>制作人员</SectionTitle><Credits items={persons} kind="person" /></div>
-        : activeTab === 'relations' ? <div><SectionTitle>关联条目</SectionTitle>{nonMusicRelations.length ? <AnimeGrid subjects={nonMusicRelations} empty="暂无关联条目" /> : <Empty>暂无关联条目</Empty>}</div>
-        : activeTab === 'douban' ? <DoubanPanel subject={subject} />
-        : activeTab === 'music' ? <div><SectionTitle>相关音乐</SectionTitle><MusicPanel subject={subject} musicRelations={musicRelations} /></div>
-        : activeTab === 'streaming' ? <div><SectionTitle>在线观看</SectionTitle><StreamingPanel subject={subject} /></div>
-        : activeTab === 'moegirl' ? <div><SectionTitle>萌娘百科</SectionTitle><MoegirlPanel subject={subject} /></div>
-        : activeTab === 'wiki' ? <div><SectionTitle>Wiki</SectionTitle><WikiPanel subject={subject} infobox={infobox} /></div>
-        : activeTab === 'talkbox' ? <div><SectionTitle>吐槽箱</SectionTitle><p className="text-sm text-base-content/60 mb-4">和同好聊聊这部作品。</p><Link href={`/anime/${subject.id}/talkbox`} className="btn btn-primary">进入吐槽箱</Link></div>
-        : <div><SectionTitle>讨论版</SectionTitle><p className="text-sm text-base-content/60 mb-4">浏览条目相关的长讨论。</p><Link href={`/anime/${subject.id}/topics`} className="btn btn-primary">查看话题</Link></div>}
+        : activeTab === 'episodes' ? <section className="bm-detail-panel"><div className="bm-detail-panel-heading"><div><span className="bm-detail-eyebrow">EPISODES</span><h2>章节</h2></div></div>{episodes.length ? <div className="bm-detail-episode-list">{episodes.map((episode, index) => <div key={episode.id || index}><span>{String(episode.sort || index + 1).padStart(2, '0')}</span><div><b>{episode.name_cn || episode.name || `第${episode.sort || index + 1}话`}</b><small>{episode.airdate || '播出日期未知'}</small></div><em>{episode.duration || ''}</em></div>)}</div> : <Empty>暂无章节</Empty>}</section>
+        : activeTab === 'characters' ? <section className="bm-detail-panel"><SectionTitle>角色</SectionTitle><Credits items={characters} kind="character" /></section>
+        : activeTab === 'staff' ? <section className="bm-detail-panel"><SectionTitle>制作人员</SectionTitle><Credits items={persons} kind="person" /></section>
+        : activeTab === 'relations' ? <section className="bm-detail-panel"><SectionTitle>关联条目</SectionTitle>{nonMusicRelations.length ? <AnimeGrid subjects={nonMusicRelations} empty="暂无关联条目" /> : <Empty>暂无关联条目</Empty>}</section>
+        : activeTab === 'douban' ? <section className="bm-detail-panel"><DoubanPanel subject={subject} /></section>
+        : activeTab === 'music' ? <section className="bm-detail-panel"><SectionTitle>相关音乐</SectionTitle><MusicPanel subject={subject} musicRelations={musicRelations} /></section>
+        : activeTab === 'streaming' ? <section className="bm-detail-panel"><SectionTitle>在线观看</SectionTitle><StreamingPanel subject={subject} /></section>
+        : activeTab === 'moegirl' ? <section className="bm-detail-panel"><SectionTitle>萌娘百科</SectionTitle><MoegirlPanel subject={subject} /></section>
+        : activeTab === 'wiki' ? <section className="bm-detail-panel"><SectionTitle>Wiki</SectionTitle><WikiPanel subject={subject} infobox={infobox} /></section>
+        : activeTab === 'talkbox' ? <section className="bm-detail-panel"><SectionTitle>吐槽箱</SectionTitle><p className="text-sm text-base-content/60 mb-4">和同好聊聊这部作品。</p><Link href={`/anime/${subject.id}/talkbox`} className="btn btn-primary">进入吐槽箱</Link></section>
+        : <section className="bm-detail-panel"><SectionTitle>讨论版</SectionTitle><p className="text-sm text-base-content/60 mb-4">浏览条目相关的长讨论。</p><Link href={`/anime/${subject.id}/topics`} className="btn btn-primary">查看话题</Link></section>}
     </div>
   </div>
 }

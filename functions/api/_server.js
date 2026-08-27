@@ -4954,9 +4954,15 @@ function turnstileOptions(c, action) {
   const hostnames = String(c.env?.TURNSTILE_HOSTNAMES || "").split(",").map((value) => value.trim()).filter(Boolean);
   return { action, hostnames };
 }
+function turnstileConfig(c) {
+  const siteKey = String(c.env?.TURNSTILE_SITE_KEY || "").trim();
+  const secretKey = String(c.env?.TURNSTILE_SECRET_KEY || "").trim();
+  const enabled = Boolean(siteKey && secretKey);
+  return { enabled, siteKey: enabled ? siteKey : null, secretKey: enabled ? secretKey : null };
+}
 function publicTurnstileConfig(c) {
-  const siteKey = String(c.env?.TURNSTILE_SITE_KEY || c.env?.VITE_TURNSTILE_SITE_KEY || "").trim();
-  return { required: Boolean(c.env?.TURNSTILE_SECRET_KEY), siteKey: siteKey || null };
+  const { enabled, siteKey } = turnstileConfig(c);
+  return { required: enabled, siteKey };
 }
 app.use("*", async (c, next) => {
   if (c.req.method === "POST" && (!c.env?.DB || !c.env?.JWT_SECRET)) {
@@ -4984,9 +4990,10 @@ app.post("/send-code", async (c) => {
     if (!email || !EMAIL_REGEX.test(email)) {
       return c.json({ data: null, error: "\u90AE\u7BB1\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
     }
+    const { enabled: turnstileEnabled, secretKey } = turnstileConfig(c);
     const turnstile = await verifyTurnstile(
       captchaToken,
-      c.env?.TURNSTILE_SECRET_KEY,
+      turnstileEnabled ? secretKey : null,
       c.req.header("CF-Connecting-IP"),
       turnstileOptions(c, purpose === "reset" ? "reset_password" : "register")
     );
@@ -5013,10 +5020,11 @@ app.post("/register", async (c) => {
     if (!password || String(password).length < 8) {
       return c.json({ data: null, error: "\u5BC6\u7801\u81F3\u5C11 8 \u4F4D", code: 400 }, 400);
     }
-    if (c.env?.TURNSTILE_SECRET_KEY) {
+    const { enabled: turnstileEnabled, secretKey } = turnstileConfig(c);
+    if (turnstileEnabled) {
       const turnstile = await verifyTurnstile(
         captchaToken,
-        c.env.TURNSTILE_SECRET_KEY,
+        secretKey,
         c.req.header("CF-Connecting-IP"),
         turnstileOptions(c, "register")
       );
@@ -5038,10 +5046,11 @@ app.post("/login", async (c) => {
     if (!email || !password) {
       return c.json({ data: null, error: "\u90AE\u7BB1\u6216\u5BC6\u7801\u4E0D\u80FD\u4E3A\u7A7A", code: 400 }, 400);
     }
-    if (c.env?.TURNSTILE_SECRET_KEY) {
+    const { enabled: turnstileEnabled, secretKey } = turnstileConfig(c);
+    if (turnstileEnabled) {
       const turnstile = await verifyTurnstile(
         captchaToken,
-        c.env.TURNSTILE_SECRET_KEY,
+        secretKey,
         c.req.header("CF-Connecting-IP"),
         turnstileOptions(c, "login")
       );
@@ -5182,10 +5191,11 @@ app.post("/forgot-password", async (c) => {
     if (!email || !EMAIL_REGEX.test(email)) {
       return c.json({ data: null, error: "\u90AE\u7BB1\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
     }
-    if (c.env?.TURNSTILE_SECRET_KEY) {
+    const { enabled: turnstileEnabled, secretKey } = turnstileConfig(c);
+    if (turnstileEnabled) {
       const turnstile = await verifyTurnstile(
         captchaToken,
-        c.env.TURNSTILE_SECRET_KEY,
+        secretKey,
         c.req.header("CF-Connecting-IP"),
         turnstileOptions(c, "reset_password")
       );
