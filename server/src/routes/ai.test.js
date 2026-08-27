@@ -45,5 +45,7 @@ describe('AI chat route', () => {
         headers: expect.objectContaining({ Authorization: 'Bearer test-key' })
       })
     )
+    const request = fetchMock.mock.calls[0][1]
+    expect(JSON.parse(request.body)).toMatchObject({ model: 'glm-5.3-flash' })
   })
 })

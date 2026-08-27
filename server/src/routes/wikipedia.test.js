@@ -78,6 +78,26 @@ describe('Wikipedia routes', () => {
     })
   })
 
+  it('摘要接口返回纯文字正文与原站链接', async () => {
+    fetchHTML.mockResolvedValue(
+      JSON.stringify({
+        query: {
+          pages: [{ title: '测试动画', extract: '这是纯文字摘要。' }]
+        }
+      })
+    )
+
+    const response = await app.request('/summary/测试动画')
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      data: {
+        title: '测试动画',
+        extract: '这是纯文字摘要。',
+        url: 'https://zh.wikipedia.org/wiki/%E6%B5%8B%E8%AF%95%E5%8A%A8%E7%94%BB'
+      },
+      code: 200
+    })
+  })
   it('正文代理返回清洗后的完整 HTML', async () => {
     fetchHTML.mockResolvedValue(
       JSON.stringify({

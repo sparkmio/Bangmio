@@ -16,7 +16,7 @@ type DoubanData = { id?: string | number; title?: string; rate?: string | number
 type DoubanComment = { user?: string; rating?: number; time?: string; useful?: number; content?: string }
 type DoubanReview = DoubanComment & { title?: string }
 type MoegirlSummary = { title?: string; extract?: string; url?: string }
-type WikipediaResult = { title?: string; description?: string; url?: string }
+type WikipediaResult = { title?: string; description?: string; extract?: string; url?: string }
 type MusicResult = { id?: number | string; name?: string; name_cn?: string; artists?: string[]; album?: string; url?: string; cover?: string; relation?: string }
 type BilibiliData = { title?: string; url?: string; cover?: string; score?: number | null; episodes?: number }
 
@@ -147,25 +147,28 @@ function StreamingPanel({ subject }: { subject: Subject }) {
 function MoegirlPanel({ subject }: { subject: Subject }) {
   const names = [...new Set([subject.name_cn, subject.name].filter(Boolean).map(String))]
   const [loading, setLoading] = useState(true)
-  const [pageName, setPageName] = useState('')
   const [summary, setSummary] = useState<MoegirlSummary | null>(null)
   useEffect(() => {
     let alive = true
-    setLoading(true); setPageName(''); setSummary(null)
-    const findPage = async () => {
+    setLoading(true); setSummary(null)
+    const loadSummary = async () => {
       for (const name of names) {
         const data = await apiFetch<{ results?: Array<{ title?: string }> }>(`/moegirl/search?q=${encodeURIComponent(name)}`).catch(() => null)
-        if (data?.results?.[0]?.title) { if (alive) setPageName(data.results[0].title); return }
+        const pageName = data?.results?.[0]?.title
+        if (!pageName) continue
+        const entry = await apiFetch<MoegirlSummary>(`/moegirl/${encodeURIComponent(pageName)}/summary`).catch(() => null)
+        if (alive) setSummary(entry || { title: pageName, url: `https://zh.moegirl.org.cn/${encodeURIComponent(pageName)}` })
+        return
       }
     }
-    void findPage().finally(() => { if (alive) setLoading(false) })
+    void loadSummary().finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [names.join('|')])
-  useEffect(() => { if (!pageName) return; let alive = true; void apiFetch<MoegirlSummary>(`/moegirl/${encodeURIComponent(pageName)}/summary`).then(data => { if (alive) setSummary(data || null) }).catch(() => undefined); return () => { alive = false } }, [pageName])
   if (loading) return <Empty>正在搜索萌娘百科…</Empty>
-  if (!pageName) return <div className="text-center py-10"><p className="text-sm text-base-content/40 mb-3">未找到萌娘百科条目</p><a className="btn btn-sm btn-ghost" href={`https://zh.moegirl.org.cn/index.php?search=${encodeURIComponent(names[0] || '')}`} target="_blank" rel="noopener noreferrer">前往萌娘百科搜索 ↗</a></div>
-  const moegirlUrl = summary?.url || `https://zh.moegirl.org.cn/${encodeURIComponent(pageName)}`
-  return <div className="space-y-4">{summary?.extract ? <div className="rounded-xl bg-base-200/40 p-4"><div className="flex justify-between gap-3"><h3 className="font-semibold">{summary.title || pageName}</h3><a className="link link-primary text-sm" href={moegirlUrl} target="_blank" rel="noopener noreferrer">原站词条 ↗</a></div><p className="text-sm leading-7 text-base-content/75 mt-2 whitespace-pre-line">{summary.extract}</p></div> : null}<EmbedFrame src={`/api/v1/moegirl/page/${encodeURIComponent(pageName)}`} title="萌娘百科完整正文" fallbackHref={moegirlUrl} /></div>
+  const searchUrl = `https://zh.moegirl.org.cn/index.php?search=${encodeURIComponent(names[0] || '')}`
+  if (!summary?.title) return <div className="bm-reference-empty"><p>未找到萌娘百科条目</p><a href={searchUrl} target="_blank" rel="noopener noreferrer">前往萌娘百科搜索 ↗</a></div>
+  const moegirlUrl = summary.url || `https://zh.moegirl.org.cn/${encodeURIComponent(summary.title)}`
+  return <article className="bm-reference-card"><header><h3>{summary.title}</h3><a href={moegirlUrl} target="_blank" rel="noopener noreferrer">原站词条 ↗</a></header><p>{summary.extract || '已找到对应词条，但暂时无法读取文字摘要。可通过右上角链接查看原文。'}</p></article>
 }
 
 function WikiPanel({ subject, infobox }: { subject: Subject; infobox: InfoboxItem[] }) {
@@ -179,17 +182,18 @@ function WikiPanel({ subject, infobox }: { subject: Subject; infobox: InfoboxIte
     const findArticle = async () => {
       for (const name of names) {
         const data = await apiFetch<{ results?: WikipediaResult[] }>(`/wikipedia/search?q=${encodeURIComponent(name)}`).catch(() => null)
-        if (data?.results?.[0]?.title) {
-          if (alive) setArticle(data.results[0])
-          return
-        }
+        const result = data?.results?.[0]
+        if (!result?.title) continue
+        const summary = await apiFetch<WikipediaResult>(`/wikipedia/summary/${encodeURIComponent(result.title)}`).catch(() => null)
+        if (alive) setArticle({ ...result, ...summary, title: summary?.title || result.title, url: summary?.url || result.url })
+        return
       }
     }
     void findArticle().finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [names.join('|')])
   const fallbackUrl = article?.url || `https://zh.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(names[0] || '')}`
-  return <div className="space-y-5">{items.length ? <section><h3 className="font-semibold mb-3">Bangumi Wiki</h3><div className="rounded-xl bg-base-200/40 p-5"><div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">{items.map((item, index) => <div key={`${item.key}-${index}`} className="text-sm"><span className="font-medium text-base-content/50">{item.key}</span><span className="ml-2 text-base-content/75">{valueText(item.value)}</span></div>)}</div></div><a className="btn btn-sm btn-ghost mt-3 w-full" href={`https://bangumi.pro/subject/${subject.id}`} target="_blank" rel="noopener noreferrer">在 Bangumi 查看完整 Wiki ↗</a></section> : null}<section><h3 className="font-semibold mb-3">维基百科</h3>{loading ? <Empty>正在搜索维基百科…</Empty> : article?.title ? <div className="space-y-4">{article.description ? <div className="rounded-xl bg-base-200/40 p-4"><div className="flex items-center justify-between gap-3"><p className="font-medium">{article.title}</p><a className="link link-primary text-sm shrink-0" href={fallbackUrl} target="_blank" rel="noopener noreferrer">原站词条 ↗</a></div><p className="text-sm text-base-content/60 mt-2">{article.description}</p></div> : null}<EmbedFrame src={`/api/v1/wikipedia/page/${encodeURIComponent(article.title)}`} title="维基百科内嵌页面" fallbackHref={fallbackUrl} /></div> : <div className="text-center py-10"><p className="text-sm text-base-content/40 mb-3">未找到维基百科条目</p><a className="btn btn-sm btn-ghost" href={fallbackUrl} target="_blank" rel="noopener noreferrer">前往维基百科搜索 ↗</a></div>}</section></div>
+  return <div className="space-y-5">{items.length ? <section><h3 className="font-semibold mb-3">Bangumi Wiki</h3><div className="rounded-xl bg-base-200/40 p-5"><div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">{items.map((item, index) => <div key={String(item.key) + '-' + index} className="text-sm"><span className="font-medium text-base-content/50">{item.key}</span><span className="ml-2 text-base-content/75">{valueText(item.value)}</span></div>)}</div></div><a className="btn btn-sm btn-ghost mt-3 w-full" href={'https://bangumi.pro/subject/' + subject.id} target="_blank" rel="noopener noreferrer">在 Bangumi 查看完整 Wiki ↗</a></section> : null}<section><h3 className="font-semibold mb-3">维基百科</h3>{loading ? <Empty>正在搜索维基百科…</Empty> : article?.title ? <article className="bm-reference-card"><header><h3>{article.title}</h3><a href={fallbackUrl} target="_blank" rel="noopener noreferrer">原站词条 ↗</a></header><p>{article.extract || article.description || '已找到对应词条，但暂时无法读取文字摘要。可通过右上角链接查看原文。'}</p></article> : <div className="bm-reference-empty"><p>未找到维基百科条目</p><a href={fallbackUrl} target="_blank" rel="noopener noreferrer">前往维基百科搜索 ↗</a></div>}</section></div>
 }
 
 export function VueAnimeDetail({ subject, relations, characters, persons, episodes, infobox }: Props) {

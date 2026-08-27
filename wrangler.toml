@@ -22,6 +22,7 @@ TURNSTILE_HOSTNAMES = "bangmio.site,www.bangmio.site,bangmio-next.sparkmio.worke
 TURNSTILE_SITE_KEY = "0x4AAAAAAEd1MmT7-jbdtWBA"
 VITE_REQUIRE_EMAIL_CODE = "true"
 RESEND_FROM = "Bangmio <signup@bangmio.site>"
+ZHIPU_MODEL = "glm-5.3-flash"
 
 [[d1_databases]]
 binding = "DB"

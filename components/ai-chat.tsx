@@ -48,23 +48,20 @@ export function AiChat({ context }: { context?: string }) {
   if (authRoutes.some(route => pathname === route || pathname.startsWith(`${route}/`))) return null
 
   return <>
-    {open ? <section className="fixed bottom-20 right-4 z-[60] flex h-[min(36rem,calc(100vh-6rem))] w-[min(25rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-base-300 bg-base-100 shadow-2xl md:bottom-6 md:right-6">
-      <header className="flex items-center justify-between border-b border-base-300 px-4 py-3">
-        <div><h2 className="font-semibold">Bangmio AI</h2><p className="text-xs text-base-content/45">聊番剧、角色与条目资料</p></div>
-        <button className="btn btn-ghost btn-sm btn-circle" type="button" onClick={() => setOpen(false)} aria-label="关闭 AI 对话">×</button>
+    {open ? <section className="bm-ai-panel" role="dialog" aria-label="Bangmio AI 对话">
+      <header className="bm-ai-header">
+        <div><h2>Bangmio AI</h2><p>聊番剧、角色与条目资料</p></div>
+        <button type="button" onClick={() => setOpen(false)} aria-label="关闭 AI 对话">×</button>
       </header>
-      <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4">
-        {messages.length ? messages.map((message, index) => <div key={`${message.role}-${index}`} className={`max-w-[90%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-6 ${message.role === 'user' ? 'ml-auto bg-primary text-primary-content' : 'bg-base-200 text-base-content'}`}>{message.content}</div>) : <p className="rounded-xl bg-base-200/60 p-3 text-sm leading-6 text-base-content/65">你好！可以问我这部作品的设定、人物关系、观看建议，或让我们一起整理资料。</p>}
-        {busy ? <div className="w-fit rounded-2xl bg-base-200 px-3 py-2 text-sm text-base-content/55">正在思考…</div> : null}
+      <div ref={scrollRef} className="bm-ai-messages">
+        {messages.length ? messages.map((message, index) => <div key={`${message.role}-${index}`} className={`bm-ai-message ${message.role === 'user' ? 'is-user' : 'is-assistant'}`}>{message.content}</div>) : <p className="bm-ai-welcome">你好！可以问我这部作品的设定、人物关系、观看建议，或让我们一起整理资料。</p>}
+        {busy ? <div className="bm-ai-message is-assistant">正在思考…</div> : null}
       </div>
-      <form className="border-t border-base-300 p-3" onSubmit={submit}>
-        {error ? <p className="mb-2 text-xs text-error">{error}</p> : null}
-        <div className="flex gap-2"><textarea className="textarea textarea-bordered min-h-0 flex-1 resize-none" rows={2} value={input} maxLength={2000} onChange={event => setInput(event.target.value)} placeholder="问点什么…" /><button className="btn btn-primary self-end" type="submit" disabled={busy || !input.trim()}>发送</button></div>
+      <form className="bm-ai-form" onSubmit={submit}>
+        {error ? <p className="bm-ai-error">{error}</p> : null}
+        <div><textarea rows={2} value={input} maxLength={2000} onChange={event => setInput(event.target.value)} placeholder="问点什么…" /><button type="submit" disabled={busy || !input.trim()}>发送</button></div>
       </form>
     </section> : null}
-    {!open ? <button className="btn btn-primary fixed bottom-20 right-4 z-[60] min-h-11 rounded-full px-4 shadow-lg shadow-primary/30 md:bottom-6 md:right-6" type="button" onClick={() => setOpen(true)} aria-label="打开 AI 助手" title="Bangmio AI 助手">
-      <span className="text-lg" aria-hidden="true">✦</span>
-      <span className="text-sm font-semibold">AI 助手</span>
-    </button> : null}
+    {!open ? <button className="bm-ai-launcher" type="button" onClick={() => setOpen(true)} aria-label="打开 AI 助手" title="Bangmio AI 助手"><span aria-hidden="true">✦</span><strong>AI 助手</strong></button> : null}
   </>
 }

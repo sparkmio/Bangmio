@@ -18439,6 +18439,42 @@ app9.get("/search", async (c) => {
     return c.json({ data: { results: [] }, code: 200 });
   }
 });
+app9.get("/summary/:title", async (c) => {
+  const rawTitle = c.req.param("title");
+  let title;
+  try {
+    title = decodeURIComponent(rawTitle);
+  } catch {
+    title = rawTitle;
+  }
+  title = String(title || "").trim();
+  if (!title) return c.json({ data: null, error: "\u7F3A\u5C11\u9875\u9762\u540D", code: 400 }, 400);
+  const cacheKey = `wikipedia_summary_${title}`;
+  const cached = cache5.get(cacheKey);
+  if (cached) return c.json({ data: cached, code: 200 });
+  try {
+    const data = await wikipediaApi({
+      action: "query",
+      prop: "extracts",
+      titles: title,
+      redirects: 1,
+      exintro: 1,
+      explaintext: 1,
+      formatversion: 2
+    });
+    const page = data?.query?.pages?.[0];
+    if (!page || page.missing) return c.json({ data: null, code: 200 });
+    const payload = {
+      title: String(page.title || title),
+      extract: String(page.extract || "").trim(),
+      url: articleUrl(page.title || title)
+    };
+    cache5.set(cacheKey, payload);
+    return c.json({ data: payload, code: 200 });
+  } catch {
+    return c.json({ data: null, code: 200 });
+  }
+});
 app9.get("/page/:title", async (c) => {
   const rawTitle = c.req.param("title");
   let title;
@@ -19199,7 +19235,7 @@ var music_default = app11;
 // server/src/routes/ai.js
 var app12 = new Hono2();
 var ZHIPU_CHAT_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
-var DEFAULT_MODEL = "glm-5.2";
+var DEFAULT_MODEL = "glm-5.3-flash";
 var MAX_MESSAGES = 12;
 var MAX_MESSAGE_LENGTH = 2e3;
 var MAX_CONTEXT_LENGTH = 5e3;

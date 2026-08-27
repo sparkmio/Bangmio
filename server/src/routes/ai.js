@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 
 const app = new Hono()
 const ZHIPU_CHAT_URL = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
-const DEFAULT_MODEL = 'glm-5.2'
+const DEFAULT_MODEL = 'glm-5.3-flash'
 const MAX_MESSAGES = 12
 const MAX_MESSAGE_LENGTH = 2000
 const MAX_CONTEXT_LENGTH = 5000

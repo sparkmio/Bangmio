@@ -47,6 +47,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const needsCaptcha = !isBangumi && turnstile.required
   const canSubmit = !needsCaptcha || Boolean(captchaToken)
   const showLoginTabs = mode === 'login'
+  const bangumiLoginHref = `/login?mode=bangumi${redirect === '/' ? '' : `&redirect=${encodeURIComponent(redirect)}`}`
 
   useEffect(() => {
     if (!seconds) return
@@ -235,8 +236,10 @@ export function AuthForm({ mode }: { mode: Mode }) {
 
         {showLoginTabs ? <div className="bm-auth-tabs" role="tablist" aria-label="登录方式">
           <button type="button" role="tab" aria-selected={!isBangumi} className={!isBangumi ? 'is-active' : ''} onClick={() => router.replace(`/login${redirect === '/' ? '' : `?redirect=${encodeURIComponent(redirect)}`}`)}>Bangmio 账号</button>
-          <button type="button" role="tab" aria-selected={isBangumi} className={isBangumi ? 'is-active' : ''} onClick={() => router.replace(`/login?mode=bangumi${redirect === '/' ? '' : `&redirect=${encodeURIComponent(redirect)}`}`)}>Bangumi 直登</button>
+          <button type="button" role="tab" aria-selected={isBangumi} className={isBangumi ? 'is-active' : ''} onClick={() => router.replace(bangumiLoginHref)}>Bangumi 直登</button>
         </div> : null}
+
+        {showLoginTabs ? <p className="bm-auth-testing-note">Bangmio账号现仅供测试使用，推荐使用<Link href={bangumiLoginHref}>Bangumi直登</Link></p> : null}
 
         {message ? <div className="bm-auth-message" role="status">{message}</div> : null}
 
