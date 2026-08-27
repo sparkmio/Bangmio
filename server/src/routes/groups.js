@@ -129,7 +129,9 @@ function groupIdFromHref(href) {
  * @returns {string}
  */
 function collapseText(str) {
-  return (str || '').replace(/\s+/g, ' ').trim()
+  return repairMojibake(String(str || ''))
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function parseGroupListHTML(html, base) {
@@ -220,7 +222,7 @@ function parseGroupDetailHTML(html, id, base) {
     const el = firstByClassSubstring(document, pattern)
     const text = el ? collapseText(el.textContent) : ''
     if (text) {
-      description = el.textContent.trim()
+      description = collapseText(el.textContent)
       break
     }
   }

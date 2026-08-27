@@ -2,8 +2,18 @@ import Link from 'next/link'
 import { safeApiFetch } from '@/lib/api'
 import { SectionHeading } from '@/components/ui'
 
+function safeText(value: unknown, fallback = ''): string {
+  if (typeof value === 'string' || typeof value === 'number') return String(value)
+  if (Array.isArray(value)) return value.map(item => safeText(item)).filter(Boolean).join(' / ')
+  if (value && typeof value === 'object') {
+    const item = value as Record<string, unknown>
+    return safeText(item.name ?? item.title ?? item.nickname ?? item.content ?? item.body, fallback)
+  }
+  return fallback
+}
+
 function groupTitle(group: any) {
-  return group.name || group.title || '未命名小组'
+  return safeText(group.name ?? group.title, '未命名小组')
 }
 
 function topicHref(topic: any) {
@@ -27,7 +37,7 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
 
   const topics = Array.isArray(group.topics) ? group.topics : Array.isArray(group.topic_list) ? group.topic_list : []
   const title = groupTitle(group)
-  const description = group.desc || group.description || group.summary || '这是一个等待大家一起补充内容的兴趣小组。'
+  const description = safeText(group.desc ?? group.description ?? group.summary, '这是一个等待大家一起补充内容的兴趣小组。')
 
   return <div className="group-detail-page">
     <header className="panel group-detail-hero">
@@ -49,7 +59,7 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
       {topics.length ? <div className="topic-list panel">
         {topics.map((topic: any, index: number) => <Link className="topic-row" href={topicHref(topic)} key={topic.id || topic.topic_id || index}>
           <span className="topic-avatar">话</span>
-          <span className="topic-row-copy"><strong>{topic.title || topic.name || '未命名话题'}</strong><small>{topic.creator?.nickname || topic.creator?.username || '社区成员'} · {countValue(topic.replies ?? topic.reply_count)} 条回复</small></span>
+          <span className="topic-row-copy"><strong>{safeText(topic.title ?? topic.name, '未命名话题')}</strong><small>{safeText(topic.creator?.nickname ?? topic.creator?.username, '社区成员')} · {countValue(topic.replies ?? topic.reply_count)} 条回复</small></span>
           <span className="topic-row-arrow" aria-hidden="true">→</span>
         </Link>)}
       </div> : <div className="panel empty-state"><div className="empty-icon">✦</div><h3>暂无话题</h3><p>来发起小组的第一个讨论吧。</p></div>}

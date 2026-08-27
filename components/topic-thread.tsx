@@ -9,8 +9,18 @@ type TopicThreadProps = {
   composerTopicId?: number
 }
 
+function safeText(value: unknown, fallback = ''): string {
+  if (typeof value === 'string' || typeof value === 'number') return String(value)
+  if (Array.isArray(value)) return value.map(item => safeText(item)).filter(Boolean).join(' / ')
+  if (value && typeof value === 'object') {
+    const item = value as Record<string, unknown>
+    return safeText(item.nickname ?? item.username ?? item.name ?? item.title ?? item.content ?? item.body, fallback)
+  }
+  return fallback
+}
+
 function creatorName(value: any) {
-  return value?.nickname || value?.username || '社区成员'
+  return safeText(value?.nickname ?? value?.username, '社区成员')
 }
 
 function dateLabel(value: unknown) {
@@ -22,8 +32,8 @@ export function TopicThread({ topic, replies, backHref, backLabel, composerTopic
   return <div className="discussion-page">
     <article className="panel discussion-header">
       <div className="eyebrow">TOPIC</div>
-      <h1>{topic.title || '未命名话题'}</h1>
-      <p className="discussion-body">{topic.content || topic.body || '暂无正文。'}</p>
+      <h1>{safeText(topic.title, '未命名话题')}</h1>
+      <p className="discussion-body">{safeText(topic.content ?? topic.body, '暂无正文。')}</p>
       <p className="discussion-meta">{author} · {dateLabel(topic.created_at)}</p>
     </article>
 
@@ -35,7 +45,7 @@ export function TopicThread({ topic, replies, backHref, backLabel, composerTopic
           <div className="avatar">{name.slice(0, 1)}</div>
           <div>
             <h3>{name}</h3>
-            <p>{reply.content || reply.body || '暂无回复内容。'}</p>
+            <p>{safeText(reply.content ?? reply.body, '暂无回复内容。')}</p>
           </div>
         </article>
       }) : <div className="panel empty-state"><h3>还没有回复</h3><p>成为第一个参与讨论的人吧。</p></div>}

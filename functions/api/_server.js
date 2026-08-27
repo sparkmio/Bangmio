@@ -18594,7 +18594,7 @@ function groupIdFromHref(href) {
   }
 }
 function collapseText(str) {
-  return (str || "").replace(/\s+/g, " ").trim();
+  return repairMojibake(String(str || "")).replace(/\s+/g, " ").trim();
 }
 function parseGroupListHTML(html, base) {
   const groups = [];
@@ -18658,7 +18658,7 @@ function parseGroupDetailHTML(html, id, base) {
     const el = firstByClassSubstring(document, pattern);
     const text = el ? collapseText(el.textContent) : "";
     if (text) {
-      description = el.textContent.trim();
+      description = collapseText(el.textContent);
       break;
     }
   }
@@ -19238,7 +19238,7 @@ var ZHIPU_CHAT_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
 var DEFAULT_MODEL = "glm-5.3-flash";
 var MAX_MESSAGES = 12;
 var MAX_MESSAGE_LENGTH = 2e3;
-var MAX_CONTEXT_LENGTH = 5e3;
+var MAX_CONTEXT_LENGTH = 7e3;
 function cleanMessage(message) {
   if (!message || typeof message !== "object") return null;
   const role = message.role === "assistant" ? "assistant" : message.role === "user" ? "user" : null;
@@ -19246,58 +19246,93 @@ function cleanMessage(message) {
   if (!role || !content || content.length > MAX_MESSAGE_LENGTH) return null;
   return { role, content };
 }
-app12.post("/chat", async (c) => {
+function cleanContext(value) {
+  if (typeof value !== "string") return "";
+  return Array.from(value).filter((char) => {
+    const code = char.charCodeAt(0);
+    return code >= 32 || code === 9 || code === 10 || code === 13;
+  }).join("").trim().slice(0, MAX_CONTEXT_LENGTH);
+}
+function systemPrompt(context) {
+  return `\u4F60\u662F Bangmio \u7684\u756A\u5267\u8D44\u6599\u52A9\u624B\u300C\u7C73\u6B27\u300D\u3002\u4F60\u719F\u6089\u52A8\u753B\u3001\u6F2B\u753B\u3001\u6E38\u620F\u3001\u97F3\u4E50\u548C Bangumi \u6761\u76EE\uFF0C\u8BED\u6C14\u53CB\u597D\u3001\u81EA\u7136\u3001\u7B80\u6D01\u3002\u56DE\u7B54\u4F18\u5148\u4F9D\u636E\u5F53\u524D\u9875\u9762\u8D44\u6599\uFF1B\u8D44\u6599\u4E0D\u8DB3\u65F6\u660E\u786E\u8BF4\u4E0D\u77E5\u9053\uFF0C\u4E0D\u7F16\u9020\u94FE\u63A5\u3001\u8BC4\u5206\u3001\u4EBA\u7269\u5173\u7CFB\u6216\u5B9E\u65F6\u4FE1\u606F\u3002\u53EF\u4EE5\u4F7F\u7528 Markdown\uFF0C\u4F46\u4E0D\u8981\u8F93\u51FA HTML\u3002\u5F53\u524D\u9875\u9762\u4E0A\u4E0B\u6587\u5982\u4E0B\uFF1A
+${context || "\u5F53\u524D\u9875\u9762\u6CA1\u6709\u53EF\u8BFB\u53D6\u7684\u6B63\u6587\u8D44\u6599\u3002"}`;
+}
+async function callZhipu(c, messages, context) {
   const apiKey = String(c.env?.ZHIPU_API_KEY || "").trim();
-  if (!apiKey) {
-    return c.json({ data: null, error: "AI \u670D\u52A1\u5C1A\u672A\u914D\u7F6E\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5", code: 503 }, 503);
-  }
-  const body = await c.req.json().catch(() => ({}));
-  const messages = Array.isArray(body?.messages) ? body.messages.map(cleanMessage).filter(Boolean) : [];
-  const context = typeof body?.context === "string" ? body.context.trim().slice(0, MAX_CONTEXT_LENGTH) : "";
-  if (!messages.length || messages.length > MAX_MESSAGES || messages.at(-1)?.role !== "user") {
-    return c.json({ data: null, error: "\u6D88\u606F\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
-  }
+  if (!apiKey) return { error: "AI \u670D\u52A1\u5C1A\u672A\u914D\u7F6E\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5", status: 503 };
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 25e3);
   try {
     const response = await fetch(ZHIPU_CHAT_URL, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: String(c.env?.ZHIPU_MODEL || DEFAULT_MODEL),
-        messages: [
-          {
-            role: "system",
-            content: `\u4F60\u662F Bangmio \u7684\u756A\u5267\u4FE1\u606F\u52A9\u624B\u3002\u7528\u7B80\u6D01\u3001\u51C6\u786E\u7684\u4E2D\u6587\u56DE\u7B54\uFF1B\u4E0D\u786E\u5B9A\u65F6\u660E\u786E\u8BF4\u660E\uFF0C\u4E0D\u7F16\u9020\u6765\u6E90\u6216\u5B9E\u65F6\u6570\u636E\u3002${context ? `
-\u5F53\u524D\u9875\u9762\u8D44\u6599\uFF08\u4EC5\u4F5C\u56DE\u7B54\u4E0A\u4E0B\u6587\uFF09\uFF1A
-${context}` : ""}`
-          },
-          ...messages
-        ],
+        messages: [{ role: "system", content: systemPrompt(context) }, ...messages],
         temperature: 0.6,
-        max_tokens: 1024
+        max_tokens: 1400
       }),
       signal: controller.signal
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       console.warn("[AI] Zhipu request failed", response.status);
-      return c.json({ data: null, error: "AI \u670D\u52A1\u6682\u65F6\u4E0D\u53EF\u7528\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5", code: 502 }, 502);
+      return { error: "AI \u670D\u52A1\u6682\u65F6\u4E0D\u53EF\u7528\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5", status: 502 };
     }
     const content = payload?.choices?.[0]?.message?.content;
-    if (typeof content !== "string" || !content.trim()) {
-      return c.json({ data: null, error: "AI \u672A\u8FD4\u56DE\u6709\u6548\u56DE\u590D\uFF0C\u8BF7\u91CD\u8BD5", code: 502 }, 502);
-    }
-    return c.json({ data: { message: content.trim() }, code: 200 });
+    if (typeof content !== "string" || !content.trim())
+      return { error: "AI \u672A\u8FD4\u56DE\u6709\u6548\u56DE\u590D\uFF0C\u8BF7\u91CD\u8BD5", status: 502 };
+    return { message: content.trim() };
   } catch (error) {
-    const message = error instanceof Error && error.name === "AbortError" ? "AI \u54CD\u5E94\u8D85\u65F6\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5" : "AI \u670D\u52A1\u6682\u65F6\u4E0D\u53EF\u7528\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5";
-    return c.json({ data: null, error: message, code: 502 }, 502);
+    return {
+      error: error instanceof Error && error.name === "AbortError" ? "AI \u54CD\u5E94\u8D85\u65F6\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5" : "AI \u670D\u52A1\u6682\u65F6\u4E0D\u53EF\u7528\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5",
+      status: 502
+    };
   } finally {
     clearTimeout(timeout);
   }
+}
+app12.post("/chat", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const messages = Array.isArray(body?.messages) ? body.messages.map(cleanMessage).filter(Boolean) : [];
+  const context = cleanContext(body?.context);
+  if (!messages.length || messages.length > MAX_MESSAGES || messages.at(-1)?.role !== "user") {
+    return c.json({ data: null, error: "\u6D88\u606F\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
+  }
+  const result = await callZhipu(c, messages, context);
+  if (result.error)
+    return c.json({ data: null, error: result.error, code: result.status }, result.status);
+  return c.json({ data: { message: result.message }, code: 200 });
+});
+app12.post("/suggestions", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const context = cleanContext(body?.context);
+  const result = await callZhipu(
+    c,
+    [
+      {
+        role: "user",
+        content: "\u6839\u636E\u5F53\u524D\u9875\u9762\u8D44\u6599\uFF0C\u4ECE\u4E0B\u9762\u56DB\u7C7B\u4E2D\u6311\u9009\u6700\u6709\u5E2E\u52A9\u7684 4 \u4E2A\u63D0\u95EE\u5EFA\u8BAE\uFF1A\u5267\u60C5\u6982\u89C8\u3001\u89D2\u8272\u5173\u7CFB\u3001\u5236\u4F5C\u4E0E\u97F3\u4E50\u3001\u89C2\u770B\u987A\u5E8F/\u76F8\u4F3C\u4F5C\u54C1\u3002\u53EA\u8FD4\u56DE JSON \u6570\u7EC4\uFF0C\u6BCF\u9879\u662F 12 \u5230 30 \u5B57\u7684\u4E2D\u6587\u95EE\u9898\uFF0C\u4E0D\u8981 Markdown\u3001\u4E0D\u8981\u89E3\u91CA\u3002"
+      }
+    ],
+    context
+  );
+  if (result.error)
+    return c.json(
+      { data: { suggestions: [] }, error: result.error, code: result.status },
+      result.status
+    );
+  let suggestions = [];
+  try {
+    const parsed = JSON.parse(
+      String(result.message).replace(/^```json\s*|\s*```$/g, "").trim()
+    );
+    if (Array.isArray(parsed))
+      suggestions = parsed.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean).slice(0, 4);
+  } catch {
+    suggestions = String(result.message).split(/\n+/).map((item) => item.replace(/^[-*\d.、）)]+\s*/, "").trim()).filter(Boolean).slice(0, 4);
+  }
+  return c.json({ data: { suggestions }, code: 200 });
 });
 var ai_default = app12;
 
