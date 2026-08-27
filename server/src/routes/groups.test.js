@@ -5,6 +5,7 @@ import {
   parseGroupDiscoverHTML,
   parseGroupTopicHTML
 } from './groups.js'
+import { repairMojibake } from '../utils/http.js'
 
 const BASE = 'https://bgm.tv'
 
@@ -264,6 +265,25 @@ describe('parseGroupTopicHTML', () => {
         timestamp: ''
       }
     ])
+  })
+
+  it('解析经缓存返回的乱码页面时保留可读的中文消息', () => {
+    const html = `
+      <h1>æ¶ˆæ¯æµ‹è¯•</h1>
+      <a href="/group/anime">åŠ¨ç”»</a>
+      <div id="post_1" class="postTopic" data-item-user="user">
+        <div class="post_actions re_info"><small>#1 - 2026-8-16 20:00</small></div>
+        <div class="inner"><strong><a href="/user/user">ç”¨æˆ·</a></strong><div class="topic_content"><div class="message">è¿™æ˜¯ä¸€ä¸ªæ­£å¸¸æ¶ˆæ¯</div></div></div>
+      </div>
+    `
+    // 路由层会在 Cache API 命中时先修复 html；此处模拟其输入。
+    const topic = parseGroupTopicHTML(repairMojibake(html), '902', BASE)
+    expect(topic).toMatchObject({
+      title: '消息测试',
+      group_name: '动画',
+      author: '用户'
+    })
+    expect(topic.replies[0]?.content).toBe('这是一个正常消息')
   })
 })
 

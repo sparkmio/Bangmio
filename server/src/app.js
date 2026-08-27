@@ -16,6 +16,7 @@ import commentsRoutes from './routes/comments.js'
 import doubanRoutes from './routes/douban.js'
 import bilibiliRoutes from './routes/bilibili.js'
 import moegirlRoutes from './routes/moegirl.js'
+import wikipediaRoutes from './routes/wikipedia.js'
 import groupRoutes from './routes/groups.js'
 import musicRoutes from './routes/music.js'
 
@@ -88,6 +89,7 @@ app.route('/api/v1/comments', commentsRoutes)
 app.route('/api/v1/douban', doubanRoutes)
 app.route('/api/v1/bilibili', bilibiliRoutes)
 app.route('/api/v1/moegirl', moegirlRoutes)
+app.route('/api/v1/wikipedia', wikipediaRoutes)
 app.route('/api/v1/groups', groupRoutes)
 app.route('/api/v1/music', musicRoutes)
 

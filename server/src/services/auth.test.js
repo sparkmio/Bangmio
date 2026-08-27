@@ -29,10 +29,9 @@ vi.mock('../utils/email.js', () => ({
   buildVerificationEmailHTML: vi.fn(() => '<html>mock</html>')
 }))
 
-// Mock http.js 的 fetchHTML（bindBangumi 用它验证 Bangumi Token）
-vi.mock('../utils/http.js', () => ({
-  fetchHTML: vi.fn(),
-  SCRAPE_UA: 'mock-ua'
+// Mock Bangumi API 客户端（bindBangumi 通过它验证 Token）
+vi.mock('./bangumi.js', () => ({
+  getClient: vi.fn()
 }))
 
 // 不 mock crypto.js 和 jwt.js（使用真实实现）
@@ -59,7 +58,7 @@ import {
 } from '../db/users.js'
 import { verifyCode, createCode, getLatestCode } from '../db/emailCodes.js'
 import { sendEmail } from '../utils/email.js'
-import { fetchHTML } from '../utils/http.js'
+import { getClient } from './bangumi.js'
 import { hashPassword, generateSalt, encryptToken } from '../utils/crypto.js'
 import { signJwt, verifyJwt } from '../utils/jwt.js'
 
@@ -74,6 +73,9 @@ const DB = {}
 
 beforeEach(() => {
   vi.clearAllMocks()
+  getClient.mockReturnValue({
+    get: vi.fn().mockResolvedValue({ id: 999, username: 'bgm-user' })
+  })
 })
 
 describe('registerUser', () => {
@@ -282,7 +284,8 @@ describe('loginUser', () => {
 
 describe('bindBangumi', () => {
   it('Bangumi API 验证成功时返回 token 与 user（含 bgmUid）', async () => {
-    fetchHTML.mockResolvedValue(JSON.stringify({ id: 999, username: 'bgm-user' }))
+    const client = { get: vi.fn().mockResolvedValue({ id: 999, username: 'bgm-user' }) }
+    getClient.mockReturnValue(client)
     const updated = {
       id: 'u1',
       email: 'a@b.c',
@@ -294,11 +297,9 @@ describe('bindBangumi', () => {
 
     const { token, user } = await bindBangumi(DB, ENV, 'u1', 'bgm-access-token')
 
-    // fetchHTML 调用参数正确
-    expect(fetchHTML).toHaveBeenCalledTimes(1)
-    const [url, opts] = fetchHTML.mock.calls[0]
-    expect(url).toBe('https://api.bgm.tv/v0/me')
-    expect(opts.headers.Authorization).toBe('Bearer bgm-access-token')
+    // Bangumi 客户端以 token 创建，并调用 /v0/me 验证
+    expect(getClient).toHaveBeenCalledWith('bgm-access-token', false)
+    expect(client.get).toHaveBeenCalledWith('/v0/me')
 
     // updateUserBgmBinding 被调用，bgmUid 转为字符串
     expect(updateUserBgmBinding).toHaveBeenCalledTimes(1)
@@ -319,7 +320,7 @@ describe('bindBangumi', () => {
   })
 
   it('Bangumi API 验证失败时抛 401 错误', async () => {
-    fetchHTML.mockRejectedValue(new Error('HTTP 401'))
+    getClient.mockReturnValue({ get: vi.fn().mockRejectedValue(new Error('HTTP 401')) })
 
     await expect(bindBangumi(DB, ENV, 'u1', 'bad-token')).rejects.toMatchObject({
       status: 401
@@ -329,7 +330,7 @@ describe('bindBangumi', () => {
   })
 
   it('Bangumi API 返回无 id 时抛 401 错误', async () => {
-    fetchHTML.mockResolvedValue(JSON.stringify({ username: 'no-id-user' }))
+    getClient.mockReturnValue({ get: vi.fn().mockResolvedValue({ username: 'no-id-user' }) })
 
     await expect(bindBangumi(DB, ENV, 'u1', 'token')).rejects.toMatchObject({
       status: 401
@@ -337,7 +338,7 @@ describe('bindBangumi', () => {
   })
 
   it('用户不存在时抛 404 错误', async () => {
-    fetchHTML.mockResolvedValue(JSON.stringify({ id: 1 }))
+    getClient.mockReturnValue({ get: vi.fn().mockResolvedValue({ id: 1 }) })
     updateUserBgmBinding.mockResolvedValue(null)
 
     await expect(bindBangumi(DB, ENV, 'no-such-user', 'token')).rejects.toMatchObject({

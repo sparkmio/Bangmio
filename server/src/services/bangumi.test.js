@@ -120,6 +120,27 @@ describe('searchAnime', () => {
     })
   })
 
+  it('官方 API 返回 5xx 时自动回退到镜像', async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(errResponse(503, { error: 'unavailable' }))
+      .mockResolvedValueOnce(okResponse({ data: [{ id: 1 }], total: 1 }))
+
+    await expect(searchAnime('x')).resolves.toEqual({ data: [{ id: 1 }], total: 1 })
+    expect(global.fetch.mock.calls[0][0]).toContain('https://api.bgm.tv/')
+    expect(global.fetch.mock.calls[1][0]).toContain('https://api.bangumi.lol/')
+  })
+
+  it('401 不切换源，直接保留 Token 无效错误', async () => {
+    global.fetch = vi.fn().mockResolvedValue(errResponse(401, { error: 'invalid token' }))
+
+    const client = getClient('bad-token')
+    await expect(client.get('/v0/me')).rejects.toMatchObject({
+      response: { status: 401 }
+    })
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+  })
+
   it('默认 limit=20、page=1 时 offset=0', async () => {
     global.fetch = vi.fn().mockResolvedValue(okResponse({ data: [], total: 0 }))
 

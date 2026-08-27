@@ -33,10 +33,11 @@ export function AuthForm({ mode }: { mode: Mode }) {
   }, [seconds])
 
   async function sendCode() {
-    if (!email) { setMessage('请先输入邮箱地址'); return }
+    const normalizedEmail = email.trim()
+    if (!normalizedEmail) { setMessage('请先输入邮箱地址'); return }
     setBusy(true); setMessage('')
     try {
-      const response = await fetch('/api/v1/auth/send-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, purpose: 'register' }) })
+      const response = await fetch('/api/v1/auth/send-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: normalizedEmail, purpose: 'register' }) })
       const payload = await response.json().catch(() => ({})) as ApiResult<{ cooldown?: number }>
       if (!response.ok) throw new Error(errorMessage(payload, '验证码发送失败'))
       setCodeSent(true); setSeconds(payload.data?.cooldown || 60)
@@ -47,7 +48,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
     setBusy(true); setMessage('')
     try {
       const endpoint = flow === 'bind' ? '/api/v1/auth/oauth-bind-url' : '/api/v1/user/oauth-url'
-      const headers = flow === 'bind' && token ? { Authorization: `Bearer ${token}` } : undefined
+      const bindToken = token || localStorage.getItem('bangmio_token') || ''
+      const headers = flow === 'bind' && bindToken ? { Authorization: `Bearer ${bindToken}` } : undefined
       const response = await fetch(endpoint, { headers })
       const payload = await response.json().catch(() => ({})) as ApiResult<string | { url?: string }>
       if (!response.ok) throw new Error(errorMessage(payload, '无法开始授权'))
@@ -61,8 +63,11 @@ export function AuthForm({ mode }: { mode: Mode }) {
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setBusy(true); setMessage('')
     try {
+      const normalizedEmail = email.trim()
+      const normalizedCode = code.trim()
+      const normalizedBangumiToken = bangumiToken.trim()
       if (currentMode === 'login') {
-        const response = await fetch('/api/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) })
+        const response = await fetch('/api/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: normalizedEmail, password }) })
         const payload = await response.json().catch(() => ({})) as ApiResult<{ token: string; user: User }>
         if (!response.ok || !payload.data?.token || !payload.data.user) throw new Error(errorMessage(payload, '登录失败'))
         setAuth(payload.data.token, payload.data.user)
@@ -70,7 +75,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         router.replace(redirect); router.refresh(); return
       }
       if (currentMode === 'register') {
-        const response = await fetch('/api/v1/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, code }) })
+        const response = await fetch('/api/v1/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: normalizedEmail, password, code: normalizedCode }) })
         const payload = await response.json().catch(() => ({})) as ApiResult<{ token: string; user: User }>
         if (!response.ok || !payload.data?.token || !payload.data.user) throw new Error(errorMessage(payload, '注册失败'))
         setAuth(payload.data.token, payload.data.user)
@@ -78,18 +83,18 @@ export function AuthForm({ mode }: { mode: Mode }) {
       }
       if (currentMode === 'bind') {
         if (!isBangmioUser || !token) throw new Error('请先使用 Bangmio 账号登录')
-        const response = await fetch('/api/v1/auth/bind-bangumi', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ bangumiToken }) })
+        const response = await fetch('/api/v1/auth/bind-bangumi', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ bangumiToken: normalizedBangumiToken }) })
         const payload = await response.json().catch(() => ({})) as ApiResult<{ token: string; user: User }>
         if (!response.ok || !payload.data?.token || !payload.data.user) throw new Error(errorMessage(payload, '绑定失败'))
         setAuth(payload.data.token, payload.data.user)
-        localStorage.setItem('bgm_token_cached', bangumiToken)
+        localStorage.setItem('bgm_token_cached', normalizedBangumiToken)
         await fetchBgmUserProfile()
         router.replace('/profile'); router.refresh(); return
       }
-      const response = await fetch('/api/v1/user/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: bangumiToken }) })
+      const response = await fetch('/api/v1/user/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: normalizedBangumiToken }) })
       const payload = await response.json().catch(() => ({})) as ApiResult<{ token: string; user: User }>
       if (!response.ok || !payload.data?.user) throw new Error(errorMessage(payload, 'Token 验证失败'))
-      setAuth(payload.data.token || bangumiToken, payload.data.user, 'bangumi')
+      setAuth(payload.data.token || normalizedBangumiToken, payload.data.user, 'bangumi')
       router.replace(redirect); router.refresh()
     } catch (error) { setMessage(error instanceof Error ? error.message : '操作失败') } finally { setBusy(false) }
   }

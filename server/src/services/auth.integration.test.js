@@ -16,10 +16,15 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest'
 
-// Mock http.js 的 fetchHTML（bindBangumi 用它验证 Bangumi Token；其它抓取不走网络）
+// Mock http.js（前端直登流程使用，避免测试触网）
 vi.mock('../utils/http.js', () => ({
   fetchHTML: vi.fn(),
   SCRAPE_UA: 'mock-ua'
+}))
+
+// Mock Bangumi API 客户端（bindBangumi 用它验证 Bangumi Token）
+vi.mock('./bangumi.js', () => ({
+  getClient: vi.fn()
 }))
 
 // Mock emailCodes.js（验证码逻辑由单元测试覆盖；集成测试中 verifyCode 固定返回 true）
@@ -41,6 +46,7 @@ vi.mock('../utils/email.js', () => ({
 // 不 mock users.js / crypto.js / jwt.js：使用真实实现，配合内存 D1 完成端到端验证
 import { registerUser, bindBangumi, refreshJwt, getCurrentUser, getUserBgmToken } from './auth.js'
 import { fetchHTML } from '../utils/http.js'
+import { getClient } from './bangumi.js'
 import { verifyCode } from '../db/emailCodes.js'
 import { verifyJwt } from '../utils/jwt.js'
 
@@ -53,7 +59,7 @@ const ENV = {
 /** 固定基准时间（用于 fake timers），便于断言 iat/exp */
 const BASE_TIME = new Date('2026-01-01T00:00:00Z').getTime()
 
-/** Bangumi /v0/me 接口地址（与 auth.js 内部常量保持一致） */
+/** Bangumi /v0/me 接口路径 */
 const BGM_ME_API = 'https://api.bgm.tv/v0/me'
 
 /**
@@ -236,8 +242,7 @@ describe('场景 1：Bangmio 完整流程（注册 → 登录 → 绑定 → 调
   })
 
   beforeEach(() => {
-    // fetchHTML 默认返回 Bangumi 用户信息（bindBangumi 验证 token 用）
-    fetchHTML.mockResolvedValue(JSON.stringify(bgmUserInfo))
+    getClient.mockReturnValue({ get: vi.fn().mockResolvedValue(bgmUserInfo) })
   })
 
   it('1.1 注册新用户返回 JWT，payload 含 userId/email，无 bgmUid', async () => {
@@ -285,11 +290,9 @@ describe('场景 1：Bangmio 完整流程（注册 → 登录 → 绑定 → 调
   it('1.3 调用 bindBangumi 通过 bgm /v0/me 验证 token 后绑定成功', async () => {
     const { token, user } = await bindBangumi(db, ENV, registeredUserId, validBgmToken)
 
-    // fetchHTML 调用参数正确：URL 与 Authorization 头
-    expect(fetchHTML).toHaveBeenCalledTimes(1)
-    const [url, opts] = fetchHTML.mock.calls[0]
-    expect(url).toBe(BGM_ME_API)
-    expect(opts.headers.Authorization).toBe('Bearer ' + validBgmToken)
+    // Bangumi 客户端带 token 创建，并调用 /v0/me
+    expect(getClient).toHaveBeenCalledWith(validBgmToken, false)
+    expect(getClient.mock.results[0].value.get).toHaveBeenCalledWith('/v0/me')
 
     // 返回 user 含 bgmUid（字符串）
     expect(user).toEqual({
@@ -422,6 +425,7 @@ describe('场景 3：未绑定 Bangmio 用户调用番剧功能 → 403 引导',
   beforeEach(async () => {
     db = createMockD1()
     fetchHTML.mockResolvedValue(JSON.stringify({ id: 12345, username: 'test' }))
+    getClient.mockReturnValue({ get: vi.fn().mockResolvedValue({ id: 12345, username: 'test' }) })
     verifyCode.mockResolvedValue(true)
 
     // 注册 Bangmio 账号但不绑定 Bangumi（场景前置）

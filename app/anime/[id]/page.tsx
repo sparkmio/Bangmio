@@ -2,8 +2,6 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { VueAnimeDetail } from '@/components/vue-anime-detail'
-import { AnimeGrid } from '@/components/anime-card'
-import { SectionHeading } from '@/components/ui'
 import { displayName, imageUrl, safeApiFetch } from '@/lib/api'
 import type { ImageSet, Subject } from '@/lib/types'
 
@@ -56,13 +54,10 @@ export default async function AnimeDetailPage({ params }: { params: Promise<{ id
     safeApiFetch<Credit[]>(`/anime/${id}/persons`),
     safeApiFetch<Episode[]>(`/anime/${id}/episodes`)
   ])
-  const relations = arrayData(relationsResponse).filter((item: Subject) => item.type !== 3)
+  const relations = arrayData(relationsResponse)
   const characters = arrayData(charactersResponse)
   const persons = arrayData(personsResponse)
   const episodes = arrayData(episodesResponse)
-  const image = imageUrl(subject.images)
-  const ratingCount = subject.rating?.count || {}
-  const ratingMax = Math.max(1, ...Object.values(ratingCount).map(Number))
   const infobox = Array.isArray(subject.infobox) ? subject.infobox.filter(item => item?.key && displayValue(item.value)) : []
 
   return <VueAnimeDetail subject={subject} relations={relations} characters={characters} persons={persons} episodes={episodes} infobox={infobox} />

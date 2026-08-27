@@ -15,7 +15,8 @@ function CallbackContent() {
     if (!code || !state) { setMessage('缺少 OAuth 参数'); return }
     const endpoint = flow === 'bind' ? '/api/v1/auth/oauth-bind-callback' : '/api/v1/user/oauth-callback'
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    if (flow === 'bind' && token) headers.Authorization = `Bearer ${token}`
+    const bindToken = token || localStorage.getItem('bangmio_token') || ''
+    if (flow === 'bind' && bindToken) headers.Authorization = `Bearer ${bindToken}`
     fetch(endpoint, { method: 'POST', headers, body: JSON.stringify({ code, state }) }).then(async response => {
       const payload = await response.json().catch(() => ({})) as ApiResult<{ token?: string; user?: User; bgmToken?: string }>
       if (!response.ok || !payload.data?.user) throw new Error(payload.error || '授权失败')

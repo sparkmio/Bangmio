@@ -14,7 +14,7 @@ function isChina(c) {
 }
 
 function redirectUri(c) {
-  return c.env?.OAUTH_REDIRECT_URI || 'http://localhost:5173/login/callback'
+  return c.env?.OAUTH_REDIRECT_URI || 'http://localhost:3001/login/callback'
 }
 
 function oauthBase(c) {
@@ -76,14 +76,16 @@ const TIMELINE_TYPE_MAP = {
 
 app.post('/auth', async c => {
   try {
-    const { token } = await c.req.json()
-    if (!token) return c.json({ error: '请输入 Access Token' }, 400)
+    const token = String((await c.req.json()).token || '').trim()
+    if (!token) return c.json({ data: null, error: '请输入 Access Token', code: 400 }, 400)
     const client = getClient(token, isChina(c))
     const user = await client.get('/v0/me')
-    return c.json({ data: { user, token } })
+    return c.json({ data: { user, token }, code: 200 })
   } catch (err) {
-    if (err.response?.status === 401) return c.json({ error: 'Token 无效，请检查' }, 401)
-    return c.json({ error: '验证失败' }, 500)
+    if (err.response?.status === 401 || err.response?.status === 403) {
+      return c.json({ data: null, error: 'Token 无效，请检查', code: 401 }, 401)
+    }
+    return c.json({ data: null, error: '验证失败，请稍后重试', code: 502 }, 502)
   }
 })
 

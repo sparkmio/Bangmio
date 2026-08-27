@@ -137,7 +137,8 @@ app.post('/send-code', async c => {
 app.post('/register', async c => {
   try {
     const body = await c.req.json().catch(() => ({}))
-    const { email, password, code, captchaToken } = body || {}
+    const { email: rawEmail, password, code, captchaToken } = body || {}
+    const email = normalizeEmail(rawEmail)
     if (!email || !EMAIL_REGEX.test(email)) {
       return c.json({ data: null, error: '邮箱格式不正确', code: 400 }, 400)
     }
@@ -172,7 +173,8 @@ app.post('/register', async c => {
 app.post('/login', async c => {
   try {
     const body = await c.req.json().catch(() => ({}))
-    const { email, password, captchaToken } = body || {}
+    const { email: rawEmail, password, captchaToken } = body || {}
+    const email = normalizeEmail(rawEmail)
     if (!email || !password) {
       return c.json({ data: null, error: '邮箱或密码不能为空', code: 400 }, 400)
     }
@@ -222,12 +224,12 @@ app.post('/refresh', async c => {
 app.post('/bind-bangumi', jwtAuth(), async c => {
   try {
     const body = await c.req.json().catch(() => ({}))
-    const { bangumiToken } = body || {}
+    const bangumiToken = String(body?.bangumiToken || '').trim()
     if (!bangumiToken) {
       return c.json({ data: null, error: 'Bangumi Token 不能为空', code: 400 }, 400)
     }
     const currentUser = c.get('user')
-    const result = await bindBangumi(c.env.DB, c.env, currentUser.userId, bangumiToken)
+    const result = await bindBangumi(c.env.DB, c.env, currentUser.userId, bangumiToken, isChina(c))
     return c.json({ data: { token: result.token, user: result.user }, code: 200 })
   } catch (err) {
     return errorResponse(err)
@@ -342,7 +344,8 @@ app.post('/oauth-bind-callback', jwtAuth(), async c => {
       oauthBase: oauthBase(c),
       appId,
       appSecret,
-      redirectUri: redirectUri(c)
+      redirectUri: redirectUri(c),
+      isChina: isChina(c)
     })
     return c.json({
       data: { token: result.token, user: result.user, bgmToken: result.bgmToken },

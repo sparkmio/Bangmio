@@ -3,6 +3,7 @@ import {
   SCRAPE_UA,
   fetchHTML,
   fetchHTMLMulti,
+  repairMojibake,
   stripTags,
   unescapeHtml,
   parseNumber,
@@ -68,6 +69,18 @@ describe('fixUrl', () => {
   it('已完整 URL 不变', () => {
     const url = 'https://example.com/image.jpg'
     expect(fixUrl(url)).toBe(url)
+  })
+})
+
+describe('repairMojibake', () => {
+  it('修复 UTF-8 被按 Windows-1252 错解的中文', () => {
+    expect(repairMojibake('è¿™æ˜¯ä¸€ä¸ªè¯´æ˜Ž')).toBe('这是一个说明')
+  })
+
+  it('不修改正常文本', () => {
+    expect(repairMojibake('这是正常中文 mixed with English')).toBe(
+      '这是正常中文 mixed with English'
+    )
   })
 })
 

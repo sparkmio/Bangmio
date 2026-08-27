@@ -18,38 +18,72 @@ function headers(token) {
     : { 'User-Agent': 'Bangmio/anime-manager' }
 }
 
-async function bgmGet(path, token, params, isChina = false) {
-  const base = isChina ? BGM_PROXY : BGM_API
-  const url = new URL(`${base}${path}`)
-  if (params) Object.entries(params).forEach(([k, v]) => v != null && url.searchParams.set(k, v))
-  const res = await fetch(url.toString(), { headers: headers(token) })
-  const text = await res.text()
-  const data = text ? JSON.parse(text) : {}
-  if (!res.ok) {
-    const err = new Error(`Bangumi API ${res.status}`)
-    err.response = { status: res.status, data }
-    throw err
+function apiBases(isChina) {
+  return isChina ? [BGM_PROXY, BGM_API] : [BGM_API, BGM_PROXY]
+}
+
+function apiError(status, data, cause) {
+  const err = new Error(`Bangumi API ${status}`)
+  err.response = { status, data }
+  if (cause) err.cause = cause
+  return err
+}
+
+/**
+ * 统一请求 Bangumi API。优先按地区选择的源；网络异常、5xx 或无效 JSON 时自动
+ * 回退另一个 API 域名。401/403 直接返回，避免把真实的 Token 问题伪装成网络问题。
+ */
+async function bgmRequest(method, path, { token, body, params, isChina = false } = {}) {
+  let lastError
+
+  for (const base of apiBases(isChina)) {
+    const url = new URL(`${base}${path}`)
+    if (params)
+      Object.entries(params).forEach(([k, v]) => v != null && url.searchParams.set(k, String(v)))
+    try {
+      const requestHeaders =
+        method === 'POST'
+          ? { ...headers(token), 'Content-Type': 'application/json' }
+          : headers(token)
+      const res = await fetch(url.toString(), {
+        ...(method === 'GET' ? {} : { method }),
+        headers: requestHeaders,
+        ...(body === undefined ? {} : { body: JSON.stringify(body) })
+      })
+      const text = await res.text()
+      let data = {}
+      try {
+        data = text ? JSON.parse(text) : {}
+      } catch (cause) {
+        lastError = apiError(res.status, { error: 'Invalid JSON response' }, cause)
+        continue
+      }
+      if (res.ok) return rewriteImageUrls(data)
+
+      const error = apiError(res.status, data)
+      if (res.status === 401 || res.status === 403 || res.status < 500) throw error
+      lastError = error
+    } catch (error) {
+      if (
+        error?.response?.status === 401 ||
+        error?.response?.status === 403 ||
+        error?.response?.status < 500
+      ) {
+        throw error
+      }
+      lastError = error
+    }
   }
-  return rewriteImageUrls(data)
+
+  throw lastError || new Error('Bangumi API unavailable')
+}
+
+async function bgmGet(path, token, params, isChina = false) {
+  return bgmRequest('GET', path, { token, params, isChina })
 }
 
 async function bgmPost(path, body, token, params, isChina = false) {
-  const base = isChina ? BGM_PROXY : BGM_API
-  const url = new URL(`${base}${path}`)
-  if (params) Object.entries(params).forEach(([k, v]) => v != null && url.searchParams.set(k, v))
-  const res = await fetch(url.toString(), {
-    method: 'POST',
-    headers: { ...headers(token), 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  })
-  const text = await res.text()
-  const data = text ? JSON.parse(text) : {}
-  if (!res.ok) {
-    const err = new Error(`Bangumi API ${res.status}`)
-    err.response = { status: res.status, data }
-    throw err
-  }
-  return rewriteImageUrls(data)
+  return bgmRequest('POST', path, { token, body, params, isChina })
 }
 
 function buildSearchBody(keyword, params = {}) {
@@ -126,12 +160,7 @@ export function getClient(token, isChina = false) {
   return {
     get: (path, params) => bgmGet(path, token, params, isChina),
     post: (path, body, params) => bgmPost(path, body, token, params, isChina),
-    delete: async path => {
-      const base = isChina ? BGM_PROXY : BGM_API
-      const r = await fetch(`${base}${path}`, { method: 'DELETE', headers: headers(token) })
-      const t = await r.text()
-      return t ? JSON.parse(t) : {}
-    }
+    delete: path => bgmRequest('DELETE', path, { token, isChina })
   }
 }
 

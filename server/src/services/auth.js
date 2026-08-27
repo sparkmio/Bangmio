@@ -42,13 +42,10 @@ import {
   resendCooldownSeconds
 } from '../db/emailCodes.js'
 import { sendEmail, buildVerificationEmailHTML } from '../utils/email.js'
-import { fetchHTML } from '../utils/http.js'
 import { exchangeBangumiOAuthCode } from './oauth.js'
+import { getClient } from './bangumi.js'
 import { logError, logInfo } from '../utils/logger.js'
 import { normalizeEmail } from '../utils/emailAddress.js'
-
-/** Bangumi `/v0/me` 接口地址，用于验证 Access Token 有效性 */
-const BGM_ME_API = 'https://api.bgm.tv/v0/me'
 
 /** OAuth 绑定流程 state JWT 有效期：5 分钟 */
 const OAUTH_BIND_STATE_TTL = 5 * 60
@@ -216,16 +213,11 @@ export async function loginUser(db, env, { email, password }) {
  *   新 JWT 与公开用户信息。
  * @throws {Error} 当 Token 无效、用户不存在或更新失败时抛出。
  */
-export async function bindBangumi(db, env, userId, bangumiToken) {
+export async function bindBangumi(db, env, userId, bangumiToken, isChina = false) {
+  const normalizedToken = String(bangumiToken || '').trim()
   let me
   try {
-    const text = await fetchHTML(BGM_ME_API, {
-      headers: {
-        Authorization: 'Bearer ' + bangumiToken,
-        Accept: 'application/json'
-      }
-    })
-    me = JSON.parse(text)
+    me = await getClient(normalizedToken, isChina).get('/v0/me')
   } catch (err) {
     logError('Bangumi token 验证失败', { userId, error: String(err) })
     throw httpError(401, 'Bangumi Token 无效')
@@ -234,7 +226,7 @@ export async function bindBangumi(db, env, userId, bangumiToken) {
   if (!bgmUid) {
     throw httpError(401, 'Bangumi Token 无效')
   }
-  const { encrypted, iv } = await encryptToken(bangumiToken, env.JWT_SECRET)
+  const { encrypted, iv } = await encryptToken(normalizedToken, env.JWT_SECRET)
   const updated = await updateUserBgmBinding(db, userId, String(bgmUid), encrypted, iv)
   if (!updated) {
     throw httpError(404, '用户不存在')
@@ -391,7 +383,7 @@ export async function verifyOAuthBindState(env, state) {
  *
  * @param {D1Database} db - D1 binding。
  * @param {object} env - 环境变量。
- * @param {{ code: string, state: string, oauthBase: string, appId: string, appSecret: string, redirectUri: string }} input
+ * @param {{ code: string, state: string, oauthBase: string, appId: string, appSecret: string, redirectUri: string, isChina?: boolean }} input
  *   OAuth 参数。
  * @returns {Promise<{ token: string, user: object }>}
  *   新 JWT 与用户信息。
@@ -400,7 +392,7 @@ export async function verifyOAuthBindState(env, state) {
 export async function bindBangumiByOAuth(
   db,
   env,
-  { code, state, oauthBase, appId, appSecret, redirectUri }
+  { code, state, oauthBase, appId, appSecret, redirectUri, isChina = false }
 ) {
   const stateResult = await verifyOAuthBindState(env, state)
   if (!stateResult.valid || !stateResult.userId) {
@@ -441,10 +433,7 @@ export async function bindBangumiByOAuth(
   // 验证 token 并获取 Bangumi 用户信息
   let me
   try {
-    const text = await fetchHTML(BGM_ME_API, {
-      headers: { Authorization: 'Bearer ' + accessToken, Accept: 'application/json' }
-    })
-    me = JSON.parse(text)
+    me = await getClient(accessToken, isChina).get('/v0/me')
   } catch (err) {
     logError('OAuth 绑定时验证 token 失败', { userId, error: String(err) })
     throw httpError(500, 'Bangumi Token 验证失败')

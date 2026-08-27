@@ -42,6 +42,72 @@ const ENCODING_SUPPORT = (() => {
   return support
 })()
 
+const WINDOWS_1252_BYTES = new Map([
+  [0x20ac, 0x80],
+  [0x201a, 0x82],
+  [0x0192, 0x83],
+  [0x201e, 0x84],
+  [0x2026, 0x85],
+  [0x2020, 0x86],
+  [0x2021, 0x87],
+  [0x02c6, 0x88],
+  [0x2030, 0x89],
+  [0x0160, 0x8a],
+  [0x2039, 0x8b],
+  [0x0152, 0x8c],
+  [0x017d, 0x8e],
+  [0x2018, 0x91],
+  [0x2019, 0x92],
+  [0x201c, 0x93],
+  [0x201d, 0x94],
+  [0x2022, 0x95],
+  [0x2013, 0x96],
+  [0x2014, 0x97],
+  [0x02dc, 0x98],
+  [0x2122, 0x99],
+  [0x0161, 0x9a],
+  [0x203a, 0x9b],
+  [0x0153, 0x9c],
+  [0x017e, 0x9e],
+  [0x0178, 0x9f]
+])
+
+function mojibakeMarkerCount(text) {
+  return (text.match(/[ÃÂâ]|(?:[à-ï][\u0080-\u00bf])/g) || []).length
+}
+
+/**
+ * 修复 UTF-8 字节被按 Latin-1 / Windows-1252 错误解读后的乱码，例如：
+ * `è¿™æ˜¯ä¸€ä¸ªè¯´æ˜Ž` -> `这是一个说明`。
+ *
+ * 只有在存在典型乱码标记且修复后更像自然文本时才替换，避免影响正常中文。
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+export function repairMojibake(text) {
+  if (!text || !/[ÃÂâ]|[à-ï][\u0080-\u00bf]/.test(text)) return text
+
+  const bytes = []
+  for (const char of text) {
+    const code = char.codePointAt(0)
+    if (code <= 0xff) bytes.push(code)
+    else if (WINDOWS_1252_BYTES.has(code)) bytes.push(WINDOWS_1252_BYTES.get(code))
+    else return text
+  }
+
+  try {
+    const repaired = new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(bytes))
+    const beforeMarkers = mojibakeMarkerCount(text)
+    const afterMarkers = mojibakeMarkerCount(repaired)
+    const beforeCjk = (text.match(/[\u3400-\u9fff]/g) || []).length
+    const afterCjk = (repaired.match(/[\u3400-\u9fff]/g) || []).length
+    return afterMarkers < beforeMarkers || afterCjk > beforeCjk ? repaired : text
+  } catch {
+    return text
+  }
+}
+
 /**
  * 显式按 UTF-8 解码响应体；若出现替换字符或解码失败，则回退到 GBK/GB18030。
  * 解决部分上游站点（如萌娘百科）在 Cloudflare Workers 中被错误按 Latin1 解码导致中文乱码的问题。
@@ -56,7 +122,7 @@ async function decodeResponseBody(res) {
   let text = ''
   try {
     text = new TextDecoder('utf-8', { fatal: false }).decode(buffer)
-    if (!text.includes('\uFFFD')) return text
+    if (!text.includes('\uFFFD')) return repairMojibake(text)
   } catch {
     // UTF-8 解码异常时继续回退
   }
@@ -69,14 +135,14 @@ async function decodeResponseBody(res) {
     }
     try {
       const decoder = new TextDecoder(label, { fatal: true })
-      return decoder.decode(buffer)
+      return repairMojibake(decoder.decode(buffer))
     } catch {
       // 当前 label 解码失败（非编码问题），继续下一个
     }
   }
 
   // 最终回退：按 UTF-8 非致命解码返回
-  return new TextDecoder('utf-8').decode(buffer)
+  return repairMojibake(new TextDecoder('utf-8').decode(buffer))
 }
 
 /**

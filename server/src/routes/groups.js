@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { parseHTML } from 'linkedom'
 import { createCache } from '../utils/cache.js'
-import { fetchHTMLMulti, parseNumber, fixUrl } from '../utils/http.js'
+import { fetchHTMLMulti, parseNumber, fixUrl, repairMojibake } from '../utils/http.js'
 import { CACHE_TTL_GROUPS } from '../config.js'
 
 const app = new Hono()
@@ -50,7 +50,7 @@ async function fetchGroupHTMLCached(urls) {
       try {
         const cached = await cache.match(url)
         if (cached) {
-          const html = await cached.text()
+          const html = repairMojibake(await cached.text())
           if (html && html.length >= 500) return { html, url, fromCache: true }
         }
       } catch {
