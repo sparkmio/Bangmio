@@ -1,8 +1,8 @@
 const BGM_API = 'https://api.bgm.tv'
-const BGM_PROXY = 'https://api.bangumi.lol'
+const BGM_PROXY = 'https://api.bangumi.pro'
 
 function rewriteImageUrls(data) {
-  if (typeof data === 'string') return data.replace(/lain\.bgm\.tv/g, 'lain.bangumi.lol')
+  if (typeof data === 'string') return data.replace(/lain\.bgm\.tv/g, 'lain.bangumi.pro')
   if (Array.isArray(data)) return data.map(rewriteImageUrls)
   if (data && typeof data === 'object') {
     const out = {}

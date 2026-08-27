@@ -9,7 +9,7 @@
       </div>
     </div>
     <a
-      :href="`https://bangumi.lol/subject/${subjectId}`"
+      :href="`https://bangumi.pro/subject/${subjectId}`"
       target="_blank"
       class="btn btn-sm btn-ghost mt-4 w-full"
       >在 Bangumi 查看完整 Wiki →</a

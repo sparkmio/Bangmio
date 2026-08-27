@@ -38,7 +38,7 @@ import { normalizeEmail } from '../utils/emailAddress.js'
 const app = new Hono()
 
 /**
- * 判断请求是否来自国内节点（决定走 bgm.tv 还是 bangumi.lol 镜像）。
+ * 判断请求是否来自国内节点（决定走 bgm.tv 还是 bangumi.pro 镜像）。
  * @param {import('hono').Context} c
  * @returns {boolean}
  */
@@ -52,7 +52,7 @@ function isChina(c) {
  * @returns {string}
  */
 function oauthBase(c) {
-  return isChina(c) ? 'https://bangumi.lol' : 'https://bgm.tv'
+  return isChina(c) ? 'https://bangumi.pro' : 'https://bgm.tv'
 }
 
 /**
@@ -62,6 +62,19 @@ function oauthBase(c) {
  */
 function redirectUri(c) {
   return c.env?.OAUTH_REDIRECT_URI || 'http://localhost:3001/login/callback'
+}
+
+function turnstileOptions(c, action) {
+  const hostnames = String(c.env?.TURNSTILE_HOSTNAMES || '')
+    .split(',')
+    .map(value => value.trim())
+    .filter(Boolean)
+  return { action, hostnames }
+}
+
+function publicTurnstileConfig(c) {
+  const siteKey = String(c.env?.TURNSTILE_SITE_KEY || c.env?.VITE_TURNSTILE_SITE_KEY || '').trim()
+  return { required: Boolean(c.env?.TURNSTILE_SECRET_KEY), siteKey: siteKey || null }
 }
 
 /**
@@ -91,6 +104,12 @@ app.use('*', async (c, next) => {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /**
+ * GET /config
+ * 返回登录页面所需的公开配置。Turnstile site key 是公开标识，secret 始终只留在 Worker。
+ */
+app.get('/config', c => c.json({ data: publicTurnstileConfig(c), code: 200 }))
+
+/**
  * POST /send-code
  * Body: { email, captchaToken, purpose? }
  * 发送邮箱验证码（用于注册）。
@@ -111,7 +130,8 @@ app.post('/send-code', async c => {
     const turnstile = await verifyTurnstile(
       captchaToken,
       c.env?.TURNSTILE_SECRET_KEY,
-      c.req.header('CF-Connecting-IP')
+      c.req.header('CF-Connecting-IP'),
+      turnstileOptions(c, purpose === 'reset' ? 'reset_password' : 'register')
     )
     if (!turnstile.success) {
       return c.json({ data: null, error: '人机验证失败，请重试', code: 400 }, 400)
@@ -150,7 +170,8 @@ app.post('/register', async c => {
       const turnstile = await verifyTurnstile(
         captchaToken,
         c.env.TURNSTILE_SECRET_KEY,
-        c.req.header('CF-Connecting-IP')
+        c.req.header('CF-Connecting-IP'),
+        turnstileOptions(c, 'register')
       )
       if (!turnstile.success) {
         return c.json({ data: null, error: '人机验证失败，请重试', code: 400 }, 400)
@@ -183,7 +204,8 @@ app.post('/login', async c => {
       const turnstile = await verifyTurnstile(
         captchaToken,
         c.env.TURNSTILE_SECRET_KEY,
-        c.req.header('CF-Connecting-IP')
+        c.req.header('CF-Connecting-IP'),
+        turnstileOptions(c, 'login')
       )
       if (!turnstile.success) {
         return c.json({ data: null, error: '人机验证失败，请重试', code: 400 }, 400)
@@ -402,7 +424,8 @@ app.post('/forgot-password', async c => {
       const turnstile = await verifyTurnstile(
         captchaToken,
         c.env.TURNSTILE_SECRET_KEY,
-        c.req.header('CF-Connecting-IP')
+        c.req.header('CF-Connecting-IP'),
+        turnstileOptions(c, 'reset_password')
       )
       if (!turnstile.success) {
         return c.json({ data: null, error: '人机验证失败，请重试', code: 400 }, 400)

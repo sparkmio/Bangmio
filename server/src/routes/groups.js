@@ -8,7 +8,7 @@ const app = new Hono()
 
 const HOSTS = {
   main: 'https://bgm.tv',
-  mirror1: 'https://bangumi.lol',
+  mirror1: 'https://bangumi.pro',
   mirror2: 'https://bangumi.one'
 }
 

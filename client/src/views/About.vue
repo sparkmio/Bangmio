@@ -30,7 +30,7 @@
           API，前端用了 Vue 3 + Vite
           ，还通过网页抓取解决了吐槽版和讨论版之类的小问题，还顺手通过cloudflare的边缘节点解决了国内无法正常访问的问题。国内没啥合适的平台所以部署在
           Cloudflare Pages，不限带宽，全球 CDN
-          加速。因为cf速度太慢，所以替换了部分接口改为桜色大佬做的镜像站bangumi.lol(详见<a
+          加速。因为cf速度太慢，所以替换了部分接口改为桜色大佬做的镜像站bangumi.pro(详见<a
             href="https://bgm.tv/group/topic/462456"
             target="_blank"
             class="link link-primary"

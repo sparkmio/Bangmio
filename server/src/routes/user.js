@@ -18,7 +18,7 @@ function redirectUri(c) {
 }
 
 function oauthBase(c) {
-  return isChina(c) ? 'https://bangumi.lol' : 'https://bgm.tv'
+  return isChina(c) ? 'https://bangumi.pro' : 'https://bgm.tv'
 }
 
 /**

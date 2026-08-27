@@ -25,10 +25,11 @@ const TURNSTILE_VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/sit
  * @param {string} token - 前端 Turnstile widget 返回的 token。
  * @param {string} secret - Turnstile secret key。
  * @param {string} [remoteip] - 用户 IP（可选，用于风控）。
+ * @param {{ action?: string, hostnames?: string[] }} [expected] - 期望的 action 与允许的主机名。
  * @returns {Promise<{ success: boolean, skipped?: boolean, reason?: string, errorCodes?: string[] }>}
  *   验证结果对象。`skipped` 仅用于未配置 secret 的本地开发环境。
  */
-export async function verifyTurnstile(token, secret, remoteip) {
+export async function verifyTurnstile(token, secret, remoteip, expected = {}) {
   // 未配置 secret：跳过验证（开发环境）
   if (!secret) {
     return { success: true, skipped: true }
@@ -49,8 +50,17 @@ export async function verifyTurnstile(token, secret, remoteip) {
       body
     })
     const data = await res.json()
+    const expectedAction = String(expected.action || '').trim()
+    const hostnames = Array.isArray(expected.hostnames) ? expected.hostnames.filter(Boolean) : []
+    const actionMatches = !expectedAction || data.action === expectedAction
+    const hostnameMatches = !hostnames.length || hostnames.includes(data.hostname)
     return {
-      success: !!data.success,
+      success: !!data.success && actionMatches && hostnameMatches,
+      reason: !actionMatches
+        ? 'action-mismatch'
+        : !hostnameMatches
+          ? 'hostname-mismatch'
+          : undefined,
       errorCodes: data['error-codes'] || []
     }
   } catch (err) {

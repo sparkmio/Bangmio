@@ -23,7 +23,7 @@ describe('exchangeBangumiOAuthCode', () => {
         appId: 'app-id',
         appSecret: 'app-secret',
         redirectUri: 'https://bangmio.site/login/callback',
-        preferredBase: 'https://bangumi.lol'
+        preferredBase: 'https://bangumi.pro'
       })
     ).resolves.toEqual({ accessToken: 'access-token', refreshToken: 'refresh-token' })
 
@@ -48,11 +48,11 @@ describe('exchangeBangumiOAuthCode', () => {
         appId: 'app-id',
         appSecret: 'app-secret',
         redirectUri: 'https://bangmio.site/login/callback',
-        preferredBase: 'https://bangumi.lol'
+        preferredBase: 'https://bangumi.pro'
       })
     ).resolves.toMatchObject({ accessToken: 'mirror-token' })
 
-    expect(fetchMock.mock.calls[1][0]).toBe('https://bangumi.lol/oauth/access_token')
+    expect(fetchMock.mock.calls[1][0]).toBe('https://bangumi.pro/oauth/access_token')
   })
 
   it('保留上游 invalid_client 错误类型供路由给出明确提示', async () => {

@@ -30,7 +30,7 @@
       </div>
       <p class="text-xs text-base-content/50 mt-1">Bangumi {{ bgmRating?.total }}人评</p>
       <a
-        :href="`https://bangumi.lol/subject/${subjectId}`"
+        :href="`https://bangumi.pro/subject/${subjectId}`"
         target="_blank"
         class="btn btn-xs btn-ghost mt-3 w-full"
         >查看详情 →</a

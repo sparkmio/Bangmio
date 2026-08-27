@@ -22,4 +22,26 @@ describe('verifyTurnstile', () => {
       reason: 'network-error'
     })
   })
+
+  it('拒绝不匹配的 action 或 hostname', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            success: true,
+            action: 'login',
+            hostname: 'bangmio.site'
+          })
+        )
+      )
+    )
+
+    await expect(
+      verifyTurnstile('token', 'secret', undefined, {
+        action: 'register',
+        hostnames: ['bangmio.site']
+      })
+    ).resolves.toMatchObject({ success: false, reason: 'action-mismatch' })
+  })
 })

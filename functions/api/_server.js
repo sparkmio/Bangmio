@@ -2756,14 +2756,14 @@ var Hono = class _Hono {
    * app.route("/api", app2) // GET /api/user
    * ```
    */
-  route(path, app13) {
+  route(path, app14) {
     const subApp = this.basePath(path);
-    app13.routes.map((r) => {
+    app14.routes.map((r) => {
       let handler4;
-      if (app13.errorHandler === errorHandler) {
+      if (app14.errorHandler === errorHandler) {
         handler4 = r.handler;
       } else {
-        handler4 = async (c, next) => (await compose([], app13.errorHandler)(c, () => r.handler(c, next))).res;
+        handler4 = async (c, next) => (await compose([], app14.errorHandler)(c, () => r.handler(c, next))).res;
         handler4[COMPOSED_HANDLER] = r.handler;
       }
       subApp.#addRoute(r.method, r.path, handler4, r.basePath);
@@ -4436,9 +4436,9 @@ async function exchangeBangumiOAuthCode({
 
 // server/src/services/bangumi.js
 var BGM_API = "https://api.bgm.tv";
-var BGM_PROXY = "https://api.bangumi.lol";
+var BGM_PROXY = "https://api.bangumi.pro";
 function rewriteImageUrls(data) {
-  if (typeof data === "string") return data.replace(/lain\.bgm\.tv/g, "lain.bangumi.lol");
+  if (typeof data === "string") return data.replace(/lain\.bgm\.tv/g, "lain.bangumi.pro");
   if (Array.isArray(data)) return data.map(rewriteImageUrls);
   if (data && typeof data === "object") {
     const out = {};
@@ -4862,7 +4862,7 @@ async function resetUserPassword(db, env, { email, code, newPassword }) {
 
 // server/src/utils/turnstile.js
 var TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
-async function verifyTurnstile(token, secret, remoteip) {
+async function verifyTurnstile(token, secret, remoteip, expected = {}) {
   if (!secret) {
     return { success: true, skipped: true };
   }
@@ -4880,8 +4880,13 @@ async function verifyTurnstile(token, secret, remoteip) {
       body
     });
     const data = await res.json();
+    const expectedAction = String(expected.action || "").trim();
+    const hostnames = Array.isArray(expected.hostnames) ? expected.hostnames.filter(Boolean) : [];
+    const actionMatches = !expectedAction || data.action === expectedAction;
+    const hostnameMatches = !hostnames.length || hostnames.includes(data.hostname);
     return {
-      success: !!data.success,
+      success: !!data.success && actionMatches && hostnameMatches,
+      reason: !actionMatches ? "action-mismatch" : !hostnameMatches ? "hostname-mismatch" : void 0,
       errorCodes: data["error-codes"] || []
     };
   } catch (err) {
@@ -4940,10 +4945,18 @@ function isChina(c) {
   return (c.env?.CF_IP_COUNTRY || "") === "CN";
 }
 function oauthBase(c) {
-  return isChina(c) ? "https://bangumi.lol" : "https://bgm.tv";
+  return isChina(c) ? "https://bangumi.pro" : "https://bgm.tv";
 }
 function redirectUri(c) {
   return c.env?.OAUTH_REDIRECT_URI || "http://localhost:3001/login/callback";
+}
+function turnstileOptions(c, action) {
+  const hostnames = String(c.env?.TURNSTILE_HOSTNAMES || "").split(",").map((value) => value.trim()).filter(Boolean);
+  return { action, hostnames };
+}
+function publicTurnstileConfig(c) {
+  const siteKey = String(c.env?.TURNSTILE_SITE_KEY || c.env?.VITE_TURNSTILE_SITE_KEY || "").trim();
+  return { required: Boolean(c.env?.TURNSTILE_SECRET_KEY), siteKey: siteKey || null };
 }
 app.use("*", async (c, next) => {
   if (c.req.method === "POST" && (!c.env?.DB || !c.env?.JWT_SECRET)) {
@@ -4962,6 +4975,7 @@ app.use("*", async (c, next) => {
   await next();
 });
 var EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+app.get("/config", (c) => c.json({ data: publicTurnstileConfig(c), code: 200 }));
 app.post("/send-code", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
@@ -4973,7 +4987,8 @@ app.post("/send-code", async (c) => {
     const turnstile = await verifyTurnstile(
       captchaToken,
       c.env?.TURNSTILE_SECRET_KEY,
-      c.req.header("CF-Connecting-IP")
+      c.req.header("CF-Connecting-IP"),
+      turnstileOptions(c, purpose === "reset" ? "reset_password" : "register")
     );
     if (!turnstile.success) {
       return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
@@ -5002,7 +5017,8 @@ app.post("/register", async (c) => {
       const turnstile = await verifyTurnstile(
         captchaToken,
         c.env.TURNSTILE_SECRET_KEY,
-        c.req.header("CF-Connecting-IP")
+        c.req.header("CF-Connecting-IP"),
+        turnstileOptions(c, "register")
       );
       if (!turnstile.success) {
         return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
@@ -5026,7 +5042,8 @@ app.post("/login", async (c) => {
       const turnstile = await verifyTurnstile(
         captchaToken,
         c.env.TURNSTILE_SECRET_KEY,
-        c.req.header("CF-Connecting-IP")
+        c.req.header("CF-Connecting-IP"),
+        turnstileOptions(c, "login")
       );
       if (!turnstile.success) {
         return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
@@ -5169,7 +5186,8 @@ app.post("/forgot-password", async (c) => {
       const turnstile = await verifyTurnstile(
         captchaToken,
         c.env.TURNSTILE_SECRET_KEY,
-        c.req.header("CF-Connecting-IP")
+        c.req.header("CF-Connecting-IP"),
+        turnstileOptions(c, "reset_password")
       );
       if (!turnstile.success) {
         return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
@@ -5543,7 +5561,7 @@ function redirectUri2(c) {
   return c.env?.OAUTH_REDIRECT_URI || "http://localhost:3001/login/callback";
 }
 function oauthBase2(c) {
-  return isChina2(c) ? "https://bangumi.lol" : "https://bgm.tv";
+  return isChina2(c) ? "https://bangumi.pro" : "https://bgm.tv";
 }
 function oauthCookieOptions(c, overrides = {}) {
   const callbackUrl = redirectUri2(c);
@@ -16951,7 +16969,7 @@ function createCache(ttl) {
 var app5 = new Hono2();
 var cache = createCache(CACHE_TTL_COMMENTS);
 var BGM_TV = "https://bgm.tv";
-var BGM_PROXY2 = "https://bangumi.lol";
+var BGM_PROXY2 = "https://bangumi.pro";
 function getBase(isChina7) {
   return isChina7 ? BGM_PROXY2 : BGM_TV;
 }
@@ -16963,7 +16981,7 @@ function parseUserLink(el) {
   let avatar = "";
   if (avatarMatch) {
     avatar = avatarMatch[1].startsWith("//") ? "https:" + avatarMatch[1] : avatarMatch[1];
-    avatar = avatar.replace("lain.bgm.tv", "lain.bangumi.lol");
+    avatar = avatar.replace("lain.bgm.tv", "lain.bangumi.pro");
   }
   return {
     username: link ? link.textContent.trim() : "",
@@ -17033,7 +17051,7 @@ function parseSubjectTalkbox(html) {
     let avatar = "";
     if (avatarMatch) {
       avatar = avatarMatch[1].startsWith("//") ? "https:" + avatarMatch[1] : avatarMatch[1];
-      avatar = avatar.replace("lain.bgm.tv", "lain.bangumi.lol");
+      avatar = avatar.replace("lain.bgm.tv", "lain.bangumi.pro");
     }
     const starEl = el.querySelector(".starlight");
     const starClass = starEl ? starEl.getAttribute("class") || "" : "";
@@ -18448,7 +18466,7 @@ var wikipedia_default = app9;
 var app10 = new Hono2();
 var HOSTS = {
   main: "https://bgm.tv",
-  mirror1: "https://bangumi.lol",
+  mirror1: "https://bangumi.pro",
   mirror2: "https://bangumi.one"
 };
 var cache6 = createCache(CACHE_TTL_GROUPS);
@@ -19168,8 +19186,77 @@ app11.get("/search", async (c) => {
 });
 var music_default = app11;
 
-// server/src/app.js
+// server/src/routes/ai.js
 var app12 = new Hono2();
+var ZHIPU_CHAT_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions";
+var DEFAULT_MODEL = "glm-5.2";
+var MAX_MESSAGES = 12;
+var MAX_MESSAGE_LENGTH = 2e3;
+var MAX_CONTEXT_LENGTH = 5e3;
+function cleanMessage(message) {
+  if (!message || typeof message !== "object") return null;
+  const role = message.role === "assistant" ? "assistant" : message.role === "user" ? "user" : null;
+  const content = typeof message.content === "string" ? message.content.trim() : "";
+  if (!role || !content || content.length > MAX_MESSAGE_LENGTH) return null;
+  return { role, content };
+}
+app12.post("/chat", async (c) => {
+  const apiKey = String(c.env?.ZHIPU_API_KEY || "").trim();
+  if (!apiKey) {
+    return c.json({ data: null, error: "AI \u670D\u52A1\u5C1A\u672A\u914D\u7F6E\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5", code: 503 }, 503);
+  }
+  const body = await c.req.json().catch(() => ({}));
+  const messages = Array.isArray(body?.messages) ? body.messages.map(cleanMessage).filter(Boolean) : [];
+  const context = typeof body?.context === "string" ? body.context.trim().slice(0, MAX_CONTEXT_LENGTH) : "";
+  if (!messages.length || messages.length > MAX_MESSAGES || messages.at(-1)?.role !== "user") {
+    return c.json({ data: null, error: "\u6D88\u606F\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25e3);
+  try {
+    const response = await fetch(ZHIPU_CHAT_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: String(c.env?.ZHIPU_MODEL || DEFAULT_MODEL),
+        messages: [
+          {
+            role: "system",
+            content: `\u4F60\u662F Bangmio \u7684\u756A\u5267\u4FE1\u606F\u52A9\u624B\u3002\u7528\u7B80\u6D01\u3001\u51C6\u786E\u7684\u4E2D\u6587\u56DE\u7B54\uFF1B\u4E0D\u786E\u5B9A\u65F6\u660E\u786E\u8BF4\u660E\uFF0C\u4E0D\u7F16\u9020\u6765\u6E90\u6216\u5B9E\u65F6\u6570\u636E\u3002${context ? `
+\u5F53\u524D\u9875\u9762\u8D44\u6599\uFF08\u4EC5\u4F5C\u56DE\u7B54\u4E0A\u4E0B\u6587\uFF09\uFF1A
+${context}` : ""}`
+          },
+          ...messages
+        ],
+        temperature: 0.6,
+        max_tokens: 1024
+      }),
+      signal: controller.signal
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      console.warn("[AI] Zhipu request failed", response.status);
+      return c.json({ data: null, error: "AI \u670D\u52A1\u6682\u65F6\u4E0D\u53EF\u7528\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5", code: 502 }, 502);
+    }
+    const content = payload?.choices?.[0]?.message?.content;
+    if (typeof content !== "string" || !content.trim()) {
+      return c.json({ data: null, error: "AI \u672A\u8FD4\u56DE\u6709\u6548\u56DE\u590D\uFF0C\u8BF7\u91CD\u8BD5", code: 502 }, 502);
+    }
+    return c.json({ data: { message: content.trim() }, code: 200 });
+  } catch (error) {
+    const message = error instanceof Error && error.name === "AbortError" ? "AI \u54CD\u5E94\u8D85\u65F6\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5" : "AI \u670D\u52A1\u6682\u65F6\u4E0D\u53EF\u7528\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5";
+    return c.json({ data: null, error: message, code: 502 }, 502);
+  } finally {
+    clearTimeout(timeout);
+  }
+});
+var ai_default = app12;
+
+// server/src/app.js
+var app13 = new Hono2();
 var allowedOrigins = /* @__PURE__ */ new Set([
   "https://bangmio.site",
   "https://www.bangmio.site",
@@ -19178,7 +19265,7 @@ var allowedOrigins = /* @__PURE__ */ new Set([
   "http://localhost:3001",
   "http://127.0.0.1:3001"
 ]);
-app12.use(
+app13.use(
   "*",
   cors({
     origin: (origin) => allowedOrigins.has(origin) ? origin : "",
@@ -19187,22 +19274,22 @@ app12.use(
     maxAge: 86400
   })
 );
-app12.use("*", async (c, next) => {
+app13.use("*", async (c, next) => {
   const country = c.req.header("cf-ipcountry") || "";
   c.env = c.env || {};
   c.env.CF_IP_COUNTRY = country;
   await next();
 });
-app12.use("*", securityHeaders());
+app13.use("*", securityHeaders());
 var postLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_POST);
 var getLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_GET);
-app12.use("/api/v1/*", async (c, next) => {
+app13.use("/api/v1/*", async (c, next) => {
   const method = c.req.method.toUpperCase();
   const limiter = method === "POST" || method === "PUT" || method === "DELETE" ? postLimiter : getLimiter;
   return limiter(c, next);
 });
 var authLimiter = rateLimit(RATE_LIMIT_WINDOW, 5);
-app12.use("/api/v1/auth/*", async (c, next) => {
+app13.use("/api/v1/auth/*", async (c, next) => {
   const path = c.req.path;
   const method = c.req.method.toUpperCase();
   if (method === "POST" && (path === "/api/v1/auth/register" || path === "/api/v1/auth/login" || path === "/api/v1/auth/send-code" || path === "/api/v1/auth/change-password" || path === "/api/v1/auth/forgot-password")) {
@@ -19210,22 +19297,23 @@ app12.use("/api/v1/auth/*", async (c, next) => {
   }
   await next();
 });
-app12.route("/api/v1/auth", auth_default);
-app12.route("/api/v1/user", user_default);
-app12.route("/api/v1/anime", anime_default);
-app12.route("/api/v1/collection", collection_default);
-app12.route("/api/v1/comments", comments_default);
-app12.route("/api/v1/douban", douban_default);
-app12.route("/api/v1/bilibili", bilibili_default);
-app12.route("/api/v1/moegirl", moegirl_default);
-app12.route("/api/v1/wikipedia", wikipedia_default);
-app12.route("/api/v1/groups", groups_default);
-app12.route("/api/v1/music", music_default);
-app12.get("/api/health", (c) => c.json({ status: "ok", country: c.env?.CF_IP_COUNTRY || "unknown" }));
-app12.all("*", (c) => {
+app13.route("/api/v1/auth", auth_default);
+app13.route("/api/v1/user", user_default);
+app13.route("/api/v1/anime", anime_default);
+app13.route("/api/v1/collection", collection_default);
+app13.route("/api/v1/comments", comments_default);
+app13.route("/api/v1/douban", douban_default);
+app13.route("/api/v1/bilibili", bilibili_default);
+app13.route("/api/v1/moegirl", moegirl_default);
+app13.route("/api/v1/wikipedia", wikipedia_default);
+app13.route("/api/v1/groups", groups_default);
+app13.route("/api/v1/music", music_default);
+app13.route("/api/v1/ai", ai_default);
+app13.get("/api/health", (c) => c.json({ status: "ok", country: c.env?.CF_IP_COUNTRY || "unknown" }));
+app13.all("*", (c) => {
   return c.json({ data: null, error: "Not Found", code: 404 }, 404);
 });
-app12.onError((err, c) => {
+app13.onError((err, c) => {
   logError("\u672A\u6355\u83B7\u7684\u670D\u52A1\u5668\u5F02\u5E38", {
     message: err?.message || String(err),
     stack: err?.stack,
@@ -19234,7 +19322,7 @@ app12.onError((err, c) => {
   });
   return c.json({ data: null, error: "\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF", code: 500 }, 500);
 });
-var app_default = app12;
+var app_default = app13;
 export {
   app_default as default
 };

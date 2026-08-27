@@ -40,7 +40,7 @@
       查看全部讨论
     </router-link>
     <a
-      :href="`https://bangumi.lol/subject/${subjectId}/board`"
+      :href="`https://bangumi.pro/subject/${subjectId}/board`"
       target="_blank"
       class="btn btn-sm btn-ghost mt-2 w-full"
       >在 Bangumi 发表讨论 →</a

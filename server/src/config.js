@@ -30,13 +30,13 @@ export const HTTP_TIMEOUT = 8000
 export const BGM_API_HOST = 'api.bgm.tv'
 
 /** Bangumi 镜像主机（国内加速） */
-export const BGM_MIRROR_HOST = 'api.bangumi.lol'
+export const BGM_MIRROR_HOST = 'api.bangumi.pro'
 
 /** Bangumi 图片主机 */
 export const BGM_IMAGE_HOST = 'lain.bgm.tv'
 
 /** Bangumi 镜像图片主机 */
-export const BGM_MIRROR_IMAGE_HOST = 'lain.bangumi.lol'
+export const BGM_MIRROR_IMAGE_HOST = 'lain.bangumi.pro'
 
 /** 速率限制窗口（毫秒，1 分钟） */
 export const RATE_LIMIT_WINDOW = 60 * 1000

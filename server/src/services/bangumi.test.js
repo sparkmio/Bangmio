@@ -128,7 +128,7 @@ describe('searchAnime', () => {
 
     await expect(searchAnime('x')).resolves.toEqual({ data: [{ id: 1 }], total: 1 })
     expect(global.fetch.mock.calls[0][0]).toContain('https://api.bgm.tv/')
-    expect(global.fetch.mock.calls[1][0]).toContain('https://api.bangumi.lol/')
+    expect(global.fetch.mock.calls[1][0]).toContain('https://api.bangumi.pro/')
   })
 
   it('401 不切换源，直接保留 Token 无效错误', async () => {
@@ -167,7 +167,7 @@ describe('searchAnime', () => {
     await searchAnime('kw', { isChina: true })
 
     const [url] = global.fetch.mock.calls[0]
-    expect(url).toContain('https://api.bangumi.lol/v0/search/subjects')
+    expect(url).toContain('https://api.bangumi.pro/v0/search/subjects')
   })
 })
 
@@ -224,10 +224,10 @@ describe('getAnimeDetail', () => {
     await getAnimeDetail(1, { isChina: true })
 
     const [url] = global.fetch.mock.calls[0]
-    expect(url).toContain('https://api.bangumi.lol/v0/subjects/1')
+    expect(url).toContain('https://api.bangumi.pro/v0/subjects/1')
   })
 
-  it('将响应中的 lain.bgm.tv 图片地址重写为 lain.bangumi.lol', async () => {
+  it('将响应中的 lain.bgm.tv 图片地址重写为 lain.bangumi.pro', async () => {
     const mockData = {
       id: 1,
       images: { large: 'http://lain.bgm.tv/pic/large.jpg' },
@@ -237,7 +237,7 @@ describe('getAnimeDetail', () => {
 
     const result = await getAnimeDetail(1)
 
-    expect(result.images.large).toContain('lain.bangumi.lol')
+    expect(result.images.large).toContain('lain.bangumi.pro')
     expect(result.images.large).not.toContain('lain.bgm.tv')
   })
 })
@@ -370,6 +370,6 @@ describe('getClient', () => {
     await client.get('/v0/me')
 
     const [url] = global.fetch.mock.calls[0]
-    expect(url).toContain('https://api.bangumi.lol/v0/me')
+    expect(url).toContain('https://api.bangumi.pro/v0/me')
   })
 })

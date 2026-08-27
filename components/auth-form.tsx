@@ -5,8 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import type { ApiResult, User } from '@/lib/types'
 import { useAuth } from './auth-provider'
+import { TurnstileWidget } from './turnstile-widget'
 
 type Mode = 'login' | 'register' | 'bangumi' | 'bind'
+type TurnstileConfig = { required: boolean; siteKey?: string | null }
 
 function errorMessage(payload: { error?: string }, fallback: string) { return payload.error || fallback }
 
@@ -22,9 +24,14 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [message, setMessage] = useState('')
   const [codeSent, setCodeSent] = useState(false)
   const [seconds, setSeconds] = useState(0)
+  const [turnstile, setTurnstile] = useState<TurnstileConfig>({ required: false })
+  const [captchaToken, setCaptchaToken] = useState('')
+  const [captchaResetSignal, setCaptchaResetSignal] = useState(0)
   const currentMode: Mode = mode === 'login' && search.get('mode') === 'bangumi' ? 'bangumi' : mode
   const isBangumi = currentMode === 'bangumi' || currentMode === 'bind'
   const redirect = search.get('redirect') || '/'
+  const needsCaptcha = !isBangumi && turnstile.required
+  const canSubmit = !needsCaptcha || Boolean(captchaToken)
 
   useEffect(() => {
     if (!seconds) return
@@ -32,16 +39,39 @@ export function AuthForm({ mode }: { mode: Mode }) {
     return () => window.clearInterval(timer)
   }, [seconds])
 
+  useEffect(() => {
+    if (isBangumi) return
+    let alive = true
+    void fetch('/api/v1/auth/config')
+      .then(async response => ({ response, payload: await response.json().catch(() => ({})) as ApiResult<TurnstileConfig> }))
+      .then(({ response, payload }) => {
+        if (alive && response.ok && payload.data) setTurnstile(payload.data)
+      })
+      .catch(() => undefined)
+    return () => { alive = false }
+  }, [isBangumi])
+
+  function captchaError(text: string) {
+    setMessage(text)
+    setCaptchaToken('')
+  }
+
+  function resetCaptcha() {
+    setCaptchaToken('')
+    setCaptchaResetSignal(value => value + 1)
+  }
+
   async function sendCode() {
     const normalizedEmail = email.trim()
     if (!normalizedEmail) { setMessage('请先输入邮箱地址'); return }
+    if (!canSubmit) { setMessage('请先完成人机验证'); return }
     setBusy(true); setMessage('')
     try {
-      const response = await fetch('/api/v1/auth/send-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: normalizedEmail, purpose: 'register' }) })
+      const response = await fetch('/api/v1/auth/send-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: normalizedEmail, purpose: 'register', captchaToken }) })
       const payload = await response.json().catch(() => ({})) as ApiResult<{ cooldown?: number }>
       if (!response.ok) throw new Error(errorMessage(payload, '验证码发送失败'))
       setCodeSent(true); setSeconds(payload.data?.cooldown || 60)
-    } catch (error) { setMessage(error instanceof Error ? error.message : '验证码发送失败') } finally { setBusy(false) }
+    } catch (error) { setMessage(error instanceof Error ? error.message : '验证码发送失败') } finally { setBusy(false); resetCaptcha() }
   }
 
   async function openOAuth(flow: 'login' | 'bind') {
@@ -61,13 +91,15 @@ export function AuthForm({ mode }: { mode: Mode }) {
   }
 
   async function submit(event: React.FormEvent) {
-    event.preventDefault(); setBusy(true); setMessage('')
+    event.preventDefault()
+    if (!canSubmit) { setMessage('请先完成人机验证'); return }
+    setBusy(true); setMessage('')
     try {
       const normalizedEmail = email.trim()
       const normalizedCode = code.trim()
       const normalizedBangumiToken = bangumiToken.trim()
       if (currentMode === 'login') {
-        const response = await fetch('/api/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: normalizedEmail, password }) })
+        const response = await fetch('/api/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: normalizedEmail, password, captchaToken }) })
         const payload = await response.json().catch(() => ({})) as ApiResult<{ token: string; user: User }>
         if (!response.ok || !payload.data?.token || !payload.data.user) throw new Error(errorMessage(payload, '登录失败'))
         setAuth(payload.data.token, payload.data.user)
@@ -75,7 +107,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         router.replace(redirect); router.refresh(); return
       }
       if (currentMode === 'register') {
-        const response = await fetch('/api/v1/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: normalizedEmail, password, code: normalizedCode }) })
+        const response = await fetch('/api/v1/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: normalizedEmail, password, code: normalizedCode, captchaToken }) })
         const payload = await response.json().catch(() => ({})) as ApiResult<{ token: string; user: User }>
         if (!response.ok || !payload.data?.token || !payload.data.user) throw new Error(errorMessage(payload, '注册失败'))
         setAuth(payload.data.token, payload.data.user)
@@ -96,16 +128,25 @@ export function AuthForm({ mode }: { mode: Mode }) {
       if (!response.ok || !payload.data?.user) throw new Error(errorMessage(payload, 'Token 验证失败'))
       setAuth(payload.data.token || normalizedBangumiToken, payload.data.user, 'bangumi')
       router.replace(redirect); router.refresh()
-    } catch (error) { setMessage(error instanceof Error ? error.message : '操作失败') } finally { setBusy(false) }
+    } catch (error) { setMessage(error instanceof Error ? error.message : '操作失败') } finally { setBusy(false); if (!isBangumi) resetCaptcha() }
   }
 
   const title = currentMode === 'register' ? '创建 Bangmio 账号' : currentMode === 'bind' ? '绑定 Bangumi 账号' : currentMode === 'bangumi' ? '登录 Bangumi' : '登录 Bangmio'
+  const action = currentMode === 'register' ? 'register' : 'login'
   return <div className="max-w-md mx-auto mt-6">
     <div className="card bg-base-100 border border-base-300"><div className="card-body p-8">
       <div className="text-center mb-6"><img src="/logo.png" alt="Bangmio" className="w-16 h-16 mx-auto rounded-2xl mb-3" decoding="async" /><h1 className="text-2xl font-bold text-base-content">{title}</h1>{currentMode === 'register' ? <p className="text-sm text-base-content/60 mt-2">创建账号后即可同步收藏、追番进度和社区内容。</p> : null}</div>
       {currentMode === 'login' ? <div className="flex gap-1 mb-4 bg-base-200 p-1 rounded-lg"><button className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${!isBangumi ? 'bg-base-100 text-primary shadow-sm' : 'text-base-content/60 hover:text-base-content'}`} type="button" onClick={() => router.replace('/login')}>Bangmio 账号</button><button className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${isBangumi ? 'bg-base-100 text-primary shadow-sm' : 'text-base-content/60 hover:text-base-content'}`} type="button" onClick={() => router.replace('/login?mode=bangumi')}>Bangumi 直登</button></div> : null}
       {message ? <div className="alert alert-error mb-4"><span>{message}</span></div> : null}
-      {!isBangumi ? <form className="flex flex-col gap-3" onSubmit={submit}><input value={email} onChange={event => setEmail(event.target.value)} type="email" placeholder="邮箱" className="input input-bordered w-full" autoComplete="email" required /><input value={password} onChange={event => setPassword(event.target.value)} type="password" placeholder="密码" className="input input-bordered w-full" autoComplete={currentMode === 'register' ? 'new-password' : 'current-password'} minLength={8} required />{currentMode === 'login' ? <div className="flex justify-end -mt-1"><Link href="/forgot-password" className="text-xs link link-primary">忘记密码？</Link></div> : null}{currentMode === 'register' ? <div className="flex gap-2"><input value={code} onChange={event => setCode(event.target.value)} className="input input-bordered flex-1" placeholder="邮箱验证码" required /><button className="btn btn-outline btn-sm" type="button" disabled={busy || seconds > 0} onClick={sendCode}>{seconds > 0 ? `${seconds}s 后重发` : codeSent ? '重新发送' : '发送验证码'}</button></div> : null}<button type="submit" disabled={busy} className="btn btn-primary w-full">{busy ? '处理中...' : currentMode === 'register' ? '注册并继续' : '登录'}</button></form> : <div className="flex flex-col gap-3"><button disabled={busy} className="btn w-full bg-[#2D89EF] text-white border-none hover:brightness-110" type="button" onClick={() => void openOAuth(currentMode === 'bind' ? 'bind' : 'login')}>{busy ? '跳转中...' : currentMode === 'bind' ? '使用 Bangumi 一键授权绑定' : '使用 Bangumi 账号登录'}</button><div className="divider text-xs text-base-content/40">{currentMode === 'bind' ? '或手动粘贴 Token' : '或手动输入 Token'}</div><form className="flex flex-col gap-3" onSubmit={submit}><input value={bangumiToken} onChange={event => setBangumiToken(event.target.value)} type="password" placeholder="粘贴 Bangumi Access Token" className="input input-bordered w-full" required /><button type="submit" disabled={busy || !bangumiToken} className="btn btn-primary w-full">{busy ? (currentMode === 'bind' ? '绑定中...' : '验证中...') : currentMode === 'bind' ? '立即绑定' : 'Token 登录'}</button></form><p className="text-xs text-center mt-2 text-base-content/50">前往 <a href="https://next.bgm.tv/demo/access-token" target="_blank" rel="noreferrer" className="link link-primary">next.bgm.tv/demo/access-token</a> 获取 Token</p></div>}
+      {!isBangumi ? <form className="flex flex-col gap-3" onSubmit={submit}>
+        <input value={email} onChange={event => setEmail(event.target.value)} type="email" placeholder="邮箱" className="input input-bordered w-full" autoComplete="email" required />
+        <input value={password} onChange={event => setPassword(event.target.value)} type="password" placeholder="密码" className="input input-bordered w-full" autoComplete={currentMode === 'register' ? 'new-password' : 'current-password'} minLength={8} required />
+        {currentMode === 'login' ? <div className="flex justify-end -mt-1"><Link href="/forgot-password" className="text-xs link link-primary">忘记密码？</Link></div> : null}
+        {currentMode === 'register' ? <div className="flex gap-2"><input value={code} onChange={event => setCode(event.target.value)} className="input input-bordered flex-1" placeholder="邮箱验证码" required /><button className="btn btn-outline btn-sm" type="button" disabled={busy || seconds > 0 || !canSubmit} onClick={sendCode}>{seconds > 0 ? `${seconds}s 后重发` : codeSent ? '重新发送' : '发送验证码'}</button></div> : null}
+        <TurnstileWidget siteKey={turnstile.siteKey || undefined} action={action} resetSignal={captchaResetSignal} onVerify={token => { setCaptchaToken(token); setMessage('') }} onError={captchaError} />
+        {needsCaptcha && !turnstile.siteKey ? <p className="text-xs text-error">人机验证配置缺失，请稍后再试。</p> : null}
+        <button type="submit" disabled={busy || !canSubmit || (needsCaptcha && !turnstile.siteKey)} className="btn btn-primary w-full">{busy ? '处理中...' : currentMode === 'register' ? '注册并继续' : '登录'}</button>
+      </form> : <div className="flex flex-col gap-3"><button disabled={busy} className="btn w-full bg-[#2D89EF] text-white border-none hover:brightness-110" type="button" onClick={() => void openOAuth(currentMode === 'bind' ? 'bind' : 'login')}>{busy ? '跳转中...' : currentMode === 'bind' ? '使用 Bangumi 一键授权绑定' : '使用 Bangumi 账号登录'}</button><div className="divider text-xs text-base-content/40">{currentMode === 'bind' ? '或手动粘贴 Token' : '或手动输入 Token'}</div><form className="flex flex-col gap-3" onSubmit={submit}><input value={bangumiToken} onChange={event => setBangumiToken(event.target.value)} type="password" placeholder="粘贴 Bangumi Access Token" className="input input-bordered w-full" required /><button type="submit" disabled={busy || !bangumiToken} className="btn btn-primary w-full">{busy ? (currentMode === 'bind' ? '绑定中...' : '验证中...') : currentMode === 'bind' ? '立即绑定' : 'Token 登录'}</button></form><p className="text-xs text-center mt-2 text-base-content/50">前往 <a href="https://next.bgm.tv/demo/access-token" target="_blank" rel="noreferrer" className="link link-primary">next.bgm.tv/demo/access-token</a> 获取 Token</p></div>}
       {currentMode === 'login' && !isBangumi ? <p className="text-sm text-center mt-2 text-base-content/50">还没账号？ <Link href="/register" className="link link-primary">立即注册</Link></p> : null}
       {currentMode === 'bind' ? <p className="text-sm text-center mt-4 text-base-content/50"><Link href="/" className="link link-primary">稍后绑定（功能受限）</Link></p> : null}
       {currentMode === 'register' ? <p className="text-sm text-center mt-4 text-base-content/50">已有账号？ <Link href="/login" className="link link-primary">返回登录</Link></p> : null}

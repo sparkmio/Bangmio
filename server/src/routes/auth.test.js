@@ -81,3 +81,24 @@ describe('POST /oauth-bind-callback', () => {
     )
   })
 })
+
+describe('GET /config', () => {
+  it('只返回登录页面需要的公开 Turnstile 配置', async () => {
+    const res = await app.request(
+      '/config',
+      { method: 'GET' },
+      {
+        TURNSTILE_SECRET_KEY: 'private-turnstile-secret',
+        TURNSTILE_SITE_KEY: 'public-site-key'
+      }
+    )
+
+    expect(res.status).toBe(200)
+    const payload = await res.json()
+    expect(payload).toEqual({
+      data: { required: true, siteKey: 'public-site-key' },
+      code: 200
+    })
+    expect(JSON.stringify(payload)).not.toContain('private-turnstile-secret')
+  })
+})

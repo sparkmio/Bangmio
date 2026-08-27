@@ -9,7 +9,7 @@ const app = new Hono()
 const cache = createCache(CACHE_TTL_COMMENTS)
 
 const BGM_TV = 'https://bgm.tv'
-const BGM_PROXY = 'https://bangumi.lol'
+const BGM_PROXY = 'https://bangumi.pro'
 
 function getBase(isChina) {
   return isChina ? BGM_PROXY : BGM_TV
@@ -23,7 +23,7 @@ function parseUserLink(el) {
   let avatar = ''
   if (avatarMatch) {
     avatar = avatarMatch[1].startsWith('//') ? 'https:' + avatarMatch[1] : avatarMatch[1]
-    avatar = avatar.replace('lain.bgm.tv', 'lain.bangumi.lol')
+    avatar = avatar.replace('lain.bgm.tv', 'lain.bangumi.pro')
   }
   return {
     username: link ? link.textContent.trim() : '',
@@ -96,7 +96,7 @@ function parseSubjectTalkbox(html) {
     let avatar = ''
     if (avatarMatch) {
       avatar = avatarMatch[1].startsWith('//') ? 'https:' + avatarMatch[1] : avatarMatch[1]
-      avatar = avatar.replace('lain.bgm.tv', 'lain.bangumi.lol')
+      avatar = avatar.replace('lain.bgm.tv', 'lain.bangumi.pro')
     }
     const starEl = el.querySelector('.starlight')
     const starClass = starEl ? starEl.getAttribute('class') || '' : ''

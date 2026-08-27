@@ -2,7 +2,7 @@
   <div>
     <CommentSection :id="subjectId" type="subject" />
     <a
-      :href="`https://bangumi.lol/subject/${subjectId}`"
+      :href="`https://bangumi.pro/subject/${subjectId}`"
       target="_blank"
       class="btn btn-sm btn-outline mt-4 w-full"
       >在 Bangumi 发表评论 →</a
