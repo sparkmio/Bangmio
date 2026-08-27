@@ -4463,7 +4463,8 @@ async function bgmRequest(method, path, { token, body, params, isChina: isChina7
   let lastError;
   for (const base of apiBases(isChina7)) {
     const url = new URL(`${base}${path}`);
-    if (params) Object.entries(params).forEach(([k, v]) => v != null && url.searchParams.set(k, String(v)));
+    if (params)
+      Object.entries(params).forEach(([k, v]) => v != null && url.searchParams.set(k, String(v)));
     try {
       const requestHeaders = method === "POST" ? { ...headers(token), "Content-Type": "application/json" } : headers(token);
       const res = await fetch(url.toString(), {
@@ -18349,16 +18350,21 @@ function wrapDocument3(fragment, title = "\u7EF4\u57FA\u767E\u79D1") {
 }
 function fallbackPage(title) {
   const url = articleUrl(title);
-  return wrapDocument3(`<main style="max-width:42rem;margin:3rem auto;text-align:center">
+  return wrapDocument3(
+    `<main style="max-width:42rem;margin:3rem auto;text-align:center">
   <h1>\u7EF4\u57FA\u767E\u79D1\u9875\u9762\u6682\u65F6\u65E0\u6CD5\u52A0\u8F7D</h1>
   <p>\u53EF\u4EE5\u76F4\u63A5\u524D\u5F80\u7EF4\u57FA\u767E\u79D1\u67E5\u770B\u5B8C\u6574\u8BCD\u6761\u3002</p>
   <p><a href="${url}" rel="noopener noreferrer">\u6253\u5F00\u300C${escapeHtml(title)}\u300D\u2197</a></p>
-</main>`, title);
+</main>`,
+    title
+  );
 }
 function cleanWikipediaPage(html) {
   const source = /<body[\s>]/i.test(html) ? html : `<!DOCTYPE html><html><body>${html}</body></html>`;
   const { document } = parseHTML(source);
-  REMOVE_SELECTORS.forEach((selector) => document.querySelectorAll(selector).forEach((el) => el.remove()));
+  REMOVE_SELECTORS.forEach(
+    (selector) => document.querySelectorAll(selector).forEach((el) => el.remove())
+  );
   document.querySelectorAll("[href], [src]").forEach((el) => {
     const href = el.getAttribute("href");
     if (href) el.setAttribute("href", fixUrl(href, WIKIPEDIA_BASE));
@@ -18414,7 +18420,8 @@ app9.get("/page/:title", async (c) => {
     title = rawTitle;
   }
   title = String(title || "").trim();
-  if (!title) return c.html(fallbackPage("\u7EF4\u57FA\u767E\u79D1"), 400, { "Content-Type": "text/html; charset=utf-8" });
+  if (!title)
+    return c.html(fallbackPage("\u7EF4\u57FA\u767E\u79D1"), 400, { "Content-Type": "text/html; charset=utf-8" });
   const cacheKey = `wikipedia_page_${title}`;
   const cached = cache5.get(cacheKey);
   if (cached) return c.html(cached, 200, { "Content-Type": "text/html; charset=utf-8" });

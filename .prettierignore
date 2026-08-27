@@ -1,5 +1,6 @@
 dist/
 functions/api/_server.js
+functions/api/_meta.json
 node_modules/
 client/dist/
 client/node_modules/
