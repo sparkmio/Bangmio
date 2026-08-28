@@ -52,4 +52,48 @@ describe('collection routes', () => {
       subject_type: 2
     })
   })
+
+  it('does not turn an upstream stats failure into a false zero', async () => {
+    mockGet.mockImplementation((path, params) => {
+      if (path.includes('/collections') && params?.type)
+        return Promise.reject(new Error('upstream unavailable'))
+      return Promise.resolve({ data: [], total: 0 })
+    })
+
+    const response = await collectionRoutes.request('http://localhost/stats', {
+      headers: {
+        Authorization: 'Bearer test-token',
+        'X-Bangumi-Username': 'authenticated-user'
+      }
+    })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      data: {
+        want: null,
+        completed: null,
+        watching: null,
+        on_hold: null,
+        dropped: null,
+        total: null
+      }
+    })
+  })
+
+  it('returns a total only when every collection status was read reliably', async () => {
+    mockGet.mockImplementation((path, params) => {
+      if (path.includes('/collections') && params?.type)
+        return Promise.resolve({ total: params.type })
+      return Promise.resolve({ data: [], total: 0 })
+    })
+
+    const response = await collectionRoutes.request('http://localhost/stats', {
+      headers: {
+        Authorization: 'Bearer test-token',
+        'X-Bangumi-Username': 'authenticated-user'
+      }
+    })
+    expect(await response.json()).toEqual({
+      data: { want: 1, completed: 2, watching: 3, on_hold: 4, dropped: 5, total: 15 }
+    })
+  })
 })

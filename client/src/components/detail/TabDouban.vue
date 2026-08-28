@@ -41,7 +41,9 @@
             <div
               class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-base-content/50 mb-1"
             >
-              <span class="font-medium text-base-content/75">{{ comment.user || '匿名用户' }}</span>
+              <span class="font-medium text-base-content/75">{{
+                comment.user || '用户信息不可用'
+              }}</span>
               <span v-if="comment.rating" class="text-amber-500">{{
                 reviewStars(comment.rating)
               }}</span>
@@ -72,7 +74,9 @@
             <div
               class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-base-content/50 mb-2"
             >
-              <span class="font-medium text-base-content/75">{{ review.user || '匿名用户' }}</span>
+              <span class="font-medium text-base-content/75">{{
+                review.user || '用户信息不可用'
+              }}</span>
               <span v-if="review.rating" class="text-amber-500">{{
                 reviewStars(review.rating)
               }}</span>

@@ -19,6 +19,10 @@ function extractUsername(c) {
 
 const COLLECTION_STATUS = new Set([1, 2, 3, 4, 5])
 
+function userPathSegment(username) {
+  return encodeURIComponent(String(username || ''))
+}
+
 function parseBoundedInteger(value, { min, max, fallback = null }) {
   if (value === undefined || value === null || value === '') return fallback
   const parsed = Number(value)
@@ -73,7 +77,7 @@ app.get('/list', async c => {
     const params = { offset, limit }
     if (subjectType !== undefined) params.subject_type = subjectType
     if (type !== undefined) params.type = type
-    const data = await client.get(`/v0/users/${username}/collections`, params)
+    const data = await client.get(`/v0/users/${userPathSegment(username)}/collections`, params)
     return c.json({ data: data.data || [], total: data.total || 0 })
   } catch (err) {
     const r = upstreamError(err.response?.status, err.response?.data, '获取收藏列表失败')
@@ -92,9 +96,12 @@ app.get('/stats', async c => {
     const client = getClient(token, isChina(c))
     const fetchTotal = type =>
       client
-        .get(`/v0/users/${username}/collections`, { type, limit: 1 })
-        .then(r => r.total)
-        .catch(() => 0)
+        .get(`/v0/users/${userPathSegment(username)}/collections`, { type, limit: 1 })
+        .then(r => {
+          const total = Number(r?.total)
+          return Number.isSafeInteger(total) && total >= 0 ? total : null
+        })
+        .catch(() => null)
     const [wish, collect, doing, on_hold, dropped] = await Promise.all([
       fetchTotal(1),
       fetchTotal(2),
@@ -102,15 +109,12 @@ app.get('/stats', async c => {
       fetchTotal(4),
       fetchTotal(5)
     ])
+    const values = [wish, collect, doing, on_hold, dropped]
+    const total = values.every(value => value !== null)
+      ? values.reduce((sum, value) => sum + value, 0)
+      : null
     return c.json({
-      data: {
-        want: wish,
-        completed: collect,
-        watching: doing,
-        on_hold,
-        dropped,
-        total: wish + collect + doing + on_hold + dropped
-      }
+      data: { want: wish, completed: collect, watching: doing, on_hold, dropped, total }
     })
   } catch (err) {
     const r = upstreamError(err.response?.status, err.response?.data, '获取统计失败')
@@ -129,7 +133,9 @@ app.get('/:animeId', async c => {
     const animeId = parseAnimeId(c.req.param('animeId'))
     if (animeId === null) return c.json({ error: '番剧 ID 不合法' }, 400)
     const client = getClient(token, isChina(c))
-    const collection = await client.get(`/v0/users/${username}/collections/${animeId}`)
+    const collection = await client.get(
+      `/v0/users/${userPathSegment(username)}/collections/${animeId}`
+    )
     return c.json({
       data: {
         anime_id: collection.subject_id,
@@ -188,7 +194,9 @@ app.post('/:animeId', async c => {
       // status 未显式提供：尝试获取当前状态以保留原值
       if (username) {
         try {
-          const current = await client.get(`/v0/users/${username}/collections/${animeId}`)
+          const current = await client.get(
+            `/v0/users/${userPathSegment(username)}/collections/${animeId}`
+          )
           if (current?.type) {
             payload.type = current.type
           } else {
@@ -212,7 +220,9 @@ app.post('/:animeId', async c => {
 
     if (username) {
       try {
-        const collection = await client.get(`/v0/users/${username}/collections/${animeId}`)
+        const collection = await client.get(
+          `/v0/users/${userPathSegment(username)}/collections/${animeId}`
+        )
         return c.json({
           data: {
             anime_id: collection.subject_id,

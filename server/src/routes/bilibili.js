@@ -3,6 +3,7 @@ import * as bangumiService from '../services/bangumi.js'
 import { createCache } from '../utils/cache.js'
 import { SCRAPE_UA } from '../utils/http.js'
 import { CACHE_TTL_BILIBILI } from '../config.js'
+import { parsePositiveId } from '../utils/validation.js'
 
 const app = new Hono()
 
@@ -83,7 +84,8 @@ app.get('/by-name', async c => {
 
 app.get('/:id', async c => {
   try {
-    const subjectId = c.req.param('id')
+    const subjectId = parsePositiveId(c.req.param('id'))
+    if (subjectId === null) return c.json({ error: 'ID 不合法' }, 400)
     const cn = isChina(c)
     const cacheKey = `bilibili_${subjectId}_${cn}`
     const cached = cache.get(cacheKey)

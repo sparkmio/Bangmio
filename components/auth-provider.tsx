@@ -13,7 +13,7 @@ const KEYS = {
 } as const
 
 type AuthKind = 'bangmio' | 'bangumi'
-type RequestOptions = { authenticate?: boolean; retry?: boolean }
+type RequestOptions = { authenticate?: boolean; retry?: boolean; tokenKind?: AuthKind }
 type AuthContextValue = {
   ready: boolean
   token: string
@@ -117,15 +117,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const request = useCallback(async <T,>(path: string, init: RequestInit = {}, options: RequestOptions = {}) => {
     const authenticate = options.authenticate !== false
-    const currentKind = kind
-    const currentToken = currentKind === 'bangmio' ? (bgmToken || localStorage.getItem(KEYS.bgmToken) || '') : token
+    const requestedKind = options.tokenKind
+    const currentKind: AuthKind = requestedKind || (path.startsWith('/auth/') ? 'bangmio' : kind === 'bangumi' ? 'bangumi' : 'bangumi')
+    const useBangmioToken = currentKind === 'bangmio'
+    let currentToken = useBangmioToken
+      ? (token || localStorage.getItem(KEYS.bangmioToken) || '')
+      : (requestedKind === 'bangumi' || kind === 'bangumi'
+        ? (token || bgmToken || localStorage.getItem(KEYS.bgmToken) || localStorage.getItem(KEYS.bangumiToken) || '')
+        : (bgmToken || localStorage.getItem(KEYS.bgmToken) || localStorage.getItem(KEYS.bangumiToken) || ''))
+    if (!currentToken && !useBangmioToken && kind === 'bangmio' && account?.bgmUid) {
+      currentToken = await fetchBgmToken() || ''
+    }
     const currentUser = user
     const perform = async (accessToken: string) => {
       const headers = new Headers(init.headers)
       headers.set('Accept', 'application/json')
       if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
       if (authenticate && accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
-      if (authenticate && currentUser?.username) headers.set('X-Bangumi-Username', String(currentUser.username))
+      if (authenticate && currentKind === 'bangumi' && currentUser?.username) headers.set('X-Bangumi-Username', String(currentUser.username))
       const response = await fetch(apiPath(path), { ...init, headers })
       const payload = await response.json().catch(() => ({})) as ApiResult<T>
       if (!response.ok) {
@@ -138,13 +147,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       return await perform(currentToken)
     } catch (error) {
-      if (authenticate && options.retry !== false && currentKind === 'bangmio' && (error as { status?: number }).status === 401) {
+      if (authenticate && options.retry !== false && useBangmioToken && (error as { status?: number }).status === 401) {
         const refreshed = await refreshBangmioToken()
-        if (refreshed) return perform(localStorage.getItem(KEYS.bgmToken) || '')
+        if (refreshed) return perform(localStorage.getItem(KEYS.bangmioToken) || '')
       }
       throw error
     }
-  }, [bgmToken, kind, refreshBangmioToken, token, user])
+  }, [account, bgmToken, fetchBgmToken, kind, refreshBangmioToken, token, user])
 
   const setAuth = useCallback((nextToken: string, nextUser: User, nextKind: AuthKind = 'bangmio') => {
     if (nextKind === 'bangmio') {

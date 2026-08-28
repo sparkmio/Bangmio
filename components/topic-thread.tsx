@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { DiscussionComposer } from './discussion-composer'
+import { RichText } from './rich-text'
+import { communityProfile } from '@/lib/community'
 
 type TopicThreadProps = {
   topic: any
@@ -7,6 +9,7 @@ type TopicThreadProps = {
   backHref: string
   backLabel: string
   composerTopicId?: number
+  composerMode?: 'reply' | 'group-reply'
 }
 
 function safeText(value: unknown, fallback = ''): string {
@@ -19,39 +22,36 @@ function safeText(value: unknown, fallback = ''): string {
   return fallback
 }
 
-function creatorName(value: any) {
-  return safeText(value?.nickname ?? value?.username, '社区成员')
-}
-
 function dateLabel(value: unknown) {
   return typeof value === 'string' && value ? value : '时间未知'
 }
 
-export function TopicThread({ topic, replies, backHref, backLabel, composerTopicId }: TopicThreadProps) {
-  const author = creatorName(topic.creator)
+export function TopicThread({ topic, replies, backHref, backLabel, composerTopicId, composerMode }: TopicThreadProps) {
+  const authorProfile = communityProfile(topic)
   return <div className="discussion-page">
     <article className="panel discussion-header">
       <div className="eyebrow">TOPIC</div>
       <h1>{safeText(topic.title, '未命名话题')}</h1>
-      <p className="discussion-body">{safeText(topic.content ?? topic.body, '暂无正文。')}</p>
-      <p className="discussion-meta">{author} · {dateLabel(topic.created_at)}</p>
+      <div className="discussion-author"><div className="avatar">{authorProfile.avatar ? <img src={authorProfile.avatar} alt="" loading="lazy" /> : authorProfile.name.slice(0, 1)}</div><span>{authorProfile.name}</span><time>{dateLabel(topic.created_at || topic.timestamp)}</time></div>
+      <RichText value={topic.content ?? topic.body} fallback="暂无正文。" />
     </article>
 
     <section className="discussion-replies" aria-labelledby="reply-heading">
       <h2 id="reply-heading">回复 {replies.length ? `(${replies.length})` : ''}</h2>
       {replies.length ? replies.map((reply: any, index) => {
-        const name = creatorName(reply.creator)
+        const profile = communityProfile(reply)
+        const name = profile.name
         return <article className="panel reply-card" key={reply.id || index}>
-          <div className="avatar">{name.slice(0, 1)}</div>
+          <div className="avatar">{profile.avatar ? <img src={profile.avatar} alt="" loading="lazy" /> : name.slice(0, 1)}</div>
           <div>
             <h3>{name}</h3>
-            <p>{safeText(reply.content ?? reply.body, '暂无回复内容。')}</p>
+            <RichText value={reply.content ?? reply.body} fallback="暂无回复内容。" />
           </div>
         </article>
       }) : <div className="panel empty-state"><h3>还没有回复</h3><p>成为第一个参与讨论的人吧。</p></div>}
     </section>
 
-    {composerTopicId ? <DiscussionComposer topicId={composerTopicId} mode="reply" /> : null}
+    {composerTopicId ? <DiscussionComposer topicId={composerTopicId} mode={composerMode || "reply"} /> : null}
     <Link className="text-link discussion-back" href={backHref}>← {backLabel}</Link>
   </div>
 }

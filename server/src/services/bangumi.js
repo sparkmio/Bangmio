@@ -1,5 +1,13 @@
+import { parsePositiveId } from '../utils/validation.js'
+
 const BGM_API = 'https://api.bgm.tv'
 const BGM_PROXY = 'https://api.bangumi.pro'
+
+function requiredId(value) {
+  const id = parsePositiveId(value)
+  if (id === null) throw new TypeError('ID must be a positive integer')
+  return id
+}
 
 function rewriteImageUrls(data) {
   if (typeof data === 'string') return data.replace(/lain\.bgm\.tv/g, 'lain.bangumi.pro')
@@ -172,7 +180,8 @@ export function getClient(token, isChina = false) {
  * @returns {Promise<Object>} 条目详情对象。
  */
 export async function getAnimeDetail(id, opts) {
-  return bgmGet(`/v0/subjects/${id}`, null, null, opts?.isChina)
+  const subjectId = requiredId(id)
+  return bgmGet(`/v0/subjects/${subjectId}`, null, null, opts?.isChina)
 }
 
 /**
@@ -185,7 +194,8 @@ export async function getAnimeDetail(id, opts) {
  * @returns {Promise<{ data: Array<Object>, total: number }>} 剧集列表及总数。
  */
 export async function getAnimeEpisodes(id, { offset = 0, limit = 100, isChina } = {}) {
-  const d = await bgmGet('/v0/episodes', null, { subject_id: id, offset, limit }, isChina)
+  const subjectId = requiredId(id)
+  const d = await bgmGet('/v0/episodes', null, { subject_id: subjectId, offset, limit }, isChina)
   return { data: d.data || [], total: d.total || 0 }
 }
 
@@ -197,7 +207,8 @@ export async function getAnimeEpisodes(id, { offset = 0, limit = 100, isChina } 
  * @returns {Promise<Array<Object>>} 角色列表。
  */
 export async function getAnimeCharacters(id, opts) {
-  return bgmGet(`/v0/subjects/${id}/characters`, null, null, opts?.isChina)
+  const subjectId = requiredId(id)
+  return bgmGet(`/v0/subjects/${subjectId}/characters`, null, null, opts?.isChina)
 }
 
 /**
@@ -208,7 +219,8 @@ export async function getAnimeCharacters(id, opts) {
  * @returns {Promise<Array<Object>>} 关联条目列表。
  */
 export async function getAnimeRelations(id, opts) {
-  return bgmGet(`/v0/subjects/${id}/subjects`, null, null, opts?.isChina)
+  const subjectId = requiredId(id)
+  return bgmGet(`/v0/subjects/${subjectId}/subjects`, null, null, opts?.isChina)
 }
 
 /**
@@ -219,7 +231,8 @@ export async function getAnimeRelations(id, opts) {
  * @returns {Promise<Array<Object>>} 制作人员列表。
  */
 export async function getAnimePersons(id, opts) {
-  return bgmGet(`/v0/subjects/${id}/persons`, null, null, opts?.isChina)
+  const subjectId = requiredId(id)
+  return bgmGet(`/v0/subjects/${subjectId}/persons`, null, null, opts?.isChina)
 }
 
 /**
@@ -269,7 +282,8 @@ export async function getAnimeTags() {
  * @returns {Promise<Object>} 角色详情对象。
  */
 export async function getCharacterDetail(id, opts) {
-  return bgmGet(`/v0/characters/${id}`, null, null, opts?.isChina)
+  const characterId = requiredId(id)
+  return bgmGet(`/v0/characters/${characterId}`, null, null, opts?.isChina)
 }
 
 /**
@@ -280,7 +294,8 @@ export async function getCharacterDetail(id, opts) {
  * @returns {Promise<Array<Object>>} 角色参演条目列表。
  */
 export async function getCharacterSubjects(id, opts) {
-  return bgmGet(`/v0/characters/${id}/subjects`, null, null, opts?.isChina)
+  const characterId = requiredId(id)
+  return bgmGet(`/v0/characters/${characterId}/subjects`, null, null, opts?.isChina)
 }
 
 /**
@@ -291,7 +306,8 @@ export async function getCharacterSubjects(id, opts) {
  * @returns {Promise<Array<Object>>} 出演人员列表。
  */
 export async function getCharacterPersons(id, opts) {
-  return bgmGet(`/v0/characters/${id}/persons`, null, null, opts?.isChina)
+  const characterId = requiredId(id)
+  return bgmGet(`/v0/characters/${characterId}/persons`, null, null, opts?.isChina)
 }
 
 /**
@@ -302,7 +318,8 @@ export async function getCharacterPersons(id, opts) {
  * @returns {Promise<Object>} 人物详情对象。
  */
 export async function getPersonDetail(id, opts) {
-  return bgmGet(`/v0/persons/${id}`, null, null, opts?.isChina)
+  const personId = requiredId(id)
+  return bgmGet(`/v0/persons/${personId}`, null, null, opts?.isChina)
 }
 
 /**
@@ -313,5 +330,6 @@ export async function getPersonDetail(id, opts) {
  * @returns {Promise<Array<Object>>} 人物参与条目列表。
  */
 export async function getPersonSubjects(id, opts) {
-  return bgmGet(`/v0/persons/${id}/subjects`, null, null, opts?.isChina)
+  const personId = requiredId(id)
+  return bgmGet(`/v0/persons/${personId}/subjects`, null, null, opts?.isChina)
 }

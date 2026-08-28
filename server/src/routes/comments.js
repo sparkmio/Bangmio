@@ -3,6 +3,7 @@ import { parseHTML } from 'linkedom'
 import { createCache } from '../utils/cache.js'
 import { fetchHTML } from '../utils/http.js'
 import { CACHE_TTL_COMMENTS, MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH } from '../config.js'
+import { parsePositiveId } from '../utils/validation.js'
 
 const app = new Hono()
 
@@ -15,21 +16,69 @@ function getBase(isChina) {
   return isChina ? BGM_PROXY : BGM_TV
 }
 
+function absoluteAvatar(raw) {
+  const value = String(raw || '').trim()
+  if (!value) return ''
+  const normalized = value.startsWith('//') ? `https:${value}` : value
+  return normalized.replace('lain.bgm.tv', 'lain.bangumi.pro')
+}
+
+function contentText(element) {
+  if (!element) return ''
+  const clone = element.cloneNode(true)
+  for (const block of clone.querySelectorAll?.(
+    'p, div, section, article, li, blockquote, pre, h1, h2, h3, h4, h5, h6'
+  ) || []) {
+    block.before('\n')
+    block.after('\n')
+  }
+  for (const br of clone.querySelectorAll?.('br') || []) br.replaceWith('\n')
+  for (const anchor of clone.querySelectorAll?.('a[href]') || []) {
+    const label = String(anchor.textContent || '').trim()
+    const rawHref = anchor.getAttribute('href') || ''
+    const href = rawHref.startsWith('/')
+      ? `https://bgm.tv${rawHref}`
+      : rawHref.startsWith('//')
+        ? `https:${rawHref}`
+        : rawHref
+    if (/^https?:\/\//i.test(href) && label && !label.includes(href) && !label.includes(rawHref)) {
+      anchor.replaceWith(`[${label}](${href})`)
+    }
+  }
+  return String(clone.textContent || '')
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map(line => line.replace(/[ \t]+/g, ' ').trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 function parseUserLink(el) {
-  const link = el.querySelector('strong > a[href^="/user/"], strong.userName > a[href^="/user/"]')
-  const avatarEl = el.querySelector('.avatarNeue')
-  const avatarStyle = avatarEl ? avatarEl.getAttribute('style') || '' : ''
-  const avatarMatch = avatarStyle.match(/url\(['"]?([^'"()]+)['"]?\)/)
-  let avatar = ''
-  if (avatarMatch) {
-    avatar = avatarMatch[1].startsWith('//') ? 'https:' + avatarMatch[1] : avatarMatch[1]
-    avatar = avatar.replace('lain.bgm.tv', 'lain.bangumi.pro')
+  const links = Array.from(el?.querySelectorAll?.('a[href]') || []).filter(item =>
+    /\/user\/[^/?#]+/i.test(item.getAttribute('href') || '')
+  )
+  const link = links.find(item => String(item.textContent || '').trim()) || links[0]
+  const href = link?.getAttribute('href') || ''
+  let username = href.match(/\/user\/([^/?#]+)/)?.[1] || ''
+  try {
+    username = decodeURIComponent(username)
+  } catch {
+    /* keep the raw segment */
   }
-  return {
-    username: link ? link.textContent.trim() : '',
-    url: link ? link.getAttribute('href') || '' : '',
-    avatar
-  }
+  const nickname = String(link?.textContent || '').trim()
+  const avatarElements = Array.from(
+    el?.querySelectorAll?.('.avatarNeue, .avatar, [style*="background-image"], img[src]') || []
+  )
+  const image = avatarElements.find(
+    item => item.tagName?.toLowerCase() === 'img' && item.getAttribute('src')
+  )
+  const styled = avatarElements.find(item => /url\(/i.test(item.getAttribute?.('style') || ''))
+  const styleMatch = String(styled?.getAttribute?.('style') || '').match(
+    /url\(['"]?([^'"()]+)['"]?\)/i
+  )
+  const avatar = absoluteAvatar(image?.getAttribute('src') || styleMatch?.[1])
+  return { username: username || nickname, nickname: nickname || username, url: href, avatar }
 }
 
 function parseSubReplies($doc, el) {
@@ -42,7 +91,7 @@ function parseSubReplies($doc, el) {
     const timestamp = actionText.replace(/#[\d-]+[\s-]*/, '').trim()
     const user = parseUserLink(subEl)
     const contentEl = subEl.querySelector('.cmt_sub_content')
-    const content = contentEl ? contentEl.textContent.trim() : ''
+    const content = contentText(contentEl)
     if (user.username && content) {
       replies.push({
         id: subEl.id?.replace('post_', '') || String(j),
@@ -67,7 +116,7 @@ function parseTalkbox(html) {
     const timestamp = actionText.replace(/#\S+\s*-?\s*/, '').trim()
     const user = parseUserLink(el)
     const contentEl = el.querySelector('.inner .message, .inner .reply_content .message')
-    const content = contentEl ? contentEl.textContent.trim() : ''
+    const content = contentText(contentEl)
     const replies = parseSubReplies(document, el)
     if (user.username && content) {
       comments.push({
@@ -88,16 +137,8 @@ function parseSubjectTalkbox(html) {
   const comments = []
   const items = document.querySelectorAll('#comment_box > .item')
   items.forEach((el, i) => {
-    const userLink = el.querySelector('a.l[href^="/user/"]')
-    if (!userLink) return
-    const avatarEl = el.querySelector('.avatarNeue')
-    const avatarStyle = avatarEl ? avatarEl.getAttribute('style') || '' : ''
-    const avatarMatch = avatarStyle.match(/url\(['"]?([^'"()]+)['"]?\)/)
-    let avatar = ''
-    if (avatarMatch) {
-      avatar = avatarMatch[1].startsWith('//') ? 'https:' + avatarMatch[1] : avatarMatch[1]
-      avatar = avatar.replace('lain.bgm.tv', 'lain.bangumi.pro')
-    }
+    const user = parseUserLink(el)
+    if (!user.username) return
     const starEl = el.querySelector('.starlight')
     const starClass = starEl ? starEl.getAttribute('class') || '' : ''
     const starMatch = starClass.match(/stars(\d+)/)
@@ -106,14 +147,10 @@ function parseSubjectTalkbox(html) {
       ? timeEls[timeEls.length - 1].textContent.trim().replace(/^@\s*/, '')
       : ''
     const contentEl = el.querySelector('p.comment')
-    const content = contentEl ? contentEl.textContent.trim() : '(无文字评价)'
+    const content = contentText(contentEl) || '(无文字评价)'
     comments.push({
       id: String(i),
-      user: {
-        username: userLink.textContent.trim(),
-        url: userLink.getAttribute('href') || '',
-        avatar
-      },
+      user,
       rating: starMatch ? parseInt(starMatch[1]) : 0,
       content,
       timestamp
@@ -155,9 +192,7 @@ function parseTopicPage(html) {
   const $op = document.querySelector('.postTopic')
   const op = {
     user: $op ? parseUserLink($op) : { username: '', url: '', avatar: '' },
-    content: $op
-      ? ($op.querySelector('.topic_content') || { textContent: '' }).textContent.trim()
-      : '',
+    content: $op ? contentText($op.querySelector('.topic_content')) : '',
     timestamp: $op
       ? ($op.querySelector('.post_actions .action small') || { textContent: '' }).textContent
           .replace(/#\d+\s*-?\s*/, '')
@@ -177,7 +212,7 @@ function parseTopicPage(html) {
     const timestamp = actionText.replace(/#\S+\s*-?\s*/, '').trim()
     const user = parseUserLink(el)
     const contentEl = el.querySelector('.message')
-    const content = contentEl ? contentEl.textContent.trim() : ''
+    const content = contentText(contentEl)
     if (user.username && content) {
       replies.push({
         id: el.id?.replace('post_', '') || String(i),
@@ -199,11 +234,13 @@ app.get('/test', async c => {
 
 app.get('/character/:id', async c => {
   try {
+    const id = parsePositiveId(c.req.param('id'))
+    if (id === null) return c.json({ error: 'ID 不合法' }, 400)
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
-    const key = `char_${c.req.param('id')}_${isChina}`
+    const key = `char_${id}_${isChina}`
     const cached = cache.get(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`${getBase(isChina)}/character/${c.req.param('id')}`)
+    const html = await fetchHTML(`${getBase(isChina)}/character/${id}`)
     const comments = parseTalkbox(html)
     cache.set(key, comments)
     return c.json({ data: comments })
@@ -214,11 +251,13 @@ app.get('/character/:id', async c => {
 
 app.get('/subject/:id', async c => {
   try {
+    const id = parsePositiveId(c.req.param('id'))
+    if (id === null) return c.json({ error: 'ID 不合法' }, 400)
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
-    const key = `subj_${c.req.param('id')}_${isChina}`
+    const key = `subj_${id}_${isChina}`
     const cached = cache.get(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`${getBase(isChina)}/subject/${c.req.param('id')}`)
+    const html = await fetchHTML(`${getBase(isChina)}/subject/${id}`)
     const comments = parseSubjectTalkbox(html)
     cache.set(key, comments)
     return c.json({ data: comments })
@@ -229,11 +268,13 @@ app.get('/subject/:id', async c => {
 
 app.get('/subject/:id/topics', async c => {
   try {
+    const id = parsePositiveId(c.req.param('id'))
+    if (id === null) return c.json({ error: 'ID 不合法' }, 400)
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
-    const key = `topics_${c.req.param('id')}_${isChina}`
+    const key = `topics_${id}_${isChina}`
     const cached = cache.get(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`${getBase(isChina)}/subject/${c.req.param('id')}/board`)
+    const html = await fetchHTML(`${getBase(isChina)}/subject/${id}/board`)
     const topics = parseTopics(html)
     cache.set(key, topics)
     return c.json({ data: topics })
@@ -244,11 +285,13 @@ app.get('/subject/:id/topics', async c => {
 
 app.get('/topic/:topicId', async c => {
   try {
+    const topicId = parsePositiveId(c.req.param('topicId'))
+    if (topicId === null) return c.json({ error: 'ID 不合法' }, 400)
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
-    const key = `topic_${c.req.param('topicId')}_${isChina}`
+    const key = `topic_${topicId}_${isChina}`
     const cached = cache.get(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`${getBase(isChina)}/subject/topic/${c.req.param('topicId')}`)
+    const html = await fetchHTML(`${getBase(isChina)}/subject/topic/${topicId}`)
     const topic = parseTopicPage(html)
     cache.set(key, topic)
     return c.json({ data: topic })
@@ -259,11 +302,13 @@ app.get('/topic/:topicId', async c => {
 
 app.get('/person/:id', async c => {
   try {
+    const id = parsePositiveId(c.req.param('id'))
+    if (id === null) return c.json({ error: 'ID 不合法' }, 400)
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
-    const key = `person_${c.req.param('id')}_${isChina}`
+    const key = `person_${id}_${isChina}`
     const cached = cache.get(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`${getBase(isChina)}/person/${c.req.param('id')}`)
+    const html = await fetchHTML(`${getBase(isChina)}/person/${id}`)
     const comments = parseTalkbox(html)
     cache.set(key, comments)
     return c.json({ data: comments })
@@ -275,26 +320,69 @@ app.get('/person/:id', async c => {
 // ===== POST routes for comment posting =====
 
 function extractFormhash(html) {
-  const m = html.match(/name="formhash"\s+value="([^"]+)"/i)
-  return m ? m[1] : null
+  const inputs = String(html || '').match(/<input\b[^>]*>/gi) || []
+  for (const input of inputs) {
+    const name = input.match(/\bname\s*=\s*(["'])formhash\1/i)
+    const value = input.match(/\bvalue\s*=\s*(["'])(.*?)\1/i)?.[2]
+    if (name && value) return value
+  }
+  return null
 }
 
 function extractChiiAuth(token) {
   return `chii_auth=${token}; chii_cookietime=2592000`
 }
 
+function commentSubmissionAccepted(response, body, location) {
+  const status = Number(response?.status || 0)
+  const redirect = String(location || '')
+  if (status >= 300 && status < 400) {
+    return Boolean(redirect) && !/(?:login|signin|auth|captcha)/i.test(redirect)
+  }
+  if (!response?.ok) return false
+  if (
+    /(?:登录失败|登陆失败|验证码|权限不足|禁止发言|请先登录|formhash.{0,30}(?:错误|无效|过期)|发送失败|提交失败|错误\s*[:：])/i.test(
+      String(body || '')
+    )
+  )
+    return false
+  return /(?:发表成功|发布成功|提交成功|发送成功|回复成功|操作成功|已发布|已成功)/i.test(
+    String(body || '')
+  )
+}
+
+async function acceptCommentSubmission(response) {
+  const body = await response.text().catch(() => '')
+  const location = response.headers.get('location') || ''
+  if (!commentSubmissionAccepted(response, body, location))
+    throw new Error('发送失败，请确认登录状态和内容后重试')
+}
+
+async function readSubmissionFields(c, { title = false } = {}) {
+  const body = await c.req.json().catch(() => null)
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return { error: '请求内容不合法' }
+  const content = typeof body.content === 'string' ? body.content.trim() : ''
+  if (!content) return { error: '内容不能为空' }
+  if (content.length > MAX_CONTENT_LENGTH) return { error: '内容过长' }
+  if (!title) return { fields: { content } }
+  const subject = typeof body.title === 'string' ? body.title.trim() : ''
+  if (!subject) return { error: '标题不能为空' }
+  if (subject.length > MAX_TITLE_LENGTH) return { error: '标题过长' }
+  return { fields: { title: subject, content } }
+}
+
 app.post('/subject/:id/comment', async c => {
   try {
+    const subjectId = parsePositiveId(c.req.param('id'))
+    if (subjectId === null) return c.json({ error: 'ID 不合法' }, 400)
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
     const base = getBase(isChina)
     const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
     if (!token) return c.json({ error: '未登录' }, 401)
-    const { content } = await c.req.json()
-    if (!content) return c.json({ error: '内容不能为空' }, 400)
-    if (content.length > MAX_CONTENT_LENGTH)
-      return c.json({ data: null, error: '内容过长', code: 400 }, 400)
+    const submission = await readSubmissionFields(c)
+    if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400)
+    const { content } = submission.fields
 
-    const subjectId = c.req.param('id')
     const pageHtml = await fetchHTML(`${base}/subject/${subjectId}/comments`, {
       headers: { Authorization: `Bearer ${token}`, Cookie: `chii_auth=${token}` }
     })
@@ -319,9 +407,8 @@ app.post('/subject/:id/comment', async c => {
       redirect: 'manual'
     })
 
-    if (res.status >= 300 && res.status < 400) return c.json({ success: true })
-    if (res.ok) return c.json({ success: true })
-    return c.json({ error: '发送失败' }, 400)
+    await acceptCommentSubmission(res)
+    return c.json({ success: true })
   } catch {
     return c.json({ error: '发送失败' }, 500)
   }
@@ -329,16 +416,16 @@ app.post('/subject/:id/comment', async c => {
 
 app.post('/topic/:topicId/reply', async c => {
   try {
+    const topicId = parsePositiveId(c.req.param('topicId'))
+    if (topicId === null) return c.json({ error: 'ID 不合法' }, 400)
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
     const base = getBase(isChina)
     const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
     if (!token) return c.json({ error: '未登录' }, 401)
-    const { content } = await c.req.json()
-    if (!content) return c.json({ error: '内容不能为空' }, 400)
-    if (content.length > MAX_CONTENT_LENGTH)
-      return c.json({ data: null, error: '内容过长', code: 400 }, 400)
+    const submission = await readSubmissionFields(c)
+    if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400)
+    const { content } = submission.fields
 
-    const topicId = c.req.param('topicId')
     const pageHtml = await fetchHTML(`${base}/subject/topic/${topicId}`, {
       headers: { Authorization: `Bearer ${token}`, Cookie: `chii_auth=${token}` }
     })
@@ -363,9 +450,8 @@ app.post('/topic/:topicId/reply', async c => {
       redirect: 'manual'
     })
 
-    if (res.status >= 300 && res.status < 400) return c.json({ success: true })
-    if (res.ok) return c.json({ success: true })
-    return c.json({ error: '发送失败' }, 400)
+    await acceptCommentSubmission(res)
+    return c.json({ success: true })
   } catch {
     return c.json({ error: '发送失败' }, 500)
   }
@@ -373,16 +459,16 @@ app.post('/topic/:topicId/reply', async c => {
 
 app.post('/subject/:id/talkbox', async c => {
   try {
+    const subjectId = parsePositiveId(c.req.param('id'))
+    if (subjectId === null) return c.json({ error: 'ID 不合法' }, 400)
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
     const base = getBase(isChina)
     const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
     if (!token) return c.json({ error: '未登录' }, 401)
-    const { content } = await c.req.json()
-    if (!content) return c.json({ error: '内容不能为空' }, 400)
-    if (content.length > MAX_CONTENT_LENGTH)
-      return c.json({ data: null, error: '内容过长', code: 400 }, 400)
+    const submission = await readSubmissionFields(c)
+    if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400)
+    const { content } = submission.fields
 
-    const subjectId = c.req.param('id')
     const pageHtml = await fetchHTML(`${base}/subject/${subjectId}/talkbox`, {
       headers: { Authorization: `Bearer ${token}`, Cookie: `chii_auth=${token}` }
     })
@@ -407,9 +493,8 @@ app.post('/subject/:id/talkbox', async c => {
       redirect: 'manual'
     })
 
-    if (res.status >= 300 && res.status < 400) return c.json({ success: true })
-    if (res.ok) return c.json({ success: true })
-    return c.json({ error: '发送失败' }, 400)
+    await acceptCommentSubmission(res)
+    return c.json({ success: true })
   } catch {
     return c.json({ error: '发送失败' }, 500)
   }
@@ -417,16 +502,16 @@ app.post('/subject/:id/talkbox', async c => {
 
 app.post('/person/:id/talkbox', async c => {
   try {
+    const personId = parsePositiveId(c.req.param('id'))
+    if (personId === null) return c.json({ error: 'ID 不合法' }, 400)
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
     const base = getBase(isChina)
     const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
     if (!token) return c.json({ error: '未登录' }, 401)
-    const { content } = await c.req.json()
-    if (!content) return c.json({ error: '内容不能为空' }, 400)
-    if (content.length > MAX_CONTENT_LENGTH)
-      return c.json({ data: null, error: '内容过长', code: 400 }, 400)
+    const submission = await readSubmissionFields(c)
+    if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400)
+    const { content } = submission.fields
 
-    const personId = c.req.param('id')
     const pageHtml = await fetchHTML(`${base}/person/${personId}/talkbox`, {
       headers: { Authorization: `Bearer ${token}`, Cookie: `chii_auth=${token}` }
     })
@@ -450,28 +535,24 @@ app.post('/person/:id/talkbox', async c => {
       redirect: 'manual'
     })
 
-    if (res.status >= 300 && res.status < 400) return c.json({ success: true })
-    if (res.ok) return c.json({ success: true })
-    return c.json({ error: '发送失败' }, 400)
+    await acceptCommentSubmission(res)
+    return c.json({ success: true })
   } catch {
     return c.json({ error: '发送失败' }, 500)
   }
 })
 app.post('/subject/:id/topic', async c => {
   try {
+    const subjectId = parsePositiveId(c.req.param('id'))
+    if (subjectId === null) return c.json({ error: 'ID 不合法' }, 400)
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
     const base = getBase(isChina)
     const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
     if (!token) return c.json({ error: '未登录' }, 401)
-    const { title, content } = await c.req.json()
-    if (!title) return c.json({ error: '标题不能为空' }, 400)
-    if (!content) return c.json({ error: '内容不能为空' }, 400)
-    if (title.length > MAX_TITLE_LENGTH)
-      return c.json({ data: null, error: '标题过长', code: 400 }, 400)
-    if (content.length > MAX_CONTENT_LENGTH)
-      return c.json({ data: null, error: '内容过长', code: 400 }, 400)
+    const submission = await readSubmissionFields(c, { title: true })
+    if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400)
+    const { title, content } = submission.fields
 
-    const subjectId = c.req.param('id')
     const pageHtml = await fetchHTML(`${base}/subject/${subjectId}/board`, {
       headers: { Authorization: `Bearer ${token}`, Cookie: `chii_auth=${token}` }
     })
@@ -497,12 +578,19 @@ app.post('/subject/:id/topic', async c => {
       redirect: 'manual'
     })
 
-    if (res.status >= 300 && res.status < 400) return c.json({ success: true })
-    if (res.ok) return c.json({ success: true })
-    return c.json({ error: '发送失败' }, 400)
+    await acceptCommentSubmission(res)
+    return c.json({ success: true })
   } catch {
     return c.json({ error: '发送失败' }, 500)
   }
 })
 
+export {
+  extractFormhash,
+  commentSubmissionAccepted,
+  parseTalkbox,
+  parseSubjectTalkbox,
+  parseTopicPage,
+  parseUserLink
+}
 export default app

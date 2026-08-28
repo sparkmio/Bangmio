@@ -226,7 +226,7 @@
                     >
                       {{ g.name }}
                     </p>
-                    <p class="text-xs text-base-content/40">{{ g.member_count || 0 }} 成员</p>
+                    <p class="text-xs text-base-content/40">{{ memberLabel(g.member_count) }}</p>
                   </div>
                 </router-link>
               </div>
@@ -398,6 +398,19 @@ import ProfileStatsPanel from '../components/profile/ProfileStatsPanel.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
+
+function safeCount(count) {
+  if (count === null || count === undefined) return null
+  const text = String(count).trim()
+  if (!text) return null
+  const value = Number(text.replaceAll(',', ''))
+  return Number.isFinite(value) && value >= 0 ? value : null
+}
+
+function memberLabel(count) {
+  const value = safeCount(count)
+  return value === null ? '成员数暂不可用' : `${value.toLocaleString()} 成员`
+}
 
 // 当前查看的用户名
 const currentUsername = computed(() => route.params.username || auth.effectiveUser?.username)

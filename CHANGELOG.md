@@ -2,8 +2,9 @@
 
 本文件由本地 Git 提交历史整理生成，记录仓库截至 2026-08-28 的全部历史提交。
 
-## Unreleased
+## v4.3.0
 
+- 2026-08-28 — fix: comprehensive community, detail, wiki and auth refinements
 - 2026-08-28 — fix: polish detail integrations and AI identity (`87206ee`)
 
 ## v4.2.0-final

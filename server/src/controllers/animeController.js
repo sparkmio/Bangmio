@@ -1,4 +1,10 @@
 import * as bangumiService from '../services/bangumi.js'
+import { parseBoundedInteger, parsePositiveId } from '../utils/validation.js'
+
+function requiredId(c) {
+  const id = parsePositiveId(c.req.param('id'))
+  return id
+}
 
 function isChina(c) {
   return (c.env?.CF_IP_COUNTRY || '') === 'CN'
@@ -39,8 +45,10 @@ export async function browseAnime(c) {
 }
 
 export async function getAnimeDetail(c) {
+  const id = requiredId(c)
+  if (id === null) return c.json({ error: 'ID 不合法' }, 400)
   try {
-    const detail = await bangumiService.getAnimeDetail(c.req.param('id'), { isChina: isChina(c) })
+    const detail = await bangumiService.getAnimeDetail(id, { isChina: isChina(c) })
     return c.json({ data: detail })
   } catch {
     return c.json({ error: '获取详情失败' }, 500)
@@ -48,11 +56,12 @@ export async function getAnimeDetail(c) {
 }
 
 export async function getAnimeEpisodes(c) {
+  const id = requiredId(c)
+  const offset = parseBoundedInteger(c.req.query('offset'), { min: 0, max: 1000000, fallback: 0 })
+  const limit = parseBoundedInteger(c.req.query('limit'), { min: 1, max: 100, fallback: 100 })
+  if (id === null || offset === null || limit === null) return c.json({ error: '参数不合法' }, 400)
   try {
-    const data = await bangumiService.getAnimeEpisodes(c.req.param('id'), {
-      ...c.req.query(),
-      isChina: isChina(c)
-    })
+    const data = await bangumiService.getAnimeEpisodes(id, { offset, limit, isChina: isChina(c) })
     return c.json({ data: data.data, total: data.total })
   } catch {
     return c.json({ error: '获取章节失败' }, 500)
@@ -60,8 +69,10 @@ export async function getAnimeEpisodes(c) {
 }
 
 export async function getAnimeCharacters(c) {
+  const id = requiredId(c)
+  if (id === null) return c.json({ error: 'ID 不合法' }, 400)
   try {
-    const data = await bangumiService.getAnimeCharacters(c.req.param('id'), { isChina: isChina(c) })
+    const data = await bangumiService.getAnimeCharacters(id, { isChina: isChina(c) })
     return c.json({ data })
   } catch {
     return c.json({ error: '获取角色失败' }, 500)
@@ -69,8 +80,10 @@ export async function getAnimeCharacters(c) {
 }
 
 export async function getAnimePersons(c) {
+  const id = requiredId(c)
+  if (id === null) return c.json({ error: 'ID 不合法' }, 400)
   try {
-    const data = await bangumiService.getAnimePersons(c.req.param('id'), { isChina: isChina(c) })
+    const data = await bangumiService.getAnimePersons(id, { isChina: isChina(c) })
     return c.json({ data })
   } catch {
     return c.json({ error: '获取制作人员失败' }, 500)
@@ -78,8 +91,10 @@ export async function getAnimePersons(c) {
 }
 
 export async function getAnimeRelations(c) {
+  const id = requiredId(c)
+  if (id === null) return c.json({ error: 'ID 不合法' }, 400)
   try {
-    const data = await bangumiService.getAnimeRelations(c.req.param('id'), { isChina: isChina(c) })
+    const data = await bangumiService.getAnimeRelations(id, { isChina: isChina(c) })
     return c.json({ data })
   } catch {
     return c.json({ error: '获取关联条目失败' }, 500)
@@ -105,8 +120,10 @@ export async function getAnimeTags(c) {
 }
 
 export async function getCharacterDetail(c) {
+  const id = requiredId(c)
+  if (id === null) return c.json({ error: 'ID 不合法' }, 400)
   try {
-    const data = await bangumiService.getCharacterDetail(c.req.param('id'), { isChina: isChina(c) })
+    const data = await bangumiService.getCharacterDetail(id, { isChina: isChina(c) })
     return c.json({ data })
   } catch {
     return c.json({ error: '获取角色详情失败' }, 500)
@@ -114,8 +131,10 @@ export async function getCharacterDetail(c) {
 }
 
 export async function getCharacterSubjects(c) {
+  const id = requiredId(c)
+  if (id === null) return c.json({ error: 'ID 不合法' }, 400)
   try {
-    const data = await bangumiService.getCharacterSubjects(c.req.param('id'), {
+    const data = await bangumiService.getCharacterSubjects(id, {
       isChina: isChina(c)
     })
     return c.json({ data })
@@ -125,8 +144,10 @@ export async function getCharacterSubjects(c) {
 }
 
 export async function getCharacterPersons(c) {
+  const id = requiredId(c)
+  if (id === null) return c.json({ error: 'ID 不合法' }, 400)
   try {
-    const data = await bangumiService.getCharacterPersons(c.req.param('id'), {
+    const data = await bangumiService.getCharacterPersons(id, {
       isChina: isChina(c)
     })
     return c.json({ data })
@@ -136,8 +157,10 @@ export async function getCharacterPersons(c) {
 }
 
 export async function getPersonDetail(c) {
+  const id = requiredId(c)
+  if (id === null) return c.json({ error: 'ID 不合法' }, 400)
   try {
-    const data = await bangumiService.getPersonDetail(c.req.param('id'), { isChina: isChina(c) })
+    const data = await bangumiService.getPersonDetail(id, { isChina: isChina(c) })
     return c.json({ data })
   } catch {
     return c.json({ error: '获取人物详情失败' }, 500)
@@ -145,8 +168,10 @@ export async function getPersonDetail(c) {
 }
 
 export async function getPersonSubjects(c) {
+  const id = requiredId(c)
+  if (id === null) return c.json({ error: 'ID 不合法' }, 400)
   try {
-    const data = await bangumiService.getPersonSubjects(c.req.param('id'), { isChina: isChina(c) })
+    const data = await bangumiService.getPersonSubjects(id, { isChina: isChina(c) })
     return c.json({ data })
   } catch {
     return c.json({ error: '获取人物作品失败' }, 500)

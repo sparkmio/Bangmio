@@ -191,7 +191,7 @@
                 </div>
               </div>
               <span class="badge badge-sm badge-primary badge-outline whitespace-nowrap">
-                {{ topic.reply_count || 0 }} 回复
+                {{ replyLabel(topic.reply_count) }}
               </span>
             </router-link>
           </div>
@@ -238,7 +238,7 @@
                 </div>
               </div>
               <span class="badge badge-sm badge-primary badge-outline whitespace-nowrap">
-                {{ topic.reply_count || 0 }} 回复
+                {{ replyLabel(topic.reply_count) }}
               </span>
             </router-link>
           </div>
@@ -338,9 +338,21 @@ function onAvatarError(event) {
   event.target.style.display = 'none'
 }
 
+function safeCount(count) {
+  if (count === null || count === undefined) return null
+  const text = String(count).trim()
+  if (!text) return null
+  const value = Number(text.replaceAll(',', ''))
+  return Number.isFinite(value) && value >= 0 ? value : null
+}
+
 function memberLabel(count) {
-  const value = Number(count)
-  return Number.isFinite(value) && value > 0 ? `${value.toLocaleString()} 成员` : '成员数暂不可用'
+  const value = safeCount(count)
+  return value === null ? '成员数暂不可用' : `${value.toLocaleString()} 成员`
+}
+function replyLabel(count) {
+  const value = safeCount(count)
+  return value === null ? '回复数暂不可用' : `${value.toLocaleString()} 回复`
 }
 
 async function loadFollowedGroups() {
@@ -364,12 +376,11 @@ async function loadFollowedGroups() {
           const detail = detailResponse.data?.data
           const topics = (detail?.topics || [])
             .slice()
-            .sort((a, b) => Number(b.reply_count || 0) - Number(a.reply_count || 0))
+            .sort((a, b) => Number(b.reply_count ?? -1) - Number(a.reply_count ?? -1))
             .slice(0, 8)
           return {
             ...group,
-            member_count:
-              Number(detail?.member_count) > 0 ? detail.member_count : group.member_count,
+            member_count: safeCount(detail?.member_count) ?? safeCount(group.member_count),
             avatar: detail?.avatar || group.avatar,
             topics
           }

@@ -55,7 +55,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
 
   useEffect(() => {
-    const protectedRoute = pathname === '/watching' || pathname === '/profile' || pathname === '/settings' || pathname.startsWith('/profile/')
+    const protectedRoute = pathname === '/watching' || pathname === '/profile' || pathname === '/settings'
     if (protectedRoute && isAuthenticated && isBangmioUser && !isBound) setShowBindModal(true)
   }, [isAuthenticated, isBangmioUser, isBound, pathname, setShowBindModal])
 

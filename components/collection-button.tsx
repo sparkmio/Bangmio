@@ -111,16 +111,106 @@ export function CollectionEditor({ animeId }: { animeId: number }) {
     setMessage('')
   }
 
+  function moveRating(delta: number) {
+    setRating(current => Math.min(10, Math.max(0, current + delta)))
+  }
+
   if (!ready) return <section className="bm-collection-editor is-loading"><p>正在读取收藏记录…</p></section>
 
-  return <section className="bm-collection-editor">
-    <header className="bm-collection-head"><div><h2>我的收藏</h2><p>记录收藏状态、评分和短评</p></div></header>
-    {isAuthenticated ? <>
-      <div className="bm-collection-toolbar"><CollectionButton animeId={animeId} initialStatus={collectionStatusValue(collection)} onSaved={next => setCollection(current => ({ ...current, ...next, status: collectionStatusValue(next) }))} /><div className="bm-collection-rating"><span>评分</span><div className="bm-rating-picker" role="radiogroup" aria-label="我的评分"><span className="bm-rating-picker-stars" aria-hidden="true"><span className="bm-rating-picker-base">★★★★★</span><span className="bm-rating-picker-fill" style={{ width: `${rating / 10 * 100}%` }}>★★★★★</span></span><div className="bm-rating-picker-hitboxes">{Array.from({ length: 10 }, (_, index) => { const value = index + 1; return <button key={value} type="button" role="radio" aria-checked={rating === value} aria-label={`${value / 2} 星（${value} 分）`} className={rating === value ? 'is-selected' : ''} onClick={() => chooseRating(value)}><span aria-hidden="true" /></button> })}</div></div><small>{rating ? `${rating} 分 · ${(rating / 2).toFixed(1)} 星` : '未评分'}</small></div></div>
-      <form className="bm-collection-form" onSubmit={saveDetails}>
-        <label className="bm-collection-comment"><span>短评</span><textarea rows={2} maxLength={2000} value={comment} onChange={event => setComment(event.target.value)} placeholder="写点观后感…" /></label>
-        <div className="bm-collection-actions"><span role="status">{message}</span><button type="submit" disabled={busy}>{busy ? '保存中…' : '保存记录'}</button></div>
-      </form>
-    </> : <div className="bm-collection-login"><span>登录后可以记录进度、评分和短评。</span><Link href={`/login?redirect=/anime/${animeId}`}>登录后继续 →</Link></div>}
-  </section>
+  return (
+    <section className="bm-collection-editor">
+      <header className="bm-collection-head">
+        <div>
+          <h2>我的收藏</h2>
+          <p>记录收藏状态、评分和短评</p>
+        </div>
+      </header>
+      {isAuthenticated ? (
+        <>
+          <div className="bm-collection-toolbar">
+            <CollectionButton
+              animeId={animeId}
+              initialStatus={collectionStatusValue(collection)}
+              onSaved={next =>
+                setCollection(current => ({
+                  ...current,
+                  ...next,
+                  status: collectionStatusValue(next)
+                }))
+              }
+            />
+            <div className="bm-collection-rating">
+              <span>评分</span>
+              <div
+                className="bm-rating-picker"
+                role="radiogroup"
+                aria-label="我的评分"
+                onKeyDown={event => {
+                  if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+                    event.preventDefault()
+                    moveRating(-1)
+                  }
+                  if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+                    event.preventDefault()
+                    moveRating(1)
+                  }
+                }}
+              >
+                <span className="bm-rating-picker-stars" aria-hidden="true">
+                  {Array.from({ length: 5 }, (_, index) => (
+                    <span key={index} className="bm-rating-star">
+                      <span className="bm-rating-star-base">☆</span>
+                      <span className="bm-rating-star-fill" style={{ width: (rating >= (index + 1) * 2 ? 100 : rating === index * 2 + 1 ? 50 : 0) + '%' }}>★</span>
+                    </span>
+                  ))}
+                </span>
+                <div className="bm-rating-picker-hitboxes">
+                  {Array.from({ length: 10 }, (_, index) => {
+                    const value = index + 1
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        role="radio"
+                        aria-checked={rating === value}
+                        aria-label={`${value / 2} 星（${value} 分）`}
+                        className={rating === value ? 'is-selected' : ''}
+                        onClick={() => chooseRating(value)}
+                      >
+                        <span aria-hidden="true" />
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <small>{rating ? `${rating} 分 · ${(rating / 2).toFixed(1)} 星` : '未评分'}</small>
+            </div>
+          </div>
+          <form className="bm-collection-form" onSubmit={saveDetails}>
+            <label className="bm-collection-comment">
+              <span>短评</span>
+              <textarea
+                rows={2}
+                maxLength={2000}
+                value={comment}
+                onChange={event => setComment(event.target.value)}
+                placeholder="写点观后感…"
+              />
+            </label>
+            <div className="bm-collection-actions">
+              <span role="status">{message}</span>
+              <button type="submit" disabled={busy}>
+                {busy ? '保存中…' : '保存记录'}
+              </button>
+            </div>
+          </form>
+        </>
+      ) : (
+        <div className="bm-collection-login">
+          <span>登录后可以记录进度、评分和短评。</span>
+          <Link href={`/login?redirect=/anime/${animeId}`}>登录后继续 →</Link>
+        </div>
+      )}
+    </section>
+  )
 }

@@ -5,6 +5,8 @@ import { exchangeBangumiOAuthCode } from '../services/oauth.js'
 import { fetchHTML, stripTags, unescapeHtml, parseNumber, fixUrl } from '../utils/http.js'
 import { getOAuthCredentials } from '../utils/oauthConfig.js'
 import { logError } from '../utils/logger.js'
+import { upstreamError } from '../utils/errors.js'
+import { parseBoundedInteger } from '../utils/validation.js'
 
 const app = new Hono()
 const OAUTH_STATE_COOKIE = 'bangmio_oauth_state'
@@ -54,6 +56,10 @@ function oauthCookieOptions(c, overrides = {}) {
 
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function userPathSegment(username) {
+  return encodeURIComponent(String(username || ''))
 }
 
 const TIMELINE_TYPE_MAP = {
@@ -185,13 +191,38 @@ app.get('/me', async c => {
   }
 })
 
+app.get('/:username/collections', async c => {
+  try {
+    const username = c.req.param('username')
+    if (!username) return c.json({ error: '缺少用户名' }, 400)
+    const offset = parseBoundedInteger(c.req.query('offset'), {
+      min: 0,
+      max: 10000000,
+      fallback: 0
+    })
+    const limit = parseBoundedInteger(c.req.query('limit'), { min: 1, max: 100, fallback: 30 })
+    if (offset === null || limit === null) return c.json({ error: '收藏列表参数不合法' }, 400)
+    const client = getClient('', isChina(c))
+    const data = await client.get('/v0/users/' + userPathSegment(username) + '/collections', {
+      offset,
+      limit
+    })
+    return c.json({ data: data.data || [], total: data.total || 0 })
+  } catch (err) {
+    const r = upstreamError(err.response?.status, err.response?.data, '获取用户收藏失败')
+    return c.json({ error: r.error }, r.code)
+  }
+})
+
 app.get('/:username/characters', async c => {
   try {
     const username = c.req.param('username')
     if (!username) return c.json({ error: '缺少用户名' }, 400)
     const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
     const client = token ? getClient(token, isChina(c)) : getClient('', isChina(c))
-    const data = await client.get(`/v0/users/${username}/characters`, { limit: 10 })
+    const data = await client.get(`/v0/users/${userPathSegment(username)}/characters`, {
+      limit: 10
+    })
     return c.json({ data: data.data || [] })
   } catch {
     return c.json({ data: [] })
@@ -204,7 +235,7 @@ app.get('/:username/persons', async c => {
     if (!username) return c.json({ error: '缺少用户名' }, 400)
     const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
     const client = token ? getClient(token, isChina(c)) : getClient('', isChina(c))
-    const data = await client.get(`/v0/users/${username}/persons`, { limit: 10 })
+    const data = await client.get(`/v0/users/${userPathSegment(username)}/persons`, { limit: 10 })
     return c.json({ data: data.data || [] })
   } catch {
     return c.json({ data: [] })
@@ -218,7 +249,7 @@ app.get('/:username/indexes', async c => {
     const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
     const client = token ? getClient(token, isChina(c)) : getClient('', isChina(c))
     // Bangumi v0 API 可能没有 /indexes，尝试调用，失败返回空数组
-    const data = await client.get(`/v0/users/${username}/indexes`)
+    const data = await client.get(`/v0/users/${userPathSegment(username)}/indexes`)
     return c.json({ data: data.data || [] })
   } catch {
     return c.json({ data: [] })
@@ -230,7 +261,7 @@ app.get('/:username/friends', async c => {
     const username = c.req.param('username')
     if (!username) return c.json({ data: [] })
     const base = oauthBase(c)
-    const html = await fetchHTML(`${base}/user/${username}/friends`)
+    const html = await fetchHTML(`${base}/user/${userPathSegment(username)}/friends`)
     if (!html) return c.json({ data: [] })
 
     const friends = []
@@ -275,8 +306,8 @@ app.get('/:username/groups', async c => {
     if (!username) return c.json({ data: [] })
     const base = oauthBase(c)
     // Bangumi 当前页面路径是 /groups；保留 /group 作为旧镜像兼容回退。
-    let html = await fetchHTML(`${base}/user/${username}/groups`)
-    if (!html) html = await fetchHTML(`${base}/user/${username}/group`)
+    let html = await fetchHTML(`${base}/user/${userPathSegment(username)}/groups`)
+    if (!html) html = await fetchHTML(`${base}/user/${userPathSegment(username)}/group`)
     if (!html) return c.json({ data: [] })
 
     // 优先从 #group 或 .groups 区块提取，避免全页导航链接受污染
@@ -307,7 +338,7 @@ app.get('/:username/groups', async c => {
         context.match(/<span class="group_member">([0-9][0-9,]*).*?<\/span>/i) ||
         context.match(/<span class="l">([0-9][0-9,]*).*?<\/span>/i) ||
         context.match(/<strong>([0-9][0-9,]*)<\/strong>/i)
-      const member_count = memberMatch ? parseNumber(memberMatch[1]) : 0
+      const member_count = memberMatch ? parseNumber(memberMatch[1]) : null
 
       const avatarMatch = context.match(/<img[^>]*src="([^"]+)"[^>]*>/i)
       const avatar = avatarMatch ? fixUrl(avatarMatch[1], base) : ''
@@ -327,7 +358,7 @@ app.get('/:username/timeline', async c => {
     const username = c.req.param('username')
     if (!username) return c.json({ data: [] })
     const base = oauthBase(c)
-    const html = await fetchHTML(`${base}/user/${username}/timeline`)
+    const html = await fetchHTML(`${base}/user/${userPathSegment(username)}/timeline`)
     if (!html) return c.json({ data: [] })
 
     const items = []
@@ -382,7 +413,7 @@ app.get('/:username/stats-yearly', async c => {
     const username = c.req.param('username')
     if (!username) return c.json({ data: [] })
     const base = oauthBase(c)
-    const html = await fetchHTML(`${base}/user/${username}`)
+    const html = await fetchHTML(`${base}/user/${userPathSegment(username)}`)
     if (!html) return c.json({ data: [] })
 
     const stats = []
@@ -510,7 +541,7 @@ app.get('/:username', async c => {
     if (!username) return c.json({ error: '缺少用户名' }, 400)
     const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
     const client = token ? getClient(token, isChina(c)) : getClient('', isChina(c))
-    const user = await client.get(`/v0/users/${username}`)
+    const user = await client.get(`/v0/users/${userPathSegment(username)}`)
     return c.json({ data: user })
   } catch {
     return c.json({ data: null })

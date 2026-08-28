@@ -3,6 +3,7 @@
 import { createElement, FormEvent, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 import type { ApiResult } from '@/lib/types'
+import { RichText } from './rich-text'
 
 type Message = { role: 'user' | 'assistant'; content: string }
 type Conversation = { id: string; title: string; messages: Message[]; updatedAt: number }
@@ -198,7 +199,7 @@ export function AiChat({ context }: { context?: string }) {
     {open ? <section className="bm-ai-panel" role="dialog" aria-label="Bangmio AI 对话">
       <header className="bm-ai-header"><div><h2>Bangmio AI</h2><p>澪 · 当前页面资料助手</p></div><div className="bm-ai-header-actions"><button type="button" onClick={() => setHistoryOpen(value => !value)} aria-label="查看历史对话">历史</button><button type="button" onClick={createConversation} aria-label="新建对话">新建</button><button type="button" onClick={() => setOpen(false)} aria-label="关闭 AI 对话">×</button></div></header>
       {historyOpen ? <aside className="bm-ai-history"><div className="bm-ai-history-title">历史对话</div>{conversations.length ? conversations.map(item => <button type="button" key={item.id} className={item.id === conversationId ? 'is-active' : ''} onClick={() => { setConversationId(item.id); setHistoryOpen(false) }}>{item.title}</button>) : <p>还没有已保存的对话</p>}</aside> : null}
-      <div ref={scrollRef} className="bm-ai-messages">{messages.map((message, index) => <div key={`${message.role}-${index}`} className={`bm-ai-message ${message.role === 'user' ? 'is-user' : 'is-assistant'}`}>{message.role === 'assistant' ? <MarkdownMessage content={message.content} /> : <p>{message.content}</p>}</div>)}{busy ? <div className="bm-ai-message is-assistant"><p>正在思考…</p></div> : null}</div>
+      <div ref={scrollRef} className="bm-ai-messages">{messages.map((message, index) => <div key={`${message.role}-${index}`} className={`bm-ai-message ${message.role === 'user' ? 'is-user' : 'is-assistant'}`}>{message.role === 'assistant' ? <MarkdownMessage content={message.content} /> : <RichText value={message.content} fallback="" />}</div>)}{busy ? <div className="bm-ai-message is-assistant"><p>正在思考…</p></div> : null}</div>
       <div className="bm-ai-suggestions">{suggestions.slice(0, 4).map(item => <button type="button" key={item} onClick={() => setInput(item)}>{item}</button>)}</div>
       <form className="bm-ai-form" onSubmit={submit}>{error ? <p className="bm-ai-error">{error}</p> : null}<div><textarea rows={2} value={input} maxLength={2000} onChange={event => setInput(event.target.value)} placeholder="问点什么…" /><button type="submit" disabled={busy || !input.trim()}>发送</button></div></form>
     </section> : null}

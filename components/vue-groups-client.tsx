@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from './auth-provider'
 
-type Group = { id: number | string; name?: string; title?: string; avatar?: string; icon?: string; description?: string; summary?: string; member_count?: number | string; topic_count?: number | string; members?: unknown; topics?: unknown }
-type Topic = { id?: number | string; topic_id?: number | string; title?: string; group_name?: string; author?: string; last_reply_time?: string; reply_count?: number | string; replies?: unknown; group?: { name?: string } }
+type Group = { id: number | string; name?: string; title?: string; avatar?: string; icon?: string; description?: string; summary?: string; member_count?: number | string | null; topic_count?: number | string | null; members?: unknown; topics?: unknown }
+type Topic = { id?: number | string; topic_id?: number | string; title?: string; group_name?: string; author?: string; last_reply_time?: string; reply_count?: number | string | null; replies?: unknown; group?: { name?: string } }
 
 function text(value: unknown, fallback = ''): string {
   if (typeof value === 'string' || typeof value === 'number') return String(value)
@@ -17,8 +17,18 @@ function text(value: unknown, fallback = ''): string {
   return fallback
 }
 function groupTitle(group: Group) { return text(group.name ?? group.title, '未命名小组') }
-function count(value: unknown) { const number = Number(text(value)); return Number.isFinite(number) ? number : Array.isArray(value) ? value.length : 0 }
-function memberLabel(value: unknown) { const number = count(value); return number > 0 ? `${number.toLocaleString()} 成员` : '成员数暂不可用' }
+function count(value: unknown): number | null {
+  if (Array.isArray(value)) return value.length
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && /^\s*\d[\d,]*\s*$/.test(value)) return Number(value.replace(/,/g, ''))
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    return count(record.count ?? record.total ?? record.length)
+  }
+  return null
+}
+function memberLabel(value: unknown) { const number = count(value); return number !== null ? `${number.toLocaleString()} 成员` : '成员数暂不可用' }
+function replyLabel(value: unknown) { const number = count(value); return number !== null ? `${number} 回复` : '回复数暂不可用' }
 function normalizeGroup(value: unknown, index = 0): Group | null {
   if (!value || typeof value !== 'object') return null
   const item = value as Record<string, unknown>
@@ -43,7 +53,7 @@ function GroupCard({ group, followed = false }: { group: Group; followed?: boole
     <div className="card-body p-4"><div className="flex items-center gap-3"><div className="w-11 h-11 rounded-full overflow-hidden bg-base-200 shrink-0">{image && /^https?:\/\//i.test(image) ? <img src={image} alt={title} className="w-full h-full object-cover" loading="lazy" decoding="async" /> : <div className="w-full h-full flex items-center justify-center text-base-content/40">{title.slice(0, 1)}</div>}</div><div className="min-w-0"><p className="font-semibold truncate">{title}</p><p className="text-xs text-base-content/50 mt-1 line-clamp-2">{memberLabel(group.member_count ?? group.members)} · {text(group.description || group.summary, '暂无简介')}</p></div></div></div>
   </Link>
 }
-function TopicList({ topics }: { topics: Topic[] }) { return <div className="divide-y divide-base-300">{topics.map((topic, index) => <Link href={`/group/topic/${encodeURIComponent(String(topic.id || topic.topic_id || index))}`} className="p-4 flex items-start gap-3 hover:bg-base-200/60 transition-colors" key={topic.id || topic.topic_id || index}><div className="min-w-0 flex-1"><p className="font-medium line-clamp-2">{text(topic.title, '未命名话题')}</p><div className="mt-1 flex items-center gap-x-2 gap-y-1 flex-wrap text-xs text-base-content/50"><span>{text(topic.group_name || topic.group?.name, '小组')}</span>{text(topic.author) ? <span>{text(topic.author)}</span> : null}{text(topic.last_reply_time) ? <span>{text(topic.last_reply_time)}</span> : null}</div></div><span className="badge badge-sm badge-primary badge-outline whitespace-nowrap">{count(topic.reply_count ?? topic.replies)} 回复</span></Link>)}</div> }
+function TopicList({ topics }: { topics: Topic[] }) { return <div className="divide-y divide-base-300">{topics.map((topic, index) => <Link href={`/group/topic/${encodeURIComponent(String(topic.id || topic.topic_id || index))}`} className="p-4 flex items-start gap-3 hover:bg-base-200/60 transition-colors" key={topic.id || topic.topic_id || index}><div className="min-w-0 flex-1"><p className="font-medium line-clamp-2">{text(topic.title, '未命名话题')}</p><div className="mt-1 flex items-center gap-x-2 gap-y-1 flex-wrap text-xs text-base-content/50"><span>{text(topic.group_name || topic.group?.name, '小组')}</span>{text(topic.author) ? <span>{text(topic.author)}</span> : null}{text(topic.last_reply_time) ? <span>{text(topic.last_reply_time)}</span> : null}</div></div><span className="badge badge-sm badge-primary badge-outline whitespace-nowrap">{replyLabel(topic.reply_count ?? topic.replies)}</span></Link>)}</div> }
 
 export function VueGroupsClient({ initialGroups, initialTopics }: { initialGroups: unknown; initialTopics: unknown }) {
   const { user, request } = useAuth()
@@ -70,7 +80,7 @@ export function VueGroupsClient({ initialGroups, initialTopics }: { initialGroup
     try {
       const payload = await request<unknown>(`/user/${encodeURIComponent(currentUsername)}/groups`, {}, { authenticate: false })
       const groups = arrayFrom(payload?.data).map(normalizeGroup).filter(Boolean) as Group[]
-      const enriched = await Promise.all(groups.map(async group => { try { const detail = await request<unknown>(`/groups/${group.id}`, {}, { authenticate: false }); const value = detail?.data && typeof detail.data === 'object' ? detail.data as Record<string, unknown> : {}; return { ...group, member_count: count(value.member_count) > 0 ? count(value.member_count) : group.member_count, avatar: text(value.avatar) || group.avatar, topics: arrayFrom(value.topics) } } catch { return group } }))
+      const enriched = await Promise.all(groups.map(async group => { try { const detail = await request<unknown>(`/groups/${encodeURIComponent(String(group.id))}`, {}, { authenticate: false }); const value = detail?.data && typeof detail.data === 'object' ? detail.data as Record<string, unknown> : {}; const memberCount = count(value.member_count); return { ...group, member_count: memberCount !== null ? memberCount : group.member_count, topic_count: count(value.topic_count ?? value.topics_count), avatar: text(value.avatar) || group.avatar, topics: arrayFrom(value.topics) } } catch { return group } }))
       setFollowedGroups(enriched)
     } catch { setFollowedGroups([]) } finally { setFollowedLoading(false) }
   }, [currentUsername, request])

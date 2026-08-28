@@ -194,5 +194,11 @@ export const groupAPI = {
   },
   getDetail(id, config = {}) {
     return api.get(`/groups/${id}`, config)
+  },
+  postTopic(groupId, body, config = {}) {
+    return api.post(`/groups/${groupId}/topic`, body, config)
+  },
+  postReply(topicId, body, config = {}) {
+    return api.post(`/groups/topic/${topicId}/reply`, body, config)
   }
 }

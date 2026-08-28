@@ -12,6 +12,7 @@ import { createCache } from '../utils/cache.js'
 import { fetchHTML, fixUrl } from '../utils/http.js'
 import { edgeCacheGet, edgeCachePut } from '../utils/edgeCache.js'
 import { CACHE_TTL_DOUBAN } from '../config.js'
+import { parsePositiveId } from '../utils/validation.js'
 
 const app = new Hono()
 
@@ -184,7 +185,8 @@ app.get('/by-name', async c => {
 
 app.get('/:id', async c => {
   try {
-    const subjectId = c.req.param('id')
+    const subjectId = parsePositiveId(c.req.param('id'))
+    if (subjectId === null) return c.json({ error: 'ID 不合法' }, 400)
     const cn = isChina(c)
     const detail = await bangumiService.getAnimeDetail(subjectId, { isChina: cn })
     if (!detail) return c.json({ data: null })
@@ -211,7 +213,8 @@ app.get('/:id', async c => {
 
 app.get('/:id/details', async c => {
   try {
-    const subjectId = c.req.param('id')
+    const subjectId = parsePositiveId(c.req.param('id'))
+    if (subjectId === null) return c.json({ error: 'ID 不合法' }, 400)
     const cn = isChina(c)
     const cacheKey = `douban_details_${subjectId}_${cn}`
     const cached = cache.get(cacheKey)
@@ -245,8 +248,8 @@ app.get('/:id/details', async c => {
 
 app.get('/:id/comments', async c => {
   try {
-    const id = c.req.param('id')
-    if (!id) return c.json({ error: '缺少ID' }, 400)
+    const id = parsePositiveId(c.req.param('id'))
+    if (id === null) return c.json({ error: 'ID 不合法' }, 400)
     const comments = await getDoubanComments(id)
     return c.json({ data: comments })
   } catch {
@@ -256,8 +259,8 @@ app.get('/:id/comments', async c => {
 
 app.get('/:id/reviews', async c => {
   try {
-    const id = c.req.param('id')
-    if (!id) return c.json({ error: '缺少ID' }, 400)
+    const id = parsePositiveId(c.req.param('id'))
+    if (id === null) return c.json({ error: 'ID 不合法' }, 400)
     const reviews = await getDoubanReviews(id)
     return c.json({ data: reviews })
   } catch {
@@ -275,9 +278,11 @@ app.get('/:id/reviews', async c => {
  */
 app.get('/:id/summary', async c => {
   try {
-    const id = c.req.param('id')
-    if (!id) return c.json({ error: '缺少ID' }, 400)
-    const summary = await getDoubanSummary(id)
+    const id = parsePositiveId(c.req.param('id'))
+    if (id === null) return c.json({ error: 'ID 不合法' }, 400)
+    // Keep the service contract string-based while validating the route value
+    // as a safe positive integer at the HTTP boundary.
+    const summary = await getDoubanSummary(String(id))
     return c.json({ data: summary })
   } catch {
     return c.json({ data: null })
@@ -380,8 +385,8 @@ async function getDoubanFallbackCached(id) {
  * @returns {Response} Content-Type 为 text/html; charset=utf-8 的 HTML 片段。
  */
 app.get('/page/:id', async c => {
-  const id = c.req.param('id')
-  if (!id) return c.json({ data: null, error: '缺少ID', code: 400 }, 400)
+  const id = parsePositiveId(c.req.param('id'))
+  if (id === null) return c.json({ data: null, error: 'ID 不合法', code: 400 }, 400)
 
   const cacheKey = `douban_page_${id}`
   const cached = pageCache.get(cacheKey)

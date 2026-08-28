@@ -4,9 +4,9 @@
  * 通过 mock bangumi.js 的 getClient 验证：
  * 1. 首次验证调用 /v0/me 且 username 匹配 → true
  * 2. username 不匹配 → false（拒绝）
- * 3. 上游异常 → fail-open 返回 true
+ * 3. 上游异常 → fail-closed 返回 false
  * 4. 缓存命中：10 分钟 TTL 内不重复调用 /v0/me
- * 5. 缺少 token/username → false（不发请求）
+ * 5. 不同 token 不共享缓存；缺少 token/username → false（不发请求）
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -55,20 +55,20 @@ describe('verifyBangumiUsername', () => {
     expect(ok).toBe(false)
   })
 
-  it('上游异常 → fail-open 返回 true（避免上游抖动误伤）', async () => {
+  it('上游异常 → fail-closed 返回 false（避免身份验证失效时放行）', async () => {
     mockGet.mockRejectedValueOnce(new Error('HTTP 500'))
 
     const ok = await verifyBangumiUsername('token', 'user1')
-    expect(ok).toBe(true)
+    expect(ok).toBe(false)
   })
 
-  it('TTL 缓存命中：同一 username 只验证一次', async () => {
+  it('TTL 缓存命中：同一 token 与 username 只验证一次，不同 token 重新验证', async () => {
     mockGet.mockResolvedValue({ id: 1, username: 'acgpzh', nickname: '' })
 
     await verifyBangumiUsername('token', 'acgpzh')
     await verifyBangumiUsername('token', 'acgpzh')
     await verifyBangumiUsername('token2', 'acgpzh')
 
-    expect(mockGet).toHaveBeenCalledTimes(1)
+    expect(mockGet).toHaveBeenCalledTimes(2)
   })
 })

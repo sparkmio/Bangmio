@@ -224,12 +224,12 @@ describe('GET /page/:id', () => {
     fetchHTML.mockResolvedValue(sampleDoubanHTML)
 
     // 第一次请求：缓存未命中，应触发 fetchHTML
-    const res1 = await app.request('/page/cache-hit-id', { method: 'GET' })
+    const res1 = await app.request('/page/123456', { method: 'GET' })
     expect(res1.status).toBe(200)
     expect(fetchHTML).toHaveBeenCalledTimes(1)
 
     // 第二次请求：缓存命中，不应再调 fetchHTML
-    const res2 = await app.request('/page/cache-hit-id', { method: 'GET' })
+    const res2 = await app.request('/page/123456', { method: 'GET' })
     expect(res2.status).toBe(200)
 
     const html2 = await res2.text()
@@ -241,10 +241,10 @@ describe('GET /page/:id', () => {
   it('不同 id 不共享缓存', async () => {
     fetchHTML.mockResolvedValue(sampleDoubanHTML)
 
-    await app.request('/page/different-id-A', { method: 'GET' })
+    await app.request('/page/123457', { method: 'GET' })
     expect(fetchHTML).toHaveBeenCalledTimes(1)
 
-    await app.request('/page/different-id-B', { method: 'GET' })
+    await app.request('/page/123458', { method: 'GET' })
     expect(fetchHTML).toHaveBeenCalledTimes(2)
   })
 })

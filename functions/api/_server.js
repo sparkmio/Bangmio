@@ -1745,15 +1745,15 @@ var getPattern = (label, next) => {
   }
   const match2 = label.match(/^\:([^\{\}]+)(?:\{(.+)\})?$/);
   if (match2) {
-    const cacheKey = `${label}#${next}`;
-    if (!patternCache[cacheKey]) {
+    const cacheKey2 = `${label}#${next}`;
+    if (!patternCache[cacheKey2]) {
       if (match2[2]) {
-        patternCache[cacheKey] = next && next[0] !== ":" && next[0] !== "*" ? [cacheKey, match2[1], new RegExp(`^${match2[2]}(?=/${next})`)] : [label, match2[1], new RegExp(`^${match2[2]}$`)];
+        patternCache[cacheKey2] = next && next[0] !== ":" && next[0] !== "*" ? [cacheKey2, match2[1], new RegExp(`^${match2[2]}(?=/${next})`)] : [label, match2[1], new RegExp(`^${match2[2]}$`)];
       } else {
-        patternCache[cacheKey] = [label, match2[1], true];
+        patternCache[cacheKey2] = [label, match2[1], true];
       }
     }
-    return patternCache[cacheKey];
+    return patternCache[cacheKey2];
   }
   return null;
 };
@@ -2756,14 +2756,14 @@ var Hono = class _Hono {
    * app.route("/api", app2) // GET /api/user
    * ```
    */
-  route(path, app14) {
+  route(path, app15) {
     const subApp = this.basePath(path);
-    app14.routes.map((r) => {
+    app15.routes.map((r) => {
       let handler4;
-      if (app14.errorHandler === errorHandler) {
+      if (app15.errorHandler === errorHandler) {
         handler4 = r.handler;
       } else {
-        handler4 = async (c, next) => (await compose([], app14.errorHandler)(c, () => r.handler(c, next))).res;
+        handler4 = async (c, next) => (await compose([], app15.errorHandler)(c, () => r.handler(c, next))).res;
         handler4[COMPOSED_HANDLER] = r.handler;
       }
       subApp.#addRoute(r.method, r.path, handler4, r.basePath);
@@ -4435,9 +4435,29 @@ async function exchangeBangumiOAuthCode({
   throw lastError || Object.assign(new Error("Bangumi OAuth endpoint unavailable"), { code: "network_error" });
 }
 
+// server/src/utils/validation.js
+function parsePositiveId(value) {
+  const text = String(value ?? "").trim();
+  if (!/^\d+$/.test(text)) return null;
+  const id = Number(text);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+function parseBoundedInteger(value, { min, max, fallback }) {
+  if (value === void 0 || value === null || value === "") return fallback;
+  const text = String(value).trim();
+  if (!/^-?\d+$/.test(text)) return null;
+  const number = Number(text);
+  return Number.isInteger(number) && number >= min && number <= max ? number : null;
+}
+
 // server/src/services/bangumi.js
 var BGM_API = "https://api.bgm.tv";
 var BGM_PROXY = "https://api.bangumi.pro";
+function requiredId(value) {
+  const id = parsePositiveId(value);
+  if (id === null) throw new TypeError("ID must be a positive integer");
+  return id;
+}
 function rewriteImageUrls(data) {
   if (typeof data === "string") return data.replace(/lain\.bgm\.tv/g, "lain.bangumi.pro");
   if (Array.isArray(data)) return data.map(rewriteImageUrls);
@@ -4532,20 +4552,25 @@ function getClient(token, isChina7 = false) {
   };
 }
 async function getAnimeDetail(id, opts) {
-  return bgmGet(`/v0/subjects/${id}`, null, null, opts?.isChina);
+  const subjectId = requiredId(id);
+  return bgmGet(`/v0/subjects/${subjectId}`, null, null, opts?.isChina);
 }
 async function getAnimeEpisodes(id, { offset = 0, limit = 100, isChina: isChina7 } = {}) {
-  const d = await bgmGet("/v0/episodes", null, { subject_id: id, offset, limit }, isChina7);
+  const subjectId = requiredId(id);
+  const d = await bgmGet("/v0/episodes", null, { subject_id: subjectId, offset, limit }, isChina7);
   return { data: d.data || [], total: d.total || 0 };
 }
 async function getAnimeCharacters(id, opts) {
-  return bgmGet(`/v0/subjects/${id}/characters`, null, null, opts?.isChina);
+  const subjectId = requiredId(id);
+  return bgmGet(`/v0/subjects/${subjectId}/characters`, null, null, opts?.isChina);
 }
 async function getAnimeRelations(id, opts) {
-  return bgmGet(`/v0/subjects/${id}/subjects`, null, null, opts?.isChina);
+  const subjectId = requiredId(id);
+  return bgmGet(`/v0/subjects/${subjectId}/subjects`, null, null, opts?.isChina);
 }
 async function getAnimePersons(id, opts) {
-  return bgmGet(`/v0/subjects/${id}/persons`, null, null, opts?.isChina);
+  const subjectId = requiredId(id);
+  return bgmGet(`/v0/subjects/${subjectId}/persons`, null, null, opts?.isChina);
 }
 async function getAnimeCalendar(opts) {
   return bgmGet("/calendar", null, null, opts?.isChina);
@@ -4575,19 +4600,24 @@ async function getAnimeTags() {
   ];
 }
 async function getCharacterDetail(id, opts) {
-  return bgmGet(`/v0/characters/${id}`, null, null, opts?.isChina);
+  const characterId = requiredId(id);
+  return bgmGet(`/v0/characters/${characterId}`, null, null, opts?.isChina);
 }
 async function getCharacterSubjects(id, opts) {
-  return bgmGet(`/v0/characters/${id}/subjects`, null, null, opts?.isChina);
+  const characterId = requiredId(id);
+  return bgmGet(`/v0/characters/${characterId}/subjects`, null, null, opts?.isChina);
 }
 async function getCharacterPersons(id, opts) {
-  return bgmGet(`/v0/characters/${id}/persons`, null, null, opts?.isChina);
+  const characterId = requiredId(id);
+  return bgmGet(`/v0/characters/${characterId}/persons`, null, null, opts?.isChina);
 }
 async function getPersonDetail(id, opts) {
-  return bgmGet(`/v0/persons/${id}`, null, null, opts?.isChina);
+  const personId = requiredId(id);
+  return bgmGet(`/v0/persons/${personId}`, null, null, opts?.isChina);
 }
 async function getPersonSubjects(id, opts) {
-  return bgmGet(`/v0/persons/${id}/subjects`, null, null, opts?.isChina);
+  const personId = requiredId(id);
+  return bgmGet(`/v0/persons/${personId}/subjects`, null, null, opts?.isChina);
 }
 
 // server/src/services/auth.js
@@ -5599,6 +5629,9 @@ function oauthCookieOptions(c, overrides = {}) {
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+function userPathSegment(username) {
+  return encodeURIComponent(String(username || ""));
+}
 var TIMELINE_TYPE_MAP = {
   collection: "\u6536\u85CF",
   wish: "\u60F3\u770B",
@@ -5722,13 +5755,37 @@ app2.get("/me", async (c) => {
     return c.json({ error: "\u767B\u5F55\u8FC7\u671F" }, 401);
   }
 });
+app2.get("/:username/collections", async (c) => {
+  try {
+    const username = c.req.param("username");
+    if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
+    const offset = parseBoundedInteger(c.req.query("offset"), {
+      min: 0,
+      max: 1e7,
+      fallback: 0
+    });
+    const limit = parseBoundedInteger(c.req.query("limit"), { min: 1, max: 100, fallback: 30 });
+    if (offset === null || limit === null) return c.json({ error: "\u6536\u85CF\u5217\u8868\u53C2\u6570\u4E0D\u5408\u6CD5" }, 400);
+    const client = getClient("", isChina2(c));
+    const data = await client.get("/v0/users/" + userPathSegment(username) + "/collections", {
+      offset,
+      limit
+    });
+    return c.json({ data: data.data || [], total: data.total || 0 });
+  } catch (err) {
+    const r = upstreamError(err.response?.status, err.response?.data, "\u83B7\u53D6\u7528\u6237\u6536\u85CF\u5931\u8D25");
+    return c.json({ error: r.error }, r.code);
+  }
+});
 app2.get("/:username/characters", async (c) => {
   try {
     const username = c.req.param("username");
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
     const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
     const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
-    const data = await client.get(`/v0/users/${username}/characters`, { limit: 10 });
+    const data = await client.get(`/v0/users/${userPathSegment(username)}/characters`, {
+      limit: 10
+    });
     return c.json({ data: data.data || [] });
   } catch {
     return c.json({ data: [] });
@@ -5740,7 +5797,7 @@ app2.get("/:username/persons", async (c) => {
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
     const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
     const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
-    const data = await client.get(`/v0/users/${username}/persons`, { limit: 10 });
+    const data = await client.get(`/v0/users/${userPathSegment(username)}/persons`, { limit: 10 });
     return c.json({ data: data.data || [] });
   } catch {
     return c.json({ data: [] });
@@ -5752,7 +5809,7 @@ app2.get("/:username/indexes", async (c) => {
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
     const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
     const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
-    const data = await client.get(`/v0/users/${username}/indexes`);
+    const data = await client.get(`/v0/users/${userPathSegment(username)}/indexes`);
     return c.json({ data: data.data || [] });
   } catch {
     return c.json({ data: [] });
@@ -5763,7 +5820,7 @@ app2.get("/:username/friends", async (c) => {
     const username = c.req.param("username");
     if (!username) return c.json({ data: [] });
     const base = oauthBase2(c);
-    const html = await fetchHTML(`${base}/user/${username}/friends`);
+    const html = await fetchHTML(`${base}/user/${userPathSegment(username)}/friends`);
     if (!html) return c.json({ data: [] });
     const friends = [];
     const seen = /* @__PURE__ */ new Set();
@@ -5794,8 +5851,8 @@ app2.get("/:username/groups", async (c) => {
     const username = c.req.param("username");
     if (!username) return c.json({ data: [] });
     const base = oauthBase2(c);
-    let html = await fetchHTML(`${base}/user/${username}/groups`);
-    if (!html) html = await fetchHTML(`${base}/user/${username}/group`);
+    let html = await fetchHTML(`${base}/user/${userPathSegment(username)}/groups`);
+    if (!html) html = await fetchHTML(`${base}/user/${userPathSegment(username)}/group`);
     if (!html) return c.json({ data: [] });
     let scope = html;
     const blockMatch = html.match(/<ul[^>]*id="memberGroupList"[^>]*>[\s\S]*?<\/ul>/i) || html.match(/id="group"[\s\S]*?<ul[\s\S]*?<\/ul>/i) || html.match(/class="[^"]*groups[^"]*"[\s\S]*?<ul[\s\S]*?<\/ul>/i) || html.match(/<h2[^>]*>小组[\s\S]*?<ul[\s\S]*?<\/ul>/i);
@@ -5813,7 +5870,7 @@ app2.get("/:username/groups", async (c) => {
       const idx = m.index;
       const context = scope.slice(Math.max(0, idx - 250), Math.min(scope.length, idx + 500));
       const memberMatch = context.match(/([0-9][0-9,]*)\s*位?\s*成员/i) || context.match(/<span class="group_member">([0-9][0-9,]*).*?<\/span>/i) || context.match(/<span class="l">([0-9][0-9,]*).*?<\/span>/i) || context.match(/<strong>([0-9][0-9,]*)<\/strong>/i);
-      const member_count = memberMatch ? parseNumber(memberMatch[1]) : 0;
+      const member_count = memberMatch ? parseNumber(memberMatch[1]) : null;
       const avatarMatch = context.match(/<img[^>]*src="([^"]+)"[^>]*>/i);
       const avatar = avatarMatch ? fixUrl(avatarMatch[1], base) : "";
       groups.push({ id, name, avatar, member_count });
@@ -5829,7 +5886,7 @@ app2.get("/:username/timeline", async (c) => {
     const username = c.req.param("username");
     if (!username) return c.json({ data: [] });
     const base = oauthBase2(c);
-    const html = await fetchHTML(`${base}/user/${username}/timeline`);
+    const html = await fetchHTML(`${base}/user/${userPathSegment(username)}/timeline`);
     if (!html) return c.json({ data: [] });
     const items = [];
     const chunks = html.split(/(?=<li[^>]*class="[^"]*tml-item)|(?=<div[^>]*class="[^"]*tml-item)/i);
@@ -5861,7 +5918,7 @@ app2.get("/:username/stats-yearly", async (c) => {
     const username = c.req.param("username");
     if (!username) return c.json({ data: [] });
     const base = oauthBase2(c);
-    const html = await fetchHTML(`${base}/user/${username}`);
+    const html = await fetchHTML(`${base}/user/${userPathSegment(username)}`);
     if (!html) return c.json({ data: [] });
     const stats = [];
     const seenYears = /* @__PURE__ */ new Set();
@@ -5971,7 +6028,7 @@ app2.get("/:username", async (c) => {
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
     const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
     const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
-    const user = await client.get(`/v0/users/${username}`);
+    const user = await client.get(`/v0/users/${userPathSegment(username)}`);
     return c.json({ data: user });
   } catch {
     return c.json({ data: null });
@@ -5980,6 +6037,10 @@ app2.get("/:username", async (c) => {
 var user_default = app2;
 
 // server/src/controllers/animeController.js
+function requiredId2(c) {
+  const id = parsePositiveId(c.req.param("id"));
+  return id;
+}
 function isChina3(c) {
   return (c.env?.CF_IP_COUNTRY || "") === "CN";
 }
@@ -6016,43 +6077,52 @@ async function browseAnime2(c) {
   }
 }
 async function getAnimeDetail2(c) {
+  const id = requiredId2(c);
+  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
   try {
-    const detail = await getAnimeDetail(c.req.param("id"), { isChina: isChina3(c) });
+    const detail = await getAnimeDetail(id, { isChina: isChina3(c) });
     return c.json({ data: detail });
   } catch {
     return c.json({ error: "\u83B7\u53D6\u8BE6\u60C5\u5931\u8D25" }, 500);
   }
 }
 async function getAnimeEpisodes2(c) {
+  const id = requiredId2(c);
+  const offset = parseBoundedInteger(c.req.query("offset"), { min: 0, max: 1e6, fallback: 0 });
+  const limit = parseBoundedInteger(c.req.query("limit"), { min: 1, max: 100, fallback: 100 });
+  if (id === null || offset === null || limit === null) return c.json({ error: "\u53C2\u6570\u4E0D\u5408\u6CD5" }, 400);
   try {
-    const data = await getAnimeEpisodes(c.req.param("id"), {
-      ...c.req.query(),
-      isChina: isChina3(c)
-    });
+    const data = await getAnimeEpisodes(id, { offset, limit, isChina: isChina3(c) });
     return c.json({ data: data.data, total: data.total });
   } catch {
     return c.json({ error: "\u83B7\u53D6\u7AE0\u8282\u5931\u8D25" }, 500);
   }
 }
 async function getAnimeCharacters2(c) {
+  const id = requiredId2(c);
+  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
   try {
-    const data = await getAnimeCharacters(c.req.param("id"), { isChina: isChina3(c) });
+    const data = await getAnimeCharacters(id, { isChina: isChina3(c) });
     return c.json({ data });
   } catch {
     return c.json({ error: "\u83B7\u53D6\u89D2\u8272\u5931\u8D25" }, 500);
   }
 }
 async function getAnimePersons2(c) {
+  const id = requiredId2(c);
+  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
   try {
-    const data = await getAnimePersons(c.req.param("id"), { isChina: isChina3(c) });
+    const data = await getAnimePersons(id, { isChina: isChina3(c) });
     return c.json({ data });
   } catch {
     return c.json({ error: "\u83B7\u53D6\u5236\u4F5C\u4EBA\u5458\u5931\u8D25" }, 500);
   }
 }
 async function getAnimeRelations2(c) {
+  const id = requiredId2(c);
+  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
   try {
-    const data = await getAnimeRelations(c.req.param("id"), { isChina: isChina3(c) });
+    const data = await getAnimeRelations(id, { isChina: isChina3(c) });
     return c.json({ data });
   } catch {
     return c.json({ error: "\u83B7\u53D6\u5173\u8054\u6761\u76EE\u5931\u8D25" }, 500);
@@ -6075,16 +6145,20 @@ async function getAnimeTags2(c) {
   }
 }
 async function getCharacterDetail2(c) {
+  const id = requiredId2(c);
+  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
   try {
-    const data = await getCharacterDetail(c.req.param("id"), { isChina: isChina3(c) });
+    const data = await getCharacterDetail(id, { isChina: isChina3(c) });
     return c.json({ data });
   } catch {
     return c.json({ error: "\u83B7\u53D6\u89D2\u8272\u8BE6\u60C5\u5931\u8D25" }, 500);
   }
 }
 async function getCharacterSubjects2(c) {
+  const id = requiredId2(c);
+  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
   try {
-    const data = await getCharacterSubjects(c.req.param("id"), {
+    const data = await getCharacterSubjects(id, {
       isChina: isChina3(c)
     });
     return c.json({ data });
@@ -6093,8 +6167,10 @@ async function getCharacterSubjects2(c) {
   }
 }
 async function getCharacterPersons2(c) {
+  const id = requiredId2(c);
+  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
   try {
-    const data = await getCharacterPersons(c.req.param("id"), {
+    const data = await getCharacterPersons(id, {
       isChina: isChina3(c)
     });
     return c.json({ data });
@@ -6103,16 +6179,20 @@ async function getCharacterPersons2(c) {
   }
 }
 async function getPersonDetail2(c) {
+  const id = requiredId2(c);
+  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
   try {
-    const data = await getPersonDetail(c.req.param("id"), { isChina: isChina3(c) });
+    const data = await getPersonDetail(id, { isChina: isChina3(c) });
     return c.json({ data });
   } catch {
     return c.json({ error: "\u83B7\u53D6\u4EBA\u7269\u8BE6\u60C5\u5931\u8D25" }, 500);
   }
 }
 async function getPersonSubjects2(c) {
+  const id = requiredId2(c);
+  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
   try {
-    const data = await getPersonSubjects(c.req.param("id"), { isChina: isChina3(c) });
+    const data = await getPersonSubjects(id, { isChina: isChina3(c) });
     return c.json({ data });
   } catch {
     return c.json({ error: "\u83B7\u53D6\u4EBA\u7269\u4F5C\u54C1\u5931\u8D25" }, 500);
@@ -6139,24 +6219,33 @@ var anime_default = app3;
 
 // server/src/services/userVerify.js
 var verifiedStore = /* @__PURE__ */ new Map();
+async function cacheKey(token, username, isChina7) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  return [bufferToHex(digest), username, isChina7 ? "CN" : "global"].join(":");
+}
 var USERNAME_VERIFY_TTL = 10 * 60 * 1e3;
 async function verifyBangumiUsername(token, username, isChina7 = false) {
   if (!token || !username) return false;
   const now = Date.now();
-  const expiresAt = verifiedStore.get(username);
+  const key2 = await cacheKey(token, username, isChina7);
+  const expiresAt = verifiedStore.get(key2);
   if (expiresAt && expiresAt > now) return true;
   try {
     const client = getClient(token, isChina7);
     const me = await client.get("/v0/me");
     const match2 = me && (me.username === username || me.nickname === username || String(me.id) === username);
     if (match2) {
-      verifiedStore.set(username, now + USERNAME_VERIFY_TTL);
+      verifiedStore.set(key2, now + USERNAME_VERIFY_TTL);
       return true;
     }
     logError("Bangumi \u76F4\u767B username \u4E0E token \u4E0D\u5339\u914D", { username });
     return false;
-  } catch {
-    return true;
+  } catch (error) {
+    logError("Bangumi \u76F4\u767B\u8EAB\u4EFD\u9A8C\u8BC1\u5931\u8D25", {
+      username,
+      reason: error instanceof Error ? error.message : "unknown"
+    });
+    return false;
   }
 }
 
@@ -6172,7 +6261,10 @@ function extractUsername(c) {
   return c.req.header("X-Bangumi-Username") || "";
 }
 var COLLECTION_STATUS = /* @__PURE__ */ new Set([1, 2, 3, 4, 5]);
-function parseBoundedInteger(value, { min, max, fallback = null }) {
+function userPathSegment2(username) {
+  return encodeURIComponent(String(username || ""));
+}
+function parseBoundedInteger2(value, { min, max, fallback = null }) {
   if (value === void 0 || value === null || value === "") return fallback;
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed < min || max !== void 0 && parsed > max)
@@ -6180,7 +6272,7 @@ function parseBoundedInteger(value, { min, max, fallback = null }) {
   return parsed;
 }
 function parseAnimeId(value) {
-  return parseBoundedInteger(value, { min: 1, max: Number.MAX_SAFE_INTEGER });
+  return parseBoundedInteger2(value, { min: 1, max: Number.MAX_SAFE_INTEGER });
 }
 async function guardUsername(c, token, username) {
   const ok = await verifyBangumiUsername(token, username, isChina4(c));
@@ -6196,23 +6288,23 @@ app4.get("/list", async (c) => {
     const guard = await guardUsername(c, token, username);
     if (guard) return guard;
     const client = getClient(token, isChina4(c));
-    const offset = parseBoundedInteger(c.req.query("offset"), {
+    const offset = parseBoundedInteger2(c.req.query("offset"), {
       min: 0,
       max: 1e7,
       fallback: 0
     });
-    const limit = parseBoundedInteger(c.req.query("limit"), { min: 1, max: 100, fallback: 30 });
+    const limit = parseBoundedInteger2(c.req.query("limit"), { min: 1, max: 100, fallback: 30 });
     const subjectTypeRaw = c.req.query("subject_type");
     const typeRaw = c.req.query("type");
-    const subjectType = subjectTypeRaw === void 0 ? void 0 : parseBoundedInteger(subjectTypeRaw, { min: 1, max: 7 });
-    const type = typeRaw === void 0 ? void 0 : parseBoundedInteger(typeRaw, { min: 1, max: 5 });
+    const subjectType = subjectTypeRaw === void 0 ? void 0 : parseBoundedInteger2(subjectTypeRaw, { min: 1, max: 7 });
+    const type = typeRaw === void 0 ? void 0 : parseBoundedInteger2(typeRaw, { min: 1, max: 5 });
     if (offset === null || limit === null || subjectType === null || type === null) {
       return c.json({ error: "\u6536\u85CF\u5217\u8868\u53C2\u6570\u4E0D\u5408\u6CD5" }, 400);
     }
     const params = { offset, limit };
     if (subjectType !== void 0) params.subject_type = subjectType;
     if (type !== void 0) params.type = type;
-    const data = await client.get(`/v0/users/${username}/collections`, params);
+    const data = await client.get(`/v0/users/${userPathSegment2(username)}/collections`, params);
     return c.json({ data: data.data || [], total: data.total || 0 });
   } catch (err) {
     const r = upstreamError(err.response?.status, err.response?.data, "\u83B7\u53D6\u6536\u85CF\u5217\u8868\u5931\u8D25");
@@ -6228,7 +6320,10 @@ app4.get("/stats", async (c) => {
     const guard = await guardUsername(c, token, username);
     if (guard) return guard;
     const client = getClient(token, isChina4(c));
-    const fetchTotal = (type) => client.get(`/v0/users/${username}/collections`, { type, limit: 1 }).then((r) => r.total).catch(() => 0);
+    const fetchTotal = (type) => client.get(`/v0/users/${userPathSegment2(username)}/collections`, { type, limit: 1 }).then((r) => {
+      const total2 = Number(r?.total);
+      return Number.isSafeInteger(total2) && total2 >= 0 ? total2 : null;
+    }).catch(() => null);
     const [wish, collect, doing, on_hold, dropped] = await Promise.all([
       fetchTotal(1),
       fetchTotal(2),
@@ -6236,15 +6331,10 @@ app4.get("/stats", async (c) => {
       fetchTotal(4),
       fetchTotal(5)
     ]);
+    const values = [wish, collect, doing, on_hold, dropped];
+    const total = values.every((value) => value !== null) ? values.reduce((sum, value) => sum + value, 0) : null;
     return c.json({
-      data: {
-        want: wish,
-        completed: collect,
-        watching: doing,
-        on_hold,
-        dropped,
-        total: wish + collect + doing + on_hold + dropped
-      }
+      data: { want: wish, completed: collect, watching: doing, on_hold, dropped, total }
     });
   } catch (err) {
     const r = upstreamError(err.response?.status, err.response?.data, "\u83B7\u53D6\u7EDF\u8BA1\u5931\u8D25");
@@ -6262,7 +6352,9 @@ app4.get("/:animeId", async (c) => {
     const animeId = parseAnimeId(c.req.param("animeId"));
     if (animeId === null) return c.json({ error: "\u756A\u5267 ID \u4E0D\u5408\u6CD5" }, 400);
     const client = getClient(token, isChina4(c));
-    const collection = await client.get(`/v0/users/${username}/collections/${animeId}`);
+    const collection = await client.get(
+      `/v0/users/${userPathSegment2(username)}/collections/${animeId}`
+    );
     return c.json({
       data: {
         anime_id: collection.subject_id,
@@ -6298,14 +6390,14 @@ app4.post("/:animeId", async (c) => {
     }
     const payload = {};
     if (body.status !== void 0) {
-      const status = parseBoundedInteger(body.status, { min: 1, max: 5 });
+      const status = parseBoundedInteger2(body.status, { min: 1, max: 5 });
       if (status === null || !COLLECTION_STATUS.has(status)) {
         return c.json({ error: "\u6536\u85CF\u72B6\u6001\u4E0D\u5408\u6CD5" }, 400);
       }
       payload.type = status;
     }
     if (body.rating !== void 0) {
-      const rating = parseBoundedInteger(body.rating, { min: 0, max: 10 });
+      const rating = parseBoundedInteger2(body.rating, { min: 0, max: 10 });
       if (rating === null) return c.json({ error: "\u8BC4\u5206\u5FC5\u987B\u662F 0 \u5230 10 \u7684\u6574\u6570" }, 400);
       payload.rate = rating;
     }
@@ -6317,7 +6409,9 @@ app4.post("/:animeId", async (c) => {
     if (!payload.type) {
       if (username) {
         try {
-          const current = await client.get(`/v0/users/${username}/collections/${animeId}`);
+          const current = await client.get(
+            `/v0/users/${userPathSegment2(username)}/collections/${animeId}`
+          );
           if (current?.type) {
             payload.type = current.type;
           } else {
@@ -6336,7 +6430,9 @@ app4.post("/:animeId", async (c) => {
     await client.post(`/v0/users/-/collections/${animeId}`, payload);
     if (username) {
       try {
-        const collection = await client.get(`/v0/users/${username}/collections/${animeId}`);
+        const collection = await client.get(
+          `/v0/users/${userPathSegment2(username)}/collections/${animeId}`
+        );
         return c.json({
           data: {
             anime_id: collection.subject_id,
@@ -16984,21 +17080,56 @@ var BGM_PROXY2 = "https://bangumi.pro";
 function getBase(isChina7) {
   return isChina7 ? BGM_PROXY2 : BGM_TV;
 }
-function parseUserLink(el) {
-  const link = el.querySelector('strong > a[href^="/user/"], strong.userName > a[href^="/user/"]');
-  const avatarEl = el.querySelector(".avatarNeue");
-  const avatarStyle = avatarEl ? avatarEl.getAttribute("style") || "" : "";
-  const avatarMatch = avatarStyle.match(/url\(['"]?([^'"()]+)['"]?\)/);
-  let avatar = "";
-  if (avatarMatch) {
-    avatar = avatarMatch[1].startsWith("//") ? "https:" + avatarMatch[1] : avatarMatch[1];
-    avatar = avatar.replace("lain.bgm.tv", "lain.bangumi.pro");
+function absoluteAvatar(raw2) {
+  const value = String(raw2 || "").trim();
+  if (!value) return "";
+  const normalized = value.startsWith("//") ? `https:${value}` : value;
+  return normalized.replace("lain.bgm.tv", "lain.bangumi.pro");
+}
+function contentText(element) {
+  if (!element) return "";
+  const clone = element.cloneNode(true);
+  for (const block of clone.querySelectorAll?.(
+    "p, div, section, article, li, blockquote, pre, h1, h2, h3, h4, h5, h6"
+  ) || []) {
+    block.before("\n");
+    block.after("\n");
   }
-  return {
-    username: link ? link.textContent.trim() : "",
-    url: link ? link.getAttribute("href") || "" : "",
-    avatar
-  };
+  for (const br of clone.querySelectorAll?.("br") || []) br.replaceWith("\n");
+  for (const anchor of clone.querySelectorAll?.("a[href]") || []) {
+    const label = String(anchor.textContent || "").trim();
+    const rawHref = anchor.getAttribute("href") || "";
+    const href = rawHref.startsWith("/") ? `https://bgm.tv${rawHref}` : rawHref.startsWith("//") ? `https:${rawHref}` : rawHref;
+    if (/^https?:\/\//i.test(href) && label && !label.includes(href) && !label.includes(rawHref)) {
+      anchor.replaceWith(`[${label}](${href})`);
+    }
+  }
+  return String(clone.textContent || "").replace(/\r\n?/g, "\n").split("\n").map((line) => line.replace(/[ \t]+/g, " ").trim()).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+function parseUserLink(el) {
+  const links = Array.from(el?.querySelectorAll?.("a[href]") || []).filter(
+    (item) => /\/user\/[^/?#]+/i.test(item.getAttribute("href") || "")
+  );
+  const link = links.find((item) => String(item.textContent || "").trim()) || links[0];
+  const href = link?.getAttribute("href") || "";
+  let username = href.match(/\/user\/([^/?#]+)/)?.[1] || "";
+  try {
+    username = decodeURIComponent(username);
+  } catch {
+  }
+  const nickname = String(link?.textContent || "").trim();
+  const avatarElements = Array.from(
+    el?.querySelectorAll?.('.avatarNeue, .avatar, [style*="background-image"], img[src]') || []
+  );
+  const image = avatarElements.find(
+    (item) => item.tagName?.toLowerCase() === "img" && item.getAttribute("src")
+  );
+  const styled = avatarElements.find((item) => /url\(/i.test(item.getAttribute?.("style") || ""));
+  const styleMatch = String(styled?.getAttribute?.("style") || "").match(
+    /url\(['"]?([^'"()]+)['"]?\)/i
+  );
+  const avatar = absoluteAvatar(image?.getAttribute("src") || styleMatch?.[1]);
+  return { username: username || nickname, nickname: nickname || username, url: href, avatar };
 }
 function parseSubReplies($doc, el) {
   const replies = [];
@@ -17010,7 +17141,7 @@ function parseSubReplies($doc, el) {
     const timestamp = actionText.replace(/#[\d-]+[\s-]*/, "").trim();
     const user = parseUserLink(subEl);
     const contentEl = subEl.querySelector(".cmt_sub_content");
-    const content = contentEl ? contentEl.textContent.trim() : "";
+    const content = contentText(contentEl);
     if (user.username && content) {
       replies.push({
         id: subEl.id?.replace("post_", "") || String(j),
@@ -17034,7 +17165,7 @@ function parseTalkbox(html) {
     const timestamp = actionText.replace(/#\S+\s*-?\s*/, "").trim();
     const user = parseUserLink(el);
     const contentEl = el.querySelector(".inner .message, .inner .reply_content .message");
-    const content = contentEl ? contentEl.textContent.trim() : "";
+    const content = contentText(contentEl);
     const replies = parseSubReplies(document, el);
     if (user.username && content) {
       comments.push({
@@ -17054,30 +17185,18 @@ function parseSubjectTalkbox(html) {
   const comments = [];
   const items = document.querySelectorAll("#comment_box > .item");
   items.forEach((el, i) => {
-    const userLink = el.querySelector('a.l[href^="/user/"]');
-    if (!userLink) return;
-    const avatarEl = el.querySelector(".avatarNeue");
-    const avatarStyle = avatarEl ? avatarEl.getAttribute("style") || "" : "";
-    const avatarMatch = avatarStyle.match(/url\(['"]?([^'"()]+)['"]?\)/);
-    let avatar = "";
-    if (avatarMatch) {
-      avatar = avatarMatch[1].startsWith("//") ? "https:" + avatarMatch[1] : avatarMatch[1];
-      avatar = avatar.replace("lain.bgm.tv", "lain.bangumi.pro");
-    }
+    const user = parseUserLink(el);
+    if (!user.username) return;
     const starEl = el.querySelector(".starlight");
     const starClass = starEl ? starEl.getAttribute("class") || "" : "";
     const starMatch = starClass.match(/stars(\d+)/);
     const timeEls = el.querySelectorAll("small.grey");
     const timestamp = timeEls.length ? timeEls[timeEls.length - 1].textContent.trim().replace(/^@\s*/, "") : "";
     const contentEl = el.querySelector("p.comment");
-    const content = contentEl ? contentEl.textContent.trim() : "(\u65E0\u6587\u5B57\u8BC4\u4EF7)";
+    const content = contentText(contentEl) || "(\u65E0\u6587\u5B57\u8BC4\u4EF7)";
     comments.push({
       id: String(i),
-      user: {
-        username: userLink.textContent.trim(),
-        url: userLink.getAttribute("href") || "",
-        avatar
-      },
+      user,
       rating: starMatch ? parseInt(starMatch[1]) : 0,
       content,
       timestamp
@@ -17116,7 +17235,7 @@ function parseTopicPage(html) {
   const $op = document.querySelector(".postTopic");
   const op = {
     user: $op ? parseUserLink($op) : { username: "", url: "", avatar: "" },
-    content: $op ? ($op.querySelector(".topic_content") || { textContent: "" }).textContent.trim() : "",
+    content: $op ? contentText($op.querySelector(".topic_content")) : "",
     timestamp: $op ? ($op.querySelector(".post_actions .action small") || { textContent: "" }).textContent.replace(/#\d+\s*-?\s*/, "").trim() : "",
     title: (document.querySelector("h1.nameSingle a, .headerNeueInner h1, title") || { textContent: "" }).textContent.trim()
   };
@@ -17129,7 +17248,7 @@ function parseTopicPage(html) {
     const timestamp = actionText.replace(/#\S+\s*-?\s*/, "").trim();
     const user = parseUserLink(el);
     const contentEl = el.querySelector(".message");
-    const content = contentEl ? contentEl.textContent.trim() : "";
+    const content = contentText(contentEl);
     if (user.username && content) {
       replies.push({
         id: el.id?.replace("post_", "") || String(i),
@@ -17148,11 +17267,13 @@ app5.get("/test", async (c) => {
 });
 app5.get("/character/:id", async (c) => {
   try {
+    const id = parsePositiveId(c.req.param("id"));
+    if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const key2 = `char_${c.req.param("id")}_${isChina7}`;
+    const key2 = `char_${id}_${isChina7}`;
     const cached = cache.get(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina7)}/character/${c.req.param("id")}`);
+    const html = await fetchHTML(`${getBase(isChina7)}/character/${id}`);
     const comments = parseTalkbox(html);
     cache.set(key2, comments);
     return c.json({ data: comments });
@@ -17162,11 +17283,13 @@ app5.get("/character/:id", async (c) => {
 });
 app5.get("/subject/:id", async (c) => {
   try {
+    const id = parsePositiveId(c.req.param("id"));
+    if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const key2 = `subj_${c.req.param("id")}_${isChina7}`;
+    const key2 = `subj_${id}_${isChina7}`;
     const cached = cache.get(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina7)}/subject/${c.req.param("id")}`);
+    const html = await fetchHTML(`${getBase(isChina7)}/subject/${id}`);
     const comments = parseSubjectTalkbox(html);
     cache.set(key2, comments);
     return c.json({ data: comments });
@@ -17176,11 +17299,13 @@ app5.get("/subject/:id", async (c) => {
 });
 app5.get("/subject/:id/topics", async (c) => {
   try {
+    const id = parsePositiveId(c.req.param("id"));
+    if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const key2 = `topics_${c.req.param("id")}_${isChina7}`;
+    const key2 = `topics_${id}_${isChina7}`;
     const cached = cache.get(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina7)}/subject/${c.req.param("id")}/board`);
+    const html = await fetchHTML(`${getBase(isChina7)}/subject/${id}/board`);
     const topics = parseTopics(html);
     cache.set(key2, topics);
     return c.json({ data: topics });
@@ -17190,11 +17315,13 @@ app5.get("/subject/:id/topics", async (c) => {
 });
 app5.get("/topic/:topicId", async (c) => {
   try {
+    const topicId = parsePositiveId(c.req.param("topicId"));
+    if (topicId === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const key2 = `topic_${c.req.param("topicId")}_${isChina7}`;
+    const key2 = `topic_${topicId}_${isChina7}`;
     const cached = cache.get(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina7)}/subject/topic/${c.req.param("topicId")}`);
+    const html = await fetchHTML(`${getBase(isChina7)}/subject/topic/${topicId}`);
     const topic = parseTopicPage(html);
     cache.set(key2, topic);
     return c.json({ data: topic });
@@ -17204,11 +17331,13 @@ app5.get("/topic/:topicId", async (c) => {
 });
 app5.get("/person/:id", async (c) => {
   try {
+    const id = parsePositiveId(c.req.param("id"));
+    if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const key2 = `person_${c.req.param("id")}_${isChina7}`;
+    const key2 = `person_${id}_${isChina7}`;
     const cached = cache.get(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina7)}/person/${c.req.param("id")}`);
+    const html = await fetchHTML(`${getBase(isChina7)}/person/${id}`);
     const comments = parseTalkbox(html);
     cache.set(key2, comments);
     return c.json({ data: comments });
@@ -17217,23 +17346,61 @@ app5.get("/person/:id", async (c) => {
   }
 });
 function extractFormhash(html) {
-  const m = html.match(/name="formhash"\s+value="([^"]+)"/i);
-  return m ? m[1] : null;
+  const inputs = String(html || "").match(/<input\b[^>]*>/gi) || [];
+  for (const input of inputs) {
+    const name = input.match(/\bname\s*=\s*(["'])formhash\1/i);
+    const value = input.match(/\bvalue\s*=\s*(["'])(.*?)\1/i)?.[2];
+    if (name && value) return value;
+  }
+  return null;
 }
 function extractChiiAuth(token) {
   return `chii_auth=${token}; chii_cookietime=2592000`;
 }
+function commentSubmissionAccepted(response, body, location) {
+  const status = Number(response?.status || 0);
+  const redirect = String(location || "");
+  if (status >= 300 && status < 400) {
+    return Boolean(redirect) && !/(?:login|signin|auth|captcha)/i.test(redirect);
+  }
+  if (!response?.ok) return false;
+  if (/(?:登录失败|登陆失败|验证码|权限不足|禁止发言|请先登录|formhash.{0,30}(?:错误|无效|过期)|发送失败|提交失败|错误\s*[:：])/i.test(
+    String(body || "")
+  ))
+    return false;
+  return /(?:发表成功|发布成功|提交成功|发送成功|回复成功|操作成功|已发布|已成功)/i.test(
+    String(body || "")
+  );
+}
+async function acceptCommentSubmission(response) {
+  const body = await response.text().catch(() => "");
+  const location = response.headers.get("location") || "";
+  if (!commentSubmissionAccepted(response, body, location))
+    throw new Error("\u53D1\u9001\u5931\u8D25\uFF0C\u8BF7\u786E\u8BA4\u767B\u5F55\u72B6\u6001\u548C\u5185\u5BB9\u540E\u91CD\u8BD5");
+}
+async function readSubmissionFields(c, { title = false } = {}) {
+  const body = await c.req.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) return { error: "\u8BF7\u6C42\u5185\u5BB9\u4E0D\u5408\u6CD5" };
+  const content = typeof body.content === "string" ? body.content.trim() : "";
+  if (!content) return { error: "\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A" };
+  if (content.length > MAX_CONTENT_LENGTH) return { error: "\u5185\u5BB9\u8FC7\u957F" };
+  if (!title) return { fields: { content } };
+  const subject = typeof body.title === "string" ? body.title.trim() : "";
+  if (!subject) return { error: "\u6807\u9898\u4E0D\u80FD\u4E3A\u7A7A" };
+  if (subject.length > MAX_TITLE_LENGTH) return { error: "\u6807\u9898\u8FC7\u957F" };
+  return { fields: { title: subject, content } };
+}
 app5.post("/subject/:id/comment", async (c) => {
   try {
+    const subjectId = parsePositiveId(c.req.param("id"));
+    if (subjectId === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const base = getBase(isChina7);
     const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
-    const { content } = await c.req.json();
-    if (!content) return c.json({ error: "\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A" }, 400);
-    if (content.length > MAX_CONTENT_LENGTH)
-      return c.json({ data: null, error: "\u5185\u5BB9\u8FC7\u957F", code: 400 }, 400);
-    const subjectId = c.req.param("id");
+    const submission = await readSubmissionFields(c);
+    if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400);
+    const { content } = submission.fields;
     const pageHtml = await fetchHTML(`${base}/subject/${subjectId}/comments`, {
       headers: { Authorization: `Bearer ${token}`, Cookie: `chii_auth=${token}` }
     });
@@ -17255,24 +17422,23 @@ app5.post("/subject/:id/comment", async (c) => {
       body: params.toString(),
       redirect: "manual"
     });
-    if (res.status >= 300 && res.status < 400) return c.json({ success: true });
-    if (res.ok) return c.json({ success: true });
-    return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 400);
+    await acceptCommentSubmission(res);
+    return c.json({ success: true });
   } catch {
     return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 500);
   }
 });
 app5.post("/topic/:topicId/reply", async (c) => {
   try {
+    const topicId = parsePositiveId(c.req.param("topicId"));
+    if (topicId === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const base = getBase(isChina7);
     const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
-    const { content } = await c.req.json();
-    if (!content) return c.json({ error: "\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A" }, 400);
-    if (content.length > MAX_CONTENT_LENGTH)
-      return c.json({ data: null, error: "\u5185\u5BB9\u8FC7\u957F", code: 400 }, 400);
-    const topicId = c.req.param("topicId");
+    const submission = await readSubmissionFields(c);
+    if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400);
+    const { content } = submission.fields;
     const pageHtml = await fetchHTML(`${base}/subject/topic/${topicId}`, {
       headers: { Authorization: `Bearer ${token}`, Cookie: `chii_auth=${token}` }
     });
@@ -17294,24 +17460,23 @@ app5.post("/topic/:topicId/reply", async (c) => {
       body: params.toString(),
       redirect: "manual"
     });
-    if (res.status >= 300 && res.status < 400) return c.json({ success: true });
-    if (res.ok) return c.json({ success: true });
-    return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 400);
+    await acceptCommentSubmission(res);
+    return c.json({ success: true });
   } catch {
     return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 500);
   }
 });
 app5.post("/subject/:id/talkbox", async (c) => {
   try {
+    const subjectId = parsePositiveId(c.req.param("id"));
+    if (subjectId === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const base = getBase(isChina7);
     const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
-    const { content } = await c.req.json();
-    if (!content) return c.json({ error: "\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A" }, 400);
-    if (content.length > MAX_CONTENT_LENGTH)
-      return c.json({ data: null, error: "\u5185\u5BB9\u8FC7\u957F", code: 400 }, 400);
-    const subjectId = c.req.param("id");
+    const submission = await readSubmissionFields(c);
+    if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400);
+    const { content } = submission.fields;
     const pageHtml = await fetchHTML(`${base}/subject/${subjectId}/talkbox`, {
       headers: { Authorization: `Bearer ${token}`, Cookie: `chii_auth=${token}` }
     });
@@ -17333,24 +17498,23 @@ app5.post("/subject/:id/talkbox", async (c) => {
       body: params.toString(),
       redirect: "manual"
     });
-    if (res.status >= 300 && res.status < 400) return c.json({ success: true });
-    if (res.ok) return c.json({ success: true });
-    return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 400);
+    await acceptCommentSubmission(res);
+    return c.json({ success: true });
   } catch {
     return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 500);
   }
 });
 app5.post("/person/:id/talkbox", async (c) => {
   try {
+    const personId = parsePositiveId(c.req.param("id"));
+    if (personId === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const base = getBase(isChina7);
     const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
-    const { content } = await c.req.json();
-    if (!content) return c.json({ error: "\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A" }, 400);
-    if (content.length > MAX_CONTENT_LENGTH)
-      return c.json({ data: null, error: "\u5185\u5BB9\u8FC7\u957F", code: 400 }, 400);
-    const personId = c.req.param("id");
+    const submission = await readSubmissionFields(c);
+    if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400);
+    const { content } = submission.fields;
     const pageHtml = await fetchHTML(`${base}/person/${personId}/talkbox`, {
       headers: { Authorization: `Bearer ${token}`, Cookie: `chii_auth=${token}` }
     });
@@ -17371,27 +17535,23 @@ app5.post("/person/:id/talkbox", async (c) => {
       body: params.toString(),
       redirect: "manual"
     });
-    if (res.status >= 300 && res.status < 400) return c.json({ success: true });
-    if (res.ok) return c.json({ success: true });
-    return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 400);
+    await acceptCommentSubmission(res);
+    return c.json({ success: true });
   } catch {
     return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 500);
   }
 });
 app5.post("/subject/:id/topic", async (c) => {
   try {
+    const subjectId = parsePositiveId(c.req.param("id"));
+    if (subjectId === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const base = getBase(isChina7);
     const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
-    const { title, content } = await c.req.json();
-    if (!title) return c.json({ error: "\u6807\u9898\u4E0D\u80FD\u4E3A\u7A7A" }, 400);
-    if (!content) return c.json({ error: "\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A" }, 400);
-    if (title.length > MAX_TITLE_LENGTH)
-      return c.json({ data: null, error: "\u6807\u9898\u8FC7\u957F", code: 400 }, 400);
-    if (content.length > MAX_CONTENT_LENGTH)
-      return c.json({ data: null, error: "\u5185\u5BB9\u8FC7\u957F", code: 400 }, 400);
-    const subjectId = c.req.param("id");
+    const submission = await readSubmissionFields(c, { title: true });
+    if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400);
+    const { title, content } = submission.fields;
     const pageHtml = await fetchHTML(`${base}/subject/${subjectId}/board`, {
       headers: { Authorization: `Bearer ${token}`, Cookie: `chii_auth=${token}` }
     });
@@ -17414,9 +17574,8 @@ app5.post("/subject/:id/topic", async (c) => {
       body: params.toString(),
       redirect: "manual"
     });
-    if (res.status >= 300 && res.status < 400) return c.json({ success: true });
-    if (res.ok) return c.json({ success: true });
-    return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 400);
+    await acceptCommentSubmission(res);
+    return c.json({ success: true });
   } catch {
     return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 500);
   }
@@ -17692,13 +17851,13 @@ app6.get("/by-name", async (c) => {
   try {
     const name = c.req.query("name");
     if (!name) return c.json({ data: null });
-    const cacheKey = `douban_name_${name}`;
-    const cached = cache2.get(cacheKey);
+    const cacheKey2 = `douban_name_${name}`;
+    const cached = cache2.get(cacheKey2);
     if (cached) return c.json({ data: cached });
     const suggestions = await searchDouban(name);
     const match2 = suggestions?.[0];
     if (!match2) {
-      cache2.set(cacheKey, null);
+      cache2.set(cacheKey2, null);
       return c.json({ data: null });
     }
     const abstract = await getDoubanAbstract(match2.id);
@@ -17713,7 +17872,7 @@ app6.get("/by-name", async (c) => {
       short_comment: abstract?.short_comment || null,
       url: `https://movie.douban.com/subject/${match2.id}`
     };
-    cache2.set(cacheKey, data);
+    cache2.set(cacheKey2, data);
     return c.json({ data });
   } catch {
     return c.json({ data: null });
@@ -17721,7 +17880,8 @@ app6.get("/by-name", async (c) => {
 });
 app6.get("/:id", async (c) => {
   try {
-    const subjectId = c.req.param("id");
+    const subjectId = parsePositiveId(c.req.param("id"));
+    if (subjectId === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const cn = isChina5(c);
     const detail = await getAnimeDetail(subjectId, { isChina: cn });
     if (!detail) return c.json({ data: null });
@@ -17747,10 +17907,11 @@ app6.get("/:id", async (c) => {
 });
 app6.get("/:id/details", async (c) => {
   try {
-    const subjectId = c.req.param("id");
+    const subjectId = parsePositiveId(c.req.param("id"));
+    if (subjectId === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const cn = isChina5(c);
-    const cacheKey = `douban_details_${subjectId}_${cn}`;
-    const cached = cache2.get(cacheKey);
+    const cacheKey2 = `douban_details_${subjectId}_${cn}`;
+    const cached = cache2.get(cacheKey2);
     if (cached) return c.json({ data: cached });
     const detail = await getAnimeDetail(subjectId, { isChina: cn });
     if (!detail) return c.json({ data: null });
@@ -17768,7 +17929,7 @@ app6.get("/:id/details", async (c) => {
       short_comment: abstract?.short_comment || null,
       url: `https://movie.douban.com/subject/${match2.id}`
     };
-    cache2.set(cacheKey, data);
+    cache2.set(cacheKey2, data);
     return c.json({ data });
   } catch {
     return c.json({ data: null });
@@ -17776,8 +17937,8 @@ app6.get("/:id/details", async (c) => {
 });
 app6.get("/:id/comments", async (c) => {
   try {
-    const id = c.req.param("id");
-    if (!id) return c.json({ error: "\u7F3A\u5C11ID" }, 400);
+    const id = parsePositiveId(c.req.param("id"));
+    if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const comments = await getDoubanComments(id);
     return c.json({ data: comments });
   } catch {
@@ -17786,8 +17947,8 @@ app6.get("/:id/comments", async (c) => {
 });
 app6.get("/:id/reviews", async (c) => {
   try {
-    const id = c.req.param("id");
-    if (!id) return c.json({ error: "\u7F3A\u5C11ID" }, 400);
+    const id = parsePositiveId(c.req.param("id"));
+    if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const reviews = await getDoubanReviews(id);
     return c.json({ data: reviews });
   } catch {
@@ -17796,9 +17957,9 @@ app6.get("/:id/reviews", async (c) => {
 });
 app6.get("/:id/summary", async (c) => {
   try {
-    const id = c.req.param("id");
-    if (!id) return c.json({ error: "\u7F3A\u5C11ID" }, 400);
-    const summary = await getDoubanSummary(id);
+    const id = parsePositiveId(c.req.param("id"));
+    if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
+    const summary = await getDoubanSummary(String(id));
     return c.json({ data: summary });
   } catch {
     return c.json({ data: null });
@@ -17865,17 +18026,17 @@ async function getDoubanFallbackCached(id) {
   return html;
 }
 app6.get("/page/:id", async (c) => {
-  const id = c.req.param("id");
-  if (!id) return c.json({ data: null, error: "\u7F3A\u5C11ID", code: 400 }, 400);
-  const cacheKey = `douban_page_${id}`;
-  const cached = pageCache.get(cacheKey);
+  const id = parsePositiveId(c.req.param("id"));
+  if (id === null) return c.json({ data: null, error: "ID \u4E0D\u5408\u6CD5", code: 400 }, 400);
+  const cacheKey2 = `douban_page_${id}`;
+  const cached = pageCache.get(cacheKey2);
   if (cached) {
     return c.html(cached, 200, { "Content-Type": "text/html; charset=utf-8" });
   }
   const respondHtml = (html) => c.html(html, 200, { "Content-Type": "text/html; charset=utf-8" });
   const edgeClean = await edgeCacheGet(`douban/page/${id}`);
   if (edgeClean) {
-    pageCache.set(cacheKey, edgeClean);
+    pageCache.set(cacheKey2, edgeClean);
     return respondHtml(edgeClean);
   }
   const url = `https://movie.douban.com/subject/${id}/`;
@@ -17898,7 +18059,7 @@ app6.get("/page/:id", async (c) => {
       const fallback = await getDoubanFallbackCached(id);
       return respondHtml(fallback);
     }
-    pageCache.set(cacheKey, fragment);
+    pageCache.set(cacheKey2, fragment);
     await edgeCachePut(`douban/page/${id}`, fragment, 600);
     return respondHtml(fragment);
   } catch {
@@ -17963,11 +18124,11 @@ app7.get("/by-name", async (c) => {
   try {
     const name = c.req.query("name");
     if (!name) return c.json({ data: null });
-    const cacheKey = `bilibili_name_${name}`;
-    const cached = cache3.get(cacheKey);
+    const cacheKey2 = `bilibili_name_${name}`;
+    const cached = cache3.get(cacheKey2);
     if (cached) return c.json({ data: cached });
     const match2 = await searchBilibiliBangumi(name);
-    cache3.set(cacheKey, match2 || null);
+    cache3.set(cacheKey2, match2 || null);
     return c.json({ data: match2 || null });
   } catch {
     return c.json({ data: null });
@@ -17975,15 +18136,16 @@ app7.get("/by-name", async (c) => {
 });
 app7.get("/:id", async (c) => {
   try {
-    const subjectId = c.req.param("id");
+    const subjectId = parsePositiveId(c.req.param("id"));
+    if (subjectId === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const cn = isChina6(c);
-    const cacheKey = `bilibili_${subjectId}_${cn}`;
-    const cached = cache3.get(cacheKey);
+    const cacheKey2 = `bilibili_${subjectId}_${cn}`;
+    const cached = cache3.get(cacheKey2);
     if (cached) return c.json({ data: cached });
     const detail = await getAnimeDetail(subjectId, { isChina: cn });
     if (!detail) return c.json({ data: null });
     const match2 = await findBilibiliMatch(detail);
-    cache3.set(cacheKey, match2 || null);
+    cache3.set(cacheKey2, match2 || null);
     return c.json({ data: match2 || null });
   } catch {
     return c.json({ data: null });
@@ -18218,15 +18380,15 @@ app8.get("/search", async (c) => {
   try {
     const q = c.req.query("q");
     if (!q) return c.json({ data: { results: [] } });
-    const cacheKey = `moesearch_${q}`;
-    const cached = cache4.get(cacheKey);
+    const cacheKey2 = `moesearch_${q}`;
+    const cached = cache4.get(cacheKey2);
     if (cached) return c.json({ data: cached });
     const apiBase = getMoegirlApi();
     const params = `action=opensearch&search=${encodeURIComponent(q)}&limit=5&format=json`;
     const json = await fetchMoegirlJSON(apiBase, params);
     let results = parseSearchResults(json);
     const data = { results, page: null };
-    cache4.set(cacheKey, data);
+    cache4.set(cacheKey2, data);
     return c.json({ data });
   } catch {
     return c.json({ data: { results: [] } });
@@ -18283,15 +18445,15 @@ app8.get("/page/:name", async (c) => {
     name = rawName;
   }
   if (!name) return c.json({ data: null, error: "\u7F3A\u5C11\u9875\u9762\u540D", code: 400 }, 400);
-  const cacheKey = `moegirl_page_${name}`;
-  const cached = cache4.get(cacheKey);
+  const cacheKey2 = `moegirl_page_${name}`;
+  const cached = cache4.get(cacheKey2);
   if (cached) {
     return c.html(cached, 200, { "Content-Type": "text/html; charset=utf-8" });
   }
   const respondHtml = (html) => c.html(html, 200, { "Content-Type": "text/html; charset=utf-8" });
   const edgeCached = await edgeCacheGet(`moegirl/page/${name}`);
   if (edgeCached) {
-    cache4.set(cacheKey, edgeCached);
+    cache4.set(cacheKey2, edgeCached);
     return respondHtml(edgeCached);
   }
   const encoded = encodeURIComponent(name);
@@ -18313,7 +18475,7 @@ app8.get("/page/:name", async (c) => {
     if (!isMoegirlBlockPage(html)) {
       const fragment = cleanMoegirlPage(html, base);
       if (fragment && fragment.trim().length >= 100) {
-        cache4.set(cacheKey, fragment);
+        cache4.set(cacheKey2, fragment);
         await edgeCachePut(`moegirl/page/${name}`, fragment, 3600);
         return respondHtml(fragment);
       }
@@ -18417,8 +18579,8 @@ async function wikipediaApi(params) {
 app9.get("/search", async (c) => {
   const q = String(c.req.query("q") || "").trim();
   if (!q) return c.json({ data: { results: [] }, code: 200 });
-  const cacheKey = `wikipedia_search_${q}`;
-  const cached = cache5.get(cacheKey);
+  const cacheKey2 = `wikipedia_search_${q}`;
+  const cached = cache5.get(cacheKey2);
   if (cached) return c.json({ data: cached, code: 200 });
   try {
     const data = await wikipediaApi({
@@ -18434,7 +18596,7 @@ app9.get("/search", async (c) => {
       url: articleUrl(item.title)
     }));
     const payload = { results };
-    cache5.set(cacheKey, payload);
+    cache5.set(cacheKey2, payload);
     return c.json({ data: payload, code: 200 });
   } catch {
     return c.json({ data: { results: [] }, code: 200 });
@@ -18450,8 +18612,8 @@ app9.get("/summary/:title", async (c) => {
   }
   title = String(title || "").trim();
   if (!title) return c.json({ data: null, error: "\u7F3A\u5C11\u9875\u9762\u540D", code: 400 }, 400);
-  const cacheKey = `wikipedia_summary_${title}`;
-  const cached = cache5.get(cacheKey);
+  const cacheKey2 = `wikipedia_summary_${title}`;
+  const cached = cache5.get(cacheKey2);
   if (cached) return c.json({ data: cached, code: 200 });
   try {
     const data = await wikipediaApi({
@@ -18470,7 +18632,7 @@ app9.get("/summary/:title", async (c) => {
       extract: String(page.extract || "").trim(),
       url: articleUrl(page.title || title)
     };
-    cache5.set(cacheKey, payload);
+    cache5.set(cacheKey2, payload);
     return c.json({ data: payload, code: 200 });
   } catch {
     return c.json({ data: null, code: 200 });
@@ -18487,8 +18649,8 @@ app9.get("/page/:title", async (c) => {
   title = String(title || "").trim();
   if (!title)
     return c.html(fallbackPage("\u7EF4\u57FA\u767E\u79D1"), 400, { "Content-Type": "text/html; charset=utf-8" });
-  const cacheKey = `wikipedia_page_${title}`;
-  const cached = cache5.get(cacheKey);
+  const cacheKey2 = `wikipedia_page_${title}`;
+  const cached = cache5.get(cacheKey2);
   if (cached) return c.html(cached, 200, { "Content-Type": "text/html; charset=utf-8" });
   try {
     const data = await wikipediaApi({
@@ -18501,7 +18663,7 @@ app9.get("/page/:title", async (c) => {
     const fragment = cleanWikipediaPage(data?.parse?.text || "");
     if (!fragment.trim()) throw new Error("empty Wikipedia page");
     const html = wrapDocument3(fragment, stripTags(data?.parse?.displaytitle || title));
-    cache5.set(cacheKey, html);
+    cache5.set(cacheKey2, html);
     return c.html(html, 200, { "Content-Type": "text/html; charset=utf-8" });
   } catch {
     return c.html(fallbackPage(title), 200, { "Content-Type": "text/html; charset=utf-8" });
@@ -18597,6 +18759,135 @@ function groupIdFromHref(href) {
 function collapseText(str) {
   return repairMojibake(String(str || "")).replace(/\s+/g, " ").trim();
 }
+var GENERIC_PROFILE_NAMES = /* @__PURE__ */ new Set([
+  "\u793E\u533A\u6210\u5458",
+  "\u793E\u533A\u7528\u6237",
+  "\u7528\u6237",
+  "\u533F\u540D\u7528\u6237",
+  "\u533F\u540D",
+  "unknown",
+  "user"
+]);
+function isGenericProfileName(value) {
+  return GENERIC_PROFILE_NAMES.has(collapseText(value).toLocaleLowerCase());
+}
+function contentText2(element, base = HOSTS.main) {
+  if (!element) return "";
+  const clone = element.cloneNode(true);
+  for (const block of clone.querySelectorAll?.(
+    "p, div, section, article, li, blockquote, pre, h1, h2, h3, h4, h5, h6"
+  ) || []) {
+    block.before("\n");
+    block.after("\n");
+  }
+  for (const br of clone.querySelectorAll?.("br") || []) br.replaceWith("\n");
+  for (const anchor of clone.querySelectorAll?.("a[href]") || []) {
+    const label = collapseText(anchor.textContent);
+    const rawHref = anchor.getAttribute("href") || "";
+    let href = "";
+    try {
+      const resolved = new URL(rawHref, base);
+      if (resolved.protocol === "http:" || resolved.protocol === "https:") href = resolved.href;
+    } catch {
+    }
+    if (href && label && !label.includes(href)) anchor.replaceWith("[" + label + "](" + href + ")");
+  }
+  return repairMojibake(String(clone.textContent || "")).replace(/\r\n?/g, "\n").split("\n").map((line) => line.replace(/[ \t]+/g, " ").trim()).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+function safeAbsoluteUrl(rawHref, base) {
+  try {
+    const resolved = new URL(String(rawHref || ""), base);
+    return resolved.protocol === "http:" || resolved.protocol === "https:" ? resolved.href : "";
+  } catch {
+    return "";
+  }
+}
+function profileFrom(container, base) {
+  const anchors = Array.from(container?.querySelectorAll?.('a[href*="/user/"]') || []);
+  const candidates = anchors.map((anchor, index) => {
+    const href2 = anchor.getAttribute("href") || "";
+    let username2 = href2.match(/\/user\/([^/?#]+)/)?.[1] || "";
+    try {
+      username2 = decodeURIComponent(username2);
+    } catch {
+    }
+    return { anchor, href: href2, username: username2, label: collapseText(anchor.textContent || ""), index };
+  });
+  const named = candidates.filter((candidate) => candidate.label || candidate.username).sort((left, right) => {
+    const score = (candidate) => (candidate.label && !isGenericProfileName(candidate.label) ? 8 : 0) + (candidate.username && !isGenericProfileName(candidate.username) ? 5 : 0);
+    return score(right) - score(left) || left.index - right.index;
+  })[0] || candidates[0];
+  const href = named?.href || "";
+  const username = named?.username || named?.label || collapseText(container?.getAttribute?.("data-item-user") || "");
+  const avatarElements = Array.from(
+    container?.querySelectorAll?.('.avatarNeue, .avatar, [style*="background-image"], img[src]') || []
+  );
+  const avatarEl = avatarElements.find(
+    (element) => element.tagName?.toLowerCase() === "img" && element.getAttribute("src")
+  ) || avatarElements.find((element) => /url\(/i.test(element.getAttribute?.("style") || ""));
+  const style = avatarEl?.getAttribute?.("style") || "";
+  const styleMatch = style.match(/url\(['"]?([^'"()]+)['"]?\)/);
+  const rawAvatar = avatarEl?.tagName?.toLowerCase() === "img" ? avatarEl.getAttribute("src") : styleMatch?.[1];
+  const avatar = rawAvatar ? fixUrl(rawAvatar, base) : "";
+  const rawLabel = named?.label || "";
+  const nickname = rawLabel && !isGenericProfileName(rawLabel) ? rawLabel : !isGenericProfileName(username) ? username : rawLabel || username;
+  return { username, nickname, avatar, url: href ? fixUrl(href, base) : "" };
+}
+function formhashFrom(html) {
+  const inputs = String(html || "").match(/<input\b[^>]*>/gi) || [];
+  for (const input of inputs) {
+    const name = input.match(/\bname\s*=\s*["']formhash["']/i);
+    const value = input.match(/\bvalue\s*=\s*["']([^"']+)["']/i)?.[1];
+    if (name && value) return value;
+  }
+  return null;
+}
+function chiiCookie(token) {
+  return "chii_auth=" + token + "; chii_cookietime=2592000";
+}
+async function submitGroupForm({ base, path, submitPath = path, token, fields }) {
+  const pageHtml = await fetchHTML(base + path, {
+    headers: { Authorization: "Bearer " + token, Cookie: "chii_auth=" + token }
+  });
+  const formhash = formhashFrom(pageHtml);
+  if (!formhash) throw new Error("\u65E0\u6CD5\u83B7\u53D6\u8868\u5355 token\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55");
+  const params = new URLSearchParams({ formhash, ...fields, submit: "submit" });
+  const response = await fetch(base + submitPath, {
+    method: "POST",
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      "Content-Type": "application/x-www-form-urlencoded",
+      Cookie: chiiCookie(token),
+      Referer: base + path
+    },
+    body: params.toString(),
+    redirect: "manual"
+  });
+  const body = await response.text().catch(() => "");
+  const location = response.headers.get("location") || "";
+  if (!groupSubmissionAccepted(response, body, location))
+    throw new Error("\u53D1\u9001\u5931\u8D25\uFF0C\u8BF7\u786E\u8BA4\u767B\u5F55\u72B6\u6001\u548C\u5185\u5BB9\u540E\u91CD\u8BD5");
+  return true;
+}
+function groupReplySubmissionPath(topicId) {
+  return "/group/topic/" + encodeURIComponent(String(topicId)) + "/new_reply";
+}
+function submissionFailure(body) {
+  return /(?:登录失败|登陆失败|验证码|权限不足|禁止发言|请先登录|formhash.{0,30}(?:错误|无效|过期)|发送失败|提交失败|错误\s*[:：])/i.test(
+    String(body || "")
+  );
+}
+function groupSubmissionAccepted(response, body, location) {
+  const status = Number(response?.status || 0);
+  const redirect = String(location || "");
+  if (status >= 300 && status < 400) {
+    return Boolean(redirect) && !/(?:login|signin|auth|captcha)/i.test(redirect) && /\/group(?:\/topic)?\//i.test(redirect);
+  }
+  if (!response?.ok || submissionFailure(body)) return false;
+  return /(?:发表成功|发布成功|提交成功|发送成功|回复成功|话题成功|操作成功|已发布|已成功)/i.test(
+    String(body || "")
+  );
+}
 function parseGroupListHTML(html, base) {
   const groups = [];
   const seen = /* @__PURE__ */ new Set();
@@ -18610,7 +18901,7 @@ function parseGroupListHTML(html, base) {
     if (id === "discover" || id === "all" || id === "category") continue;
     const name = collapseText(anchor.textContent);
     if (!name || /^\d+$/.test(name)) continue;
-    let member_count = 0;
+    let member_count = null;
     let containerText = anchor.parentElement?.textContent || "";
     if (!containerText) {
       let sib = anchor.nextElementSibling;
@@ -18659,7 +18950,7 @@ function parseGroupDetailHTML(html, id, base) {
     const el = firstByClassSubstring(document, pattern);
     const text = el ? collapseText(el.textContent) : "";
     if (text) {
-      description = collapseText(el.textContent);
+      description = contentText2(el, base);
       break;
     }
   }
@@ -18702,17 +18993,14 @@ function parseGroupDetailHTML(html, id, base) {
       if (!title) continue;
       const row = anchor.closest("tr") || anchor.parentElement;
       const rowText = row?.textContent || "";
-      let author = "";
-      const userLink = row?.querySelector('a[href*="/user/"]');
-      if (userLink) {
-        author = collapseText(userLink.textContent);
-      }
-      let reply_count = 0;
+      const profile = profileFrom(row, base);
+      const author = profile.nickname;
+      let reply_count = null;
       const postsEl = row?.querySelector('td.posts, [class*="posts"]');
-      if (postsEl) {
+      if (postsEl && /\d/.test(postsEl.textContent || "")) {
         reply_count = parseNumber(postsEl.textContent);
       }
-      if (!reply_count) {
+      if (reply_count === null) {
         const replyMatch = rowText.match(/\((\d+)\s*(?:回复|reply|条)/i) || rowText.match(/(\d+)\s*(?:回复|reply)/i);
         if (replyMatch) reply_count = parseNumber(replyMatch[1]);
       }
@@ -18724,15 +19012,37 @@ function parseGroupDetailHTML(html, id, base) {
           last_reply_time = timeText;
         }
       }
-      topics.push({ id: topicId, title, author, reply_count, last_reply_time });
+      topics.push({
+        id: topicId,
+        title,
+        author,
+        username: profile.username,
+        nickname: profile.nickname,
+        avatar: profile.avatar,
+        creator: profile,
+        user: profile,
+        reply_count,
+        last_reply_time
+      });
       if (topics.length >= 20) break;
     }
   }
+  const topicCountCandidates = [
+    ...Array.from(document.querySelectorAll("[data-topic-count], [data-topics-count]")).map(
+      (el) => el.getAttribute("data-topic-count") || el.getAttribute("data-topics-count") || ""
+    ),
+    ...Array.from(document.querySelectorAll("[class]")).filter((el) => /topic[_-]?count/i.test(el.getAttribute("class") || "")).map((el) => el.textContent || ""),
+    document.body?.textContent || ""
+  ];
+  const topicCountText = topicCountCandidates.find((text) => /(?:话题|topics?)/i.test(text)) || "";
+  const topicCountMatch = topicCountText.match(/([0-9][0-9,]*)\s*(?:个?话题|topics?)/i) || topicCountText.match(/(?:话题|topics?)\s*[:：]?\s*([0-9][0-9,]*)/i);
+  const topic_count = topicCountMatch ? parseNumber(topicCountMatch[1]) : null;
   return {
     id,
     name: finalName,
     description,
     member_count,
+    topic_count,
     avatar,
     topics,
     url: `${base}/group/${id}`
@@ -18772,29 +19082,26 @@ function parseMemberCount(document) {
     const context = collapseText(el.parentElement?.textContent || "");
     if (/(?:成员|members?|subscribers?)/i.test(context)) return parseNumber(value);
   }
-  return 0;
+  return null;
 }
 function parseGroupTopicHTML(html, id, base) {
   const { document } = parseHTML(html);
   const titleEl = document.querySelector("h1, h2.topic_title, .topic_title, .topicTitle");
   const title = collapseText(titleEl?.textContent || "") || "\u8BDD\u9898 #" + id;
   const isGroupAnchor = (anchor) => {
-    const href = anchor.getAttribute("href") || "";
+    const href = safeAbsoluteUrl(anchor.getAttribute("href") || "", base);
     return /(?:^|\/)group\/[^/?#]+/.test(href) && !/\/group\/topic\//.test(href);
   };
   const groupAnchor = Array.from(titleEl?.querySelectorAll("a[href]") || []).find(isGroupAnchor) || Array.from(document.querySelectorAll("a[href]")).find(isGroupAnchor);
   const authorLinks = Array.from(document.querySelectorAll('a[href*="/user/"]'));
   const rows = [];
   const seen = /* @__PURE__ */ new Set();
-  const authorFrom = (container) => {
-    const anchors = Array.from(container.querySelectorAll('a[href*="/user/"]'));
-    const namedAnchor = anchors.find((anchor) => collapseText(anchor.textContent));
-    return collapseText(namedAnchor?.textContent || "") || container.getAttribute("data-item-user") || "";
-  };
+  const authorFrom = (container) => profileFrom(container, base);
   const appendRow = (container, fallbackFloor) => {
-    const author = authorFrom(container);
+    const profile = authorFrom(container);
+    const author = profile.nickname || container.getAttribute("data-item-user") || "";
     const contentEl = container.querySelector(".topic_content > .message") || container.querySelector(".reply_content > .message") || container.querySelector(".topic_content") || container.querySelector(".reply_content") || container.querySelector(".cmt_sub_content, .sub_reply_content, .message, .content, p");
-    const content = collapseText(contentEl?.textContent || "");
+    const content = contentText2(contentEl, base);
     if (!author || !content) return false;
     const postId = (container.getAttribute("id") || "").match(/^post_(\d+)/i)?.[1];
     const floorAnchor = container.querySelector(
@@ -18813,6 +19120,11 @@ function parseGroupTopicHTML(html, id, base) {
       id: postId ? `${id}-${postId}` : `${id}-${floor}`,
       floor,
       author,
+      username: profile.username,
+      nickname: profile.nickname,
+      avatar: profile.avatar,
+      creator: profile,
+      user: profile,
       content,
       timestamp
     });
@@ -18862,10 +19174,11 @@ function parseGroupTopicHTML(html, id, base) {
     group_id: groupAnchor ? groupIdFromHref(groupAnchor.getAttribute("href")) || "" : "",
     group_name: groupAnchor ? collapseText(groupAnchor.textContent) : "",
     author: rows[0]?.author || authorLinks.map((link) => collapseText(link.textContent)).find(Boolean) || "",
-    reply_count: Math.max(
-      Math.max(0, rows.length - 1),
-      replyMatch ? parseNumber(replyMatch[1]) : 0
-    ),
+    username: rows[0]?.username || "",
+    nickname: rows[0]?.nickname || rows[0]?.author || "",
+    avatar: rows[0]?.avatar || "",
+    creator: rows[0]?.creator || { username: "", nickname: "", avatar: "", url: "" },
+    reply_count: replyMatch ? Math.max(rows.length - 1, parseNumber(replyMatch[1])) : rows.length > 1 ? rows.length - 1 : null,
     replies: rows,
     url: base + "/group/topic/" + id
   };
@@ -18887,12 +19200,13 @@ function parseGroupDiscoverHTML(html, base) {
     if (seen.has(id)) continue;
     seen.add(id);
     const groupAnchor = Array.from(row.querySelectorAll("a[href]")).find((anchor) => {
-      const href = anchor.getAttribute("href") || "";
+      const href = safeAbsoluteUrl(anchor.getAttribute("href") || "", base);
       return /(?:^|\/)group\/[^/?#]+/.test(href) && !/\/group\/topic\//.test(href);
     });
     const authorAnchor = Array.from(row.querySelectorAll("a[href]")).find(
       (anchor) => /(?:^|\/)user\/[^/?#]+/.test(anchor.getAttribute("href") || "")
     );
+    const authorProfile = authorAnchor ? profileFrom(row, base) : { username: "", nickname: "", avatar: "", url: "" };
     const rowText = collapseText(row.textContent);
     const replyMatch = rowText.match(/\(\s*\+?([0-9][0-9,]*)\s*\)/);
     const dateMatch = rowText.match(/\b\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:\s+\d{1,2}:\d{2})?\b/);
@@ -18904,20 +19218,25 @@ function parseGroupDiscoverHTML(html, base) {
       title,
       group_id: groupId || "",
       group_name: groupAnchor ? collapseText(groupAnchor.textContent) : "",
-      author: authorAnchor ? collapseText(authorAnchor.textContent) : "",
-      reply_count: replyMatch ? parseNumber(replyMatch[1]) : 0,
+      author: authorProfile.nickname || (authorAnchor ? collapseText(authorAnchor.textContent) : ""),
+      username: authorProfile.username,
+      nickname: authorProfile.nickname,
+      avatar: authorProfile.avatar,
+      creator: authorProfile,
+      user: authorProfile,
+      reply_count: replyMatch ? parseNumber(replyMatch[1]) : null,
       last_reply_time: dateMatch ? dateMatch[0] : "",
       url: `${base}/group/topic/${id}`
     });
     if (topics.length >= 30) break;
   }
-  return topics.sort((a, b) => b.reply_count - a.reply_count);
+  return topics.sort((a, b) => Number(b.reply_count ?? -1) - Number(a.reply_count ?? -1));
 }
 app10.get("/", async (c) => {
   try {
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const cacheKey = `groups_list_${isChina7 ? "cn" : "global"}`;
-    const cached = cache6.get(cacheKey);
+    const cacheKey2 = `groups_list_${isChina7 ? "cn" : "global"}`;
+    const cached = cache6.get(cacheKey2);
     if (cached) return c.json({ data: cached.data, degraded: cached.degraded === true });
     const bases = getBaseUrls(isChina7);
     const urls = bases.map((base) => `${base}/group/all`);
@@ -18946,7 +19265,7 @@ app10.get("/", async (c) => {
       }
       degraded = true;
     }
-    cache6.set(cacheKey, { data: groups, degraded });
+    cache6.set(cacheKey2, { data: groups, degraded });
     return c.json({ data: groups, degraded });
   } catch {
     return c.json({
@@ -18960,8 +19279,8 @@ app10.get("/topic/:id", async (c) => {
     const id = c.req.param("id");
     if (!id || !/^\d+$/.test(id)) return c.json({ data: null, degraded: true }, 400);
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const cacheKey = "groups_topic_" + id + "_" + (isChina7 ? "cn" : "global");
-    const cached = cache6.get(cacheKey);
+    const cacheKey2 = "groups_topic_" + id + "_" + (isChina7 ? "cn" : "global");
+    const cached = cache6.get(cacheKey2);
     if (cached) return c.json({ data: cached.data, degraded: cached.degraded === true });
     const bases = getBaseUrls(isChina7);
     const urls = bases.map((base) => base + "/group/topic/" + id);
@@ -18969,7 +19288,7 @@ app10.get("/topic/:id", async (c) => {
     const baseUrl = url.replace(/\/group\/topic\/[^/]+\/?$/, "") || bases[0];
     const topic = parseGroupTopicHTML(html, id, baseUrl);
     const degraded = topic.title === "\u8BDD\u9898 #" + id && topic.replies.length === 0;
-    cache6.set(cacheKey, { data: topic, degraded });
+    cache6.set(cacheKey2, { data: topic, degraded });
     return c.json({ data: topic, degraded });
   } catch {
     return c.json({ data: null, degraded: true });
@@ -18978,8 +19297,8 @@ app10.get("/topic/:id", async (c) => {
 app10.get("/discover", async (c) => {
   try {
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const cacheKey = `groups_discover_${isChina7 ? "cn" : "global"}`;
-    const cached = cache6.get(cacheKey);
+    const cacheKey2 = `groups_discover_${isChina7 ? "cn" : "global"}`;
+    const cached = cache6.get(cacheKey2);
     if (cached) return c.json({ data: cached.data, degraded: cached.degraded === true });
     const bases = getBaseUrls(isChina7);
     const urls = bases.map((base) => `${base}/group/discover`);
@@ -18987,7 +19306,7 @@ app10.get("/discover", async (c) => {
     const baseUrl = url.replace(/\/group\/discover\/?$/, "") || bases[0];
     const topics = parseGroupDiscoverHTML(html, baseUrl);
     const degraded = topics.length === 0;
-    cache6.set(cacheKey, { data: topics, degraded });
+    cache6.set(cacheKey2, { data: topics, degraded });
     return c.json({ data: topics, degraded });
   } catch {
     return c.json({ data: [], degraded: true });
@@ -18998,8 +19317,8 @@ app10.get("/search", async (c) => {
     const keyword = (c.req.query("keyword") || c.req.query("q") || "").trim();
     if (!keyword) return c.json({ data: [], degraded: false });
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const cacheKey = `groups_search_${keyword}_${isChina7 ? "cn" : "global"}`;
-    const cached = cache6.get(cacheKey);
+    const cacheKey2 = `groups_search_${keyword}_${isChina7 ? "cn" : "global"}`;
+    const cached = cache6.get(cacheKey2);
     if (cached) return c.json({ data: cached.data, degraded: cached.degraded === true });
     const bases = getBaseUrls(isChina7);
     const urls = bases.map((base) => `${base}/group/all`);
@@ -19032,7 +19351,7 @@ app10.get("/search", async (c) => {
     const result = groups.filter(
       (g) => (g.name || "").toLowerCase().includes(q) || (g.description || "").toLowerCase().includes(q)
     );
-    cache6.set(cacheKey, { data: result, degraded });
+    cache6.set(cacheKey2, { data: result, degraded });
     return c.json({ data: result, degraded });
   } catch {
     return c.json({ data: [], degraded: true });
@@ -19041,9 +19360,11 @@ app10.get("/search", async (c) => {
 app10.get("/:id", async (c) => {
   try {
     const id = c.req.param("id");
+    if (!id || id.length > 80 || /[\\/?#]/.test(id))
+      return c.json({ data: null, error: "\u5C0F\u7EC4 ID \u4E0D\u5408\u6CD5", code: 400 }, 400);
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const cacheKey = `groups_detail_${id}_${isChina7 ? "cn" : "global"}`;
-    const cached = cache6.get(cacheKey);
+    const cacheKey2 = `groups_detail_${id}_${isChina7 ? "cn" : "global"}`;
+    const cached = cache6.get(cacheKey2);
     if (cached) return c.json({ data: cached.data, degraded: cached.degraded === true });
     const bases = getBaseUrls(isChina7);
     const urls = bases.map((base) => `${base}/group/${id}`);
@@ -19061,7 +19382,8 @@ app10.get("/:id", async (c) => {
           id,
           name: id,
           description: "",
-          member_count: 0,
+          member_count: null,
+          topic_count: null,
           avatar: "",
           url: `${bases[0]}/group/${id}`,
           topics: []
@@ -19069,12 +19391,12 @@ app10.get("/:id", async (c) => {
         degraded = true;
       }
       lastSuccessStore.set(id, detail);
-      cache6.set(cacheKey, { data: detail, degraded });
+      cache6.set(cacheKey2, { data: detail, degraded });
       return c.json({ data: detail, degraded });
     } catch {
       const lastSuccess = lastSuccessStore.get(id);
       if (lastSuccess) {
-        cache6.set(cacheKey, { data: lastSuccess, degraded: false });
+        cache6.set(cacheKey2, { data: lastSuccess, degraded: false });
         return c.json({ data: lastSuccess, degraded: false });
       }
       const fallback = FALLBACK_GROUPS.find((g) => g.id === id);
@@ -19082,12 +19404,13 @@ app10.get("/:id", async (c) => {
         id,
         name: id,
         description: "",
-        member_count: 0,
+        member_count: null,
+        topic_count: null,
         avatar: "",
         url: `${bases[0]}/group/${id}`,
         topics: []
       };
-      cache6.set(cacheKey, { data: detail, degraded: true });
+      cache6.set(cacheKey2, { data: detail, degraded: true });
       return c.json({ data: detail, degraded: true });
     }
   } catch {
@@ -19097,13 +19420,71 @@ app10.get("/:id", async (c) => {
         id,
         name: id,
         description: "",
-        member_count: 0,
+        member_count: null,
+        topic_count: null,
         avatar: "",
         url: `${HOSTS.main}/group/${id}`,
         topics: []
       },
       degraded: true
     });
+  }
+});
+app10.post("/:id/topic", async (c) => {
+  try {
+    const groupId = c.req.param("id");
+    if (!groupId || groupId.length > 80 || /[\\/?#]/.test(groupId))
+      return c.json({ data: null, error: "\u5C0F\u7EC4 ID \u4E0D\u5408\u6CD5", code: 400 }, 400);
+    const token = (c.req.header("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
+    if (!token) return c.json({ data: null, error: "\u672A\u767B\u5F55", code: 401 }, 401);
+    const body = await c.req.json().catch(() => ({}));
+    const title = String(body?.title || "").trim();
+    const content = String(body?.content || "").trim();
+    if (!title || !content)
+      return c.json({ data: null, error: "\u6807\u9898\u548C\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A", code: 400 }, 400);
+    if (title.length > 120 || content.length > 2e4)
+      return c.json({ data: null, error: "\u5185\u5BB9\u8FC7\u957F", code: 400 }, 400);
+    const base = getBaseUrls((c.env?.CF_IP_COUNTRY || "") === "CN")[0];
+    await submitGroupForm({
+      base,
+      path: "/group/" + encodeURIComponent(groupId) + "/new_topic",
+      token,
+      fields: { title, content }
+    });
+    return c.json({ data: { success: true }, code: 200 });
+  } catch (error) {
+    return c.json(
+      { data: null, error: error instanceof Error ? error.message : "\u53D1\u9001\u5931\u8D25", code: 400 },
+      400
+    );
+  }
+});
+app10.post("/topic/:topicId/reply", async (c) => {
+  try {
+    const topicId = c.req.param("topicId");
+    if (!/^\d+$/.test(topicId) || !Number.isSafeInteger(Number(topicId)) || Number(topicId) <= 0)
+      return c.json({ data: null, error: "\u8BDD\u9898 ID \u4E0D\u5408\u6CD5", code: 400 }, 400);
+    const token = (c.req.header("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
+    if (!token) return c.json({ data: null, error: "\u672A\u767B\u5F55", code: 401 }, 401);
+    const body = await c.req.json().catch(() => ({}));
+    const content = String(body?.content || "").trim();
+    if (!content) return c.json({ data: null, error: "\u5185\u5BB9\u4E0D\u80FD\u4E3A\u7A7A", code: 400 }, 400);
+    if (content.length > 2e4) return c.json({ data: null, error: "\u5185\u5BB9\u8FC7\u957F", code: 400 }, 400);
+    const base = getBaseUrls((c.env?.CF_IP_COUNTRY || "") === "CN")[0];
+    const path = "/group/topic/" + encodeURIComponent(topicId);
+    await submitGroupForm({
+      base,
+      path,
+      submitPath: groupReplySubmissionPath(topicId),
+      token,
+      fields: { content }
+    });
+    return c.json({ data: { success: true }, code: 200 });
+  } catch (error) {
+    return c.json(
+      { data: null, error: error instanceof Error ? error.message : "\u53D1\u9001\u5931\u8D25", code: 400 },
+      400
+    );
   }
 });
 var groups_default = app10;
@@ -19221,11 +19602,11 @@ app11.get("/search", async (c) => {
     if (!q || !q.trim()) {
       return c.json({ data: { results: [] } });
     }
-    const cacheKey = `music_search_${q.trim()}`;
-    const cached = cache7.get(cacheKey);
+    const cacheKey2 = `music_search_${q.trim()}`;
+    const cached = cache7.get(cacheKey2);
     if (cached) return c.json({ data: { results: cached } });
     const results = await searchNetEase(q.trim(), 10);
-    cache7.set(cacheKey, results);
+    cache7.set(cacheKey2, results);
     return c.json({ data: { results } });
   } catch {
     return c.json({ data: { results: [] } });
@@ -19337,8 +19718,21 @@ app12.post("/suggestions", async (c) => {
 });
 var ai_default = app12;
 
-// server/src/app.js
+// server/src/routes/geo.js
 var app13 = new Hono2();
+app13.get(
+  "/",
+  (c) => c.json({
+    data: {
+      country: c.env?.CF_IP_COUNTRY || "unknown",
+      isChina: (c.env?.CF_IP_COUNTRY || "") === "CN"
+    }
+  })
+);
+var geo_default = app13;
+
+// server/src/app.js
+var app14 = new Hono2();
 var allowedOrigins = /* @__PURE__ */ new Set([
   "https://bangmio.site",
   "https://www.bangmio.site",
@@ -19347,7 +19741,7 @@ var allowedOrigins = /* @__PURE__ */ new Set([
   "http://localhost:3001",
   "http://127.0.0.1:3001"
 ]);
-app13.use(
+app14.use(
   "*",
   cors({
     origin: (origin) => allowedOrigins.has(origin) ? origin : "",
@@ -19356,46 +19750,47 @@ app13.use(
     maxAge: 86400
   })
 );
-app13.use("*", async (c, next) => {
+app14.use("*", async (c, next) => {
   const country = c.req.header("cf-ipcountry") || "";
   c.env = c.env || {};
   c.env.CF_IP_COUNTRY = country;
   await next();
 });
-app13.use("*", securityHeaders());
+app14.use("*", securityHeaders());
 var postLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_POST);
 var getLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_GET);
-app13.use("/api/v1/*", async (c, next) => {
+app14.use("/api/v1/*", async (c, next) => {
   const method = c.req.method.toUpperCase();
   const limiter = method === "POST" || method === "PUT" || method === "DELETE" ? postLimiter : getLimiter;
   return limiter(c, next);
 });
 var authLimiter = rateLimit(RATE_LIMIT_WINDOW, 5);
-app13.use("/api/v1/auth/*", async (c, next) => {
+app14.use("/api/v1/auth/*", async (c, next) => {
   const path = c.req.path;
   const method = c.req.method.toUpperCase();
-  if (method === "POST" && (path === "/api/v1/auth/register" || path === "/api/v1/auth/login" || path === "/api/v1/auth/send-code" || path === "/api/v1/auth/change-password" || path === "/api/v1/auth/forgot-password")) {
+  if (method === "POST" && (path === "/api/v1/auth/register" || path === "/api/v1/auth/login" || path === "/api/v1/auth/send-code" || path === "/api/v1/auth/change-password" || path === "/api/v1/auth/forgot-password" || path === "/api/v1/auth/reset-password")) {
     return authLimiter(c, next);
   }
   await next();
 });
-app13.route("/api/v1/auth", auth_default);
-app13.route("/api/v1/user", user_default);
-app13.route("/api/v1/anime", anime_default);
-app13.route("/api/v1/collection", collection_default);
-app13.route("/api/v1/comments", comments_default);
-app13.route("/api/v1/douban", douban_default);
-app13.route("/api/v1/bilibili", bilibili_default);
-app13.route("/api/v1/moegirl", moegirl_default);
-app13.route("/api/v1/wikipedia", wikipedia_default);
-app13.route("/api/v1/groups", groups_default);
-app13.route("/api/v1/music", music_default);
-app13.route("/api/v1/ai", ai_default);
-app13.get("/api/health", (c) => c.json({ status: "ok", country: c.env?.CF_IP_COUNTRY || "unknown" }));
-app13.all("*", (c) => {
+app14.route("/api/v1/auth", auth_default);
+app14.route("/api/v1/user", user_default);
+app14.route("/api/v1/anime", anime_default);
+app14.route("/api/v1/collection", collection_default);
+app14.route("/api/v1/comments", comments_default);
+app14.route("/api/v1/douban", douban_default);
+app14.route("/api/v1/bilibili", bilibili_default);
+app14.route("/api/v1/moegirl", moegirl_default);
+app14.route("/api/v1/wikipedia", wikipedia_default);
+app14.route("/api/v1/geo", geo_default);
+app14.route("/api/v1/groups", groups_default);
+app14.route("/api/v1/music", music_default);
+app14.route("/api/v1/ai", ai_default);
+app14.get("/api/health", (c) => c.json({ status: "ok", country: c.env?.CF_IP_COUNTRY || "unknown" }));
+app14.all("*", (c) => {
   return c.json({ data: null, error: "Not Found", code: 404 }, 404);
 });
-app13.onError((err, c) => {
+app14.onError((err, c) => {
   logError("\u672A\u6355\u83B7\u7684\u670D\u52A1\u5668\u5F02\u5E38", {
     message: err?.message || String(err),
     stack: err?.stack,
@@ -19404,7 +19799,7 @@ app13.onError((err, c) => {
   });
   return c.json({ data: null, error: "\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF", code: 500 }, 500);
 });
-var app_default = app13;
+var app_default = app14;
 export {
   app_default as default
 };

@@ -28,12 +28,69 @@
             v-if="group.member_count != null || group.members != null"
             class="badge badge-primary badge-outline"
           >
-            {{ group.member_count ?? group.members }} 成员
+            {{ memberLabel(group.member_count ?? group.members) }}
+          </span>
+          <span
+            v-if="hasCountField(group, 'topic_count', 'topics_count', 'topics')"
+            class="badge badge-ghost"
+          >
+            {{ topicLabel(group.topic_count ?? group.topics_count ?? group.topics) }}
           </span>
         </div>
         <p class="text-sm text-base-content/70">
           {{ group.description || '暂无简介' }}
         </p>
+      </div>
+
+      <!-- 发起话题 -->
+      <div class="bg-base-100 rounded-xl p-6 shadow-card mb-6 border border-base-300">
+        <template v-if="auth.isAuthenticated && auth.isBound">
+          <div class="flex items-center justify-between gap-3 mb-3">
+            <h2 class="text-lg font-semibold">发起新话题</h2>
+            <span class="text-xs text-base-content/50">支持换行和链接</span>
+          </div>
+          <form class="space-y-3" @submit.prevent="submitTopic">
+            <input
+              v-model="newTopicTitle"
+              type="text"
+              maxlength="120"
+              class="input input-bordered w-full"
+              placeholder="话题标题"
+              :disabled="sending"
+            />
+            <textarea
+              v-model="newTopicContent"
+              maxlength="20000"
+              class="textarea textarea-bordered w-full min-h-28 leading-7"
+              placeholder="写下话题内容..."
+              :disabled="sending"
+            />
+            <div class="flex justify-end">
+              <button
+                type="submit"
+                class="btn btn-primary"
+                :disabled="sending || !newTopicTitle.trim() || !newTopicContent.trim()"
+              >
+                <span v-if="sending" class="loading loading-spinner loading-sm" />
+                {{ sending ? '发布中...' : '发布话题' }}
+              </button>
+            </div>
+          </form>
+        </template>
+        <template v-else-if="auth.isAuthenticated">
+          <p class="text-sm text-base-content/65">请先绑定 Bangumi 账号后再发起话题。</p>
+          <button class="btn btn-sm btn-primary mt-3" @click="auth.setShowBindModal(true)">
+            去绑定
+          </button>
+        </template>
+        <template v-else>
+          <p class="text-sm text-base-content/65">登录并绑定 Bangumi 账号后即可发起话题。</p>
+          <router-link
+            class="btn btn-sm btn-primary mt-3 w-fit"
+            :to="{ path: '/login', query: { redirect: route.fullPath } }"
+            >去登录</router-link
+          >
+        </template>
       </div>
 
       <!-- 最近话题 -->
@@ -52,8 +109,11 @@
               }}</span>
               <div class="flex items-center gap-2 shrink-0">
                 <!-- 回复数 -->
-                <span v-if="getReplies(t) != null" class="badge badge-sm badge-ghost">
-                  {{ getReplies(t) }} 回复
+                <span
+                  v-if="hasCountField(t, 'replies', 'reply_count', 'posts')"
+                  class="badge badge-sm badge-ghost"
+                >
+                  {{ replyLabel(getReplies(t)) }}
                 </span>
                 <!-- 跳转箭头 -->
                 <svg
@@ -181,6 +241,8 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { groupAPI } from '../api/endpoints'
+import { useAuthStore } from '../stores/auth'
+import { useToastStore } from '../stores/toast'
 
 const route = useRoute()
 const group = ref(null)
@@ -189,6 +251,11 @@ const loading = ref(true)
 const degraded = ref(false)
 // 错误分类: null | 'network' | 'server' | 'notfound' | 'placeholder'
 const errorType = ref(null)
+const auth = useAuthStore()
+const toast = useToastStore()
+const newTopicTitle = ref('')
+const newTopicContent = ref('')
+const sending = ref(false)
 
 // 根据 axios 错误对象分类错误类型
 function classifyError(err) {
@@ -209,16 +276,76 @@ function isEmptyGroup(data) {
   return false
 }
 
-// 兼容多种字段命名，提取话题作者
+function safeCount(value) {
+  if (value === null || value === undefined) return null
+  const text = String(value).trim()
+  if (!text) return null
+  const count = Number(text.replaceAll(',', ''))
+  return Number.isFinite(count) && count >= 0 ? count : null
+}
+
+function hasCountField(value, ...keys) {
+  return Boolean(value && keys.some(key => value[key] !== undefined && value[key] !== null))
+}
+
+function memberLabel(value) {
+  const count = safeCount(value)
+  return count === null ? '成员数暂不可用' : count.toLocaleString() + ' 成员'
+}
+
+function topicLabel(value) {
+  const count = safeCount(Array.isArray(value) ? value.length : value)
+  return count === null ? '话题数暂不可用' : count.toLocaleString() + ' 话题'
+}
+
+function replyLabel(value) {
+  const count = safeCount(value)
+  return count === null ? '回复数暂不可用' : `${count.toLocaleString()} 回复`
+}
+
+const GENERIC_NAMES = new Set([
+  '社区成员',
+  '社区用户',
+  '用户',
+  '匿名用户',
+  '匿名',
+  'unknown',
+  'user'
+])
+
+function usefulName(value) {
+  const name = String(value || '').trim()
+  return name && !GENERIC_NAMES.has(name.toLocaleLowerCase()) ? name : ''
+}
+
+// 兼容多种字段命名，优先真实昵称，再回退到用户名；占位昵称不能覆盖真实资料。
 function getAuthor(t) {
   if (!t) return ''
-  if (typeof t.author === 'string') return t.author
-  if (t.author?.username) return t.author.username
-  if (t.author?.name) return t.author.name
-  if (t.username) return t.username
-  if (t.user?.username) return t.user.username
-  if (t.user?.name) return t.user.name
-  return ''
+  const candidates = [t.user, t.creator, typeof t.author === 'object' ? t.author : t.author, t]
+  const selected = candidates
+    .map((candidate, index) => {
+      if (typeof candidate === 'string' || typeof candidate === 'number') {
+        const value = String(candidate).trim()
+        return { name: value, username: value, score: usefulName(value) ? 8 : 0 - index / 100 }
+      }
+      const name = String(
+        candidate?.nickname || candidate?.name || candidate?.display_name || ''
+      ).trim()
+      const username = String(candidate?.username || '').trim()
+      return {
+        name,
+        username,
+        score:
+          (usefulName(name) ? 8 : 0) +
+          (usefulName(username) ? 5 : 0) +
+          (candidate?.avatar ? 3 : 0) +
+          (candidate?.url ? 2 : 0) -
+          index / 100
+      }
+    })
+    .filter(candidate => candidate.name || candidate.username)
+    .sort((left, right) => right.score - left.score)[0]
+  return usefulName(selected?.name) || usefulName(selected?.username) || ''
 }
 
 // 兼容多种字段命名，提取回复数
@@ -241,6 +368,24 @@ function getLastReply(t) {
   // YYYY-MM-DD HH:mm
   const pad = n => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+async function submitTopic() {
+  const title = newTopicTitle.value.trim()
+  const content = newTopicContent.value.trim()
+  if (!title || !content || sending.value || !auth.isAuthenticated || !auth.isBound) return
+  sending.value = true
+  try {
+    await groupAPI.postTopic(route.params.id, { title, content })
+    newTopicTitle.value = ''
+    newTopicContent.value = ''
+    toast.success('话题发布成功')
+    await loadGroup()
+  } catch (error) {
+    toast.error(error.response?.data?.error || '发布失败，请稍后重试')
+  } finally {
+    sending.value = false
+  }
 }
 
 async function loadGroup() {

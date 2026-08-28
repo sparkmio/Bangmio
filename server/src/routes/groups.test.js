@@ -3,7 +3,9 @@ import {
   parseGroupListHTML,
   parseGroupDetailHTML,
   parseGroupDiscoverHTML,
-  parseGroupTopicHTML
+  parseGroupTopicHTML,
+  groupSubmissionAccepted,
+  groupReplySubmissionPath
 } from './groups.js'
 import { repairMojibake } from '../utils/http.js'
 
@@ -116,7 +118,7 @@ describe('parseGroupDetailHTML', () => {
       avatar: 'https://bgm.tv/icon/xxx.jpg',
       url: 'https://bgm.tv/group/bgm38'
     })
-    expect(detail.topics).toEqual([
+    expect(detail.topics).toMatchObject([
       {
         id: '101',
         title: '七月新番讨论帖',
@@ -191,6 +193,21 @@ describe('parseGroupDiscoverHTML', () => {
         group_id: 'game',
         group_name: '游戏',
         author: 'admin',
+        username: 'admin',
+        nickname: 'admin',
+        avatar: '',
+        creator: {
+          username: 'admin',
+          nickname: 'admin',
+          avatar: '',
+          url: 'https://bgm.tv/user/admin'
+        },
+        user: {
+          username: 'admin',
+          nickname: 'admin',
+          avatar: '',
+          url: 'https://bgm.tv/user/admin'
+        },
         reply_count: 42,
         last_reply_time: '2026-8-16 18:49',
         url: 'https://bgm.tv/group/topic/102'
@@ -201,6 +218,11 @@ describe('parseGroupDiscoverHTML', () => {
         group_id: 'anime',
         group_name: '动画交流',
         author: 'sai',
+        username: 'sai',
+        nickname: 'sai',
+        avatar: '',
+        creator: { username: 'sai', nickname: 'sai', avatar: '', url: 'https://bgm.tv/user/sai' },
+        user: { username: 'sai', nickname: 'sai', avatar: '', url: 'https://bgm.tv/user/sai' },
         reply_count: 9,
         last_reply_time: '2026-8-16 18:51',
         url: 'https://bgm.tv/group/topic/101'
@@ -210,6 +232,21 @@ describe('parseGroupDiscoverHTML', () => {
 
   it('没有话题表时返回空数组', () => {
     expect(parseGroupDiscoverHTML('<h1>小组</h1>', BASE)).toEqual([])
+  })
+
+  it('无法解析统计值时保留未知状态，并为作者返回完整资料', () => {
+    const [topic] = parseGroupDiscoverHTML(
+      '<table class="topic_list"><tr><td><a href="/group/topic/201">无统计话题</a></td><td><a href="/group/other">其他</a></td><td><a href="/user/reader"><img src="/avatar/reader.jpg" alt="">读者</a></td></tr></table>',
+      BASE
+    )
+    expect(topic).toMatchObject({
+      author: '读者',
+      username: 'reader',
+      nickname: '读者',
+      avatar: 'https://bgm.tv/avatar/reader.jpg',
+      reply_count: null,
+      creator: { username: 'reader', nickname: '读者' }
+    })
   })
 })
 describe('group detail enrichment', () => {
@@ -222,6 +259,19 @@ describe('group detail enrichment', () => {
 
     expect(detail.member_count).toBe(12345)
   })
+})
+
+it('preserves line breaks and resolves relative links in group content', () => {
+  const html = `
+    <h1>链接和换行</h1>
+    <a href="/group/anime">动画交流</a>
+    <div id="post_1" class="postTopic">
+      <a href="/user/sai">sai</a>
+      <div class="topic_content"><div class="message">第一行<br>第二行 <a href="/wiki/foo">Foo</a></div></div>
+    </div>`
+
+  const topic = parseGroupTopicHTML(html, '904', BASE)
+  expect(topic.replies[0]?.content).toBe('第一行\n第二行 [Foo](https://bgm.tv/wiki/foo)')
 })
 
 describe('parseGroupTopicHTML', () => {
@@ -249,7 +299,7 @@ describe('parseGroupTopicHTML', () => {
       reply_count: 2,
       url: 'https://bgm.tv/group/topic/900'
     })
-    expect(parseGroupTopicHTML(html, '900', BASE).replies).toEqual([
+    expect(parseGroupTopicHTML(html, '900', BASE).replies).toMatchObject([
       {
         id: '900-1',
         floor: 1,
@@ -287,6 +337,42 @@ describe('parseGroupTopicHTML', () => {
   })
 })
 
+describe('group submission response handling', () => {
+  it('posts group replies to the dedicated new_reply endpoint', () => {
+    expect(groupReplySubmissionPath('123')).toBe('/group/topic/123/new_reply')
+    expect(groupReplySubmissionPath('中文 123')).toBe(
+      '/group/topic/%E4%B8%AD%E6%96%87%20123/new_reply'
+    )
+  })
+
+  it('accepts a successful group redirect', () => {
+    expect(groupSubmissionAccepted({ status: 302, ok: false }, '', '/group/topic/123')).toBe(true)
+    expect(groupSubmissionAccepted({ status: 302, ok: false }, '', '/group/bgm38')).toBe(true)
+  })
+
+  it('rejects login redirects and ambiguous 2xx pages', () => {
+    expect(
+      groupSubmissionAccepted({ status: 302, ok: false }, '', '/login?from=/group/bgm38')
+    ).toBe(false)
+    expect(groupSubmissionAccepted({ status: 200, ok: true }, '<form>请先登录</form>', '')).toBe(
+      false
+    )
+    expect(groupSubmissionAccepted({ status: 200, ok: true }, '<form>发表内容</form>', '')).toBe(
+      false
+    )
+    expect(groupSubmissionAccepted({ status: 200, ok: true }, '<p>发表成功</p>', '')).toBe(true)
+  })
+})
+
+it('无法解析小组帖子回复数时保留未知值，而不是伪造为 0', () => {
+  const topic = parseGroupTopicHTML(
+    '<h1>无统计话题</h1><div id="post_1" class="postTopic"><a href="/user/sai">sai</a><div class="topic_content"><div class="message">正文</div></div></div>',
+    '903',
+    BASE
+  )
+  expect(topic.reply_count).toBeNull()
+})
+
 it('跳过无文字头像链接，保留当前页面中的真实用户名、楼层与楼中楼内容', () => {
   const html = `
       <h1><a href="/group/forum">站务论坛</a> » 测试话题</h1>
@@ -315,7 +401,7 @@ it('跳过无文字头像链接，保留当前页面中的真实用户名、楼�
 
   const topic = parseGroupTopicHTML(html, '901', BASE)
   expect(topic).toMatchObject({ group_id: 'forum', group_name: '站务论坛', author: 'Sai' })
-  expect(topic.replies).toEqual([
+  expect(topic.replies).toMatchObject([
     {
       id: '901-1',
       floor: 1,

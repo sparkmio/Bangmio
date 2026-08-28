@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { parseHTML } from 'linkedom'
 import { createCache } from '../utils/cache.js'
-import { fetchHTMLMulti, parseNumber, fixUrl, repairMojibake } from '../utils/http.js'
+import { fetchHTML, fetchHTMLMulti, parseNumber, fixUrl, repairMojibake } from '../utils/http.js'
 import { CACHE_TTL_GROUPS } from '../config.js'
 
 const app = new Hono()
@@ -134,6 +134,174 @@ function collapseText(str) {
     .trim()
 }
 
+const GENERIC_PROFILE_NAMES = new Set([
+  '社区成员',
+  '社区用户',
+  '用户',
+  '匿名用户',
+  '匿名',
+  'unknown',
+  'user'
+])
+
+function isGenericProfileName(value) {
+  return GENERIC_PROFILE_NAMES.has(collapseText(value).toLocaleLowerCase())
+}
+
+function contentText(element, base = HOSTS.main) {
+  if (!element) return ''
+  const clone = element.cloneNode(true)
+  // 保留段落/列表/引用等块级元素的边界，避免上游 HTML 的多段正文被拼成一行。
+  for (const block of clone.querySelectorAll?.(
+    'p, div, section, article, li, blockquote, pre, h1, h2, h3, h4, h5, h6'
+  ) || []) {
+    block.before('\n')
+    block.after('\n')
+  }
+  for (const br of clone.querySelectorAll?.('br') || []) br.replaceWith('\n')
+  for (const anchor of clone.querySelectorAll?.('a[href]') || []) {
+    const label = collapseText(anchor.textContent)
+    const rawHref = anchor.getAttribute('href') || ''
+    let href = ''
+    try {
+      const resolved = new URL(rawHref, base)
+      if (resolved.protocol === 'http:' || resolved.protocol === 'https:') href = resolved.href
+    } catch {
+      // Ignore malformed or unsafe links and retain their visible label.
+    }
+    if (href && label && !label.includes(href)) anchor.replaceWith('[' + label + '](' + href + ')')
+  }
+  return repairMojibake(String(clone.textContent || ''))
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map(line => line.replace(/[ \t]+/g, ' ').trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+function safeAbsoluteUrl(rawHref, base) {
+  try {
+    const resolved = new URL(String(rawHref || ''), base)
+    return resolved.protocol === 'http:' || resolved.protocol === 'https:' ? resolved.href : ''
+  } catch {
+    return ''
+  }
+}
+
+function profileFrom(container, base) {
+  const anchors = Array.from(container?.querySelectorAll?.('a[href*="/user/"]') || [])
+  const candidates = anchors.map((anchor, index) => {
+    const href = anchor.getAttribute('href') || ''
+    let username = href.match(/\/user\/([^/?#]+)/)?.[1] || ''
+    try {
+      username = decodeURIComponent(username)
+    } catch {
+      /* keep the raw segment */
+    }
+    return { anchor, href, username, label: collapseText(anchor.textContent || ''), index }
+  })
+  const named =
+    candidates
+      .filter(candidate => candidate.label || candidate.username)
+      .sort((left, right) => {
+        const score = candidate =>
+          (candidate.label && !isGenericProfileName(candidate.label) ? 8 : 0) +
+          (candidate.username && !isGenericProfileName(candidate.username) ? 5 : 0)
+        return score(right) - score(left) || left.index - right.index
+      })[0] || candidates[0]
+  const href = named?.href || ''
+  const username =
+    named?.username ||
+    named?.label ||
+    collapseText(container?.getAttribute?.('data-item-user') || '')
+  const avatarElements = Array.from(
+    container?.querySelectorAll?.('.avatarNeue, .avatar, [style*="background-image"], img[src]') ||
+      []
+  )
+  const avatarEl =
+    avatarElements.find(
+      element => element.tagName?.toLowerCase() === 'img' && element.getAttribute('src')
+    ) || avatarElements.find(element => /url\(/i.test(element.getAttribute?.('style') || ''))
+  const style = avatarEl?.getAttribute?.('style') || ''
+  const styleMatch = style.match(/url\(['"]?([^'"()]+)['"]?\)/)
+  const rawAvatar =
+    avatarEl?.tagName?.toLowerCase() === 'img' ? avatarEl.getAttribute('src') : styleMatch?.[1]
+  const avatar = rawAvatar ? fixUrl(rawAvatar, base) : ''
+  const rawLabel = named?.label || ''
+  const nickname =
+    rawLabel && !isGenericProfileName(rawLabel)
+      ? rawLabel
+      : !isGenericProfileName(username)
+        ? username
+        : rawLabel || username
+  return { username, nickname, avatar, url: href ? fixUrl(href, base) : '' }
+}
+
+function formhashFrom(html) {
+  const inputs = String(html || '').match(/<input\b[^>]*>/gi) || []
+  for (const input of inputs) {
+    const name = input.match(/\bname\s*=\s*["']formhash["']/i)
+    const value = input.match(/\bvalue\s*=\s*["']([^"']+)["']/i)?.[1]
+    if (name && value) return value
+  }
+  return null
+}
+
+function chiiCookie(token) {
+  return 'chii_auth=' + token + '; chii_cookietime=2592000'
+}
+
+async function submitGroupForm({ base, path, submitPath = path, token, fields }) {
+  const pageHtml = await fetchHTML(base + path, {
+    headers: { Authorization: 'Bearer ' + token, Cookie: 'chii_auth=' + token }
+  })
+  const formhash = formhashFrom(pageHtml)
+  if (!formhash) throw new Error('无法获取表单 token，请重新登录')
+  const params = new URLSearchParams({ formhash, ...fields, submit: 'submit' })
+  const response = await fetch(base + submitPath, {
+    method: 'POST',
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Cookie: chiiCookie(token),
+      Referer: base + path
+    },
+    body: params.toString(),
+    redirect: 'manual'
+  })
+  const body = await response.text().catch(() => '')
+  const location = response.headers.get('location') || ''
+  if (!groupSubmissionAccepted(response, body, location))
+    throw new Error('发送失败，请确认登录状态和内容后重试')
+  return true
+}
+
+function groupReplySubmissionPath(topicId) {
+  return '/group/topic/' + encodeURIComponent(String(topicId)) + '/new_reply'
+}
+
+function submissionFailure(body) {
+  return /(?:登录失败|登陆失败|验证码|权限不足|禁止发言|请先登录|formhash.{0,30}(?:错误|无效|过期)|发送失败|提交失败|错误\s*[:：])/i.test(
+    String(body || '')
+  )
+}
+
+function groupSubmissionAccepted(response, body, location) {
+  const status = Number(response?.status || 0)
+  const redirect = String(location || '')
+  if (status >= 300 && status < 400) {
+    return (
+      Boolean(redirect) &&
+      !/(?:login|signin|auth|captcha)/i.test(redirect) &&
+      /\/group(?:\/topic)?\//i.test(redirect)
+    )
+  }
+  if (!response?.ok || submissionFailure(body)) return false
+  return /(?:发表成功|发布成功|提交成功|发送成功|回复成功|话题成功|操作成功|已发布|已成功)/i.test(
+    String(body || '')
+  )
+}
 function parseGroupListHTML(html, base) {
   const groups = []
   const seen = new Set()
@@ -156,7 +324,7 @@ function parseGroupListHTML(html, base) {
 
     // 成员数：在锚点所在容器（通常是 li/行）内查找 "NNN 位成员"；
     // 孤儿节点回退到锚点后的兄弟元素文本
-    let member_count = 0
+    let member_count = null
     let containerText = anchor.parentElement?.textContent || ''
     if (!containerText) {
       let sib = anchor.nextElementSibling
@@ -222,7 +390,7 @@ function parseGroupDetailHTML(html, id, base) {
     const el = firstByClassSubstring(document, pattern)
     const text = el ? collapseText(el.textContent) : ''
     if (text) {
-      description = collapseText(el.textContent)
+      description = contentText(el, base)
       break
     }
   }
@@ -275,20 +443,16 @@ function parseGroupDetailHTML(html, id, base) {
       const row = anchor.closest('tr') || anchor.parentElement
       const rowText = row?.textContent || ''
 
-      // 作者：行内 /user/ 链接
-      let author = ''
-      const userLink = row?.querySelector('a[href*="/user/"]')
-      if (userLink) {
-        author = collapseText(userLink.textContent)
-      }
+      const profile = profileFrom(row, base)
+      const author = profile.nickname
 
       // 回复数：td.posts / class 含 posts 的元素，回退 "(N 回复)" / "N 回复"
-      let reply_count = 0
+      let reply_count = null
       const postsEl = row?.querySelector('td.posts, [class*="posts"]')
-      if (postsEl) {
+      if (postsEl && /\d/.test(postsEl.textContent || '')) {
         reply_count = parseNumber(postsEl.textContent)
       }
-      if (!reply_count) {
+      if (reply_count === null) {
         const replyMatch =
           rowText.match(/\((\d+)\s*(?:回复|reply|条)/i) || rowText.match(/(\d+)\s*(?:回复|reply)/i)
         if (replyMatch) reply_count = parseNumber(replyMatch[1])
@@ -304,16 +468,43 @@ function parseGroupDetailHTML(html, id, base) {
         }
       }
 
-      topics.push({ id: topicId, title, author, reply_count, last_reply_time })
+      topics.push({
+        id: topicId,
+        title,
+        author,
+        username: profile.username,
+        nickname: profile.nickname,
+        avatar: profile.avatar,
+        creator: profile,
+        user: profile,
+        reply_count,
+        last_reply_time
+      })
       if (topics.length >= 20) break
     }
   }
+
+  const topicCountCandidates = [
+    ...Array.from(document.querySelectorAll('[data-topic-count], [data-topics-count]')).map(
+      el => el.getAttribute('data-topic-count') || el.getAttribute('data-topics-count') || ''
+    ),
+    ...Array.from(document.querySelectorAll('[class]'))
+      .filter(el => /topic[_-]?count/i.test(el.getAttribute('class') || ''))
+      .map(el => el.textContent || ''),
+    document.body?.textContent || ''
+  ]
+  const topicCountText = topicCountCandidates.find(text => /(?:话题|topics?)/i.test(text)) || ''
+  const topicCountMatch =
+    topicCountText.match(/([0-9][0-9,]*)\s*(?:个?话题|topics?)/i) ||
+    topicCountText.match(/(?:话题|topics?)\s*[:：]?\s*([0-9][0-9,]*)/i)
+  const topic_count = topicCountMatch ? parseNumber(topicCountMatch[1]) : null
 
   return {
     id,
     name: finalName,
     description,
     member_count,
+    topic_count,
     avatar,
     topics,
     url: `${base}/group/${id}`
@@ -324,7 +515,7 @@ function parseGroupDetailHTML(html, id, base) {
  * 从 Bangumi 小组页面提取成员数。不同镜像/页面版本的标记不完全一致，
  * 不能只依赖“位成员”这一个文案，否则个人小组页会全部退化成 0。
  * @param {Document} document
- * @returns {number}
+ * @returns {number | null}
  */
 function parseMemberCount(document) {
   const candidates = []
@@ -364,7 +555,7 @@ function parseMemberCount(document) {
     const context = collapseText(el.parentElement?.textContent || '')
     if (/(?:成员|members?|subscribers?)/i.test(context)) return parseNumber(value)
   }
-  return 0
+  return null
 }
 
 /**
@@ -381,7 +572,7 @@ function parseGroupTopicHTML(html, id, base) {
 
   // 页面导航也包含 /group/discover；优先从 h1 的面包屑中读取真正所属小组。
   const isGroupAnchor = anchor => {
-    const href = anchor.getAttribute('href') || ''
+    const href = safeAbsoluteUrl(anchor.getAttribute('href') || '', base)
     return /(?:^|\/)group\/[^/?#]+/.test(href) && !/\/group\/topic\//.test(href)
   }
   const groupAnchor =
@@ -391,24 +582,18 @@ function parseGroupTopicHTML(html, id, base) {
   const rows = []
   const seen = new Set()
 
-  const authorFrom = container => {
-    const anchors = Array.from(container.querySelectorAll('a[href*="/user/"]'))
-    const namedAnchor = anchors.find(anchor => collapseText(anchor.textContent))
-    // Bangumi 的第一个用户链接往往是无文字的头像链接，必须跳过它。
-    return (
-      collapseText(namedAnchor?.textContent || '') || container.getAttribute('data-item-user') || ''
-    )
-  }
+  const authorFrom = container => profileFrom(container, base)
 
   const appendRow = (container, fallbackFloor) => {
-    const author = authorFrom(container)
+    const profile = authorFrom(container)
+    const author = profile.nickname || container.getAttribute('data-item-user') || ''
     const contentEl =
       container.querySelector('.topic_content > .message') ||
       container.querySelector('.reply_content > .message') ||
       container.querySelector('.topic_content') ||
       container.querySelector('.reply_content') ||
       container.querySelector('.cmt_sub_content, .sub_reply_content, .message, .content, p')
-    const content = collapseText(contentEl?.textContent || '')
+    const content = contentText(contentEl, base)
     if (!author || !content) return false
 
     const postId = (container.getAttribute('id') || '').match(/^post_(\d+)/i)?.[1]
@@ -429,6 +614,11 @@ function parseGroupTopicHTML(html, id, base) {
       id: postId ? `${id}-${postId}` : `${id}-${floor}`,
       floor,
       author,
+      username: profile.username,
+      nickname: profile.nickname,
+      avatar: profile.avatar,
+      creator: profile,
+      user: profile,
       content,
       timestamp
     })
@@ -489,10 +679,15 @@ function parseGroupTopicHTML(html, id, base) {
       rows[0]?.author ||
       authorLinks.map(link => collapseText(link.textContent)).find(Boolean) ||
       '',
-    reply_count: Math.max(
-      Math.max(0, rows.length - 1),
-      replyMatch ? parseNumber(replyMatch[1]) : 0
-    ),
+    username: rows[0]?.username || '',
+    nickname: rows[0]?.nickname || rows[0]?.author || '',
+    avatar: rows[0]?.avatar || '',
+    creator: rows[0]?.creator || { username: '', nickname: '', avatar: '', url: '' },
+    reply_count: replyMatch
+      ? Math.max(rows.length - 1, parseNumber(replyMatch[1]))
+      : rows.length > 1
+        ? rows.length - 1
+        : null,
     replies: rows,
     url: base + '/group/topic/' + id
   }
@@ -524,12 +719,15 @@ function parseGroupDiscoverHTML(html, base) {
     seen.add(id)
 
     const groupAnchor = Array.from(row.querySelectorAll('a[href]')).find(anchor => {
-      const href = anchor.getAttribute('href') || ''
+      const href = safeAbsoluteUrl(anchor.getAttribute('href') || '', base)
       return /(?:^|\/)group\/[^/?#]+/.test(href) && !/\/group\/topic\//.test(href)
     })
     const authorAnchor = Array.from(row.querySelectorAll('a[href]')).find(anchor =>
       /(?:^|\/)user\/[^/?#]+/.test(anchor.getAttribute('href') || '')
     )
+    const authorProfile = authorAnchor
+      ? profileFrom(row, base)
+      : { username: '', nickname: '', avatar: '', url: '' }
 
     const rowText = collapseText(row.textContent)
     const replyMatch = rowText.match(/\(\s*\+?([0-9][0-9,]*)\s*\)/)
@@ -543,8 +741,14 @@ function parseGroupDiscoverHTML(html, base) {
       title,
       group_id: groupId || '',
       group_name: groupAnchor ? collapseText(groupAnchor.textContent) : '',
-      author: authorAnchor ? collapseText(authorAnchor.textContent) : '',
-      reply_count: replyMatch ? parseNumber(replyMatch[1]) : 0,
+      author:
+        authorProfile.nickname || (authorAnchor ? collapseText(authorAnchor.textContent) : ''),
+      username: authorProfile.username,
+      nickname: authorProfile.nickname,
+      avatar: authorProfile.avatar,
+      creator: authorProfile,
+      user: authorProfile,
+      reply_count: replyMatch ? parseNumber(replyMatch[1]) : null,
       last_reply_time: dateMatch ? dateMatch[0] : '',
       url: `${base}/group/topic/${id}`
     })
@@ -553,10 +757,19 @@ function parseGroupDiscoverHTML(html, base) {
   }
 
   // 源站按时间展示；这里按回复数优先，保证“热门帖子”而不是随机小组列表。
-  return topics.sort((a, b) => b.reply_count - a.reply_count)
+  return topics.sort((a, b) => Number(b.reply_count ?? -1) - Number(a.reply_count ?? -1))
 }
 // 导出解析函数供单元测试使用（fixture 驱动，不依赖上游网络）
-export { parseGroupListHTML, parseGroupDetailHTML, parseGroupDiscoverHTML, parseGroupTopicHTML }
+export {
+  parseGroupListHTML,
+  parseGroupDetailHTML,
+  parseGroupDiscoverHTML,
+  parseGroupTopicHTML,
+  formhashFrom,
+  groupSubmissionAccepted,
+  submissionFailure,
+  groupReplySubmissionPath
+}
 
 // GET /groups - 小组列表
 app.get('/', async c => {
@@ -709,6 +922,8 @@ app.get('/search', async c => {
 app.get('/:id', async c => {
   try {
     const id = c.req.param('id')
+    if (!id || id.length > 80 || /[\\/?#]/.test(id))
+      return c.json({ data: null, error: '小组 ID 不合法', code: 400 }, 400)
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
     const cacheKey = `groups_detail_${id}_${isChina ? 'cn' : 'global'}`
     const cached = cache.get(cacheKey)
@@ -737,7 +952,8 @@ app.get('/:id', async c => {
               id,
               name: id,
               description: '',
-              member_count: 0,
+              member_count: null,
+              topic_count: null,
               avatar: '',
               url: `${bases[0]}/group/${id}`,
               topics: []
@@ -764,7 +980,8 @@ app.get('/:id', async c => {
             id,
             name: id,
             description: '',
-            member_count: 0,
+            member_count: null,
+            topic_count: null,
             avatar: '',
             url: `${bases[0]}/group/${id}`,
             topics: []
@@ -779,7 +996,8 @@ app.get('/:id', async c => {
         id,
         name: id,
         description: '',
-        member_count: 0,
+        member_count: null,
+        topic_count: null,
         avatar: '',
         url: `${HOSTS.main}/group/${id}`,
         topics: []
@@ -789,4 +1007,62 @@ app.get('/:id', async c => {
   }
 })
 
+app.post('/:id/topic', async c => {
+  try {
+    const groupId = c.req.param('id')
+    if (!groupId || groupId.length > 80 || /[\\/?#]/.test(groupId))
+      return c.json({ data: null, error: '小组 ID 不合法', code: 400 }, 400)
+    const token = (c.req.header('Authorization') || '').replace(/^Bearer\s+/i, '').trim()
+    if (!token) return c.json({ data: null, error: '未登录', code: 401 }, 401)
+    const body = await c.req.json().catch(() => ({}))
+    const title = String(body?.title || '').trim()
+    const content = String(body?.content || '').trim()
+    if (!title || !content)
+      return c.json({ data: null, error: '标题和内容不能为空', code: 400 }, 400)
+    if (title.length > 120 || content.length > 20000)
+      return c.json({ data: null, error: '内容过长', code: 400 }, 400)
+    const base = getBaseUrls((c.env?.CF_IP_COUNTRY || '') === 'CN')[0]
+    await submitGroupForm({
+      base,
+      path: '/group/' + encodeURIComponent(groupId) + '/new_topic',
+      token,
+      fields: { title, content }
+    })
+    return c.json({ data: { success: true }, code: 200 })
+  } catch (error) {
+    return c.json(
+      { data: null, error: error instanceof Error ? error.message : '发送失败', code: 400 },
+      400
+    )
+  }
+})
+
+app.post('/topic/:topicId/reply', async c => {
+  try {
+    const topicId = c.req.param('topicId')
+    if (!/^\d+$/.test(topicId) || !Number.isSafeInteger(Number(topicId)) || Number(topicId) <= 0)
+      return c.json({ data: null, error: '话题 ID 不合法', code: 400 }, 400)
+    const token = (c.req.header('Authorization') || '').replace(/^Bearer\s+/i, '').trim()
+    if (!token) return c.json({ data: null, error: '未登录', code: 401 }, 401)
+    const body = await c.req.json().catch(() => ({}))
+    const content = String(body?.content || '').trim()
+    if (!content) return c.json({ data: null, error: '内容不能为空', code: 400 }, 400)
+    if (content.length > 20000) return c.json({ data: null, error: '内容过长', code: 400 }, 400)
+    const base = getBaseUrls((c.env?.CF_IP_COUNTRY || '') === 'CN')[0]
+    const path = '/group/topic/' + encodeURIComponent(topicId)
+    await submitGroupForm({
+      base,
+      path,
+      submitPath: groupReplySubmissionPath(topicId),
+      token,
+      fields: { content }
+    })
+    return c.json({ data: { success: true }, code: 200 })
+  } catch (error) {
+    return c.json(
+      { data: null, error: error instanceof Error ? error.message : '发送失败', code: 400 },
+      400
+    )
+  }
+})
 export default app

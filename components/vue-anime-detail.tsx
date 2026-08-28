@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { CollectionEditor } from './collection-button'
 import { AnimeGrid } from './anime-card'
+import { RichText } from './rich-text'
 import { displayName, imageUrl } from '@/lib/api'
 import type { ApiResult, ImageSet, Subject } from '@/lib/types'
 
@@ -11,7 +12,7 @@ type Episode = { id?: number; sort?: number; name?: string; name_cn?: string; ai
 type Credit = { id?: number; name?: string; name_cn?: string; relation?: string; role?: string; type?: number; order?: number; career?: string[]; images?: ImageSet }
 type InfoboxItem = { key?: string; value?: unknown }
 type Props = { subject: Subject; relations: Subject[]; characters: Credit[]; persons: Credit[]; episodes: Episode[]; infobox: InfoboxItem[] }
-type TabKey = 'overview' | 'episodes' | 'characters' | 'staff' | 'relations' | 'talkbox' | 'topics' | 'douban' | 'music' | 'streaming' | 'moegirl' | 'wiki'
+type TabKey = 'overview' | 'episodes' | 'characters' | 'staff' | 'relations' | 'talkbox' | 'topics' | 'douban' | 'music' | 'streaming' | 'wiki'
 type DoubanData = { id?: string | number; title?: string; rate?: string | number; url?: string; release_year?: string | number; types?: string[]; episodes_count?: number; short_comment?: { content?: string } | null }
 type DoubanComment = { user?: string; rating?: number; time?: string; useful?: number; content?: string }
 type DoubanReview = DoubanComment & { title?: string }
@@ -22,7 +23,7 @@ type BilibiliData = { title?: string; url?: string; cover?: string; score?: numb
 const tabs: Array<[TabKey, string]> = [
   ['overview', '概览'], ['episodes', '章节'], ['characters', '角色'], ['staff', '制作人员'],
   ['relations', '关联'], ['douban', '豆瓣'], ['music', '音乐'], ['streaming', '在线观看'],
-  ['moegirl', '萌娘百科'], ['wiki', 'Wiki'], ['talkbox', '吐槽'], ['topics', '讨论版']
+  ['wiki', 'Wiki'], ['talkbox', '吐槽'], ['topics', '讨论版']
 ]
 
 function valueText(value: unknown) {
@@ -98,8 +99,7 @@ function ExternalLinks({ subject, douban, bilibili }: { subject: Subject; douban
     ['网易云音乐', `https://music.163.com/#/search/m/?s=${encodeURIComponent(title)}`],
     ['B 站', bilibili?.url || `https://search.bilibili.com/bangumi?keyword=${encodeURIComponent(title)}`],
     ['girigirilove', `https://ani.girigirilove.com/search/-------------.html?wd=${encodeURIComponent(title)}`],
-    ['萌娘百科', `https://zh.moegirl.org.cn/index.php?search=${encodeURIComponent(title)}`],
-    ['Wikipedia', `https://zh.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(title)}`]
+    ['萌娘百科', `https://zh.moegirl.org.cn/index.php?search=${encodeURIComponent(title)}`]
   ]
   return <section><SectionTitle>外部链接</SectionTitle><div className="flex flex-wrap gap-2">{links.map(([label, href]) => <a key={label} href={href} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-ghost border border-base-300/70">{label} ↗</a>)}</div><p className="text-xs text-base-content/35 mt-3">外部网站内容由对应站点提供，本站只保留跳转入口。</p></section>
 }
@@ -127,7 +127,7 @@ function EmbedFrame({ src, title, fallbackHref = src }: { src: string; title: st
 
   if (failed) return <div className="rounded-xl border border-base-300 bg-base-200/30 p-6 text-center"><p className="text-sm text-base-content/50 mb-3">页面暂时无法嵌入</p><a className="btn btn-sm btn-primary" href={fallbackHref} target="_blank" rel="noopener noreferrer">打开原页面 ↗</a></div>
   if (!html) return <div className="bm-embed-loading" role="status">正在加载页面…</div>
-  return <iframe title={title} srcDoc={html} sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" className="w-full min-h-[620px] rounded-xl border border-base-300 bg-white" loading="lazy" />
+  return <iframe title={title} srcDoc={html} sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" className="w-full min-h-[920px] rounded-xl border border-base-300 bg-white" loading="lazy" />
 }
 
 function CoverImage({ src, alt = '' }: { src?: string; alt?: string }) {
@@ -165,7 +165,7 @@ function DoubanPanel({ subject }: { subject: Subject }) {
   if (!details?.id) return <div className="text-center py-10"><p className="text-sm text-base-content/40 mb-3">未找到豆瓣条目</p><a className="btn btn-sm btn-ghost" href={`https://www.douban.com/search?q=${encodeURIComponent(title)}`} target="_blank" rel="noopener noreferrer">前往豆瓣搜索 ↗</a></div>
   const stars = Math.min(5, Math.max(0, Math.round(Number(details.rate || 0) / 2)))
   const doubanUrl = details.url || `https://www.douban.com/search?q=${encodeURIComponent(title)}`
-  return <div className="space-y-5"><div className="rounded-xl bg-base-200/40 p-5"><div className="flex flex-wrap items-baseline gap-3"><h2 className="text-xl font-bold flex-1">{details.title || title}</h2><span className="text-4xl font-black text-amber-500">{details.rate || '—'}</span><span className="text-amber-400 tracking-widest">{'★'.repeat(stars)}{'☆'.repeat(5 - stars)}</span></div><p className="text-sm text-base-content/55 mt-2">{[details.release_year ? `${details.release_year} 年` : '', details.types?.join(' / '), details.episodes_count ? `${details.episodes_count} 集` : ''].filter(Boolean).join(' · ')}</p>{summary?.intro || details.short_comment?.content ? <p className="mt-4 border-l-4 border-amber-500/60 rounded-r-lg bg-base-100/60 p-4 text-sm leading-relaxed whitespace-pre-line">{summary?.intro || details.short_comment?.content}</p> : null}<div className="flex flex-wrap gap-2 mt-5"><a className="btn btn-sm btn-primary" href={doubanUrl} target="_blank" rel="noopener noreferrer">前往豆瓣查看 ↗</a><a className="btn btn-sm btn-ghost" href={`/api/v1/douban/page/${details.id}`} target="_blank" rel="noopener noreferrer">打开内嵌页面 ↗</a></div></div>{comments.length ? <section><SectionTitle>短评</SectionTitle><div className="space-y-3">{comments.slice(0, 8).map((comment, index) => <article key={`${comment.user}-${index}`} className="rounded-lg bg-base-200/40 p-3"><p className="text-xs text-base-content/50 mb-1">{comment.user || '匿名用户'} {comment.time ? `· ${comment.time}` : ''}</p><p className="text-sm leading-relaxed whitespace-pre-line">{comment.content}</p></article>)}</div></section> : null}{reviews.length ? <section><SectionTitle>长评</SectionTitle><div className="space-y-3">{reviews.slice(0, 5).map((review, index) => <article key={`${review.title}-${index}`} className="rounded-lg bg-base-200/40 p-4"><h3 className="font-medium">{review.title || '豆瓣长评'}</h3><p className="text-xs text-base-content/50 my-1">{review.user || '匿名用户'} {review.time ? `· ${review.time}` : ''}</p><p className="text-sm leading-relaxed whitespace-pre-line">{review.content}</p></article>)}</div></section> : null}<EmbedFrame src={`/api/v1/douban/page/${details.id}`} title="豆瓣条目内嵌页面" fallbackHref={doubanUrl} /></div>
+  return <div className="space-y-5"><div className="rounded-xl bg-base-200/40 p-5"><div className="flex flex-wrap items-baseline gap-3"><h2 className="text-xl font-bold flex-1">{details.title || title}</h2><span className="text-4xl font-black text-amber-500">{details.rate || '—'}</span><span className="text-amber-400 tracking-widest">{'★'.repeat(stars)}{'☆'.repeat(5 - stars)}</span></div><p className="text-sm text-base-content/55 mt-2">{[details.release_year ? `${details.release_year} 年` : '', details.types?.join(' / '), details.episodes_count ? `${details.episodes_count} 集` : ''].filter(Boolean).join(' · ')}</p>{summary?.intro || details.short_comment?.content ? <div className="mt-4 border-l-4 border-amber-500/60 rounded-r-lg bg-base-100/60 p-4 text-sm"><RichText value={summary?.intro || details.short_comment?.content} /></div> : null}<div className="flex flex-wrap gap-2 mt-5"><a className="btn btn-sm btn-primary" href={doubanUrl} target="_blank" rel="noopener noreferrer">前往豆瓣查看 ↗</a><a className="btn btn-sm btn-ghost" href={`/api/v1/douban/page/${details.id}`} target="_blank" rel="noopener noreferrer">打开内嵌页面 ↗</a></div></div>{comments.length ? <section><SectionTitle>短评</SectionTitle><div className="space-y-3">{comments.slice(0, 8).map((comment, index) => <article key={`${comment.user}-${index}`} className="rounded-lg bg-base-200/40 p-3"><p className="text-xs text-base-content/50 mb-1">{comment.user || '匿名用户'} {comment.time ? `· ${comment.time}` : ''}</p><RichText value={comment.content} fallback="暂无内容。" /></article>)}</div></section> : null}{reviews.length ? <section><SectionTitle>长评</SectionTitle><div className="space-y-3">{reviews.slice(0, 5).map((review, index) => <article key={`${review.title}-${index}`} className="rounded-lg bg-base-200/40 p-4"><h3 className="font-medium">{review.title || '豆瓣长评'}</h3><p className="text-xs text-base-content/50 my-1">{review.user || '匿名用户'} {review.time ? `· ${review.time}` : ''}</p><RichText value={review.content} fallback="暂无内容。" /></article>)}</div></section> : null}<EmbedFrame src={`/api/v1/douban/page/${details.id}`} title="豆瓣条目内嵌页面" fallbackHref={doubanUrl} /></div>
 }
 
 function MusicPanel({ subject, musicRelations }: { subject: Subject; musicRelations: Subject[] }) {
@@ -234,7 +234,19 @@ function WikiPanel({ subject, infobox }: { subject: Subject; infobox: InfoboxIte
   const names = [...new Set([subject.name_cn, subject.name].filter(Boolean).map(String))]
   const [loading, setLoading] = useState(true)
   const [article, setArticle] = useState<WikipediaResult | null>(null)
+  const [isChina, setIsChina] = useState(false)
+  const [geoReady, setGeoReady] = useState(false)
   useEffect(() => {
+    let alive = true
+    void apiFetch<{ isChina?: boolean }>(`/geo`).then(data => {
+      if (!alive) return
+      setIsChina(data?.isChina === true)
+      setGeoReady(true)
+    }).catch(() => { if (alive) { setIsChina(true); setGeoReady(true) } })
+    return () => { alive = false }
+  }, [])
+  useEffect(() => {
+    if (!geoReady || isChina) return
     let alive = true
     setLoading(true); setArticle(null)
     const findArticle = async () => {
@@ -248,10 +260,10 @@ function WikiPanel({ subject, infobox }: { subject: Subject; infobox: InfoboxIte
     }
     void findArticle().finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [names.join('|')])
+  }, [geoReady, isChina, names.join('|')])
   const fallbackUrl = article?.url || `https://zh.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(names[0] || '')}`
   const bangumiItems = infobox.slice(0, 14)
-  return <div className="space-y-5"><article className="bm-bangumi-wiki-card"><header><div><h3>Bangumi Wiki</h3><p>来自 Bangumi 条目的资料</p></div><a href={`https://bangumi.tv/subject/${subject.id}`} target="_blank" rel="noopener noreferrer">原条目 ↗</a></header>{subject.summary ? <p className="bm-bangumi-wiki-summary">{subject.summary}</p> : null}{bangumiItems.length ? <dl>{bangumiItems.map((item, index) => <div key={`${item.key}-${index}`}><dt>{item.key || '资料'}</dt><dd>{valueText(item.value)}</dd></div>)}</dl> : <p className="bm-reference-muted">暂无额外 Wiki 字段。</p>}</article>{loading ? <Empty>正在搜索维基百科…</Empty> : article?.title ? <article className="bm-reference-card"><header><h3>{article.title}</h3><a href={fallbackUrl} target="_blank" rel="noopener noreferrer">原站词条 ↗</a></header><EmbedFrame src={`/api/v1/wikipedia/page/${encodeURIComponent(article.title)}`} title={`${article.title} · Wikipedia`} fallbackHref={fallbackUrl} /></article> : <div className="bm-reference-empty"><p>未找到维基百科条目</p><a href={fallbackUrl} target="_blank" rel="noopener noreferrer">前往维基百科搜索 ↗</a></div>}</div>
+  return <div className="space-y-5"><article className="bm-bangumi-wiki-card"><header><div><h3>Bangumi Wiki</h3><p>来自 Bangumi 条目的资料</p></div><a href={`https://bangumi.tv/subject/${subject.id}`} target="_blank" rel="noopener noreferrer">原条目 ↗</a></header>{subject.summary ? <RichText value={subject.summary} /> : null}{bangumiItems.length ? <dl>{bangumiItems.map((item, index) => <div key={`${item.key}-${index}`}><dt>{item.key || '资料'}</dt><dd>{valueText(item.value)}</dd></div>)}</dl> : <p className="bm-reference-muted">暂无额外 Wiki 字段。</p>}</article><MoegirlPanel subject={subject} />{!geoReady ? <div className="bm-reference-empty"><p>正在检测当前地区…</p></div> : isChina ? <div className="bm-reference-empty"><p>Wikipedia 在中国大陆地区不可用</p></div> : loading ? <Empty>正在搜索维基百科…</Empty> : article?.title ? <article className="bm-reference-card"><header><h3>{article.title}</h3><a href={fallbackUrl} target="_blank" rel="noopener noreferrer">原站词条 ↗</a></header><EmbedFrame src={`/api/v1/wikipedia/page/${encodeURIComponent(article.title)}`} title={`${article.title} · Wikipedia`} fallbackHref={fallbackUrl} /></article> : <div className="bm-reference-empty"><p>未找到维基百科条目</p><a href={fallbackUrl} target="_blank" rel="noopener noreferrer">前往维基百科搜索 ↗</a></div>}</div>
 }
 
 export function VueAnimeDetail({ subject, relations, characters, persons, episodes, infobox }: Props) {
@@ -278,8 +290,11 @@ export function VueAnimeDetail({ subject, relations, characters, persons, episod
       <div className="relative max-w-5xl mx-auto px-4 md:px-8 py-10 md:py-16">
         <Link href="/anime" className="btn btn-ghost btn-sm text-primary/80 mb-4 inline-flex items-center gap-1">← 返回</Link>
         <div className="bm-detail-hero-grid">
-          <div className="bm-detail-poster flex-shrink-0 w-40 sm:w-48 md:w-60 mx-auto md:mx-0">
-            {image ? <img src={image} alt={title} loading="eager" decoding="async" className="w-full rounded-2xl shadow-2xl ring-1 ring-white/10" /> : <div className="w-full aspect-[2/3] rounded-2xl bg-base-300 flex items-center justify-center">暂无封面</div>}
+          <div className="bm-detail-left">
+            <div className="bm-detail-poster flex-shrink-0 w-40 sm:w-48 md:w-60 mx-auto md:mx-0">
+              {image ? <img src={image} alt={title} loading="eager" decoding="async" className="w-full rounded-2xl shadow-2xl ring-1 ring-white/10" /> : <div className="w-full aspect-[2/3] rounded-2xl bg-base-300 flex items-center justify-center">暂无封面</div>}
+            </div>
+            <CollectionEditor animeId={subject.id} />
           </div>
           <div className="bm-detail-info-card flex-1 min-w-0 text-center md:text-left">
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 text-base-content break-words line-clamp-2">{title}</h1>
@@ -290,7 +305,6 @@ export function VueAnimeDetail({ subject, relations, characters, persons, episod
               <span className="badge badge-lg badge-ghost">{typeLabel}</span>
               {subject.eps ? <span className="badge badge-lg badge-ghost">{subject.eps}话</span> : null}
             </div>
-            <CollectionEditor animeId={subject.id} />
           </div>
         </div>
       </div>
@@ -306,7 +320,7 @@ export function VueAnimeDetail({ subject, relations, characters, persons, episod
       {activeTab === 'overview' ? <div className="space-y-6">
         <section>
           <SectionTitle>简介</SectionTitle>
-          <p className="text-sm leading-relaxed text-base-content/70 whitespace-pre-line">{subject.summary || '暂无简介。'}</p>
+          <RichText value={subject.summary} fallback="暂无简介。" />
           {subject.tags?.length ? <div className="flex flex-wrap gap-2 mt-4">{subject.tags.slice(0, 12).map(tag => <span className="badge badge-ghost" key={tag.name}>{tag.name}</span>)}</div> : null}
         </section>
         <section>
@@ -323,7 +337,6 @@ export function VueAnimeDetail({ subject, relations, characters, persons, episod
         : activeTab === 'douban' ? <section><DoubanPanel subject={subject} /></section>
         : activeTab === 'music' ? <section><SectionTitle>相关音乐</SectionTitle><MusicPanel subject={subject} musicRelations={musicRelations} /></section>
         : activeTab === 'streaming' ? <section><SectionTitle>在线观看</SectionTitle><StreamingPanel subject={subject} /></section>
-        : activeTab === 'moegirl' ? <section><SectionTitle>萌娘百科</SectionTitle><MoegirlPanel subject={subject} /></section>
         : activeTab === 'wiki' ? <section><SectionTitle>Wiki</SectionTitle><WikiPanel subject={subject} infobox={infobox} /></section>
         : activeTab === 'talkbox' ? <section><SectionTitle>吐槽箱</SectionTitle><p className="text-sm text-base-content/60 mb-4">和同好聊聊这部作品。</p><Link href={`/anime/${subject.id}/talkbox`} className="btn btn-primary">进入吐槽箱</Link></section>
         : <section><SectionTitle>讨论版</SectionTitle><p className="text-sm text-base-content/60 mb-4">浏览条目相关的长讨论。</p><Link href={`/anime/${subject.id}/topics`} className="btn btn-primary">查看话题</Link></section>}

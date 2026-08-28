@@ -70,7 +70,8 @@ function isBangumiApiUrl(url) {
     url.startsWith('/user/') ||
     url.startsWith('/anime') ||
     url.startsWith('/collection') ||
-    url.startsWith('/comments')
+    url.startsWith('/comments') ||
+    url.startsWith('/groups/')
   )
 }
 function getAuthTokenForUrl(url, auth) {
@@ -84,12 +85,20 @@ function getAuthTokenForUrl(url, auth) {
   return auth.bangmioToken || auth.effectiveBgmToken || null
 }
 
-api.interceptors.request.use(config => {
+api.interceptors.request.use(async config => {
   const auth = getAuthStore()
   const url = config.url || ''
 
   if (auth) {
-    const tokenForRequest = getAuthTokenForUrl(url, auth)
+    let tokenForRequest = getAuthTokenForUrl(url, auth)
+    if (
+      !tokenForRequest &&
+      isBangumiApiUrl(url) &&
+      auth.isBangmioUser &&
+      auth.bangmioUser?.bgmUid
+    ) {
+      tokenForRequest = (await auth.fetchBgmToken()) || auth.effectiveBgmToken || null
+    }
     if (tokenForRequest) {
       config.headers.Authorization = `Bearer ${tokenForRequest}`
     }
