@@ -3840,8 +3840,9 @@ function localStoreCleanup(store, now) {
 function securityHeaders() {
   return async (c, next) => {
     await next();
+    const embeddablePage = /^\/api\/v1\/(?:wikipedia|moegirl|douban)\/page\//.test(c.req.path);
     c.header("X-Content-Type-Options", "nosniff");
-    c.header("X-Frame-Options", "DENY");
+    c.header("X-Frame-Options", embeddablePage ? "SAMEORIGIN" : "DENY");
     c.header("Referrer-Policy", "strict-origin-when-cross-origin");
     c.header("X-XSS-Protection", "1; mode=block");
     const csp = [
@@ -3851,7 +3852,7 @@ function securityHeaders() {
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: https: http:",
       "connect-src 'self' https:",
-      "frame-ancestors 'none'"
+      embeddablePage ? "frame-ancestors 'self'" : "frame-ancestors 'none'"
     ].join("; ");
     c.header("Content-Security-Policy", csp);
   };
@@ -19254,7 +19255,7 @@ function cleanContext(value) {
   }).join("").trim().slice(0, MAX_CONTEXT_LENGTH);
 }
 function systemPrompt(context) {
-  return `\u4F60\u662F Bangmio \u7684\u756A\u5267\u8D44\u6599\u52A9\u624B\u300C\u7C73\u6B27\u300D\u3002\u4F60\u719F\u6089\u52A8\u753B\u3001\u6F2B\u753B\u3001\u6E38\u620F\u3001\u97F3\u4E50\u548C Bangumi \u6761\u76EE\uFF0C\u8BED\u6C14\u53CB\u597D\u3001\u81EA\u7136\u3001\u7B80\u6D01\u3002\u56DE\u7B54\u4F18\u5148\u4F9D\u636E\u5F53\u524D\u9875\u9762\u8D44\u6599\uFF1B\u8D44\u6599\u4E0D\u8DB3\u65F6\u660E\u786E\u8BF4\u4E0D\u77E5\u9053\uFF0C\u4E0D\u7F16\u9020\u94FE\u63A5\u3001\u8BC4\u5206\u3001\u4EBA\u7269\u5173\u7CFB\u6216\u5B9E\u65F6\u4FE1\u606F\u3002\u53EF\u4EE5\u4F7F\u7528 Markdown\uFF0C\u4F46\u4E0D\u8981\u8F93\u51FA HTML\u3002\u5F53\u524D\u9875\u9762\u4E0A\u4E0B\u6587\u5982\u4E0B\uFF1A
+  return `\u4F60\u662F Bangmio \u7684\u756A\u5267\u8D44\u6599\u52A9\u624B\u300C\u6FAA\u300D\u3002\u4F60\u719F\u6089\u52A8\u753B\u3001\u6F2B\u753B\u3001\u6E38\u620F\u3001\u97F3\u4E50\u548C Bangumi \u6761\u76EE\uFF0C\u8BED\u6C14\u53CB\u597D\u3001\u81EA\u7136\u3001\u7B80\u6D01\u3002\u56DE\u7B54\u4F18\u5148\u4F9D\u636E\u5F53\u524D\u9875\u9762\u8D44\u6599\uFF1B\u8D44\u6599\u4E0D\u8DB3\u65F6\u660E\u786E\u8BF4\u4E0D\u77E5\u9053\uFF0C\u4E0D\u7F16\u9020\u94FE\u63A5\u3001\u8BC4\u5206\u3001\u4EBA\u7269\u5173\u7CFB\u6216\u5B9E\u65F6\u4FE1\u606F\u3002\u53EF\u4EE5\u4F7F\u7528 Markdown\uFF0C\u4F46\u4E0D\u8981\u8F93\u51FA HTML\u3002\u5F53\u524D\u9875\u9762\u4E0A\u4E0B\u6587\u5982\u4E0B\uFF1A
 ${context || "\u5F53\u524D\u9875\u9762\u6CA1\u6709\u53EF\u8BFB\u53D6\u7684\u6B63\u6587\u8D44\u6599\u3002"}`;
 }
 async function callZhipu(c, messages, context) {

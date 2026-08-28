@@ -26,8 +26,12 @@ export type Subject = {
 
 export type Collection = {
   subject_id?: number
+  anime_id?: number
   type?: number
+  status?: number
+  collection_type?: number
   rate?: number
+  rating?: number
   comment?: string
   ep_status?: number
   subject?: Subject

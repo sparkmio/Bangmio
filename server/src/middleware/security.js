@@ -6,8 +6,10 @@ export function securityHeaders() {
   return async (c, next) => {
     await next()
 
+    const embeddablePage = /^\/api\/v1\/(?:wikipedia|moegirl|douban)\/page\//.test(c.req.path)
+
     c.header('X-Content-Type-Options', 'nosniff')
-    c.header('X-Frame-Options', 'DENY')
+    c.header('X-Frame-Options', embeddablePage ? 'SAMEORIGIN' : 'DENY')
     c.header('Referrer-Policy', 'strict-origin-when-cross-origin')
     c.header('X-XSS-Protection', '1; mode=block')
 
@@ -20,7 +22,7 @@ export function securityHeaders() {
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: https: http:",
       "connect-src 'self' https:",
-      "frame-ancestors 'none'"
+      embeddablePage ? "frame-ancestors 'self'" : "frame-ancestors 'none'"
     ].join('; ')
     c.header('Content-Security-Policy', csp)
   }

@@ -62,7 +62,7 @@ function creditImportance(item: Credit, index: number) {
 function Credits({ items, kind }: { items: Credit[]; kind: 'character' | 'person' }) {
   if (!items.length) return <Empty>暂无{kind === 'character' ? '角色' : '制作人员'}资料</Empty>
   const sorted = [...items].sort((a, b) => creditImportance(a, items.indexOf(a)) - creditImportance(b, items.indexOf(b)))
-  return <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">{sorted.slice(0, 32).map((item, index) => {
+  return <div className="bm-credit-grid">{sorted.slice(0, 32).map((item, index) => {
     const name = item.name_cn || item.name || '未命名'
     const image = imageUrl(item.images)
     const identity = item.relation || item.role || item.career?.[0] || (kind === 'character' ? '角色' : '制作人员')
@@ -105,9 +105,35 @@ function ExternalLinks({ subject, douban, bilibili }: { subject: Subject; douban
 }
 
 function EmbedFrame({ src, title, fallbackHref = src }: { src: string; title: string; fallbackHref?: string }) {
+  const [html, setHtml] = useState('')
   const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setHtml('')
+    setFailed(false)
+    void fetch(src, { headers: { Accept: 'text/html' }, signal: controller.signal })
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        return response.text()
+      })
+      .then(value => setHtml(value))
+      .catch(error => {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        setFailed(true)
+      })
+    return () => controller.abort()
+  }, [src])
+
   if (failed) return <div className="rounded-xl border border-base-300 bg-base-200/30 p-6 text-center"><p className="text-sm text-base-content/50 mb-3">页面暂时无法嵌入</p><a className="btn btn-sm btn-primary" href={fallbackHref} target="_blank" rel="noopener noreferrer">打开原页面 ↗</a></div>
-  return <iframe title={title} src={src} sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" className="w-full min-h-[620px] rounded-xl border border-base-300 bg-white" loading="lazy" onError={() => setFailed(true)} />
+  if (!html) return <div className="bm-embed-loading" role="status">正在加载页面…</div>
+  return <iframe title={title} srcDoc={html} sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" className="w-full min-h-[620px] rounded-xl border border-base-300 bg-white" loading="lazy" />
+}
+
+function CoverImage({ src, alt = '' }: { src?: string; alt?: string }) {
+  const [failed, setFailed] = useState(false)
+  if (!src || failed) return <span aria-hidden="true">♫</span>
+  return <img src={src} alt={alt} loading="lazy" decoding="async" onError={() => setFailed(true)} />
 }
 
 function DoubanPanel({ subject }: { subject: Subject }) {
@@ -147,7 +173,7 @@ function MusicPanel({ subject, musicRelations }: { subject: Subject; musicRelati
   const [results, setResults] = useState<MusicResult[]>([])
   useEffect(() => { let alive = true; void apiFetch<{ results?: MusicResult[] }>(`/music/search?q=${encodeURIComponent(title)}`).then(data => { if (alive) setResults(data?.results || []) }).catch(() => undefined); return () => { alive = false } }, [title])
   const items: MusicResult[] = useMemo(() => {
-    const relations = musicRelations.map(item => ({ id: item.id, name: item.name, name_cn: item.name_cn, relation: String(item.relation || '') }))
+    const relations = musicRelations.map(item => ({ id: item.id, name: item.name, name_cn: item.name_cn, relation: String(item.relation || ''), cover: imageUrl(item.images) }))
     const seen = new Set(relations.map(item => `${item.name_cn || ''}|${item.name || ''}`))
     return [...relations, ...results.filter(item => !seen.has(`${item.name_cn || ''}|${item.name || ''}`))]
   }, [musicRelations, results])
@@ -159,7 +185,7 @@ function MusicPanel({ subject, musicRelations }: { subject: Subject; musicRelati
     ['YouTube', itemUrl('youtube', name)]
   ] as const
   if (!items.length) return <div className="space-y-4"><Empty>暂无相关音乐</Empty><div className="bm-music-search-links">{platformLinks(title).map(([label, href]) => <a className="btn btn-sm btn-ghost" href={href} key={label} target="_blank" rel="noopener noreferrer">{label}搜索 ↗</a>)}</div></div>
-  return <div className="space-y-4"><div className="bm-music-grid">{items.slice(0, 18).map((item, index) => { const name = item.name_cn || item.name || '未命名音乐'; const artists = Array.isArray(item.artists) ? item.artists.join(' / ') : item.artists || item.album || ''; const directUrl = item.url || (item.id ? `https://music.163.com/#/song?id=${encodeURIComponent(String(item.id))}` : ''); return <article key={item.id || `${name}-${index}`} className="bm-music-card"><div className="bm-music-cover">{item.cover ? <img src={item.cover} alt="" loading="lazy" decoding="async" /> : <span aria-hidden="true">♫</span>}</div><div className="bm-music-copy"><div className="bm-music-title-row"><strong>{name}</strong>{item.relation ? <span>{item.relation}</span> : null}</div>{artists ? <p>{artists}</p> : null}<div className="bm-music-links">{platformLinks(name).map(([label, href]) => <a href={href} key={label} target="_blank" rel="noopener noreferrer">{label}</a>)}</div>{directUrl ? <a className="bm-music-direct" href={directUrl} target="_blank" rel="noopener noreferrer">打开网易云歌曲 ↗</a> : null}</div></article> })}</div><div className="bm-music-search-links">{platformLinks(title).map(([label, href]) => <a className="btn btn-sm btn-ghost" href={href} key={label} target="_blank" rel="noopener noreferrer">在{label}搜索更多 ↗</a>)}</div></div>
+  return <div className="space-y-4"><div className="bm-music-grid">{items.slice(0, 18).map((item, index) => { const name = item.name_cn || item.name || '未命名音乐'; const artists = Array.isArray(item.artists) ? item.artists.join(' / ') : item.artists || item.album || ''; return <article key={item.id || `${name}-${index}`} className="bm-music-card"><div className="bm-music-cover"><CoverImage src={item.cover} alt={name} /></div><div className="bm-music-copy"><div className="bm-music-title-row"><strong>{name}</strong>{item.relation ? <span>{item.relation}</span> : null}</div>{artists ? <p>{artists}</p> : null}<div className="bm-music-links">{platformLinks(name).map(([label, href]) => <a href={href} key={label} target="_blank" rel="noopener noreferrer">{label}</a>)}</div></div></article> })}</div><div className="bm-music-search-links">{platformLinks(title).map(([label, href]) => <a className="btn btn-sm btn-ghost" href={href} key={label} target="_blank" rel="noopener noreferrer">在{label}搜索更多 ↗</a>)}</div></div>
 }
 
 function itemUrl(platform: string, query: string) {
@@ -224,7 +250,8 @@ function WikiPanel({ subject, infobox }: { subject: Subject; infobox: InfoboxIte
     return () => { alive = false }
   }, [names.join('|')])
   const fallbackUrl = article?.url || `https://zh.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(names[0] || '')}`
-  return <div className="space-y-5">{loading ? <Empty>正在搜索维基百科…</Empty> : article?.title ? <article className="bm-reference-card"><header><h3>{article.title}</h3><a href={fallbackUrl} target="_blank" rel="noopener noreferrer">原站词条 ↗</a></header><EmbedFrame src={`/api/v1/wikipedia/page/${encodeURIComponent(article.title)}`} title={`${article.title} · Wikipedia`} fallbackHref={fallbackUrl} /></article> : <div className="bm-reference-empty"><p>未找到维基百科条目</p><a href={fallbackUrl} target="_blank" rel="noopener noreferrer">前往维基百科搜索 ↗</a></div>}</div>
+  const bangumiItems = infobox.slice(0, 14)
+  return <div className="space-y-5"><article className="bm-bangumi-wiki-card"><header><div><h3>Bangumi Wiki</h3><p>来自 Bangumi 条目的资料</p></div><a href={`https://bangumi.tv/subject/${subject.id}`} target="_blank" rel="noopener noreferrer">原条目 ↗</a></header>{subject.summary ? <p className="bm-bangumi-wiki-summary">{subject.summary}</p> : null}{bangumiItems.length ? <dl>{bangumiItems.map((item, index) => <div key={`${item.key}-${index}`}><dt>{item.key || '资料'}</dt><dd>{valueText(item.value)}</dd></div>)}</dl> : <p className="bm-reference-muted">暂无额外 Wiki 字段。</p>}</article>{loading ? <Empty>正在搜索维基百科…</Empty> : article?.title ? <article className="bm-reference-card"><header><h3>{article.title}</h3><a href={fallbackUrl} target="_blank" rel="noopener noreferrer">原站词条 ↗</a></header><EmbedFrame src={`/api/v1/wikipedia/page/${encodeURIComponent(article.title)}`} title={`${article.title} · Wikipedia`} fallbackHref={fallbackUrl} /></article> : <div className="bm-reference-empty"><p>未找到维基百科条目</p><a href={fallbackUrl} target="_blank" rel="noopener noreferrer">前往维基百科搜索 ↗</a></div>}</div>
 }
 
 export function VueAnimeDetail({ subject, relations, characters, persons, episodes, infobox }: Props) {
@@ -250,11 +277,11 @@ export function VueAnimeDetail({ subject, relations, characters, persons, episod
       </div>
       <div className="relative max-w-5xl mx-auto px-4 md:px-8 py-10 md:py-16">
         <Link href="/anime" className="btn btn-ghost btn-sm text-primary/80 mb-4 inline-flex items-center gap-1">← 返回</Link>
-        <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-start">
-          <div className="flex-shrink-0 w-40 sm:w-48 md:w-60 mx-auto md:mx-0">
+        <div className="bm-detail-hero-grid">
+          <div className="bm-detail-poster flex-shrink-0 w-40 sm:w-48 md:w-60 mx-auto md:mx-0">
             {image ? <img src={image} alt={title} loading="eager" decoding="async" className="w-full rounded-2xl shadow-2xl ring-1 ring-white/10" /> : <div className="w-full aspect-[2/3] rounded-2xl bg-base-300 flex items-center justify-center">暂无封面</div>}
           </div>
-          <div className="flex-1 min-w-0 text-center md:text-left">
+          <div className="bm-detail-info-card flex-1 min-w-0 text-center md:text-left">
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 text-base-content break-words line-clamp-2">{title}</h1>
             {subject.name_cn && subject.name && subject.name_cn !== subject.name ? <p className="text-base text-base-content/50 mb-4">{subject.name}</p> : null}
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-6">

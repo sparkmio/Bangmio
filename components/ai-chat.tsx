@@ -8,7 +8,7 @@ type Message = { role: 'user' | 'assistant'; content: string }
 type Conversation = { id: string; title: string; messages: Message[]; updatedAt: number }
 
 const STORAGE_KEY = 'bangmio-ai-conversations-v1'
-const OPENING: Message = { role: 'assistant', content: '你好，我是米欧，Bangmio 的番剧资料助手。\n\n我可以结合你当前正在浏览的页面，帮你梳理剧情、角色、制作信息、音乐和观看顺序。你也可以直接问我：“这页最值得关注的是什么？”' }
+const OPENING: Message = { role: 'assistant', content: '你好，我是澪，Bangmio 的番剧资料助手。\n\n我可以结合你当前正在浏览的页面，帮你梳理剧情、角色、制作信息、音乐和观看顺序。你也可以直接问我：“这页最值得关注的是什么？”' }
 const DEFAULT_SUGGESTIONS = ['用当前页面内容概括这部作品', '介绍页面里的主要角色和关系', '找出这部作品的音乐与演唱者', '这部作品适合什么顺序观看？']
 
 function readConversations(): Conversation[] {
@@ -196,7 +196,7 @@ export function AiChat({ context }: { context?: string }) {
 
   return <>
     {open ? <section className="bm-ai-panel" role="dialog" aria-label="Bangmio AI 对话">
-      <header className="bm-ai-header"><div><h2>Bangmio AI</h2><p>米欧 · 当前页面资料助手</p></div><div className="bm-ai-header-actions"><button type="button" onClick={() => setHistoryOpen(value => !value)} aria-label="查看历史对话">历史</button><button type="button" onClick={createConversation} aria-label="新建对话">新建</button><button type="button" onClick={() => setOpen(false)} aria-label="关闭 AI 对话">×</button></div></header>
+      <header className="bm-ai-header"><div><h2>Bangmio AI</h2><p>澪 · 当前页面资料助手</p></div><div className="bm-ai-header-actions"><button type="button" onClick={() => setHistoryOpen(value => !value)} aria-label="查看历史对话">历史</button><button type="button" onClick={createConversation} aria-label="新建对话">新建</button><button type="button" onClick={() => setOpen(false)} aria-label="关闭 AI 对话">×</button></div></header>
       {historyOpen ? <aside className="bm-ai-history"><div className="bm-ai-history-title">历史对话</div>{conversations.length ? conversations.map(item => <button type="button" key={item.id} className={item.id === conversationId ? 'is-active' : ''} onClick={() => { setConversationId(item.id); setHistoryOpen(false) }}>{item.title}</button>) : <p>还没有已保存的对话</p>}</aside> : null}
       <div ref={scrollRef} className="bm-ai-messages">{messages.map((message, index) => <div key={`${message.role}-${index}`} className={`bm-ai-message ${message.role === 'user' ? 'is-user' : 'is-assistant'}`}>{message.role === 'assistant' ? <MarkdownMessage content={message.content} /> : <p>{message.content}</p>}</div>)}{busy ? <div className="bm-ai-message is-assistant"><p>正在思考…</p></div> : null}</div>
       <div className="bm-ai-suggestions">{suggestions.slice(0, 4).map(item => <button type="button" key={item} onClick={() => setInput(item)}>{item}</button>)}</div>
