@@ -81,8 +81,11 @@ function StarRating({ score, size = 'text-base' }: { score?: number; size?: stri
 
 function RatingChart({ subject }: { subject: Subject }) {
   const counts = subject.rating?.count || {}
-  const max = Math.max(1, ...Object.values(counts).map(Number))
-  return <div className="rounded-xl bg-base-200/40 p-5"><div className="flex items-center gap-5"><div className="text-center w-24 shrink-0"><p className="text-3xl font-black text-amber-400">{subject.rating?.score ? Number(subject.rating.score).toFixed(1) : '—'}</p><StarRating score={subject.rating?.score} size="text-sm" /><p className="text-xs text-base-content/40 mt-1">{subject.rating?.total || 0} 人评分</p></div><div className="flex-1 space-y-1.5">{Array.from({ length: 10 }, (_, index) => 10 - index).map(score => <div key={score} className="flex items-center gap-2 text-xs"><span className="w-4 text-right text-base-content/40">{score}</span><div className="flex-1 h-1.5 rounded-full overflow-hidden bg-base-300/60"><div className="h-full rounded-full bg-primary" style={{ width: `${(Number(counts[score] || 0) / max) * 100}%` }} /></div><span className="w-8 text-right text-base-content/40">{counts[score] || 0}</span></div>)}</div></div></div>
+  const scores = Array.from({ length: 10 }, (_, index) => 10 - index)
+  const values = scores.map(score => Number(counts[score] || 0))
+  const max = Math.max(0, ...values)
+  const total = Number(subject.rating?.total || values.reduce((sum, value) => sum + value, 0))
+  return <article className="bm-rating-chart-card" aria-label="评分分布"><header><div><h3>评分分布</h3><p>{total.toLocaleString()} 人评分</p></div><strong>{subject.rating?.score ? Number(subject.rating.score).toFixed(1) : '—'}</strong></header><div className="bm-rating-chart-bars">{scores.map((score, index) => { const count = values[index]; const height = max ? Math.max(5, count / max * 100) : 0; return <div className="bm-rating-chart-column" key={score} title={score + ' 分：' + count + ' 人'}><span className="bm-rating-chart-count">{count || ''}</span><div className="bm-rating-chart-bar-track"><span className="bm-rating-chart-bar" style={{ height: height + '%' }} /></div><small>{score}</small></div> })}</div><div className="bm-rating-chart-caption"><StarRating score={subject.rating?.score} size="text-sm" /><span>10 分制</span></div></article>
 }
 
 function CollectionChart({ subject }: { subject: Subject }) {
@@ -304,7 +307,7 @@ export function VueAnimeDetail({ subject, relations, characters, persons, episod
               <span className="badge badge-lg badge-ghost">{typeLabel}</span>
               {subject.eps ? <span className="badge badge-lg badge-ghost">{subject.eps}话</span> : null}
             </div>
-            <CollectionEditor animeId={subject.id} />
+            <CollectionEditor animeId={subject.id} episodes={episodes} totalEpisodes={subject.eps || subject.eps_count || episodes.length} />
           </div>
         </div>
       </div>
@@ -323,6 +326,7 @@ export function VueAnimeDetail({ subject, relations, characters, persons, episod
           <RichText value={subject.summary} fallback="暂无简介。" />
           {subject.tags?.length ? <div className="flex flex-wrap gap-2 mt-4">{subject.tags.slice(0, 12).map(tag => <span className="badge badge-ghost" key={tag.name}>{tag.name}</span>)}</div> : null}
         </section>
+        <div className="bm-detail-stats-grid"><RatingChart subject={subject} /><CollectionChart subject={subject} /></div>
         <section>
           <SectionTitle>条目信息</SectionTitle>
           <dl className="bm-detail-facts">{primaryMeta.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>

@@ -11,3 +11,7 @@ JWT_SECRET=change-me-to-a-random-secret-at-least-32-chars
 
 # 全局加密 salt（用于派生密钥等，生产环境请使用随机字符串）
 BGMIO_SALT=change-me-to-a-random-salt
+
+# Resend 邮件服务（不要提交真实密钥；生产环境请配置为 Cloudflare Worker Secret）
+RESEND_API_KEY=re_your_resend_api_key
+RESEND_FROM=Bangmio <signup@bangmio.site>

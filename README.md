@@ -51,6 +51,15 @@ Bangumi (bgm.tv) 第三方客户端。支持 OAuth 登录、动画浏览与搜�
 
 修改 Worker 变量后请重新部署一次，再从 `https://bangmio.site` 发起登录。不要使用 `www` 或 `pages.dev` 地址测试 OAuth。授权返回后如果仍失败，页面会区分显示：配置错误、回调地址/授权码错误，或 Bangumi 上游暂时不可用。
 
+### Resend 邮件验证码配置
+
+注册页的邮箱验证码依赖 Resend。请在 Cloudflare Worker `bangmio-next` 的 **Settings → Variables and Secrets** 中添加：
+
+- `RESEND_API_KEY`：Resend API Key，必须选择 **Secret**，不要写入 `wrangler.toml`、代码或 Git；
+- `RESEND_FROM`：可选发件人，默认是 `Bangmio <signup@bangmio.site>`。该地址的域名必须已在 Resend 中验证。
+
+添加或更换 Secret 后需要重新部署 Worker。若仍提示邮件服务未配置，说明当前运行环境没有读取到 `RESEND_API_KEY`；若 Resend 返回发件人错误，请在 Resend 中验证 `bangmio.site`，并使用该已验证域名下的发件人地址。已经在聊天或日志中暴露过的 API Key 应立即在 Resend 控制台撤销并重新生成，旧 Key 不要继续使用。
+
 ## Cloudflare Workers 部署
 
 当前项目使用根目录的 `wrangler.toml` 和 OpenNext 配置，不再使用旧版 Pages 的 `client/dist` 静态目录。先执行 dry-run 检查，再部署：

@@ -27,18 +27,21 @@ const DEFAULT_FROM = 'Bangmio <signup@bangmio.site>'
  * @throws {Error} 当 API 调用失败（非 2xx）时抛出带状态码与响应体的错误。
  */
 export async function sendEmail({ to, subject, html }, apiKey, from) {
-  if (!apiKey) throw new Error('RESEND_API_KEY 未配置')
-  if (!to) throw new Error('收件人不能为空')
+  const normalizedApiKey = String(apiKey || '').trim()
+  const normalizedFrom = String(from || DEFAULT_FROM).trim()
+  const normalizedTo = String(to || '').trim()
+  if (!normalizedApiKey) throw new Error('RESEND_API_KEY 未配置')
+  if (!normalizedTo) throw new Error('收件人不能为空')
 
   const res = await fetch(RESEND_API, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${normalizedApiKey}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      from: from || DEFAULT_FROM,
-      to,
+      from: normalizedFrom,
+      to: normalizedTo,
       subject,
       html
     })
@@ -49,7 +52,11 @@ export async function sendEmail({ to, subject, html }, apiKey, from) {
     throw new Error(`Resend API ${res.status}: ${text}`)
   }
 
-  return res.json()
+  const payload = await res.json().catch(() => null)
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Resend API 返回了无效响应')
+  }
+  return payload
 }
 
 /**

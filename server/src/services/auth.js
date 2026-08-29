@@ -84,8 +84,8 @@ function httpError(status, message) {
  *
  * 流程：
  * 1. 检查 1 分钟内是否已发送过（防滥用），未到冷却时间返回剩余秒数
- * 2. 生成 6 位数字验证码并写入 D1（10 分钟过期）
- * 3. 通过 Resend 发送验证码邮件
+ * 2. 生成 6 位数字验证码并通过 Resend 发送邮件
+ * 3. 邮件发送成功后写入 D1（10 分钟过期），避免发送失败留下可用冷却记录
  *
  * @param {D1Database} db - D1 binding。
  * @param {object} env - 环境变量（需含 `RESEND_API_KEY`，可选 `RESEND_FROM`）。
@@ -104,7 +104,6 @@ export async function sendVerificationCode(db, env, { email, purpose = 'register
     throw httpError(500, '邮件服务未配置（缺少 RESEND_API_KEY）')
   }
   const code = generateNumericCode()
-  await createCode(db, { email: normalizedEmail, code, purpose })
   try {
     await sendEmail(
       {
@@ -118,6 +117,12 @@ export async function sendVerificationCode(db, env, { email, purpose = 'register
   } catch (err) {
     logError('验证码邮件发送失败', { email: normalizedEmail, error: String(err) })
     throw httpError(500, '验证码发送失败，请稍后重试')
+  }
+  try {
+    await createCode(db, { email: normalizedEmail, code, purpose })
+  } catch (err) {
+    logError('验证码记录写入失败', { email: normalizedEmail, error: String(err) })
+    throw httpError(500, '验证码记录保存失败，请稍后重试')
   }
   logInfo('验证码已发送', { email: normalizedEmail, purpose })
   return { sent: true, cooldownSeconds: 0 }

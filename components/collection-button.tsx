@@ -15,10 +15,6 @@ const options = [
 ] as const
 
 export function collectionStatusValue(collection?: Partial<Collection> | null) {
-  // The detail endpoint exposes this as `status`, while Bangumi's native
-  // collection payload calls the same field `type`. Prefer the normalized
-  // API field so a subject's unrelated `type` value cannot be shown as a
-  // collection state.
   const raw = collection?.status ?? collection?.collection_type ?? collection?.type
   const value = Number(raw)
   return Number.isInteger(value) && value >= 1 && value <= 5 ? value : 0
@@ -28,6 +24,12 @@ export function collectionRatingValue(collection?: Partial<Collection> | null) {
   const raw = collection?.rate ?? collection?.rating
   const value = Number(raw)
   return Number.isInteger(value) && value >= 0 && value <= 10 ? value : 0
+}
+
+export function collectionEpisodeValue(collection?: Partial<Collection> | null) {
+  const raw = collection?.ep_status ?? collection?.episode
+  const value = Number(raw)
+  return Number.isSafeInteger(value) && value >= 0 ? value : 0
 }
 
 export function collectionStatusLabel(status: number) {
@@ -72,11 +74,14 @@ export function CollectionButton({ animeId, initialStatus = 0, onSaved }: { anim
   return <div className="bm-collection-status"><button className="bm-collection-status-button" type="button" onClick={() => setOpen(value => !value)} disabled={saving}>{saving ? '保存中…' : label} <span aria-hidden="true">⌄</span></button>{open ? <div className="bm-collection-menu" role="menu">{options.map(([value, text]) => <button key={value} className={value === status ? 'is-active' : ''} onClick={() => select(value)} type="button" role="menuitem">{text}{value === status ? ' ✓' : ''}</button>)}</div> : null}{message ? <div className="bm-collection-error">{message}</div> : null}</div>
 }
 
-export function CollectionEditor({ animeId }: { animeId: number }) {
+type CollectionEditorProps = { animeId: number; episodes?: Array<{ sort?: number; name?: string; name_cn?: string }>; totalEpisodes?: number }
+
+export function CollectionEditor({ animeId, episodes = [], totalEpisodes = 0 }: CollectionEditorProps) {
   const { ready, isAuthenticated, request } = useAuth()
   const router = useRouter()
   const [collection, setCollection] = useState<Collection | null>(null)
   const [rating, setRating] = useState(0)
+  const [episode, setEpisode] = useState(0)
   const [comment, setComment] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -85,13 +90,17 @@ export function CollectionEditor({ animeId }: { animeId: number }) {
     if (!ready || !isAuthenticated) {
       setCollection(null)
       setRating(0)
+      setEpisode(0)
       setComment('')
       return
     }
     let alive = true
     request<Collection>(`/collection/${animeId}`).then(payload => {
       if (!alive || !payload.data) return
-      setCollection(payload.data); setRating(collectionRatingValue(payload.data)); setComment(String(payload.data.comment || ''))
+      setCollection(payload.data)
+      setRating(collectionRatingValue(payload.data))
+      setEpisode(collectionEpisodeValue(payload.data))
+      setComment(String(payload.data.comment || ''))
     }).catch(() => undefined)
     return () => { alive = false }
   }, [animeId, isAuthenticated, ready, request])
@@ -102,7 +111,10 @@ export function CollectionEditor({ animeId }: { animeId: number }) {
     setBusy(true); setMessage('')
     try {
       const payload = await request<Collection>(`/collection/${animeId}`, { method: 'POST', body: JSON.stringify({ rating, comment }) })
-      setCollection(payload.data || collection); setRating(collectionRatingValue(payload.data || collection)); setMessage('评分和短评已保存')
+      setCollection(current => ({ ...current, ...payload.data }))
+      setRating(collectionRatingValue(payload.data || collection))
+      setEpisode(collectionEpisodeValue(payload.data || collection))
+      setMessage('评分和短评已保存')
     } catch (error) { setMessage(error instanceof Error ? error.message : '保存失败') } finally { setBusy(false) }
   }
 
@@ -115,13 +127,35 @@ export function CollectionEditor({ animeId }: { animeId: number }) {
     setRating(current => Math.min(10, Math.max(0, current + delta)))
   }
 
+  const episodeTotal = Math.max(0, Number(totalEpisodes || episodes.length || 0))
+  const episodeItems = Array.from({ length: episodeTotal }, (_, index) => index + 1)
+  const watching = collectionStatusValue(collection) === 3
+  const progressPercent = episodeTotal ? Math.round((episode / episodeTotal) * 100) : 0
+
+  async function updateEpisode(nextEpisode: number) {
+    const bounded = Math.max(0, Math.min(episodeTotal, nextEpisode))
+    if (bounded === episode || !isAuthenticated) return
+    const previous = episode
+    setEpisode(bounded)
+    setBusy(true)
+    setMessage('')
+    try {
+      const payload = await request<Collection>(`/collection/${animeId}`, { method: 'POST', body: JSON.stringify({ episode: bounded }) })
+      setCollection(current => ({ ...current, ...payload.data, ep_status: bounded, episode: bounded }))
+      setEpisode(collectionEpisodeValue(payload.data) || bounded)
+    } catch (error) {
+      setEpisode(previous)
+      setMessage(error instanceof Error ? error.message : '观看进度保存失败')
+    } finally { setBusy(false) }
+  }
+
   if (!ready) return <section className="bm-collection-editor is-loading"><p>正在读取收藏记录…</p></section>
 
   return (
     <section className="bm-collection-editor">
       <header className="bm-collection-head">
         <div>
-          <h2>我的收藏</h2>
+          <h2>收藏盒</h2>
           <p>记录收藏状态、评分和短评</p>
         </div>
       </header>
@@ -131,13 +165,7 @@ export function CollectionEditor({ animeId }: { animeId: number }) {
             <CollectionButton
               animeId={animeId}
               initialStatus={collectionStatusValue(collection)}
-              onSaved={next =>
-                setCollection(current => ({
-                  ...current,
-                  ...next,
-                  status: collectionStatusValue(next)
-                }))
-              }
+              onSaved={next => setCollection(current => ({ ...current, ...next, status: collectionStatusValue(next) }))}
             />
             <div className="bm-collection-rating">
               <span>评分</span>
@@ -156,52 +184,32 @@ export function CollectionEditor({ animeId }: { animeId: number }) {
                   }
                 }}
               >
-                <span className="bm-rating-picker-stars" aria-hidden="true">
-                  {Array.from({ length: 5 }, (_, index) => (
-                    <span key={index} className="bm-rating-star">
-                      <span className="bm-rating-star-base">☆</span>
-                      <span className="bm-rating-star-fill" style={{ width: (rating >= (index + 1) * 2 ? 100 : rating === index * 2 + 1 ? 50 : 0) + '%' }}>★</span>
-                    </span>
-                  ))}
-                </span>
-                <div className="bm-rating-picker-hitboxes">
+                <div className="bm-rating-picker-stars">
                   {Array.from({ length: 10 }, (_, index) => {
                     const value = index + 1
-                    return (
-                      <button
-                        key={value}
-                        type="button"
-                        role="radio"
-                        aria-checked={rating === value}
-                        aria-label={`${value / 2} 星（${value} 分）`}
-                        className={rating === value ? 'is-selected' : ''}
-                        onClick={() => chooseRating(value)}
-                      >
-                        <span aria-hidden="true" />
-                      </button>
-                    )
+                    return <button key={value} type="button" role="radio" aria-checked={rating === value} aria-label={`${value} 分`} className={rating >= value ? 'is-selected' : ''} onClick={() => chooseRating(value)}>{rating >= value ? '★' : '☆'}</button>
                   })}
                 </div>
               </div>
-              <small>{rating ? `${rating} 分 · ${(rating / 2).toFixed(1)} 星` : '未评分'}</small>
+              <small>{rating ? `${rating} 分` : '未评分'}</small>
             </div>
           </div>
+          {watching && episodeTotal ? <section className="bm-watch-progress-card" aria-label="观看进度管理">
+            <div className="bm-watch-progress-head">
+              <div><strong>观看进度管理</strong><span>已看 {episode} / {episodeTotal} 集</span></div>
+              <button type="button" onClick={() => void updateEpisode(episodeTotal)} disabled={busy || episode === episodeTotal}>全部看过</button>
+            </div>
+            <div className="bm-watch-progress-track" aria-hidden="true"><span style={{ width: `${progressPercent}%` }} /></div>
+            <div className="bm-watch-progress-episodes">{episodeItems.map(item => <button key={item} type="button" className={item <= episode ? 'is-watched' : ''} aria-label={`标记看到第 ${item} 集`} aria-pressed={item <= episode} onClick={() => void updateEpisode(item)} disabled={busy}>{String(item).padStart(2, '0')}</button>)}</div>
+          </section> : null}
           <form className="bm-collection-form" onSubmit={saveDetails}>
             <label className="bm-collection-comment">
               <span>短评</span>
-              <textarea
-                rows={2}
-                maxLength={2000}
-                value={comment}
-                onChange={event => setComment(event.target.value)}
-                placeholder="写点观后感…"
-              />
+              <textarea rows={2} maxLength={2000} value={comment} onChange={event => setComment(event.target.value)} placeholder="写点观后感…" />
             </label>
             <div className="bm-collection-actions">
               <span role="status">{message}</span>
-              <button type="submit" disabled={busy}>
-                {busy ? '保存中…' : '保存记录'}
-              </button>
+              <button type="submit" disabled={busy}>{busy ? '保存中…' : '保存记录'}</button>
             </div>
           </form>
         </>

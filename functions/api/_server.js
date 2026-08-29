@@ -4322,17 +4322,20 @@ function resendCooldownSeconds(latest) {
 var RESEND_API = "https://api.resend.com/emails";
 var DEFAULT_FROM = "Bangmio <signup@bangmio.site>";
 async function sendEmail({ to, subject, html }, apiKey, from) {
-  if (!apiKey) throw new Error("RESEND_API_KEY \u672A\u914D\u7F6E");
-  if (!to) throw new Error("\u6536\u4EF6\u4EBA\u4E0D\u80FD\u4E3A\u7A7A");
+  const normalizedApiKey = String(apiKey || "").trim();
+  const normalizedFrom = String(from || DEFAULT_FROM).trim();
+  const normalizedTo = String(to || "").trim();
+  if (!normalizedApiKey) throw new Error("RESEND_API_KEY \u672A\u914D\u7F6E");
+  if (!normalizedTo) throw new Error("\u6536\u4EF6\u4EBA\u4E0D\u80FD\u4E3A\u7A7A");
   const res = await fetch(RESEND_API, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${normalizedApiKey}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      from: from || DEFAULT_FROM,
-      to,
+      from: normalizedFrom,
+      to: normalizedTo,
       subject,
       html
     })
@@ -4341,7 +4344,11 @@ async function sendEmail({ to, subject, html }, apiKey, from) {
     const text = await res.text().catch(() => "");
     throw new Error(`Resend API ${res.status}: ${text}`);
   }
-  return res.json();
+  const payload = await res.json().catch(() => null);
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Resend API \u8FD4\u56DE\u4E86\u65E0\u6548\u54CD\u5E94");
+  }
+  return payload;
 }
 function buildVerificationEmailHTML(code) {
   return `<!DOCTYPE html>
@@ -4652,7 +4659,6 @@ async function sendVerificationCode(db, env, { email, purpose = "register" }) {
     throw httpError(500, "\u90AE\u4EF6\u670D\u52A1\u672A\u914D\u7F6E\uFF08\u7F3A\u5C11 RESEND_API_KEY\uFF09");
   }
   const code = generateNumericCode();
-  await createCode(db, { email: normalizedEmail, code, purpose });
   try {
     await sendEmail(
       {
@@ -4666,6 +4672,12 @@ async function sendVerificationCode(db, env, { email, purpose = "register" }) {
   } catch (err) {
     logError("\u9A8C\u8BC1\u7801\u90AE\u4EF6\u53D1\u9001\u5931\u8D25", { email: normalizedEmail, error: String(err) });
     throw httpError(500, "\u9A8C\u8BC1\u7801\u53D1\u9001\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
+  }
+  try {
+    await createCode(db, { email: normalizedEmail, code, purpose });
+  } catch (err) {
+    logError("\u9A8C\u8BC1\u7801\u8BB0\u5F55\u5199\u5165\u5931\u8D25", { email: normalizedEmail, error: String(err) });
+    throw httpError(500, "\u9A8C\u8BC1\u7801\u8BB0\u5F55\u4FDD\u5B58\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5");
   }
   logInfo("\u9A8C\u8BC1\u7801\u5DF2\u53D1\u9001", { email: normalizedEmail, purpose });
   return { sent: true, cooldownSeconds: 0 };
@@ -6361,6 +6373,7 @@ app4.get("/:animeId", async (c) => {
         status: collection.type,
         rating: collection.rate || 0,
         comment: collection.comment || "",
+        ep_status: collection.ep_status || 0,
         episode: collection.ep_status || 0,
         subject: collection.subject || null,
         updated_at: collection.updated_at
@@ -6406,6 +6419,11 @@ app4.post("/:animeId", async (c) => {
       if (comment.length > 2e3) return c.json({ error: "\u8BC4\u8BBA\u4E0D\u80FD\u8D85\u8FC7 2000 \u4E2A\u5B57\u7B26" }, 400);
       payload.comment = comment;
     }
+    if (body.episode !== void 0 || body.ep_status !== void 0) {
+      const episode = parseBoundedInteger2(body.episode ?? body.ep_status, { min: 0, max: 1e4 });
+      if (episode === null) return c.json({ error: "\u89C2\u770B\u8FDB\u5EA6\u4E0D\u5408\u6CD5" }, 400);
+      payload.ep_status = episode;
+    }
     if (!payload.type) {
       if (username) {
         try {
@@ -6439,6 +6457,7 @@ app4.post("/:animeId", async (c) => {
             status: collection.type,
             rating: collection.rate || 0,
             comment: collection.comment || "",
+            ep_status: collection.ep_status || 0,
             episode: collection.ep_status || 0,
             subject: collection.subject || null,
             updated_at: collection.updated_at
@@ -6450,6 +6469,8 @@ app4.post("/:animeId", async (c) => {
             status: payload.type,
             rating: payload.rate || 0,
             comment: payload.comment || "",
+            ep_status: payload.ep_status || 0,
+            episode: payload.ep_status || 0,
             updated: true
           }
         });

@@ -142,6 +142,7 @@ app.get('/:animeId', async c => {
         status: collection.type,
         rating: collection.rate || 0,
         comment: collection.comment || '',
+        ep_status: collection.ep_status || 0,
         episode: collection.ep_status || 0,
         subject: collection.subject || null,
         updated_at: collection.updated_at
@@ -189,6 +190,11 @@ app.post('/:animeId', async c => {
       if (comment.length > 2000) return c.json({ error: '评论不能超过 2000 个字符' }, 400)
       payload.comment = comment
     }
+    if (body.episode !== undefined || body.ep_status !== undefined) {
+      const episode = parseBoundedInteger(body.episode ?? body.ep_status, { min: 0, max: 10000 })
+      if (episode === null) return c.json({ error: '观看进度不合法' }, 400)
+      payload.ep_status = episode
+    }
 
     if (!payload.type) {
       // status 未显式提供：尝试获取当前状态以保留原值
@@ -229,6 +235,7 @@ app.post('/:animeId', async c => {
             status: collection.type,
             rating: collection.rate || 0,
             comment: collection.comment || '',
+            ep_status: collection.ep_status || 0,
             episode: collection.ep_status || 0,
             subject: collection.subject || null,
             updated_at: collection.updated_at
@@ -240,6 +247,8 @@ app.post('/:animeId', async c => {
             status: payload.type,
             rating: payload.rate || 0,
             comment: payload.comment || '',
+            ep_status: payload.ep_status || 0,
+            episode: payload.ep_status || 0,
             updated: true
           }
         })
