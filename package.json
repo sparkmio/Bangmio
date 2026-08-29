@@ -8,7 +8,7 @@
     "dev:server": "node --watch server/src/index.js",
     "server:start": "node server/src/index.js",
     "dev:all": "concurrently -n server,next -c yellow,cyan \"npm:dev:server\" \"npm:dev:next\"",
-    "build": "npm run server:build && npm run next:build",
+    "build": "opennextjs-cloudflare build",
     "server:build": "npx esbuild server/src/app.js --bundle --platform=node --format=esm --outfile=functions/api/_server.js --metafile=functions/api/_meta.json",
     "bundle:size": "node scripts/bundle-size.mjs",
     "postinstall": "npm install --prefix client",
@@ -23,12 +23,12 @@
     "next:build": "next build",
     "typecheck": "tsc --noEmit",
     "next:start": "next start",
-    "next:open": "opennextjs-cloudflare build",
-    "next:deploy": "opennextjs-cloudflare build && wrangler deploy",
+    "next:open": "npm run build",
+    "next:deploy": "npm run build && wrangler deploy",
     "dev:vue": "npm run dev --prefix client",
     "build:vue": "cd client && npm install --no-audit --no-fund && npm run build",
     "lint:vue": "eslint . --ext .js,.vue",
-    "next:dry-run": "opennextjs-cloudflare build && wrangler deploy --dry-run"
+    "next:dry-run": "npm run build && wrangler deploy --dry-run"
   },
   "devDependencies": {
     "@hono/node-server": "^1.17.0",

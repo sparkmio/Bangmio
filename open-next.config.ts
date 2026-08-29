@@ -9,6 +9,7 @@ const override = {
 }
 
 const config: OpenNextConfig = {
+  buildCommand: 'npm run server:build && npm run next:build',
   default: {
     override: {
       wrapper: 'cloudflare-node',
