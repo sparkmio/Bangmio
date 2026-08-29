@@ -127,7 +127,7 @@ function EmbedFrame({ src, title, fallbackHref = src }: { src: string; title: st
 
   if (failed) return <div className="rounded-xl border border-base-300 bg-base-200/30 p-6 text-center"><p className="text-sm text-base-content/50 mb-3">页面暂时无法嵌入</p><a className="btn btn-sm btn-primary" href={fallbackHref} target="_blank" rel="noopener noreferrer">打开原页面 ↗</a></div>
   if (!html) return <div className="bm-embed-loading" role="status">正在加载页面…</div>
-  return <iframe title={title} srcDoc={html} sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" className="w-full min-h-[920px] rounded-xl border border-base-300 bg-white" loading="lazy" />
+  return <iframe title={title} srcDoc={html} sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" className="bm-embed-frame w-full rounded-xl border border-base-300 bg-white" loading="lazy" />
 }
 
 function CoverImage({ src, alt = '' }: { src?: string; alt?: string }) {
@@ -291,10 +291,9 @@ export function VueAnimeDetail({ subject, relations, characters, persons, episod
         <Link href="/anime" className="btn btn-ghost btn-sm text-primary/80 mb-4 inline-flex items-center gap-1">← 返回</Link>
         <div className="bm-detail-hero-grid">
           <div className="bm-detail-left">
-            <div className="bm-detail-poster flex-shrink-0 w-40 sm:w-48 md:w-60 mx-auto md:mx-0">
+            <div className="bm-detail-poster">
               {image ? <img src={image} alt={title} loading="eager" decoding="async" className="w-full rounded-2xl shadow-2xl ring-1 ring-white/10" /> : <div className="w-full aspect-[2/3] rounded-2xl bg-base-300 flex items-center justify-center">暂无封面</div>}
             </div>
-            <CollectionEditor animeId={subject.id} />
           </div>
           <div className="bm-detail-info-card flex-1 min-w-0 text-center md:text-left">
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 text-base-content break-words line-clamp-2">{title}</h1>
@@ -305,6 +304,7 @@ export function VueAnimeDetail({ subject, relations, characters, persons, episod
               <span className="badge badge-lg badge-ghost">{typeLabel}</span>
               {subject.eps ? <span className="badge badge-lg badge-ghost">{subject.eps}话</span> : null}
             </div>
+            <CollectionEditor animeId={subject.id} />
           </div>
         </div>
       </div>

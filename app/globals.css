@@ -578,24 +578,34 @@ html[data-theme='dark'] .bm-auth-page {
 
 .bm-detail-hero-grid {
   display: grid;
-  grid-template-columns: minmax(160px, 240px) minmax(0, 1fr);
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
   align-items: start;
-  gap: 24px;
+  gap: 28px;
 }
 
 .bm-detail-left {
   display: grid;
+  width: 100%;
   min-width: 0;
   align-content: start;
   gap: 14px;
 }
 
 .bm-detail-poster {
+  width: 100%;
   margin: 0;
 }
 
-.bm-detail-left .bm-collection-editor {
+.bm-detail-poster > img,
+.bm-detail-poster > div {
+  display: block;
   width: 100%;
+}
+
+.bm-detail-info-card > .bm-collection-editor {
+  width: min(100%, 560px);
+  margin: 24px 0 0;
+  text-align: left;
 }
 
 .bm-detail-info-card {
@@ -1359,8 +1369,8 @@ html[data-theme='dark'] .bm-auth-page {
 }
 .bm-credit-card {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  aspect-ratio: 9 / 16;
+  grid-template-rows: auto auto;
+  min-height: 0;
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--bm-line);
@@ -1378,6 +1388,7 @@ html[data-theme='dark'] .bm-auth-page {
   box-shadow: var(--bm-shadow);
 }
 .bm-credit-photo {
+  aspect-ratio: 4 / 3;
   min-height: 0;
   display: grid;
   place-items: center;
@@ -1390,26 +1401,29 @@ html[data-theme='dark'] .bm-auth-page {
 .bm-credit-photo img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 .bm-credit-copy {
   display: grid;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
-  min-height: 48px;
-  padding: 8px 9px 9px;
+  min-height: 62px;
+  padding: 10px 11px 11px;
 }
 .bm-credit-copy strong {
+  display: -webkit-box;
   overflow: hidden;
   color: var(--bm-text);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 14px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 .bm-credit-copy small {
   overflow: hidden;
   color: var(--bm-muted);
-  font-size: 10px;
+  font-size: 11px;
+  line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1611,12 +1625,16 @@ html[data-theme='dark'] .bm-auth-page {
   font-size: 12px;
   font-weight: 700;
 }
-.bm-reference-card > iframe {
+.bm-embed-frame {
+  display: block;
+  width: 100%;
+  height: clamp(520px, 72vh, 760px);
+  min-height: 0;
   margin-top: 2px;
 }
 .bm-embed-loading {
   display: grid;
-  min-height: 180px;
+  min-height: clamp(260px, 45vh, 420px);
   place-items: center;
   color: var(--bm-muted);
   border: 1px solid var(--bm-line);
@@ -1624,17 +1642,13 @@ html[data-theme='dark'] .bm-auth-page {
   background: color-mix(in srgb, var(--bm-soft) 55%, var(--bm-surface));
   font-size: 12px;
 }
-@media (max-width: 720px) {
+@media (max-width: 960px) {
   .bm-detail-hero-grid {
     grid-template-columns: 1fr;
-    gap: 18px;
+    gap: 22px;
   }
   .bm-detail-left {
-    width: min(62vw, 220px);
-    justify-self: center;
-  }
-  .bm-detail-poster {
-    width: 100%;
+    width: min(100%, 280px);
     justify-self: center;
   }
   .bm-detail-info-card {
@@ -1643,8 +1657,28 @@ html[data-theme='dark'] .bm-auth-page {
   .bm-detail-info-card .bm-collection-toolbar {
     justify-content: center;
   }
+  .bm-detail-info-card > .bm-collection-editor {
+    margin-right: auto;
+    margin-left: auto;
+  }
   .bm-collection-toolbar {
     grid-template-columns: 1fr;
+  }
+  .bm-credit-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .bm-detail-hero-grid {
+    gap: 18px;
+  }
+  .bm-detail-left {
+    width: min(100%, 280px);
+  }
+  .bm-detail-poster {
+    width: 100%;
+    justify-self: center;
   }
   .bm-collection-rating {
     justify-content: center;
@@ -1652,6 +1686,16 @@ html[data-theme='dark'] .bm-auth-page {
   .bm-credit-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+  }
+  .bm-credit-copy {
+    min-height: 58px;
+    padding: 9px 10px 10px;
+  }
+  .bm-embed-frame {
+    height: clamp(460px, 68vh, 620px);
+  }
+  .bm-embed-loading {
+    min-height: clamp(240px, 42vh, 360px);
   }
   .bm-music-grid {
     grid-template-columns: 1fr;
