@@ -1,52 +1,142 @@
 'use client'
 
 import Link from 'next/link'
+import { EpisodeList } from './episode-list'
+import { DataUnavailable } from './data-unavailable'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { CollectionEditor } from './collection-button'
 import { AnimeGrid } from './anime-card'
 import { RichText } from './rich-text'
-import { displayName, imageUrl } from '@/lib/api'
+import { apiFetch as requestApi, displayName, imageUrl } from '@/lib/api'
 import type { ApiResult, ImageSet, Subject } from '@/lib/types'
 
-type Episode = { id?: number; sort?: number; name?: string; name_cn?: string; airdate?: string; duration?: string }
-type Credit = { id?: number; name?: string; name_cn?: string; relation?: string; role?: string; type?: number; order?: number; career?: string[]; images?: ImageSet }
+type Episode = {
+  id?: number
+  sort?: number
+  name?: string
+  name_cn?: string
+  airdate?: string
+  duration?: string
+}
+type Credit = {
+  id?: number
+  name?: string
+  name_cn?: string
+  relation?: string
+  role?: string
+  type?: number
+  order?: number
+  career?: string[]
+  images?: ImageSet
+}
 type InfoboxItem = { key?: string; value?: unknown }
-type Props = { subject: Subject; relations: Subject[]; characters: Credit[]; persons: Credit[]; episodes: Episode[]; infobox: InfoboxItem[] }
-type TabKey = 'overview' | 'episodes' | 'characters' | 'staff' | 'relations' | 'talkbox' | 'topics' | 'douban' | 'music' | 'streaming' | 'wiki'
-type DoubanData = { id?: string | number; title?: string; rate?: string | number; url?: string; release_year?: string | number; types?: string[]; episodes_count?: number; short_comment?: { content?: string } | null }
-type DoubanComment = { user?: string; rating?: number; time?: string; useful?: number; content?: string }
+type Props = {
+  subject: Subject
+  relations: Subject[]
+  characters: Credit[]
+  persons: Credit[]
+  episodes: Episode[]
+  episodeTotal?: number
+  episodesFailed?: boolean
+  failedSections?: Array<'characters' | 'staff' | 'relations'>
+  infobox: InfoboxItem[]
+}
+type TabKey =
+  | 'overview'
+  | 'episodes'
+  | 'characters'
+  | 'staff'
+  | 'relations'
+  | 'talkbox'
+  | 'topics'
+  | 'douban'
+  | 'music'
+  | 'streaming'
+  | 'wiki'
+type DoubanData = {
+  id?: string | number
+  title?: string
+  rate?: string | number
+  url?: string
+  release_year?: string | number
+  types?: string[]
+  episodes_count?: number
+  short_comment?: { content?: string } | null
+}
+type DoubanComment = {
+  user?: string
+  rating?: number
+  time?: string
+  useful?: number
+  content?: string
+}
 type DoubanReview = DoubanComment & { title?: string }
 type WikipediaResult = { title?: string; description?: string; extract?: string; url?: string }
-type MusicResult = { id?: number | string; name?: string; name_cn?: string; artists?: string | string[]; album?: string; url?: string; cover?: string; relation?: string }
-type BilibiliData = { title?: string; url?: string; cover?: string; score?: number | null; episodes?: number }
+type MusicResult = {
+  id?: number | string
+  name?: string
+  name_cn?: string
+  artists?: string | string[]
+  album?: string
+  url?: string
+  cover?: string
+  relation?: string
+}
+type BilibiliData = {
+  title?: string
+  url?: string
+  cover?: string
+  score?: number | null
+  episodes?: number
+}
 
 const tabs: Array<[TabKey, string]> = [
-  ['overview', '概览'], ['episodes', '章节'], ['characters', '角色'], ['staff', '制作人员'],
-  ['relations', '关联'], ['douban', '豆瓣'], ['music', '音乐'], ['streaming', '在线观看'],
-  ['wiki', 'Wiki'], ['talkbox', '吐槽'], ['topics', '讨论版']
+  ['overview', '概览'],
+  ['episodes', '章节'],
+  ['characters', '角色'],
+  ['staff', '制作人员'],
+  ['relations', '关联'],
+  ['douban', '豆瓣'],
+  ['music', '音乐'],
+  ['streaming', '在线观看'],
+  ['wiki', 'Wiki'],
+  ['talkbox', '吐槽'],
+  ['topics', '讨论版']
 ]
 
 function valueText(value: unknown) {
-  if (Array.isArray(value)) return value.map(item => typeof item === 'string' ? item : typeof item === 'object' && item ? JSON.stringify(item) : String(item)).join(' / ')
+  if (Array.isArray(value))
+    return value
+      .map(item =>
+        typeof item === 'string'
+          ? item
+          : typeof item === 'object' && item
+            ? JSON.stringify(item)
+            : String(item)
+      )
+      .join(' / ')
   if (typeof value === 'string' || typeof value === 'number') return String(value)
   return value ? JSON.stringify(value) : ''
 }
 
 function importantInfobox(infobox: InfoboxItem[]) {
-  const important = /原作|导演|监督|系列构成|脚本|音乐|人物设定|角色设计|制作|制作公司|放送|首播|发行|集数|话数|时长|地区|语言|类型|出版社/i
+  const important =
+    /原作|导演|监督|系列构成|脚本|音乐|人物设定|角色设计|制作|制作公司|放送|首播|发行|集数|话数|时长|地区|语言|类型|出版社/i
   return infobox.filter(item => important.test(String(item.key || ''))).slice(0, 8)
 }
 
-function apiFetch<T>(path: string) {
-  return fetch(`/api/v1${path}`, { headers: { Accept: 'application/json' } }).then(async response => {
-    const payload = await response.json().catch(() => ({})) as ApiResult<T>
-    if (!response.ok) throw new Error(payload.error || `请求失败 (${response.status})`)
-    return payload.data as T
-  })
+async function apiFetch<T>(path: string) {
+  const payload = await requestApi<T>(path)
+  return payload.data as T
 }
 
 function SectionTitle({ children }: { children: ReactNode }) {
-  return <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><span className="w-1 h-5 rounded-full bg-primary" />{children}</h2>
+  return (
+    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+      <span className="w-1 h-5 rounded-full bg-primary" />
+      {children}
+    </h2>
+  )
 }
 
 function Empty({ children = '暂无资料' }: { children?: ReactNode }) {
@@ -61,22 +151,67 @@ function creditImportance(item: Credit, index: number) {
 }
 
 function Credits({ items, kind }: { items: Credit[]; kind: 'character' | 'person' }) {
+  const [expanded, setExpanded] = useState(false)
   if (!items.length) return <Empty>暂无{kind === 'character' ? '角色' : '制作人员'}资料</Empty>
-  const sorted = [...items].sort((a, b) => creditImportance(a, items.indexOf(a)) - creditImportance(b, items.indexOf(b)))
-  return <div className="bm-credit-grid">{sorted.slice(0, 32).map((item, index) => {
-    const name = item.name_cn || item.name || '未命名'
-    const image = imageUrl(item.images)
-    const identity = item.relation || item.role || item.career?.[0] || (kind === 'character' ? '角色' : '制作人员')
-    return <Link href={`/${kind}/${item.id || index}`} key={item.id || `${name}-${index}`} className="bm-credit-card">
-      <div className="bm-credit-photo">{image ? <img src={image} alt={name} loading="lazy" decoding="async" /> : <span>{name.slice(0, 1)}</span>}</div>
-      <div className="bm-credit-copy"><strong>{name}</strong><small>{identity}</small></div>
-    </Link>
-  })}</div>
+  const sorted = [...items].sort(
+    (a, b) => creditImportance(a, items.indexOf(a)) - creditImportance(b, items.indexOf(b))
+  )
+  return (
+    <>
+      <div className="bm-credit-grid">
+        {sorted.slice(0, expanded ? sorted.length : 32).map((item, index) => {
+          const name = item.name_cn || item.name || '未命名'
+          const image = imageUrl(item.images)
+          const identity =
+            item.relation ||
+            item.role ||
+            item.career?.[0] ||
+            (kind === 'character' ? '角色' : '制作人员')
+          return (
+            <Link
+              href={`/${kind}/${item.id || index}`}
+              key={item.id || `${name}-${index}`}
+              className="bm-credit-card"
+            >
+              <div className="bm-credit-photo">
+                {image ? (
+                  <img src={image} alt={name} loading="lazy" decoding="async" />
+                ) : (
+                  <span>{name.slice(0, 1)}</span>
+                )}
+              </div>
+              <div className="bm-credit-copy">
+                <strong>{name}</strong>
+                <small>{identity}</small>
+              </div>
+            </Link>
+          )
+        })}
+      </div>
+      {sorted.length > 32 ? (
+        <button
+          type="button"
+          className="btn btn-ghost mt-4"
+          aria-expanded={expanded}
+          onClick={() => setExpanded(value => !value)}
+        >
+          {expanded ? '收起' : `展开全部 ${sorted.length} 项`}
+        </button>
+      ) : null}
+    </>
+  )
 }
 
 function StarRating({ score, size = 'text-base' }: { score?: number; size?: string }) {
   const value = Math.max(0, Math.min(5, Number(score || 0) / 2))
-  return <span className={`bm-star-rating ${size}`} aria-label={`${value.toFixed(1)} / 5 星`}><span className="bm-star-rating-base">★★★★★</span><span className="bm-star-rating-fill" style={{ width: `${value / 5 * 100}%` }}>★★★★★</span></span>
+  return (
+    <span className={`bm-star-rating ${size}`} aria-label={`${value.toFixed(1)} / 5 星`}>
+      <span className="bm-star-rating-base">★★★★★</span>
+      <span className="bm-star-rating-fill" style={{ width: `${(value / 5) * 100}%` }}>
+        ★★★★★
+      </span>
+    </span>
+  )
 }
 
 function RatingChart({ subject }: { subject: Subject }) {
@@ -85,29 +220,123 @@ function RatingChart({ subject }: { subject: Subject }) {
   const values = scores.map(score => Number(counts[score] || 0))
   const max = Math.max(0, ...values)
   const total = Number(subject.rating?.total || values.reduce((sum, value) => sum + value, 0))
-  return <article className="bm-rating-chart-card" aria-label="评分分布"><header><div><h3>评分分布</h3><p>{total.toLocaleString()} 人评分</p></div><strong>{subject.rating?.score ? Number(subject.rating.score).toFixed(1) : '—'}</strong></header><div className="bm-rating-chart-bars">{scores.map((score, index) => { const count = values[index]; const height = max ? Math.max(5, count / max * 100) : 0; return <div className="bm-rating-chart-column" key={score} title={score + ' 分：' + count + ' 人'}><span className="bm-rating-chart-count">{count || ''}</span><div className="bm-rating-chart-bar-track"><span className="bm-rating-chart-bar" style={{ height: height + '%' }} /></div><small>{score}</small></div> })}</div><div className="bm-rating-chart-caption"><StarRating score={subject.rating?.score} size="text-sm" /><span>10 分制</span></div></article>
+  return (
+    <article className="bm-rating-chart-card" aria-label="评分分布">
+      <header>
+        <div>
+          <h3>评分分布</h3>
+          <p>{total.toLocaleString()} 人评分</p>
+        </div>
+        <strong>{subject.rating?.score ? Number(subject.rating.score).toFixed(1) : '—'}</strong>
+      </header>
+      <div className="bm-rating-chart-bars">
+        {scores.map((score, index) => {
+          const count = values[index]
+          const height = max ? Math.max(5, (count / max) * 100) : 0
+          return (
+            <div
+              className="bm-rating-chart-column"
+              key={score}
+              title={score + ' 分：' + count + ' 人'}
+            >
+              <span className="bm-rating-chart-count">{count || ''}</span>
+              <div className="bm-rating-chart-bar-track">
+                <span className="bm-rating-chart-bar" style={{ height: height + '%' }} />
+              </div>
+              <small>{score}</small>
+            </div>
+          )
+        })}
+      </div>
+      <div className="bm-rating-chart-caption">
+        <StarRating score={subject.rating?.score} size="text-sm" />
+        <span>10 分制</span>
+      </div>
+    </article>
+  )
 }
 
 function CollectionChart({ subject }: { subject: Subject }) {
   const collection = subject.collection || {}
-  const items: Array<[string, string, string]> = [['wish', '想看', 'text-blue-400'], ['doing', '在追', 'text-emerald-400'], ['collect', '看过', 'text-primary'], ['dropped', '弃番', 'text-red-400']]
-  return <div className="rounded-xl bg-base-200/40 p-5"><h3 className="font-semibold text-sm text-base-content/80 mb-4">收藏统计</h3><div className="grid grid-cols-2 gap-3">{items.map(([key, label, color]) => <div key={key} className="text-center p-3 rounded-lg bg-base-300/30"><p className={`text-xl font-bold ${color}`}>{Number(collection[key] || 0).toLocaleString()}</p><p className="text-xs mt-1 text-base-content/40">{label}</p></div>)}</div></div>
+  const items: Array<[string, string, string]> = [
+    ['wish', '想看', 'text-blue-400'],
+    ['doing', '在追', 'text-emerald-400'],
+    ['collect', '看过', 'text-primary'],
+    ['dropped', '弃番', 'text-red-400']
+  ]
+  return (
+    <div className="rounded-xl bg-base-200/40 p-5">
+      <h3 className="font-semibold text-sm text-base-content/80 mb-4">收藏统计</h3>
+      <div className="grid grid-cols-2 gap-3">
+        {items.map(([key, label, color]) => (
+          <div key={key} className="text-center p-3 rounded-lg bg-base-300/30">
+            <p className={`text-xl font-bold ${color}`}>
+              {Number(collection[key] || 0).toLocaleString()}
+            </p>
+            <p className="text-xs mt-1 text-base-content/40">{label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
-function ExternalLinks({ subject, douban, bilibili }: { subject: Subject; douban?: DoubanData | null; bilibili?: BilibiliData | null }) {
+function ExternalLinks({
+  subject,
+  douban,
+  bilibili
+}: {
+  subject: Subject
+  douban?: DoubanData | null
+  bilibili?: BilibiliData | null
+}) {
   const title = displayName(subject)
   const links: Array<[string, string]> = [
     ['Bangumi 条目', `https://bangumi.tv/subject/${subject.id}`],
     ['豆瓣', douban?.url || `https://www.douban.com/search?q=${encodeURIComponent(title)}`],
     ['网易云音乐', `https://music.163.com/#/search/m/?s=${encodeURIComponent(title)}`],
-    ['B 站', bilibili?.url || `https://search.bilibili.com/bangumi?keyword=${encodeURIComponent(title)}`],
-    ['girigirilove', `https://ani.girigirilove.com/search/-------------.html?wd=${encodeURIComponent(title)}`],
+    [
+      'B 站',
+      bilibili?.url || `https://search.bilibili.com/bangumi?keyword=${encodeURIComponent(title)}`
+    ],
+    [
+      'girigirilove',
+      `https://ani.girigirilove.com/search/-------------.html?wd=${encodeURIComponent(title)}`
+    ],
     ['萌娘百科', `https://zh.moegirl.org.cn/index.php?search=${encodeURIComponent(title)}`]
   ]
-  return <section><SectionTitle>外部链接</SectionTitle><div className="flex flex-wrap gap-2">{links.map(([label, href]) => <a key={label} href={href} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-ghost border border-base-300/70">{label} ↗</a>)}</div><p className="text-xs text-base-content/35 mt-3">外部网站内容由对应站点提供，本站只保留跳转入口。</p></section>
+  return (
+    <section>
+      <SectionTitle>外部链接</SectionTitle>
+      <div className="flex flex-wrap gap-2">
+        {links.map(([label, href]) => (
+          <a
+            key={label}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-sm btn-ghost border border-base-300/70"
+          >
+            {label} ↗
+          </a>
+        ))}
+      </div>
+      <p className="text-xs text-base-content/35 mt-3">
+        外部网站内容由对应站点提供，本站只保留跳转入口。
+      </p>
+    </section>
+  )
 }
 
-function EmbedFrame({ src, title, fallbackHref = src }: { src: string; title: string; fallbackHref?: string }) {
+function EmbedFrame({
+  src,
+  title,
+  fallbackHref = src
+}: {
+  src: string
+  title: string
+  fallbackHref?: string
+}) {
   const [html, setHtml] = useState('')
   const [failed, setFailed] = useState(false)
 
@@ -128,9 +357,35 @@ function EmbedFrame({ src, title, fallbackHref = src }: { src: string; title: st
     return () => controller.abort()
   }, [src])
 
-  if (failed) return <div className="rounded-xl border border-base-300 bg-base-200/30 p-6 text-center"><p className="text-sm text-base-content/50 mb-3">页面暂时无法嵌入</p><a className="btn btn-sm btn-primary" href={fallbackHref} target="_blank" rel="noopener noreferrer">打开原页面 ↗</a></div>
-  if (!html) return <div className="bm-embed-loading" role="status">正在加载页面…</div>
-  return <iframe title={title} srcDoc={html} sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" className="bm-embed-frame w-full rounded-xl border border-base-300 bg-white" loading="lazy" />
+  if (failed)
+    return (
+      <div className="rounded-xl border border-base-300 bg-base-200/30 p-6 text-center">
+        <p className="text-sm text-base-content/50 mb-3">页面暂时无法嵌入</p>
+        <a
+          className="btn btn-sm btn-primary"
+          href={fallbackHref}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          打开原页面 ↗
+        </a>
+      </div>
+    )
+  if (!html)
+    return (
+      <div className="bm-embed-loading" role="status">
+        正在加载页面…
+      </div>
+    )
+  return (
+    <iframe
+      title={title}
+      srcDoc={html}
+      sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+      className="bm-embed-frame w-full rounded-xl border border-base-300 bg-white"
+      loading="lazy"
+    />
+  )
 }
 
 function CoverImage({ src, alt = '' }: { src?: string; alt?: string }) {
@@ -148,47 +403,239 @@ function DoubanPanel({ subject }: { subject: Subject }) {
   const [reviews, setReviews] = useState<DoubanReview[]>([])
   useEffect(() => {
     let alive = true
-    setLoading(true); setDetails(null); setSummary(null); setComments([]); setReviews([])
-    void apiFetch<DoubanData>(`/douban/by-name?name=${encodeURIComponent(title)}`).then(data => {
-      if (!alive) return
-      setDetails(data || null)
-      if (!data?.id) return null
-      return Promise.all([
-        apiFetch<{ intro?: string }>(`/douban/${data.id}/summary`).catch(() => null),
-        apiFetch<DoubanComment[]>(`/douban/${data.id}/comments`).catch(() => []),
-        apiFetch<DoubanReview[]>(`/douban/${data.id}/reviews`).catch(() => [])
-      ]).then(([nextSummary, nextComments, nextReviews]) => {
+    setLoading(true)
+    setDetails(null)
+    setSummary(null)
+    setComments([])
+    setReviews([])
+    void apiFetch<DoubanData>(`/douban/by-name?name=${encodeURIComponent(title)}`)
+      .then(data => {
         if (!alive) return
-        setSummary(nextSummary); setComments(nextComments || []); setReviews(nextReviews || [])
+        setDetails(data || null)
+        if (!data?.id) return null
+        return Promise.all([
+          apiFetch<{ intro?: string }>(`/douban/${data.id}/summary`).catch(() => null),
+          apiFetch<DoubanComment[]>(`/douban/${data.id}/comments`).catch(() => []),
+          apiFetch<DoubanReview[]>(`/douban/${data.id}/reviews`).catch(() => [])
+        ]).then(([nextSummary, nextComments, nextReviews]) => {
+          if (!alive) return
+          setSummary(nextSummary)
+          setComments(nextComments || [])
+          setReviews(nextReviews || [])
+        })
       })
-    }).catch(() => { if (alive) setDetails(null) }).finally(() => { if (alive) setLoading(false) })
-    return () => { alive = false }
+      .catch(() => {
+        if (alive) setDetails(null)
+      })
+      .finally(() => {
+        if (alive) setLoading(false)
+      })
+    return () => {
+      alive = false
+    }
   }, [title])
   if (loading) return <Empty>正在加载豆瓣资料…</Empty>
-  if (!details?.id) return <div className="text-center py-10"><p className="text-sm text-base-content/40 mb-3">未找到豆瓣条目</p><a className="btn btn-sm btn-ghost" href={`https://www.douban.com/search?q=${encodeURIComponent(title)}`} target="_blank" rel="noopener noreferrer">前往豆瓣搜索 ↗</a></div>
+  if (!details?.id)
+    return (
+      <div className="text-center py-10">
+        <p className="text-sm text-base-content/40 mb-3">未找到豆瓣条目</p>
+        <a
+          className="btn btn-sm btn-ghost"
+          href={`https://www.douban.com/search?q=${encodeURIComponent(title)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          前往豆瓣搜索 ↗
+        </a>
+      </div>
+    )
   const stars = Math.min(5, Math.max(0, Math.round(Number(details.rate || 0) / 2)))
   const doubanUrl = details.url || `https://www.douban.com/search?q=${encodeURIComponent(title)}`
-  return <div className="space-y-5"><div className="rounded-xl bg-base-200/40 p-5"><div className="flex flex-wrap items-baseline gap-3"><h2 className="text-xl font-bold flex-1">{details.title || title}</h2><span className="text-4xl font-black text-amber-500">{details.rate || '—'}</span><span className="text-amber-400 tracking-widest">{'★'.repeat(stars)}{'☆'.repeat(5 - stars)}</span></div><p className="text-sm text-base-content/55 mt-2">{[details.release_year ? `${details.release_year} 年` : '', details.types?.join(' / '), details.episodes_count ? `${details.episodes_count} 集` : ''].filter(Boolean).join(' · ')}</p>{summary?.intro || details.short_comment?.content ? <div className="mt-4 border-l-4 border-amber-500/60 rounded-r-lg bg-base-100/60 p-4 text-sm"><RichText value={summary?.intro || details.short_comment?.content} /></div> : null}<div className="flex flex-wrap gap-2 mt-5"><a className="btn btn-sm btn-primary" href={doubanUrl} target="_blank" rel="noopener noreferrer">前往豆瓣查看 ↗</a><a className="btn btn-sm btn-ghost" href={`/api/v1/douban/page/${details.id}`} target="_blank" rel="noopener noreferrer">打开内嵌页面 ↗</a></div></div>{comments.length ? <section><SectionTitle>短评</SectionTitle><div className="space-y-3">{comments.slice(0, 8).map((comment, index) => <article key={`${comment.user}-${index}`} className="rounded-lg bg-base-200/40 p-3"><p className="text-xs text-base-content/50 mb-1">{comment.user || '匿名用户'} {comment.time ? `· ${comment.time}` : ''}</p><RichText value={comment.content} fallback="暂无内容。" /></article>)}</div></section> : null}{reviews.length ? <section><SectionTitle>长评</SectionTitle><div className="space-y-3">{reviews.slice(0, 5).map((review, index) => <article key={`${review.title}-${index}`} className="rounded-lg bg-base-200/40 p-4"><h3 className="font-medium">{review.title || '豆瓣长评'}</h3><p className="text-xs text-base-content/50 my-1">{review.user || '匿名用户'} {review.time ? `· ${review.time}` : ''}</p><RichText value={review.content} fallback="暂无内容。" /></article>)}</div></section> : null}<EmbedFrame src={`/api/v1/douban/page/${details.id}`} title="豆瓣条目内嵌页面" fallbackHref={doubanUrl} /></div>
+  return (
+    <div className="space-y-5">
+      <div className="rounded-xl bg-base-200/40 p-5">
+        <div className="flex flex-wrap items-baseline gap-3">
+          <h2 className="text-xl font-bold flex-1">{details.title || title}</h2>
+          <span className="text-4xl font-black text-amber-500">{details.rate || '—'}</span>
+          <span className="text-amber-400 tracking-widest">
+            {'★'.repeat(stars)}
+            {'☆'.repeat(5 - stars)}
+          </span>
+        </div>
+        <p className="text-sm text-base-content/55 mt-2">
+          {[
+            details.release_year ? `${details.release_year} 年` : '',
+            details.types?.join(' / '),
+            details.episodes_count ? `${details.episodes_count} 集` : ''
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </p>
+        {summary?.intro || details.short_comment?.content ? (
+          <div className="mt-4 border-l-4 border-amber-500/60 rounded-r-lg bg-base-100/60 p-4 text-sm">
+            <RichText value={summary?.intro || details.short_comment?.content} />
+          </div>
+        ) : null}
+        <div className="flex flex-wrap gap-2 mt-5">
+          <a
+            className="btn btn-sm btn-primary"
+            href={doubanUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            前往豆瓣查看 ↗
+          </a>
+          <a
+            className="btn btn-sm btn-ghost"
+            href={`/api/v1/douban/page/${details.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            打开内嵌页面 ↗
+          </a>
+        </div>
+      </div>
+      {comments.length ? (
+        <section>
+          <SectionTitle>短评</SectionTitle>
+          <div className="space-y-3">
+            {comments.slice(0, 8).map((comment, index) => (
+              <article key={`${comment.user}-${index}`} className="rounded-lg bg-base-200/40 p-3">
+                <p className="text-xs text-base-content/50 mb-1">
+                  {comment.user || '匿名用户'} {comment.time ? `· ${comment.time}` : ''}
+                </p>
+                <RichText value={comment.content} fallback="暂无内容。" />
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {reviews.length ? (
+        <section>
+          <SectionTitle>长评</SectionTitle>
+          <div className="space-y-3">
+            {reviews.slice(0, 5).map((review, index) => (
+              <article key={`${review.title}-${index}`} className="rounded-lg bg-base-200/40 p-4">
+                <h3 className="font-medium">{review.title || '豆瓣长评'}</h3>
+                <p className="text-xs text-base-content/50 my-1">
+                  {review.user || '匿名用户'} {review.time ? `· ${review.time}` : ''}
+                </p>
+                <RichText value={review.content} fallback="暂无内容。" />
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+      <EmbedFrame
+        src={`/api/v1/douban/page/${details.id}`}
+        title="豆瓣条目内嵌页面"
+        fallbackHref={doubanUrl}
+      />
+    </div>
+  )
 }
 
 function MusicPanel({ subject, musicRelations }: { subject: Subject; musicRelations: Subject[] }) {
   const title = displayName(subject)
   const [results, setResults] = useState<MusicResult[]>([])
-  useEffect(() => { let alive = true; void apiFetch<{ results?: MusicResult[] }>(`/music/search?q=${encodeURIComponent(title)}`).then(data => { if (alive) setResults(data?.results || []) }).catch(() => undefined); return () => { alive = false } }, [title])
+  useEffect(() => {
+    let alive = true
+    void apiFetch<{ results?: MusicResult[] }>(`/music/search?q=${encodeURIComponent(title)}`)
+      .then(data => {
+        if (alive) setResults(data?.results || [])
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [title])
   const items: MusicResult[] = useMemo(() => {
-    const relations = musicRelations.map(item => ({ id: item.id, name: item.name, name_cn: item.name_cn, relation: String(item.relation || ''), cover: imageUrl(item.images) }))
+    const relations = musicRelations.map(item => ({
+      id: item.id,
+      name: item.name,
+      name_cn: item.name_cn,
+      relation: String(item.relation || ''),
+      cover: imageUrl(item.images)
+    }))
     const seen = new Set(relations.map(item => `${item.name_cn || ''}|${item.name || ''}`))
-    return [...relations, ...results.filter(item => !seen.has(`${item.name_cn || ''}|${item.name || ''}`))]
+    return [
+      ...relations,
+      ...results.filter(item => !seen.has(`${item.name_cn || ''}|${item.name || ''}`))
+    ]
   }, [musicRelations, results])
-  const platformLinks = (name: string) => [
-    ['网易云', itemUrl('netease', name)],
-    ['QQ 音乐', itemUrl('qq', name)],
-    ['B 站', itemUrl('bilibili', name)],
-    ['Spotify', itemUrl('spotify', name)],
-    ['YouTube', itemUrl('youtube', name)]
-  ] as const
-  if (!items.length) return <div className="space-y-4"><Empty>暂无相关音乐</Empty><div className="bm-music-search-links">{platformLinks(title).map(([label, href]) => <a className="btn btn-sm btn-ghost" href={href} key={label} target="_blank" rel="noopener noreferrer">{label}搜索 ↗</a>)}</div></div>
-  return <div className="space-y-4"><div className="bm-music-grid">{items.slice(0, 18).map((item, index) => { const name = item.name_cn || item.name || '未命名音乐'; const artists = Array.isArray(item.artists) ? item.artists.join(' / ') : item.artists || item.album || ''; return <article key={item.id || `${name}-${index}`} className="bm-music-card"><div className="bm-music-cover"><CoverImage src={item.cover} alt={name} /></div><div className="bm-music-copy"><div className="bm-music-title-row"><strong>{name}</strong>{item.relation ? <span>{item.relation}</span> : null}</div>{artists ? <p>{artists}</p> : null}<div className="bm-music-links">{platformLinks(name).map(([label, href]) => <a href={href} key={label} target="_blank" rel="noopener noreferrer">{label}</a>)}</div></div></article> })}</div><div className="bm-music-search-links">{platformLinks(title).map(([label, href]) => <a className="btn btn-sm btn-ghost" href={href} key={label} target="_blank" rel="noopener noreferrer">在{label}搜索更多 ↗</a>)}</div></div>
+  const platformLinks = (name: string) =>
+    [
+      ['网易云', itemUrl('netease', name)],
+      ['QQ 音乐', itemUrl('qq', name)],
+      ['B 站', itemUrl('bilibili', name)],
+      ['Spotify', itemUrl('spotify', name)],
+      ['YouTube', itemUrl('youtube', name)]
+    ] as const
+  if (!items.length)
+    return (
+      <div className="space-y-4">
+        <Empty>暂无相关音乐</Empty>
+        <div className="bm-music-search-links">
+          {platformLinks(title).map(([label, href]) => (
+            <a
+              className="btn btn-sm btn-ghost"
+              href={href}
+              key={label}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {label}搜索 ↗
+            </a>
+          ))}
+        </div>
+      </div>
+    )
+  return (
+    <div className="space-y-4">
+      <div className="bm-music-grid">
+        {items.slice(0, 18).map((item, index) => {
+          const name = item.name_cn || item.name || '未命名音乐'
+          const artists = Array.isArray(item.artists)
+            ? item.artists.join(' / ')
+            : item.artists || item.album || ''
+          return (
+            <article key={item.id || `${name}-${index}`} className="bm-music-card">
+              <div className="bm-music-cover">
+                <CoverImage src={item.cover} alt={name} />
+              </div>
+              <div className="bm-music-copy">
+                <div className="bm-music-title-row">
+                  <strong>{name}</strong>
+                  {item.relation ? <span>{item.relation}</span> : null}
+                </div>
+                {artists ? <p>{artists}</p> : null}
+                <div className="bm-music-links">
+                  {platformLinks(name).map(([label, href]) => (
+                    <a href={href} key={label} target="_blank" rel="noopener noreferrer">
+                      {label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </article>
+          )
+        })}
+      </div>
+      <div className="bm-music-search-links">
+        {platformLinks(title).map(([label, href]) => (
+          <a
+            className="btn btn-sm btn-ghost"
+            href={href}
+            key={label}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            在{label}搜索更多 ↗
+          </a>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function itemUrl(platform: string, query: string) {
@@ -203,77 +650,249 @@ function itemUrl(platform: string, query: string) {
 function StreamingPanel({ subject }: { subject: Subject }) {
   const title = displayName(subject)
   const [bilibili, setBilibili] = useState<BilibiliData | null>(null)
-  useEffect(() => { let alive = true; void apiFetch<BilibiliData>(`/bilibili/by-name?name=${encodeURIComponent(title)}`).then(data => { if (alive) setBilibili(data || null) }).catch(() => undefined); return () => { alive = false } }, [title])
-  return <div className="space-y-3"><a className="btn btn-primary w-full" href={bilibili?.url || `https://search.bilibili.com/bangumi?keyword=${encodeURIComponent(title)}`} target="_blank" rel="noopener noreferrer">{bilibili?.url ? `前往 B 站观看《${bilibili.title || title}》` : `在 B 站搜索《${title}》`} ↗</a><a className="btn btn-outline w-full" href={`https://ani.girigirilove.com/search/-------------.html?wd=${encodeURIComponent(title)}`} target="_blank" rel="noopener noreferrer">前往 girigirilove 搜索观看 ↗</a><p className="text-xs text-base-content/35 text-center mt-4">点击跳转至第三方网站，本站不存储视频内容。</p></div>
+  useEffect(() => {
+    let alive = true
+    void apiFetch<BilibiliData>(`/bilibili/by-name?name=${encodeURIComponent(title)}`)
+      .then(data => {
+        if (alive) setBilibili(data || null)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [title])
+  return (
+    <div className="space-y-3">
+      <a
+        className="btn btn-primary w-full"
+        href={
+          bilibili?.url ||
+          `https://search.bilibili.com/bangumi?keyword=${encodeURIComponent(title)}`
+        }
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        {bilibili?.url ? `前往 B 站观看《${bilibili.title || title}》` : `在 B 站搜索《${title}》`}{' '}
+        ↗
+      </a>
+      <a
+        className="btn btn-outline w-full"
+        href={`https://ani.girigirilove.com/search/-------------.html?wd=${encodeURIComponent(title)}`}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        前往 girigirilove 搜索观看 ↗
+      </a>
+      <p className="text-xs text-base-content/35 text-center mt-4">
+        点击跳转至第三方网站，本站不存储视频内容。
+      </p>
+    </div>
+  )
 }
 
 function MoegirlPanel({ subject }: { subject: Subject }) {
-  const names = [...new Set([subject.name_cn, subject.name].filter(Boolean).map(String))]
+  const names = useMemo(
+    () => [...new Set([subject.name_cn, subject.name].filter(Boolean).map(String))],
+    [subject.name_cn, subject.name]
+  )
   const [loading, setLoading] = useState(true)
   const [pageName, setPageName] = useState('')
   useEffect(() => {
     let alive = true
-    setLoading(true); setPageName('')
+    setLoading(true)
+    setPageName('')
     const findPage = async () => {
       for (const name of names) {
-        const data = await apiFetch<{ results?: Array<{ title?: string }> }>(`/moegirl/search?q=${encodeURIComponent(name)}`).catch(() => null)
+        const data = await apiFetch<{ results?: Array<{ title?: string }> }>(
+          `/moegirl/search?q=${encodeURIComponent(name)}`
+        ).catch(() => null)
         const found = data?.results?.[0]?.title
         if (!found) continue
         if (alive) setPageName(found)
         return
       }
     }
-    void findPage().finally(() => { if (alive) setLoading(false) })
-    return () => { alive = false }
-  }, [names.join('|')])
+    void findPage().finally(() => {
+      if (alive) setLoading(false)
+    })
+    return () => {
+      alive = false
+    }
+  }, [names])
   if (loading) return <Empty>正在搜索萌娘百科…</Empty>
   const searchUrl = `https://zh.moegirl.org.cn/index.php?search=${encodeURIComponent(names[0] || '')}`
-  if (!pageName) return <div className="bm-reference-empty"><p>未找到萌娘百科条目</p><a href={searchUrl} target="_blank" rel="noopener noreferrer">前往萌娘百科搜索 ↗</a></div>
+  if (!pageName)
+    return (
+      <div className="bm-reference-empty">
+        <p>未找到萌娘百科条目</p>
+        <a href={searchUrl} target="_blank" rel="noopener noreferrer">
+          前往萌娘百科搜索 ↗
+        </a>
+      </div>
+    )
   const moegirlUrl = `https://zh.moegirl.org.cn/${encodeURIComponent(pageName)}`
-  return <article className="bm-reference-card"><header><h3>{pageName}</h3><a href={moegirlUrl} target="_blank" rel="noopener noreferrer">原站词条 ↗</a></header><EmbedFrame src={`/api/v1/moegirl/page/${encodeURIComponent(pageName)}`} title={`${pageName} · 萌娘百科`} fallbackHref={moegirlUrl} /></article>
+  return (
+    <article className="bm-reference-card">
+      <header>
+        <h3>{pageName}</h3>
+        <a href={moegirlUrl} target="_blank" rel="noopener noreferrer">
+          原站词条 ↗
+        </a>
+      </header>
+      <EmbedFrame
+        src={`/api/v1/moegirl/page/${encodeURIComponent(pageName)}`}
+        title={`${pageName} · 萌娘百科`}
+        fallbackHref={moegirlUrl}
+      />
+    </article>
+  )
 }
 
 function WikiPanel({ subject, infobox }: { subject: Subject; infobox: InfoboxItem[] }) {
-  const names = [...new Set([subject.name_cn, subject.name].filter(Boolean).map(String))]
+  const names = useMemo(
+    () => [...new Set([subject.name_cn, subject.name].filter(Boolean).map(String))],
+    [subject.name_cn, subject.name]
+  )
   const [loading, setLoading] = useState(true)
   const [article, setArticle] = useState<WikipediaResult | null>(null)
   const [isChina, setIsChina] = useState(false)
   const [geoReady, setGeoReady] = useState(false)
   useEffect(() => {
     let alive = true
-    void apiFetch<{ isChina?: boolean }>(`/geo`).then(data => {
-      if (!alive) return
-      setIsChina(data?.isChina === true)
-      setGeoReady(true)
-    }).catch(() => { if (alive) { setIsChina(true); setGeoReady(true) } })
-    return () => { alive = false }
+    void apiFetch<{ isChina?: boolean }>(`/geo`)
+      .then(data => {
+        if (!alive) return
+        setIsChina(data?.isChina === true)
+        setGeoReady(true)
+      })
+      .catch(() => {
+        if (alive) {
+          setIsChina(true)
+          setGeoReady(true)
+        }
+      })
+    return () => {
+      alive = false
+    }
   }, [])
   useEffect(() => {
     if (!geoReady || isChina) return
     let alive = true
-    setLoading(true); setArticle(null)
+    setLoading(true)
+    setArticle(null)
     const findArticle = async () => {
       for (const name of names) {
-        const data = await apiFetch<{ results?: WikipediaResult[] }>(`/wikipedia/search?q=${encodeURIComponent(name)}`).catch(() => null)
+        const data = await apiFetch<{ results?: WikipediaResult[] }>(
+          `/wikipedia/search?q=${encodeURIComponent(name)}`
+        ).catch(() => null)
         const result = data?.results?.[0]
         if (!result?.title) continue
         if (alive) setArticle(result)
         return
       }
     }
-    void findArticle().finally(() => { if (alive) setLoading(false) })
-    return () => { alive = false }
-  }, [geoReady, isChina, names.join('|')])
-  const fallbackUrl = article?.url || `https://zh.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(names[0] || '')}`
+    void findArticle().finally(() => {
+      if (alive) setLoading(false)
+    })
+    return () => {
+      alive = false
+    }
+  }, [geoReady, isChina, names])
+  const fallbackUrl =
+    article?.url ||
+    `https://zh.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(names[0] || '')}`
   const bangumiItems = infobox.slice(0, 14)
-  return <div className="space-y-5"><article className="bm-bangumi-wiki-card"><header><div><h3>Bangumi Wiki</h3><p>来自 Bangumi 条目的资料</p></div><a href={`https://bangumi.tv/subject/${subject.id}`} target="_blank" rel="noopener noreferrer">原条目 ↗</a></header>{subject.summary ? <RichText value={subject.summary} /> : null}{bangumiItems.length ? <dl>{bangumiItems.map((item, index) => <div key={`${item.key}-${index}`}><dt>{item.key || '资料'}</dt><dd>{valueText(item.value)}</dd></div>)}</dl> : <p className="bm-reference-muted">暂无额外 Wiki 字段。</p>}</article><MoegirlPanel subject={subject} />{!geoReady ? <div className="bm-reference-empty"><p>正在检测当前地区…</p></div> : isChina ? <div className="bm-reference-empty"><p>Wikipedia 在中国大陆地区不可用</p></div> : loading ? <Empty>正在搜索维基百科…</Empty> : article?.title ? <article className="bm-reference-card"><header><h3>{article.title}</h3><a href={fallbackUrl} target="_blank" rel="noopener noreferrer">原站词条 ↗</a></header><EmbedFrame src={`/api/v1/wikipedia/page/${encodeURIComponent(article.title)}`} title={`${article.title} · Wikipedia`} fallbackHref={fallbackUrl} /></article> : <div className="bm-reference-empty"><p>未找到维基百科条目</p><a href={fallbackUrl} target="_blank" rel="noopener noreferrer">前往维基百科搜索 ↗</a></div>}</div>
+  return (
+    <div className="space-y-5">
+      <article className="bm-bangumi-wiki-card">
+        <header>
+          <div>
+            <h3>Bangumi Wiki</h3>
+            <p>来自 Bangumi 条目的资料</p>
+          </div>
+          <a
+            href={`https://bangumi.tv/subject/${subject.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            原条目 ↗
+          </a>
+        </header>
+        {subject.summary ? <RichText value={subject.summary} /> : null}
+        {bangumiItems.length ? (
+          <dl>
+            {bangumiItems.map((item, index) => (
+              <div key={`${item.key}-${index}`}>
+                <dt>{item.key || '资料'}</dt>
+                <dd>{valueText(item.value)}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className="bm-reference-muted">暂无额外 Wiki 字段。</p>
+        )}
+      </article>
+      <MoegirlPanel subject={subject} />
+      {!geoReady ? (
+        <div className="bm-reference-empty">
+          <p>正在检测当前地区…</p>
+        </div>
+      ) : isChina ? (
+        <div className="bm-reference-empty">
+          <p>Wikipedia 在中国大陆地区不可用</p>
+        </div>
+      ) : loading ? (
+        <Empty>正在搜索维基百科…</Empty>
+      ) : article?.title ? (
+        <article className="bm-reference-card">
+          <header>
+            <h3>{article.title}</h3>
+            <a href={fallbackUrl} target="_blank" rel="noopener noreferrer">
+              原站词条 ↗
+            </a>
+          </header>
+          <EmbedFrame
+            src={`/api/v1/wikipedia/page/${encodeURIComponent(article.title)}`}
+            title={`${article.title} · Wikipedia`}
+            fallbackHref={fallbackUrl}
+          />
+        </article>
+      ) : (
+        <div className="bm-reference-empty">
+          <p>未找到维基百科条目</p>
+          <a href={fallbackUrl} target="_blank" rel="noopener noreferrer">
+            前往维基百科搜索 ↗
+          </a>
+        </div>
+      )}
+    </div>
+  )
 }
 
-export function VueAnimeDetail({ subject, relations, characters, persons, episodes, infobox }: Props) {
+export function VueAnimeDetail({
+  subject,
+  relations,
+  characters,
+  persons,
+  episodes,
+  episodeTotal = episodes.length,
+  episodesFailed = false,
+  failedSections = [],
+  infobox
+}: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
   const image = imageUrl(subject.images)
   const title = displayName(subject)
-  const typeLabel = subject.type === 2 ? '动画' : subject.type === 1 ? '书籍' : subject.type === 3 ? '音乐' : subject.type === 4 ? '游戏' : '条目'
+  const typeLabel =
+    subject.type === 2
+      ? '动画'
+      : subject.type === 1
+        ? '书籍'
+        : subject.type === 3
+          ? '音乐'
+          : subject.type === 4
+            ? '游戏'
+            : '条目'
   const musicRelations = useMemo(() => relations.filter(item => item.type === 3), [relations])
   const nonMusicRelations = useMemo(() => relations.filter(item => item.type !== 3), [relations])
   const infoboxItems = importantInfobox(infobox)
@@ -284,66 +903,226 @@ export function VueAnimeDetail({ subject, relations, characters, persons, episod
     ['排名', subject.rating?.rank ? `#${subject.rating.rank}` : '暂无']
   ]
 
-  return <div>
-    <div className="-mx-4 md:-mx-8 -mt-6 relative overflow-hidden">
-      <div className="absolute inset-0 overflow-hidden">
-        {image ? <img src={image} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover scale-110 blur-3xl opacity-30" /> : null}
-        <div className="absolute inset-0 bg-gradient-to-b from-base-100/60 via-base-100/90 to-base-100" />
-      </div>
-      <div className="relative max-w-5xl mx-auto px-4 md:px-8 py-10 md:py-16">
-        <Link href="/anime" className="btn btn-ghost btn-sm text-primary/80 mb-4 inline-flex items-center gap-1">← 返回</Link>
-        <div className="bm-detail-hero-grid">
-          <div className="bm-detail-left">
-            <div className="bm-detail-poster">
-              {image ? <img src={image} alt={title} loading="eager" decoding="async" className="w-full rounded-2xl shadow-2xl ring-1 ring-white/10" /> : <div className="w-full aspect-[2/3] rounded-2xl bg-base-300 flex items-center justify-center">暂无封面</div>}
+  return (
+    <div>
+      <div className="-mx-4 md:-mx-8 -mt-6 relative overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden">
+          {image ? (
+            <img
+              src={image}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="w-full h-full object-cover scale-110 blur-3xl opacity-30"
+            />
+          ) : null}
+          <div className="absolute inset-0 bg-gradient-to-b from-base-100/60 via-base-100/90 to-base-100" />
+        </div>
+        <div className="relative max-w-5xl mx-auto px-4 md:px-8 py-10 md:py-16">
+          <Link
+            href="/anime"
+            className="btn btn-ghost btn-sm text-primary/80 mb-4 inline-flex items-center gap-1"
+          >
+            ← 返回
+          </Link>
+          <div className="bm-detail-hero-grid">
+            <div className="bm-detail-left">
+              <div className="bm-detail-poster">
+                {image ? (
+                  <img
+                    src={image}
+                    alt={title}
+                    loading="eager"
+                    decoding="async"
+                    className="w-full rounded-2xl shadow-2xl ring-1 ring-white/10"
+                  />
+                ) : (
+                  <div className="w-full aspect-[2/3] rounded-2xl bg-base-300 flex items-center justify-center">
+                    暂无封面
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="bm-detail-info-card flex-1 min-w-0 text-center md:text-left">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 text-base-content break-words line-clamp-2">{title}</h1>
-            {subject.name_cn && subject.name && subject.name_cn !== subject.name ? <p className="text-base text-base-content/50 mb-4">{subject.name}</p> : null}
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-6">
-              {subject.rating?.score ? <span className="badge badge-lg gap-2 font-bold border-0 bg-amber-500/15 text-amber-400"><StarRating score={subject.rating.score} size="text-base" /><span>{Number(subject.rating.score).toFixed(1)}</span><span className="text-xs font-normal text-base-content/40">({subject.rating.total || 0}人)</span></span> : null}
-              {subject.rating?.rank ? <span className="badge badge-lg font-bold border-0 bg-primary/15 text-primary">#{subject.rating.rank}</span> : null}
-              <span className="badge badge-lg badge-ghost">{typeLabel}</span>
-              {subject.eps ? <span className="badge badge-lg badge-ghost">{subject.eps}话</span> : null}
+            <div className="bm-detail-info-card flex-1 min-w-0 text-center md:text-left">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 text-base-content break-words line-clamp-2">
+                {title}
+              </h1>
+              {subject.name_cn && subject.name && subject.name_cn !== subject.name ? (
+                <p className="text-base text-base-content/50 mb-4">{subject.name}</p>
+              ) : null}
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-6">
+                {subject.rating?.score ? (
+                  <span className="badge badge-lg gap-2 font-bold border-0 bg-amber-500/15 text-amber-400">
+                    <StarRating score={subject.rating.score} size="text-base" />
+                    <span>{Number(subject.rating.score).toFixed(1)}</span>
+                    <span className="text-xs font-normal text-base-content/40">
+                      ({subject.rating.total || 0}人)
+                    </span>
+                  </span>
+                ) : null}
+                {subject.rating?.rank ? (
+                  <span className="badge badge-lg font-bold border-0 bg-primary/15 text-primary">
+                    #{subject.rating.rank}
+                  </span>
+                ) : null}
+                <span className="badge badge-lg badge-ghost">{typeLabel}</span>
+                {subject.eps ? (
+                  <span className="badge badge-lg badge-ghost">{subject.eps}话</span>
+                ) : null}
+              </div>
+              <CollectionEditor
+                animeId={subject.id}
+                subjectType={subject.type}
+                episodes={episodes}
+                totalEpisodes={subject.eps || subject.eps_count || episodes.length}
+              />
             </div>
-            <CollectionEditor animeId={subject.id} episodes={episodes} totalEpisodes={subject.eps || subject.eps_count || episodes.length} />
           </div>
         </div>
       </div>
-    </div>
 
-    <div className="sticky top-0 z-30 bg-base-100/80 backdrop-blur-md border-b border-base-300/50">
-      <div className="max-w-5xl mx-auto px-4 md:px-8 flex gap-1 overflow-x-auto scrollbar-hide">
-        {tabs.map(([key, label]) => <button key={key} className={`px-4 py-3 min-h-[44px] text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeTab === key ? 'border-primary text-primary' : 'border-transparent text-base-content/60 hover:text-base-content'}`} type="button" onClick={() => setActiveTab(key)}>{label}</button>)}
+      <div className="sticky top-0 z-30 bg-base-100/80 backdrop-blur-md border-b border-base-300/50">
+        <div className="max-w-5xl mx-auto px-4 md:px-8 flex gap-1 overflow-x-auto scrollbar-hide">
+          {tabs.map(([key, label]) => (
+            <button
+              key={key}
+              className={`px-4 py-3 min-h-[44px] text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeTab === key ? 'border-primary text-primary' : 'border-transparent text-base-content/60 hover:text-base-content'}`}
+              type="button"
+              onClick={() => setActiveTab(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="max-w-5xl mx-auto px-4 md:px-8 py-6">
+        {activeTab === 'overview' ? (
+          <div className="space-y-6">
+            <section>
+              <SectionTitle>简介</SectionTitle>
+              <RichText value={subject.summary} fallback="暂无简介。" />
+              {subject.tags?.length ? (
+                <div className="flex flex-wrap gap-2 mt-4">
+                  {subject.tags.slice(0, 12).map(tag => (
+                    <span className="badge badge-ghost" key={tag.name}>
+                      {tag.name}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+            <div className="bm-detail-stats-grid">
+              <RatingChart subject={subject} />
+              <CollectionChart subject={subject} />
+            </div>
+            <section>
+              <SectionTitle>条目信息</SectionTitle>
+              <dl className="bm-detail-facts">
+                {primaryMeta.map(([label, value]) => (
+                  <div key={label}>
+                    <dt>{label}</dt>
+                    <dd>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              {infoboxItems.length ? (
+                <div className="bm-detail-production">
+                  <h3>制作信息</h3>
+                  <dl>
+                    {infoboxItems.map((item, index) => (
+                      <div key={`${item.key}-${index}`}>
+                        <dt>{item.key || '资料'}</dt>
+                        <dd>{valueText(item.value)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              ) : null}
+            </section>
+            <section>
+              <ExternalLinks subject={subject} />
+            </section>
+          </div>
+        ) : activeTab === 'episodes' ? (
+          <EpisodeList
+            key={subject.id}
+            subjectId={subject.id}
+            initialEpisodes={episodes}
+            initialTotal={episodeTotal}
+            initialFailed={episodesFailed}
+          />
+        ) : activeTab === 'characters' ? (
+          <section>
+            <SectionTitle>角色</SectionTitle>
+            <>
+              {failedSections.includes('characters') ? (
+                <DataUnavailable label="角色" />
+              ) : (
+                <Credits items={characters} kind="character" />
+              )}
+            </>
+          </section>
+        ) : activeTab === 'staff' ? (
+          <section>
+            <SectionTitle>制作人员</SectionTitle>
+            <>
+              {failedSections.includes('staff') ? (
+                <DataUnavailable label="制作人员" />
+              ) : (
+                <Credits items={persons} kind="person" />
+              )}
+            </>
+          </section>
+        ) : activeTab === 'relations' ? (
+          <section>
+            <SectionTitle>关联条目</SectionTitle>
+            {failedSections.includes('relations') ? (
+              <DataUnavailable label="关联条目" />
+            ) : nonMusicRelations.length ? (
+              <AnimeGrid subjects={nonMusicRelations} empty="暂无关联条目" />
+            ) : (
+              <Empty>暂无关联条目</Empty>
+            )}
+          </section>
+        ) : activeTab === 'douban' ? (
+          <section>
+            <DoubanPanel subject={subject} />
+          </section>
+        ) : activeTab === 'music' ? (
+          <section>
+            <SectionTitle>相关音乐</SectionTitle>
+            {failedSections.includes('relations') ? <DataUnavailable label="关联音乐资料" /> : null}
+            <MusicPanel subject={subject} musicRelations={musicRelations} />
+          </section>
+        ) : activeTab === 'streaming' ? (
+          <section>
+            <SectionTitle>在线观看</SectionTitle>
+            <StreamingPanel subject={subject} />
+          </section>
+        ) : activeTab === 'wiki' ? (
+          <section>
+            <SectionTitle>Wiki</SectionTitle>
+            <WikiPanel subject={subject} infobox={infobox} />
+          </section>
+        ) : activeTab === 'talkbox' ? (
+          <section>
+            <SectionTitle>吐槽箱</SectionTitle>
+            <p className="text-sm text-base-content/60 mb-4">和同好聊聊这部作品。</p>
+            <Link href={`/anime/${subject.id}/talkbox`} className="btn btn-primary">
+              进入吐槽箱
+            </Link>
+          </section>
+        ) : (
+          <section>
+            <SectionTitle>讨论版</SectionTitle>
+            <p className="text-sm text-base-content/60 mb-4">浏览条目相关的长讨论。</p>
+            <Link href={`/anime/${subject.id}/topics`} className="btn btn-primary">
+              查看话题
+            </Link>
+          </section>
+        )}
       </div>
     </div>
-
-    <div className="max-w-5xl mx-auto px-4 md:px-8 py-6">
-      {activeTab === 'overview' ? <div className="space-y-6">
-        <section>
-          <SectionTitle>简介</SectionTitle>
-          <RichText value={subject.summary} fallback="暂无简介。" />
-          {subject.tags?.length ? <div className="flex flex-wrap gap-2 mt-4">{subject.tags.slice(0, 12).map(tag => <span className="badge badge-ghost" key={tag.name}>{tag.name}</span>)}</div> : null}
-        </section>
-        <div className="bm-detail-stats-grid"><RatingChart subject={subject} /><CollectionChart subject={subject} /></div>
-        <section>
-          <SectionTitle>条目信息</SectionTitle>
-          <dl className="bm-detail-facts">{primaryMeta.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-          {infoboxItems.length ? <div className="bm-detail-production"><h3>制作信息</h3><dl>{infoboxItems.map((item, index) => <div key={`${item.key}-${index}`}><dt>{item.key || '资料'}</dt><dd>{valueText(item.value)}</dd></div>)}</dl></div> : null}
-        </section>
-        <section><ExternalLinks subject={subject} /></section>
-      </div>
-        : activeTab === 'episodes' ? <section><SectionTitle>章节</SectionTitle>{episodes.length ? <div className="divide-y divide-base-300 rounded-xl bg-base-200/30">{episodes.map((episode, index) => <div className="flex items-center gap-4 p-3" key={episode.id || index}><span className="text-sm font-bold text-primary w-8">{String(episode.sort || index + 1).padStart(2, '0')}</span><div className="min-w-0 flex-1"><p className="text-sm">{episode.name_cn || episode.name || `第${episode.sort || index + 1}话`}</p><p className="text-xs text-base-content/50">{episode.airdate || '播出日期未知'}</p></div><span className="text-xs text-base-content/50">{episode.duration || ''}</span></div>)}</div> : <Empty>暂无章节</Empty>}</section>
-        : activeTab === 'characters' ? <section><SectionTitle>角色</SectionTitle><Credits items={characters} kind="character" /></section>
-        : activeTab === 'staff' ? <section><SectionTitle>制作人员</SectionTitle><Credits items={persons} kind="person" /></section>
-        : activeTab === 'relations' ? <section><SectionTitle>关联条目</SectionTitle>{nonMusicRelations.length ? <AnimeGrid subjects={nonMusicRelations} empty="暂无关联条目" /> : <Empty>暂无关联条目</Empty>}</section>
-        : activeTab === 'douban' ? <section><DoubanPanel subject={subject} /></section>
-        : activeTab === 'music' ? <section><SectionTitle>相关音乐</SectionTitle><MusicPanel subject={subject} musicRelations={musicRelations} /></section>
-        : activeTab === 'streaming' ? <section><SectionTitle>在线观看</SectionTitle><StreamingPanel subject={subject} /></section>
-        : activeTab === 'wiki' ? <section><SectionTitle>Wiki</SectionTitle><WikiPanel subject={subject} infobox={infobox} /></section>
-        : activeTab === 'talkbox' ? <section><SectionTitle>吐槽箱</SectionTitle><p className="text-sm text-base-content/60 mb-4">和同好聊聊这部作品。</p><Link href={`/anime/${subject.id}/talkbox`} className="btn btn-primary">进入吐槽箱</Link></section>
-        : <section><SectionTitle>讨论版</SectionTitle><p className="text-sm text-base-content/60 mb-4">浏览条目相关的长讨论。</p><Link href={`/anime/${subject.id}/topics`} className="btn btn-primary">查看话题</Link></section>}
-    </div>
-  </div>
+  )
 }

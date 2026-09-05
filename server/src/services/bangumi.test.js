@@ -373,3 +373,40 @@ describe('getClient', () => {
     expect(url).toContain('https://api.bangumi.pro/v0/me')
   })
 })
+
+describe('request retry safety', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  it.each([
+    ['network', () => Promise.reject(new Error('network down'))],
+    ['5xx', () => Promise.resolve(errResponse(502))],
+    ['invalid JSON', () => Promise.resolve({ ok: true, status: 200, text: async () => '<html>' })]
+  ])('does not replay writes after %s failure', async (_label, response) => {
+    const fetcher = vi.fn().mockImplementation(response)
+    vi.stubGlobal('fetch', fetcher)
+    await expect(
+      getClient('test-only').post('/v0/users/-/collections/1', { type: 3 })
+    ).rejects.toThrow()
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(fetcher.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal)
+  })
+  it('can fall back for read-only POST search', async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(errResponse(502))
+      .mockResolvedValueOnce(okResponse({ data: [], total: 0 }))
+    vi.stubGlobal('fetch', fetcher)
+    await expect(searchAnime('test', { tag: '科幻' })).resolves.toEqual({ data: [], total: 0 })
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(JSON.parse(fetcher.mock.calls[1][1].body).filter.tag).toEqual(['科幻'])
+  })
+  it('does not fall back on an HTML unauthorized response', async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue({ ok: false, status: 401, text: async () => '<html>' })
+    vi.stubGlobal('fetch', fetcher)
+    await expect(getClient('test-only').get('/v0/me')).rejects.toMatchObject({
+      response: { status: 401 }
+    })
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+})

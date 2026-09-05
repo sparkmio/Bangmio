@@ -2106,3 +2106,41 @@ html[data-theme='dark'] .bm-auth-page {
     width: auto;
   }
 }
+
+/* Source-owned additions: the imported legacy utility stylesheet is not regenerated. */
+.bm-progress-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin: 0.75rem 0;
+  font-size: 0.8rem;
+}
+.bm-progress-pagination button,
+.bm-progress-pagination select {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--bm-line);
+  border-radius: 0.5rem;
+  color: var(--bm-text);
+  background: var(--bm-surface);
+}
+.bm-progress-pagination button:disabled {
+  opacity: 0.45;
+}
+
+/* Shared native modal; independent of the legacy Vue stylesheet. */
+.bm-modal {
+  padding: 0;
+  border: 0;
+  border-radius: 1rem;
+  width: min(24rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  color: inherit;
+  background: var(--color-base-100, Canvas);
+  overflow: auto;
+}
+.bm-modal::backdrop {
+  background: rgb(0 0 0 / 0.35);
+  backdrop-filter: blur(4px);
+}

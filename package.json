@@ -11,10 +11,10 @@
     "build": "opennextjs-cloudflare build",
     "server:build": "npx esbuild server/src/app.js --bundle --platform=node --format=esm --outfile=functions/api/_server.js --metafile=functions/api/_meta.json",
     "bundle:size": "node scripts/bundle-size.mjs",
-    "postinstall": "npm install --prefix client",
+    "postinstall": "npm ci --prefix client && npm ci --prefix tooling/eslint --ignore-scripts --install-strategy=nested",
     "prepare": "husky",
-    "lint": "npm run lint:vue && npm run typecheck",
-    "lint:fix": "eslint . --ext .js,.vue --fix",
+    "lint": "npm run lint:vue && npm run lint:react && npm run typecheck",
+    "lint:fix": "npm run lint:vue -- --fix && npm run lint:react -- --fix",
     "format": "prettier --write \"**/*.{js,vue,json,css,md}\"",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -26,9 +26,11 @@
     "next:open": "npm run build",
     "next:deploy": "npm run build && wrangler deploy",
     "dev:vue": "npm run dev --prefix client",
-    "build:vue": "cd client && npm install --no-audit --no-fund && npm run build",
+    "build:vue": "npm run build --prefix client",
     "lint:vue": "eslint . --ext .js,.vue",
-    "next:dry-run": "npm run build && wrangler deploy --dry-run"
+    "next:dry-run": "npm run build && wrangler deploy --dry-run",
+    "lint:react": "eslint app components lib --ext .ts,.tsx --no-eslintrc --config .eslintrc.react.cjs --max-warnings=0",
+    "check": "npm run lint && npm test && npm run next:build"
   },
   "devDependencies": {
     "@hono/node-server": "^1.17.0",
@@ -42,13 +44,17 @@
     "esbuild": "^0.28.1",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-vue": "^9.27.0",
     "husky": "^9.1.7",
     "jsdom": "^25.0.1",
     "lint-staged": "^15.2.10",
     "prettier": "^3.3.3",
     "typescript": "^7.0.2",
-    "vitest": "^2.1.8",
+    "vite": "^6.4.3",
+    "vitest": "^3.2.7",
     "vue": "^3.5.34",
     "wrangler": "^4.123.0"
   },
@@ -65,6 +71,10 @@
       "prettier --write"
     ],
     "*.{json,css,md}": [
+      "prettier --write"
+    ],
+    "*.{ts,tsx}": [
+      "eslint --no-eslintrc --config .eslintrc.react.cjs --max-warnings=0",
       "prettier --write"
     ]
   },

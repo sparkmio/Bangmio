@@ -21,6 +21,8 @@ export async function searchAnime(c) {
       isChina: isChina(c)
     }
     if (typeNum > 0) opts.type = typeNum
+    const tag = c.req.query('tag')
+    if (tag) opts.tag = tag
     const result = await bangumiService.searchAnime(keyword, opts)
     return c.json({ data: result.data, total: result.total })
   } catch {
@@ -50,8 +52,9 @@ export async function getAnimeDetail(c) {
   try {
     const detail = await bangumiService.getAnimeDetail(id, { isChina: isChina(c) })
     return c.json({ data: detail })
-  } catch {
-    return c.json({ error: '获取详情失败' }, 500)
+  } catch (error) {
+    if (error?.response?.status === 404) return c.json({ error: '条目不存在' }, 404)
+    return c.json({ error: '获取详情失败，请稍后重试' }, 502)
   }
 }
 

@@ -1,3 +1,5 @@
+set -e
+
 npx lint-staged
 
 # 先格式化源码，再重新生成后端 bundle 并纳入本次提交，避免每次构建都

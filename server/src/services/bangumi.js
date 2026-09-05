@@ -39,10 +39,11 @@ function apiError(status, data, cause) {
 
 /**
  * 统一请求 Bangumi API。优先按地区选择的源；网络异常、5xx 或无效 JSON 时自动
- * 回退另一个 API 域名。401/403 直接返回，避免把真实的 Token 问题伪装成网络问题。
+ * 回退另一个 API 域名（仅 GET 和只读搜索 POST）。写操作不重放；401/403 直接返回。
  */
 async function bgmRequest(method, path, { token, body, params, isChina = false } = {}) {
   let lastError
+  const canRetry = method === 'GET' || (method === 'POST' && path === '/v0/search/subjects')
 
   for (const base of apiBases(isChina)) {
     const url = new URL(`${base}${path}`)
@@ -56,6 +57,7 @@ async function bgmRequest(method, path, { token, body, params, isChina = false }
       const res = await fetch(url.toString(), {
         ...(method === 'GET' ? {} : { method }),
         headers: requestHeaders,
+        signal: AbortSignal.timeout(8000),
         ...(body === undefined ? {} : { body: JSON.stringify(body) })
       })
       const text = await res.text()
@@ -63,13 +65,20 @@ async function bgmRequest(method, path, { token, body, params, isChina = false }
       try {
         data = text ? JSON.parse(text) : {}
       } catch (cause) {
-        lastError = apiError(res.status, { error: 'Invalid JSON response' }, cause)
+        lastError = apiError(
+          res.ok || res.status >= 500 ? 502 : res.status,
+          { error: 'Invalid JSON response' },
+          cause
+        )
+        if (!canRetry || res.status === 401 || res.status === 403 || (!res.ok && res.status < 500))
+          throw lastError
         continue
       }
       if (res.ok) return rewriteImageUrls(data)
 
       const error = apiError(res.status, data)
       if (res.status === 401 || res.status === 403 || res.status < 500) throw error
+      if (!canRetry) throw error
       lastError = error
     } catch (error) {
       if (
@@ -79,6 +88,8 @@ async function bgmRequest(method, path, { token, body, params, isChina = false }
       ) {
         throw error
       }
+      // Never replay a possibly successful write after a network failure.
+      if (!canRetry) throw error
       lastError = error
     }
   }

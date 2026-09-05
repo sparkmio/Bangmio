@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { Collection, Subject, User } from '@/lib/types'
 import { avatarUrl, displayName, imageUrl } from '@/lib/api'
@@ -9,28 +9,163 @@ import { useAuth } from './auth-provider'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { ready, isAuthenticated } = useAuth()
-  if (!ready) return <div className="py-20 text-center"><span className="loading loading-spinner loading-lg text-primary" /></div>
-  if (!isAuthenticated) return <div className="py-20 text-center"><p className="text-base-content/50 mb-3">请先登录</p><Link href="/login" className="btn btn-primary btn-sm">登录 Bangmio</Link></div>
+  if (!ready)
+    return (
+      <div className="py-20 text-center">
+        <span className="loading loading-spinner loading-lg text-primary" />
+      </div>
+    )
+  if (!isAuthenticated)
+    return (
+      <div className="py-20 text-center">
+        <p className="text-base-content/50 mb-3">请先登录</p>
+        <Link href="/login" className="btn btn-primary btn-sm">
+          登录 Bangmio
+        </Link>
+      </div>
+    )
   return <>{children}</>
 }
 
-function asList(value: unknown): Collection[] { return Array.isArray(value) ? value as Collection[] : [] }
-function collectionId(collection: Collection) { return Number(collection.subject_id || collection.subject?.id || collection.anime_id || 0) }
-function subjectType(collection: Collection) { return Number(collection.subject_type || collection.subject?.type || 0) }
+function asList(value: unknown): Collection[] {
+  return Array.isArray(value) ? (value as Collection[]) : []
+}
+function collectionId(collection: Collection) {
+  return Number(collection.subject_id || collection.subject?.id || collection.anime_id || 0)
+}
+function subjectType(collection: Collection) {
+  return Number(collection.subject_type || collection.subject?.type || 0)
+}
 
 const mediaConfig = [
-  { type: 1, label: '书籍', statuses: [['在读', 3], ['读过', 2], ['想读', 1]] as Array<[string, number]> },
-  { type: 2, label: '动画', statuses: [['在看', 3], ['看过', 2], ['想看', 1], ['搁置', 4], ['抛弃', 5]] as Array<[string, number]> },
-  { type: 3, label: '音乐', statuses: [['在听', 3], ['听过', 2], ['想听', 1]] as Array<[string, number]> },
-  { type: 4, label: '游戏', statuses: [['在玩', 3], ['玩过', 2], ['想玩', 1], ['搁置', 4], ['抛弃', 5]] as Array<[string, number]> }
+  {
+    type: 1,
+    label: '书籍',
+    statuses: [
+      ['在读', 3],
+      ['读过', 2],
+      ['想读', 1]
+    ] as Array<[string, number]>
+  },
+  {
+    type: 2,
+    label: '动画',
+    statuses: [
+      ['在看', 3],
+      ['看过', 2],
+      ['想看', 1],
+      ['搁置', 4],
+      ['抛弃', 5]
+    ] as Array<[string, number]>
+  },
+  {
+    type: 3,
+    label: '音乐',
+    statuses: [
+      ['在听', 3],
+      ['听过', 2],
+      ['想听', 1]
+    ] as Array<[string, number]>
+  },
+  {
+    type: 4,
+    label: '游戏',
+    statuses: [
+      ['在玩', 3],
+      ['玩过', 2],
+      ['想玩', 1],
+      ['搁置', 4],
+      ['抛弃', 5]
+    ] as Array<[string, number]>
+  }
 ]
 
 function CollectionStrip({ items }: { items: Collection[] }) {
-  return <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">{items.map(item => { const id = collectionId(item); const subject = (item.subject || {}) as Subject; const cover = imageUrl(subject.images); return <Link href={`/anime/${id}`} key={id} className="shrink-0 group" title={displayName(subject)}><div className="w-16 h-[90px] sm:w-[72px] sm:h-[100px] rounded-md overflow-hidden bg-base-200 shadow-sm relative">{cover ? <img src={cover} alt={displayName(subject)} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" decoding="async" /> : <div className="w-full h-full flex items-center justify-center text-[10px] text-base-content/40 p-1 text-center">{displayName(subject)}</div>}{item.rate ? <div className="absolute top-1 right-1 px-1 py-0.5 bg-black/70 rounded text-[10px] font-bold text-amber-400">★ {item.rate}</div> : null}</div><p className="text-[10px] text-center mt-1 text-base-content/60 line-clamp-1 w-16 sm:w-[72px] group-hover:text-primary transition-colors">{displayName(subject)}</p></Link> })}</div>
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
+      {items.map(item => {
+        const id = collectionId(item)
+        const subject = (item.subject || {}) as Subject
+        const cover = imageUrl(subject.images)
+        return (
+          <Link
+            href={`/anime/${id}`}
+            key={id}
+            className="shrink-0 group"
+            title={displayName(subject)}
+          >
+            <div className="w-16 h-[90px] sm:w-[72px] sm:h-[100px] rounded-md overflow-hidden bg-base-200 shadow-sm relative">
+              {cover ? (
+                <img
+                  src={cover}
+                  alt={displayName(subject)}
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  loading="lazy"
+                  decoding="async"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-[10px] text-base-content/40 p-1 text-center">
+                  {displayName(subject)}
+                </div>
+              )}
+              {item.rate ? (
+                <div className="absolute top-1 right-1 px-1 py-0.5 bg-black/70 rounded text-[10px] font-bold text-amber-400">
+                  ★ {item.rate}
+                </div>
+              ) : null}
+            </div>
+            <p className="text-[10px] text-center mt-1 text-base-content/60 line-clamp-1 w-16 sm:w-[72px] group-hover:text-primary transition-colors">
+              {displayName(subject)}
+            </p>
+          </Link>
+        )
+      })}
+    </div>
+  )
 }
 
-function CollectionSection({ label, statuses, grouped, counts }: { label: string; statuses: Array<[string, number]>; grouped: Record<number, Collection[]>; counts: Record<number, number> }) {
-  return <div className="card bg-base-100 border border-base-300"><div className="card-body p-4"><div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4"><h2 className="text-base font-bold text-base-content">我的{label}</h2><div className="flex items-center gap-3 text-xs text-base-content/50 flex-wrap">{statuses.map(([name, type]) => <span key={type}>{name} <span className="text-base-content font-medium">{counts[type] || 0}</span></span>)}</div></div>{statuses.map(([name, type]) => <div key={type} className="mb-4 last:mb-0"><div className="flex items-center justify-between mb-2"><span className="text-sm font-medium text-base-content">{name}</span>{grouped[type]?.length ? <span className="text-xs text-base-content/40">{grouped[type].length} 部</span> : null}</div>{grouped[type]?.length ? <CollectionStrip items={grouped[type].slice(0, 10)} /> : <div className="text-xs text-base-content/40 py-2">暂无</div>}</div>)}</div></div>
+function CollectionSection({
+  label,
+  statuses,
+  grouped,
+  counts
+}: {
+  label: string
+  statuses: Array<[string, number]>
+  grouped: Record<number, Collection[]>
+  counts: Record<number, number>
+}) {
+  return (
+    <div className="card bg-base-100 border border-base-300">
+      <div className="card-body p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <h2 className="text-base font-bold text-base-content">我的{label}</h2>
+          <div className="flex items-center gap-3 text-xs text-base-content/50 flex-wrap">
+            {statuses.map(([name, type]) => (
+              <span key={type}>
+                {name} <span className="text-base-content font-medium">{counts[type] || 0}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+        {statuses.map(([name, type]) => (
+          <div key={type} className="mb-4 last:mb-0">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-base-content">{name}</span>
+              {grouped[type]?.length ? (
+                <span className="text-xs text-base-content/40">{grouped[type].length} 部</span>
+              ) : null}
+            </div>
+            {grouped[type]?.length ? (
+              <CollectionStrip items={grouped[type].slice(0, 10)} />
+            ) : (
+              <div className="text-xs text-base-content/40 py-2">暂无</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function StatsPanel({ collections }: { collections: Collection[] }) {
@@ -39,10 +174,62 @@ function StatsPanel({ collections }: { collections: Collection[] }) {
   const rated = list.filter(item => Number(item.rate) >= 1 && Number(item.rate) <= 10)
   const total = list.length
   const completed = list.filter(item => Number(item.type) === 2).length
-  const average = rated.length ? (rated.reduce((sum, item) => sum + Number(item.rate), 0) / rated.length).toFixed(1) : '-'
-  const deviation = rated.length ? Math.sqrt(rated.reduce((sum, item) => sum + (Number(item.rate) - Number(average)) ** 2, 0) / rated.length).toFixed(2) : '-'
-  const cards = [['border-pink-500/30 bg-pink-500/10 text-pink-700', total, '收藏数'], ['border-green-500/30 bg-green-500/10 text-green-700', completed, '完成数'], ['border-blue-500/30 bg-blue-500/10 text-blue-700', `${total ? Math.round(completed / total * 100) : 0}%`, '完成率'], ['border-orange-500/30 bg-orange-500/10 text-orange-700', average, '平均分'], ['border-purple-500/30 bg-purple-500/10 text-purple-700', deviation, '标准差'], ['border-cyan-500/30 bg-cyan-500/10 text-cyan-700', rated.length, '评分数']] as const
-  return <div id="stats" className="card bg-base-100 border border-base-300"><div className="card-body p-4"><div className="flex items-center gap-1 border-b border-base-300 mb-4 overflow-x-auto">{[['全部', 0], ['书籍', 1], ['动画', 2], ['音乐', 3], ['游戏', 4]].map(([label, value]) => <button key={value} className={`px-3 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${filter === value ? 'border-primary text-primary' : 'border-transparent text-base-content/50 hover:text-base-content'}`} onClick={() => setFilter(Number(value))} type="button">{label}</button>)}</div><div className="grid grid-cols-2 gap-2 mb-4">{cards.map(([color, value, label]) => <div key={label} className={`rounded-2xl border p-3 ${color}`}><p className="text-xl font-bold">{value}</p><p className="text-xs mt-1">{label}</p></div>)}</div><div className="text-xs text-base-content/40 py-2">{rated.length ? `共 ${rated.length} 条评分` : '暂无评分数据'}</div></div></div>
+  const average = rated.length
+    ? (rated.reduce((sum, item) => sum + Number(item.rate), 0) / rated.length).toFixed(1)
+    : '-'
+  const deviation = rated.length
+    ? Math.sqrt(
+        rated.reduce((sum, item) => sum + (Number(item.rate) - Number(average)) ** 2, 0) /
+          rated.length
+      ).toFixed(2)
+    : '-'
+  const cards = [
+    ['border-pink-500/30 bg-pink-500/10 text-pink-700', total, '收藏数'],
+    ['border-green-500/30 bg-green-500/10 text-green-700', completed, '完成数'],
+    [
+      'border-blue-500/30 bg-blue-500/10 text-blue-700',
+      `${total ? Math.round((completed / total) * 100) : 0}%`,
+      '完成率'
+    ],
+    ['border-orange-500/30 bg-orange-500/10 text-orange-700', average, '平均分'],
+    ['border-purple-500/30 bg-purple-500/10 text-purple-700', deviation, '标准差'],
+    ['border-cyan-500/30 bg-cyan-500/10 text-cyan-700', rated.length, '评分数']
+  ] as const
+  return (
+    <div id="stats" className="card bg-base-100 border border-base-300">
+      <div className="card-body p-4">
+        <div className="flex items-center gap-1 border-b border-base-300 mb-4 overflow-x-auto">
+          {[
+            ['全部', 0],
+            ['书籍', 1],
+            ['动画', 2],
+            ['音乐', 3],
+            ['游戏', 4]
+          ].map(([label, value]) => (
+            <button
+              key={value}
+              className={`px-3 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${filter === value ? 'border-primary text-primary' : 'border-transparent text-base-content/50 hover:text-base-content'}`}
+              onClick={() => setFilter(Number(value))}
+              type="button"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {cards.map(([color, value, label]) => (
+            <div key={label} className={`rounded-2xl border p-3 ${color}`}>
+              <p className="text-xl font-bold">{value}</p>
+              <p className="text-xs mt-1">{label}</p>
+            </div>
+          ))}
+        </div>
+        <div className="text-xs text-base-content/40 py-2">
+          {rated.length ? `共 ${rated.length} 条评分` : '暂无评分数据'}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function ProfilePage({ username }: { username?: string }) {
@@ -56,39 +243,208 @@ export function ProfilePage({ username }: { username?: string }) {
   const [error, setError] = useState('')
   const name = username || user?.username || ''
   useEffect(() => {
-    if ((!isAuthenticated && !username) || !name) { setLoading(false); return }
+    if ((!isAuthenticated && !username) || !name) {
+      setLoading(false)
+      return
+    }
     let alive = true
-    setLoading(true); setError('')
+    setLoading(true)
+    setError('')
     const encodedName = encodeURIComponent(name)
     const publicRequest = { authenticate: false } as const
     const collectionRequest = username
-      ? request<Collection[]>(`/user/${encodedName}/collections?offset=0&limit=100`, {}, publicRequest)
+      ? request<Collection[]>(
+          `/user/${encodedName}/collections?offset=0&limit=100`,
+          {},
+          publicRequest
+        )
       : request<Collection[]>('/collection/list?offset=0&limit=100')
     Promise.all([
-      username ? request<User>(`/user/${encodedName}`, {}, publicRequest) : Promise.resolve({ data: user }),
+      username
+        ? request<User>(`/user/${encodedName}`, {}, publicRequest)
+        : Promise.resolve({ data: user }),
       collectionRequest,
-      request<any[]>(`/user/${encodedName}/timeline`, {}, publicRequest).catch(() => ({ data: [] })),
+      request<any[]>(`/user/${encodedName}/timeline`, {}, publicRequest).catch(() => ({
+        data: []
+      })),
       request<any[]>(`/user/${encodedName}/friends`, {}, publicRequest).catch(() => ({ data: [] })),
       request<any[]>(`/user/${encodedName}/groups`, {}, publicRequest).catch(() => ({ data: [] }))
-    ]).then(([profileResult, collectionResult, timelineResult, friendsResult, groupsResult]) => {
-      if (!alive) return
-      setProfile(profileResult.data || null)
-      setCollections(asList(collectionResult.data))
-      setTimeline(Array.isArray(timelineResult.data) ? timelineResult.data : [])
-      setFriends(Array.isArray(friendsResult.data) ? friendsResult.data : [])
-      setGroups(Array.isArray(groupsResult.data) ? groupsResult.data : [])
-    }).catch(value => { if (alive) setError(value instanceof Error ? value.message : '个人页加载失败') }).finally(() => { if (alive) setLoading(false) })
-    return () => { alive = false }
+    ])
+      .then(([profileResult, collectionResult, timelineResult, friendsResult, groupsResult]) => {
+        if (!alive) return
+        setProfile(profileResult.data || null)
+        setCollections(asList(collectionResult.data))
+        setTimeline(Array.isArray(timelineResult.data) ? timelineResult.data : [])
+        setFriends(Array.isArray(friendsResult.data) ? friendsResult.data : [])
+        setGroups(Array.isArray(groupsResult.data) ? groupsResult.data : [])
+      })
+      .catch(value => {
+        if (alive) setError(value instanceof Error ? value.message : '个人页加载失败')
+      })
+      .finally(() => {
+        if (alive) setLoading(false)
+      })
+    return () => {
+      alive = false
+    }
   }, [isAuthenticated, name, request, username, user])
   const profileName = profile?.nickname || profile?.username || name || 'Bangmio 用户'
   const avatar = avatarUrl(profile || user || undefined)
-  const groupedByType = useMemo(() => Object.fromEntries(mediaConfig.map(config => [config.type, Object.fromEntries(config.statuses.map(([, status]) => [status, collections.filter(item => subjectType(item) === config.type && Number(item.type) === status)]))])), [collections]) as Record<number, Record<number, Collection[]>>
-  const content = <div className="max-w-none lg:max-w-[900px] lg:ml-[240px] lg:mr-auto">
-    {loading ? <div className="py-20 text-center"><span className="loading loading-spinner loading-lg text-primary" /><p className="text-base-content/50 mt-3">正在获取 Bangumi 资料...</p></div> : error ? <div className="py-20 text-center"><p className="text-base-content/50 mb-3">个人页加载失败</p><p className="text-sm text-error">{error}</p></div> : <>
-      <div className="card bg-base-100 border border-base-300 mb-4 overflow-hidden"><div className="h-16 bg-gradient-to-r from-primary/30 via-secondary/20 to-accent/30" /><div className="card-body p-4 pt-0"><div className="flex flex-col sm:flex-row sm:items-end gap-3 -mt-8"><div className="avatar shrink-0"><div className="w-16 h-16 rounded-xl ring-4 ring-base-100 shadow-lg overflow-hidden bg-primary text-primary-content flex items-center justify-center text-2xl font-bold">{avatar ? <img src={avatar} alt={profileName} className="w-full h-full object-cover" /> : profileName.slice(0, 1)}</div></div><div className="flex-1 min-w-0 pb-1"><div className="flex items-center gap-2 flex-wrap"><h1 className="text-xl font-bold text-base-content">{profileName}</h1>{profile?.user_group ? <span className="badge badge-sm badge-outline">{String(profile.user_group)}</span> : null}</div><p className="text-sm text-base-content/50 mt-0.5">@{profile?.username || name} · UID: {String(profile?.id || '')}</p>{profile?.sign ? <p className="text-sm mt-2 text-base-content/70 line-clamp-2">{profile.sign}</p> : null}</div></div></div></div>
-      <div className="card bg-base-100 border border-base-300 mb-4"><nav className="flex items-center px-2 py-1 overflow-x-auto">{['时光机', '收藏', '时间胶囊', '人物', '日志', '目录', '小组', '好友', '维基', '天窗'].map((label, index) => <a key={label} href={index === 0 ? '#top' : index === 1 ? '#collections' : index === 2 ? '#timeline' : '#'} className={`px-3 py-2 text-sm whitespace-nowrap transition-colors rounded-lg ${index === 0 ? 'text-primary font-medium bg-primary/10' : 'text-base-content/60 hover:text-base-content hover:bg-base-200'}`}>{label}</a>)}</nav></div>
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4"><div id="collections" className="main-col space-y-4">{mediaConfig.map(config => <CollectionSection key={config.type} label={config.label} statuses={config.statuses} grouped={groupedByType[config.type] || {}} counts={Object.fromEntries(config.statuses.map(([, status]) => [status, groupedByType[config.type]?.[status]?.length || 0]))} />)}</div><div className="sidebar-col space-y-4"><div id="timeline" className="card bg-base-100 border border-base-300"><div className="card-body p-4"><div className="flex items-center justify-between mb-4"><h3 className="text-sm font-bold text-base-content/70">/ 我的时间胶囊</h3><span className="text-xs text-base-content/40">...more</span></div>{timeline.length ? <div className="space-y-3">{timeline.slice(0, 8).map((item, index) => <div key={item.id || index} className="text-xs"><span className="badge badge-xs mr-2">{item.action || item.type || '收藏'}</span>{item.subject_name || item.subject?.name_cn || item.subject?.name || ''}</div>)}</div> : <div className="text-xs text-base-content/40 py-2">还没有时间胶囊</div>}</div></div><StatsPanel collections={collections} />{friends.length ? <div id="friends" className="card bg-base-100 border border-base-300"><div className="card-body p-4"><h3 className="text-sm font-bold text-base-content/70 mb-4">/ 我的朋友</h3><div className="grid grid-cols-4 sm:grid-cols-6 gap-2">{friends.slice(0, 12).map((friend, index) => <a key={friend.username || index} href={`/profile/${friend.username || friend.id}`} className="text-xs text-center line-clamp-1">{friend.nickname || friend.username || '用户'}</a>)}</div></div></div> : null}{groups.length ? <div id="groups" className="card bg-base-100 border border-base-300"><div className="card-body p-4"><h3 className="text-sm font-bold text-base-content/70 mb-4">/ 我参加的小组</h3><div className="space-y-2">{groups.slice(0, 8).map((group, index) => <div key={group.id || index} className="text-sm">{group.name || group.title || '兴趣小组'}</div>)}</div></div></div> : null}</div></div>
-    </>}</div>
+  const groupedByType = useMemo(
+    () =>
+      Object.fromEntries(
+        mediaConfig.map(config => [
+          config.type,
+          Object.fromEntries(
+            config.statuses.map(([, status]) => [
+              status,
+              collections.filter(
+                item => subjectType(item) === config.type && Number(item.type) === status
+              )
+            ])
+          )
+        ])
+      ),
+    [collections]
+  ) as Record<number, Record<number, Collection[]>>
+  const content = (
+    <div className="max-w-none lg:max-w-[900px] lg:ml-[240px] lg:mr-auto">
+      {loading ? (
+        <div className="py-20 text-center">
+          <span className="loading loading-spinner loading-lg text-primary" />
+          <p className="text-base-content/50 mt-3">正在获取 Bangumi 资料...</p>
+        </div>
+      ) : error ? (
+        <div className="py-20 text-center">
+          <p className="text-base-content/50 mb-3">个人页加载失败</p>
+          <p className="text-sm text-error">{error}</p>
+        </div>
+      ) : (
+        <>
+          <div className="card bg-base-100 border border-base-300 mb-4 overflow-hidden">
+            <div className="h-16 bg-gradient-to-r from-primary/30 via-secondary/20 to-accent/30" />
+            <div className="card-body p-4 pt-0">
+              <div className="flex flex-col sm:flex-row sm:items-end gap-3 -mt-8">
+                <div className="avatar shrink-0">
+                  <div className="w-16 h-16 rounded-xl ring-4 ring-base-100 shadow-lg overflow-hidden bg-primary text-primary-content flex items-center justify-center text-2xl font-bold">
+                    {avatar ? (
+                      <img src={avatar} alt={profileName} className="w-full h-full object-cover" />
+                    ) : (
+                      profileName.slice(0, 1)
+                    )}
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0 pb-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-xl font-bold text-base-content">{profileName}</h1>
+                    {profile?.user_group ? (
+                      <span className="badge badge-sm badge-outline">
+                        {String(profile.user_group)}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-sm text-base-content/50 mt-0.5">
+                    @{profile?.username || name} · UID: {String(profile?.id || '')}
+                  </p>
+                  {profile?.sign ? (
+                    <p className="text-sm mt-2 text-base-content/70 line-clamp-2">{profile.sign}</p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="card bg-base-100 border border-base-300 mb-4">
+            <nav className="flex items-center px-2 py-1 overflow-x-auto">
+              {['时光机', '收藏', '时间胶囊'].map((label, index) => (
+                <a
+                  key={label}
+                  href={index === 0 ? '#top' : index === 1 ? '#collections' : '#timeline'}
+                  className={`px-3 py-2 text-sm whitespace-nowrap transition-colors rounded-lg ${index === 0 ? 'text-primary font-medium bg-primary/10' : 'text-base-content/60 hover:text-base-content hover:bg-base-200'}`}
+                >
+                  {label}
+                </a>
+              ))}
+            </nav>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
+            <div id="collections" className="main-col space-y-4">
+              {mediaConfig.map(config => (
+                <CollectionSection
+                  key={config.type}
+                  label={config.label}
+                  statuses={config.statuses}
+                  grouped={groupedByType[config.type] || {}}
+                  counts={Object.fromEntries(
+                    config.statuses.map(([, status]) => [
+                      status,
+                      groupedByType[config.type]?.[status]?.length || 0
+                    ])
+                  )}
+                />
+              ))}
+            </div>
+            <div className="sidebar-col space-y-4">
+              <div id="timeline" className="card bg-base-100 border border-base-300">
+                <div className="card-body p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold text-base-content/70">/ 我的时间胶囊</h3>
+                    <span className="text-xs text-base-content/40">...more</span>
+                  </div>
+                  {timeline.length ? (
+                    <div className="space-y-3">
+                      {timeline.slice(0, 8).map((item, index) => (
+                        <div key={item.id || index} className="text-xs">
+                          <span className="badge badge-xs mr-2">
+                            {item.action || item.type || '收藏'}
+                          </span>
+                          {item.subject_name || item.subject?.name_cn || item.subject?.name || ''}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-base-content/40 py-2">还没有时间胶囊</div>
+                  )}
+                </div>
+              </div>
+              <StatsPanel collections={collections} />
+              {friends.length ? (
+                <div id="friends" className="card bg-base-100 border border-base-300">
+                  <div className="card-body p-4">
+                    <h3 className="text-sm font-bold text-base-content/70 mb-4">/ 我的朋友</h3>
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                      {friends.slice(0, 12).map((friend, index) => (
+                        <a
+                          key={friend.username || index}
+                          href={`/profile/${friend.username || friend.id}`}
+                          className="text-xs text-center line-clamp-1"
+                        >
+                          {friend.nickname || friend.username || '用户'}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              {groups.length ? (
+                <div id="groups" className="card bg-base-100 border border-base-300">
+                  <div className="card-body p-4">
+                    <h3 className="text-sm font-bold text-base-content/70 mb-4">/ 我参加的小组</h3>
+                    <div className="space-y-2">
+                      {groups.slice(0, 8).map((group, index) => (
+                        <div key={group.id || index} className="text-sm">
+                          {group.name || group.title || '兴趣小组'}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
   return username ? content : <RequireAuth>{content}</RequireAuth>
 }
 
@@ -99,22 +455,298 @@ export function WatchingPage() {
   const [selectedId, setSelectedId] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  async function load() { if (!isAuthenticated) return; setLoading(true); setError(''); try { const filter = subjectType ? `&subject_type=${subjectType}` : ''; const payload = await request<Collection[]>(`/collection/list?offset=0&limit=30&type=3${filter}`); const data = asList(payload.data).filter(item => Number(item.subject?.type || item.subject_type || 0) !== 4); setCollections(data); setSelectedId(collectionId(data[0] || {})) } catch (value) { setError(value instanceof Error ? value.message : '在追列表加载失败') } finally { setLoading(false) } }
-  useEffect(() => { void load() }, [isAuthenticated, subjectType])
-  const selected = useMemo(() => collections.find(item => collectionId(item) === selectedId) || collections[0] || null, [collections, selectedId])
+  const loadSequence = useRef(0)
+  const invalidateLoad = useCallback(() => {
+    ++loadSequence.current
+  }, [])
+  const load = useCallback(async () => {
+    const sequence = ++loadSequence.current
+    if (!isAuthenticated) {
+      setCollections([])
+      setSelectedId(0)
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    setError('')
+    try {
+      const filter = subjectType ? '&subject_type=' + subjectType : ''
+      const payload = await request<Collection[]>(
+        '/collection/list?offset=0&limit=30&type=3' + filter
+      )
+      if (sequence !== loadSequence.current) return
+      const data = asList(payload.data).filter(
+        item => Number(item.subject?.type || item.subject_type || 0) !== 4
+      )
+      setCollections(data)
+      setSelectedId(collectionId(data[0] || {}))
+    } catch (value) {
+      if (sequence === loadSequence.current)
+        setError(value instanceof Error ? value.message : '在追列表加载失败')
+    } finally {
+      if (sequence === loadSequence.current) setLoading(false)
+    }
+  }, [isAuthenticated, subjectType, request])
+  useEffect(() => {
+    void load()
+    return invalidateLoad
+  }, [load, invalidateLoad])
+  const selected = useMemo(
+    () => collections.find(item => collectionId(item) === selectedId) || collections[0] || null,
+    [collections, selectedId]
+  )
   const subject = selected?.subject || null
   const total = Number(subject?.eps || subject?.eps_count || 0)
   const watched = Number(selected?.ep_status || 0)
   const episodeCount = Math.min(total || Math.max(watched, 12), 24)
-  return <RequireAuth><div><div className="flex items-center justify-between mb-4"><div className="flex items-center gap-3"><Link href="/" className="text-base-content/50 hover:text-primary">← 返回</Link><h1 className="text-xl font-semibold text-base-content">在追</h1></div></div><div className="flex gap-1.5 mb-5 overflow-x-auto scrollbar-hide">{typeTabs.map(tab => <button key={tab.value} className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300 ${subjectType === tab.value ? 'bg-primary text-primary-content shadow-sm' : 'bg-base-200/60 text-base-content/60 hover:bg-base-200'}`} onClick={() => setSubjectType(tab.value)} type="button">{tab.label}</button>)}</div>{loading ? <div className="py-12 text-center text-base-content/30 text-sm rounded-xl bg-base-200/30">正在加载在追内容…</div> : null}{error ? <div className="py-12 text-center text-error text-sm rounded-xl bg-base-200/30">{error}</div> : null}{!loading && !error && collections.length ? <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-start"><aside className="lg:col-span-3"><div className="space-y-1 overflow-y-auto pr-1 scrollbar-hide -mx-1 px-1" style={{ maxHeight: 'min(600px, 70vh)' }}>{collections.map(item => { const id = collectionId(item); const itemSubject = (item.subject || {}) as Subject; const cover = imageUrl(itemSubject.images); const active = id === selectedId; return <button key={id} className={`w-full flex items-center gap-3 p-2 sm:p-2.5 rounded-lg text-left transition-all duration-200 min-h-[48px] ${active ? 'bg-primary/10 border-l-2 border-primary pl-3' : 'hover:bg-base-200/60 border-l-2 border-transparent'}`} onClick={() => setSelectedId(id)} type="button">{cover ? <img src={cover} alt={displayName(itemSubject)} className="w-10 h-14 sm:w-11 sm:h-[60px] rounded object-cover flex-shrink-0" /> : null}<span className="min-w-0 flex-1"><strong className="text-[13px] sm:text-sm font-medium text-base-content line-clamp-1 block">{displayName(itemSubject)}</strong><small className="text-xs text-primary font-semibold mt-0.5 block">[{Number(item.ep_status || 0)}/{Number(itemSubject.eps || itemSubject.eps_count || 0) || '?'}]</small></span></button> })}</div></aside>{selected && subject ? <article className="lg:col-span-9 rounded-xl bg-base-200/40 p-5"><div className="flex gap-5 mb-4">{imageUrl(subject.images) ? <img className="w-24 h-32 sm:w-28 sm:h-40 rounded-lg object-cover shadow-md flex-shrink-0" src={imageUrl(subject.images)} alt={displayName(subject)} /> : null}<div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-semibold text-base-content mb-1">{displayName(subject)}</h2>{subject.name && subject.name_cn && subject.name !== subject.name_cn ? <p className="text-sm text-base-content/50 mb-3">{subject.name}</p> : null}</div><CollectionButton animeId={collectionId(selected)} initialStatus={Number(selected.type || 3)} /></div><div className="flex gap-3 text-sm"><Link href={`/anime/${collectionId(selected)}/topics`} className="text-primary hover-underline-wipe">参与讨论</Link><Link href={`/anime/${collectionId(selected)}/talkbox`} className="text-primary hover-underline-wipe">观吐槽</Link><Link href={`/anime/${collectionId(selected)}`} className="text-primary hover-underline-wipe">详情页</Link></div></div></div><div className="mt-4"><p className="text-xs text-base-content/40 mb-2">播放进度 · 已看 {watched} / {total || '?'}</p><div className="flex flex-wrap gap-1.5">{Array.from({ length: episodeCount }, (_, index) => index + 1).map(episode => <span key={episode} className={`min-w-10 min-h-9 px-1 rounded-lg text-xs font-bold flex items-center justify-center ${episode <= watched ? 'bg-primary text-white' : 'bg-base-300 text-base-content/40'}`}>{String(episode).padStart(2, '0')}</span>)}</div></div></article> : null}</div> : null}{!loading && !error && !collections.length ? <div className="py-12 text-center text-base-content/30 text-sm rounded-xl bg-base-200/30">还没有在追的内容</div> : null}</div></RequireAuth>
+  return (
+    <RequireAuth>
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="text-base-content/50 hover:text-primary">
+              ← 返回
+            </Link>
+            <h1 className="text-xl font-semibold text-base-content">在追</h1>
+          </div>
+        </div>
+        <div className="flex gap-1.5 mb-5 overflow-x-auto scrollbar-hide">
+          {typeTabs.map(tab => (
+            <button
+              key={tab.value}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300 ${subjectType === tab.value ? 'bg-primary text-primary-content shadow-sm' : 'bg-base-200/60 text-base-content/60 hover:bg-base-200'}`}
+              onClick={() => setSubjectType(tab.value)}
+              type="button"
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        {loading ? (
+          <div className="py-12 text-center text-base-content/30 text-sm rounded-xl bg-base-200/30">
+            正在加载在追内容…
+          </div>
+        ) : null}
+        {error ? (
+          <div className="py-12 text-center text-error text-sm rounded-xl bg-base-200/30">
+            {error}
+          </div>
+        ) : null}
+        {!loading && !error && collections.length ? (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-start">
+            <aside className="lg:col-span-3">
+              <div
+                className="space-y-1 overflow-y-auto pr-1 scrollbar-hide -mx-1 px-1"
+                style={{ maxHeight: 'min(600px, 70vh)' }}
+              >
+                {collections.map(item => {
+                  const id = collectionId(item)
+                  const itemSubject = (item.subject || {}) as Subject
+                  const cover = imageUrl(itemSubject.images)
+                  const active = id === selectedId
+                  return (
+                    <button
+                      key={id}
+                      className={`w-full flex items-center gap-3 p-2 sm:p-2.5 rounded-lg text-left transition-all duration-200 min-h-[48px] ${active ? 'bg-primary/10 border-l-2 border-primary pl-3' : 'hover:bg-base-200/60 border-l-2 border-transparent'}`}
+                      onClick={() => setSelectedId(id)}
+                      type="button"
+                    >
+                      {cover ? (
+                        <img
+                          src={cover}
+                          alt={displayName(itemSubject)}
+                          className="w-10 h-14 sm:w-11 sm:h-[60px] rounded object-cover flex-shrink-0"
+                        />
+                      ) : null}
+                      <span className="min-w-0 flex-1">
+                        <strong className="text-[13px] sm:text-sm font-medium text-base-content line-clamp-1 block">
+                          {displayName(itemSubject)}
+                        </strong>
+                        <small className="text-xs text-primary font-semibold mt-0.5 block">
+                          [{Number(item.ep_status || 0)}/
+                          {Number(itemSubject.eps || itemSubject.eps_count || 0) || '?'}]
+                        </small>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </aside>
+            {selected && subject ? (
+              <article className="lg:col-span-9 rounded-xl bg-base-200/40 p-5">
+                <div className="flex gap-5 mb-4">
+                  {imageUrl(subject.images) ? (
+                    <img
+                      className="w-24 h-32 sm:w-28 sm:h-40 rounded-lg object-cover shadow-md flex-shrink-0"
+                      src={imageUrl(subject.images)}
+                      alt={displayName(subject)}
+                    />
+                  ) : null}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h2 className="text-lg font-semibold text-base-content mb-1">
+                          {displayName(subject)}
+                        </h2>
+                        {subject.name && subject.name_cn && subject.name !== subject.name_cn ? (
+                          <p className="text-sm text-base-content/50 mb-3">{subject.name}</p>
+                        ) : null}
+                      </div>
+                      <CollectionButton
+                        animeId={collectionId(selected)}
+                        initialStatus={Number(selected.type || 3)}
+                      />
+                    </div>
+                    <div className="flex gap-3 text-sm">
+                      <Link
+                        href={`/anime/${collectionId(selected)}/topics`}
+                        className="text-primary hover-underline-wipe"
+                      >
+                        参与讨论
+                      </Link>
+                      <Link
+                        href={`/anime/${collectionId(selected)}/talkbox`}
+                        className="text-primary hover-underline-wipe"
+                      >
+                        观吐槽
+                      </Link>
+                      <Link
+                        href={`/anime/${collectionId(selected)}`}
+                        className="text-primary hover-underline-wipe"
+                      >
+                        详情页
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <p className="text-xs text-base-content/40 mb-2">
+                    播放进度 · 已看 {watched} / {total || '?'}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Array.from({ length: episodeCount }, (_, index) => index + 1).map(episode => (
+                      <span
+                        key={episode}
+                        className={`min-w-10 min-h-9 px-1 rounded-lg text-xs font-bold flex items-center justify-center ${episode <= watched ? 'bg-primary text-white' : 'bg-base-300 text-base-content/40'}`}
+                      >
+                        {String(episode).padStart(2, '0')}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </article>
+            ) : null}
+          </div>
+        ) : null}
+        {!loading && !error && !collections.length ? (
+          <div className="py-12 text-center text-base-content/30 text-sm rounded-xl bg-base-200/30">
+            还没有在追的内容
+          </div>
+        ) : null}
+      </div>
+    </RequireAuth>
+  )
 }
 
 export function SettingsPage() {
   const { account, isBangmioUser, fetchBgmUserProfile, logout, request } = useAuth()
-  const [currentPassword, setCurrentPassword] = useState(''); const [newPassword, setNewPassword] = useState(''); const [message, setMessage] = useState(''); const [busy, setBusy] = useState(false)
-  async function changePassword(event: React.FormEvent) { event.preventDefault(); setBusy(true); setMessage(''); try { await request('/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }, { authenticate: true, tokenKind: 'bangmio' }); setCurrentPassword(''); setNewPassword(''); setMessage('密码已更新') } catch (value) { setMessage(value instanceof Error ? value.message : '修改密码失败') } finally { setBusy(false) } }
-  return <RequireAuth><div className="max-w-2xl"><h1 className="text-xl font-bold mb-4">设置</h1><div className="card bg-base-100 border border-base-300"><div className="card-body p-5"><h2 className="font-bold">{account?.email || '当前账号'}</h2><p className="text-sm text-base-content/60">{isBangmioUser ? '当前使用 Bangmio 账号。' : '当前使用 Bangumi Access Token 直登。'}</p>{isBangmioUser ? <><button className="btn btn-outline btn-sm mt-3" type="button" onClick={() => void fetchBgmUserProfile().then(value => setMessage(value ? 'Bangumi 资料已刷新' : '未能刷新资料'))}>刷新 Bangumi 资料</button><Link href="/bind-bangumi" className="link link-primary block mt-3">重新绑定 Bangumi →</Link></> : null}<button className="btn btn-ghost btn-sm mt-3 text-error" type="button" onClick={logout}>退出当前账号</button></div></div>{isBangmioUser ? <form className="card bg-base-100 border border-base-300 mt-4" onSubmit={changePassword}><div className="card-body p-5"><h2 className="font-bold">修改密码</h2><label className="form-control"><span className="label-text">当前密码</span><input className="input input-bordered" type="password" value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} required /></label><label className="form-control"><span className="label-text">新密码</span><input className="input input-bordered" type="password" value={newPassword} onChange={event => setNewPassword(event.target.value)} minLength={8} required /></label><button className="btn btn-primary" type="submit" disabled={busy}>{busy ? '保存中…' : '保存新密码'}</button></div></form> : null}{message ? <p className="text-sm text-primary mt-3">{message}</p> : null}</div></RequireAuth>
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function changePassword(event: React.FormEvent) {
+    event.preventDefault()
+    setBusy(true)
+    setMessage('')
+    try {
+      await request(
+        '/auth/change-password',
+        { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) },
+        { authenticate: true, tokenKind: 'bangmio' }
+      )
+      setCurrentPassword('')
+      setNewPassword('')
+      setMessage('密码已更新')
+    } catch (value) {
+      setMessage(value instanceof Error ? value.message : '修改密码失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <RequireAuth>
+      <div className="max-w-2xl">
+        <h1 className="text-xl font-bold mb-4">设置</h1>
+        <div className="card bg-base-100 border border-base-300">
+          <div className="card-body p-5">
+            <h2 className="font-bold">{account?.email || '当前账号'}</h2>
+            <p className="text-sm text-base-content/60">
+              {isBangmioUser ? '当前使用 Bangmio 账号。' : '当前使用 Bangumi Access Token 直登。'}
+            </p>
+            {isBangmioUser ? (
+              <>
+                <button
+                  className="btn btn-outline btn-sm mt-3"
+                  type="button"
+                  onClick={() =>
+                    void fetchBgmUserProfile().then(value =>
+                      setMessage(value ? 'Bangumi 资料已刷新' : '未能刷新资料')
+                    )
+                  }
+                >
+                  刷新 Bangumi 资料
+                </button>
+                <Link href="/bind-bangumi" className="link link-primary block mt-3">
+                  重新绑定 Bangumi →
+                </Link>
+              </>
+            ) : null}
+            <button className="btn btn-ghost btn-sm mt-3 text-error" type="button" onClick={logout}>
+              退出当前账号
+            </button>
+          </div>
+        </div>
+        {isBangmioUser ? (
+          <form className="card bg-base-100 border border-base-300 mt-4" onSubmit={changePassword}>
+            <div className="card-body p-5">
+              <h2 className="font-bold">修改密码</h2>
+              <label className="form-control">
+                <span className="label-text">当前密码</span>
+                <input
+                  className="input input-bordered"
+                  type="password"
+                  value={currentPassword}
+                  onChange={event => setCurrentPassword(event.target.value)}
+                  required
+                />
+              </label>
+              <label className="form-control">
+                <span className="label-text">新密码</span>
+                <input
+                  className="input input-bordered"
+                  type="password"
+                  value={newPassword}
+                  onChange={event => setNewPassword(event.target.value)}
+                  minLength={8}
+                  required
+                />
+              </label>
+              <button className="btn btn-primary" type="submit" disabled={busy}>
+                {busy ? '保存中…' : '保存新密码'}
+              </button>
+            </div>
+          </form>
+        ) : null}
+        {message ? <p className="text-sm text-primary mt-3">{message}</p> : null}
+      </div>
+    </RequireAuth>
+  )
 }
 
 type Tab = { value: number; label: string }
-const typeTabs: Tab[] = [{ value: 0, label: '全部' }, { value: 2, label: '动画' }, { value: 6, label: '三次元' }, { value: 1, label: '书籍' }]
+const typeTabs: Tab[] = [
+  { value: 0, label: '全部' },
+  { value: 2, label: '动画' },
+  { value: 6, label: '三次元' },
+  { value: 1, label: '书籍' }
+]

@@ -1,8 +1,3 @@
-import { defineConfig } from 'vitest/config'
-
-export default defineConfig({
-  test: {
-    environment: 'node',
-    exclude: ['node_modules', 'client/**']
-  }
-})
+// Compatibility entry point: keep one test discovery/alias contract.
+// @ts-expect-error — the existing JavaScript config has no declaration file.
+export { default } from './vitest.config.js'

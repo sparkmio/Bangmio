@@ -4,8 +4,10 @@ import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
   plugins: [vue()],
+  esbuild: { jsx: 'automatic' },
   resolve: {
     alias: {
+      '@': fileURLToPath(new URL('.', import.meta.url)),
       // 统一 vue 运行时到根目录的单一副本：
       // @vue/test-utils（根依赖）解析的是根 node_modules 里的 vue（peer 自动安装），
       // 而 client 源码解析的是 client/node_modules 里的 vue —— 两者会形成双实例，
@@ -18,11 +20,39 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    environment: 'node',
-    include: ['**/*.test.js'],
-    // 组件测试需要 DOM 环境，其余（纯函数/后端）保持 node 环境
-    environmentMatchGlobs: [['client/src/components/**/*.test.js', 'jsdom']],
-    // 允许 client/src 与 Pages Functions 下的 .test.js 被执行；仅排除构建产物与 node_modules
-    exclude: ['**/node_modules/**', 'dist/**', 'client/dist/**', 'client/node_modules/**']
+    // Explicit projects replace deprecated environmentMatchGlobs; never run a test twice.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'node',
+          environment: 'node',
+          include: ['**/*.test.js', 'lib/**/*.test.ts'],
+          exclude: [
+            '**/node_modules/**',
+            '**/dist/**',
+            '.cache/**',
+            '.next/**',
+            '.open-next/**',
+            'client/src/components/**/*.test.js',
+            'lib/ai-context.test.ts'
+          ]
+        }
+      },
+      {
+        extends: true,
+        test: {
+          name: 'dom',
+          environment: 'jsdom',
+          include: [
+            'client/src/components/**/*.test.js',
+            'components/**/*.test.tsx',
+            'app/**/*.test.tsx',
+            'lib/ai-context.test.ts'
+          ],
+          exclude: ['**/node_modules/**', '**/dist/**', '.cache/**', '.next/**', '.open-next/**']
+        }
+      }
+    ]
   }
 })
