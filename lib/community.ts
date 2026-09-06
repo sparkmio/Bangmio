@@ -79,9 +79,15 @@ export function communityProfile(value: any): CommunityProfile {
 export function groupTopicView(source: any) {
   const replies = Array.isArray(source.replies) ? source.replies : []
   const opening = source.main_post
-  if (!opening || typeof opening !== 'object' || !opening.id) return { topic: source, replies }
+  const inferredOpening =
+    !opening || typeof opening !== 'object' || !opening.id
+      ? replies.find((reply: any) => String(reply?.floor ?? '').trim() === '1')
+      : null
+  const resolvedOpening =
+    opening && typeof opening === 'object' && opening.id ? opening : inferredOpening
+  if (!resolvedOpening) return { topic: source, replies }
   return {
-    topic: { ...source, content: opening.content, timestamp: opening.timestamp },
-    replies: replies.filter((reply: any) => reply.id !== opening.id)
+    topic: { ...source, content: resolvedOpening.content, timestamp: resolvedOpening.timestamp },
+    replies: replies.filter((reply: any) => reply.id !== resolvedOpening.id)
   }
 }

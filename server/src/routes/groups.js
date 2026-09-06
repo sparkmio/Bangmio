@@ -615,11 +615,15 @@ function parseGroupTopicHTML(html, id, base) {
   for (const anchor of titleClone?.querySelectorAll?.('a[href]') || []) {
     if (isGroupAnchor(anchor)) anchor.remove()
   }
-  const title =
+  const rawTitle =
     collapseText(titleClone?.textContent || titleEl?.textContent || '').replace(
       /^[\s»›|/:：-]+/,
       ''
     ) || '话题 #' + id
+  const title =
+    rawTitle.includes('»') || rawTitle.includes('›')
+      ? rawTitle.split(/[»›]/).map(collapseText).filter(Boolean).pop() || rawTitle
+      : rawTitle
 
   const authorLinks = Array.from(document.querySelectorAll('a[href*="/user/"]'))
   const rows = []
@@ -671,7 +675,9 @@ function parseGroupTopicHTML(html, id, base) {
   // 当前 Bangumi 页面：首帖为 .postTopic，一级回复为 #comment_list > .row_reply，
   // 楼中楼为 .topic_sub_reply > .sub_reply_bg。仅解析这些实际帖子容器，避免把
   // .reply_content 和空白头像链接当成一条回复，从而显示为“匿名用户”。
-  const mainPost = document.querySelector('.postTopic[id^="post_"]')
+  const mainPost = document.querySelector(
+    '.postTopic, [class*="postTopic"], .topic_post, .topic-post, .topicTopic'
+  )
   const mainPostRow = mainPost && appendRow(mainPost, 1) ? rows[0] : null
 
   const replyContainers = Array.from(document.querySelectorAll('#comment_list > .row_reply'))

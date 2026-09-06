@@ -391,6 +391,16 @@ it('从带小组面包屑的标题中分离真实话题标题', () => {
   expect(topic.group_name).toBe('站务论坛')
 })
 
+it('从纯文本小组面包屑中分离真实话题标题，并识别无 post id 的首帖', () => {
+  const topic = parseGroupTopicHTML(
+    '<h1>站务论坛 » 纯文本标题</h1><div class="postTopic"><a href="/user/sai">sai</a><div class="topic_content"><div class="message">首帖正文</div></div></div>',
+    '906',
+    BASE
+  )
+  expect(topic.title).toBe('纯文本标题')
+  expect(topic.main_post).toMatchObject({ content: '首帖正文', author: 'sai' })
+})
+
 it('无法解析小组帖子回复数时保留未知值，而不是伪造为 0', () => {
   const topic = parseGroupTopicHTML(
     '<h1>无统计话题</h1><div id="post_1" class="postTopic"><a href="/user/sai">sai</a><div class="topic_content"><div class="message">正文</div></div></div>',

@@ -7,7 +7,10 @@ html {
 }
 
 body {
-  min-width: 320px;
+  /* Do not force a 320px layout viewport: on some 320px devices the
+     scrollbar/safe-area leaves 319px of usable width and creates horizontal
+     page scrolling. Components already define their own readable minimums. */
+  min-width: 0;
 }
 
 button,

@@ -19199,10 +19199,11 @@ function parseGroupTopicHTML(html, id, base) {
   for (const anchor of titleClone?.querySelectorAll?.("a[href]") || []) {
     if (isGroupAnchor(anchor)) anchor.remove();
   }
-  const title = collapseText(titleClone?.textContent || titleEl?.textContent || "").replace(
+  const rawTitle = collapseText(titleClone?.textContent || titleEl?.textContent || "").replace(
     /^[\s»›|/:：-]+/,
     ""
   ) || "\u8BDD\u9898 #" + id;
+  const title = rawTitle.includes("\xBB") || rawTitle.includes("\u203A") ? rawTitle.split(/[»›]/).map(collapseText).filter(Boolean).pop() || rawTitle : rawTitle;
   const authorLinks = Array.from(document.querySelectorAll('a[href*="/user/"]'));
   const rows = [];
   const seen = /* @__PURE__ */ new Set();
@@ -19240,7 +19241,9 @@ function parseGroupTopicHTML(html, id, base) {
     });
     return true;
   };
-  const mainPost = document.querySelector('.postTopic[id^="post_"]');
+  const mainPost = document.querySelector(
+    '.postTopic, [class*="postTopic"], .topic_post, .topic-post, .topicTopic'
+  );
   const mainPostRow = mainPost && appendRow(mainPost, 1) ? rows[0] : null;
   const replyContainers = Array.from(document.querySelectorAll("#comment_list > .row_reply"));
   if (!replyContainers.length) {

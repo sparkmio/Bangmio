@@ -49,3 +49,11 @@ it('does not assume the first reply is the opening post when upstream omits it',
   const source = { replies: [{ id: 't-2', content: '回复' }] }
   expect(groupTopicView(source)).toEqual({ topic: source, replies: source.replies })
 })
+
+it('缺少 main_post 时从一楼回复恢复主楼正文', () => {
+  const opening = { id: 'topic-1', floor: '1', content: '首帖正文', timestamp: '刚刚' }
+  const reply = { id: 'topic-2', floor: '2', content: '回复正文' }
+  const view = groupTopicView({ title: '话题', replies: [opening, reply] })
+  expect(view.topic.content).toBe('首帖正文')
+  expect(view.replies).toEqual([reply])
+})
