@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from './auth-provider'
+import { apiFetch } from '@/lib/api'
 
 type Group = {
   id: number | string
@@ -108,6 +109,7 @@ function arrayFrom(value: unknown, key?: string) {
 function GroupCard({ group, followed = false }: { group: Group; followed?: boolean }) {
   const title = groupTitle(group)
   const image = text(group.avatar || group.icon)
+  const [failedImage, setFailedImage] = useState('')
   return (
     <Link
       href={`/group/${encodeURIComponent(String(group.id))}`}
@@ -116,10 +118,14 @@ function GroupCard({ group, followed = false }: { group: Group; followed?: boole
       <div className="card-body p-4">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-full overflow-hidden bg-base-200 shrink-0">
-            {image && /^https?:\/\//i.test(image) ? (
+            {image && failedImage !== image && /^https?:\/\//i.test(image) ? (
               <img
                 src={image}
-                alt={title}
+                alt=""
+                ref={element => {
+                  if (element?.complete && !element.naturalWidth) setFailedImage(image)
+                }}
+                onError={() => setFailedImage(image)}
                 className="w-full h-full object-cover"
                 loading="lazy"
                 decoding="async"
@@ -132,10 +138,12 @@ function GroupCard({ group, followed = false }: { group: Group; followed?: boole
           </div>
           <div className="min-w-0">
             <p className="font-semibold truncate">{title}</p>
-            <p className="text-xs text-base-content/50 mt-1 line-clamp-2">
-              {memberLabel(group.member_count ?? group.members)} ·{' '}
-              {text(group.description || group.summary, '暂无简介')}
+            <p className="community-group-description">
+              {text(group.description || group.summary, '暂无小组简介')}
             </p>
+            <span className="community-group-meta">
+              {memberLabel(group.member_count ?? group.members)}
+            </span>
           </div>
         </div>
       </div>
@@ -144,11 +152,11 @@ function GroupCard({ group, followed = false }: { group: Group; followed?: boole
 }
 function TopicList({ topics }: { topics: Topic[] }) {
   return (
-    <div className="divide-y divide-base-300">
+    <div className="community-topics">
       {topics.map((topic, index) => (
         <Link
           href={`/group/topic/${encodeURIComponent(String(topic.id || topic.topic_id || index))}`}
-          className="p-4 flex items-start gap-3 hover:bg-base-200/60 transition-colors"
+          className="community-topic-row"
           key={topic.id || topic.topic_id || index}
         >
           <div className="min-w-0 flex-1">
@@ -159,7 +167,7 @@ function TopicList({ topics }: { topics: Topic[] }) {
               {text(topic.last_reply_time) ? <span>{text(topic.last_reply_time)}</span> : null}
             </div>
           </div>
-          <span className="badge badge-sm badge-primary badge-outline whitespace-nowrap">
+          <span className="community-reply-count">
             {replyLabel(topic.reply_count ?? topic.replies)}
           </span>
         </Link>
@@ -193,6 +201,10 @@ export function VueGroupsClient({
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchError, setSearchError] = useState('')
   const [followedGroups, setFollowedGroups] = useState<Group[]>([])
+  const [followedError, setFollowedError] = useState('')
+  const searchGeneration = useRef(0)
+  const searchController = useRef<AbortController | null>(null)
+  const followedGeneration = useRef(0)
   const [followedLoading, setFollowedLoading] = useState(false)
   const [allGroups, setAllGroups] = useState<Group[]>(initialGroupList)
   const [allGroupsLoading, setAllGroupsLoading] = useState(false)
@@ -208,83 +220,67 @@ export function VueGroupsClient({
   const isSearching = Boolean(searchQuery.trim())
 
   const loadFollowedGroups = useCallback(async () => {
+    const generation = ++followedGeneration.current
     if (!currentUsername) {
       setFollowedGroups([])
+      setFollowedLoading(false)
       return
     }
     setFollowedLoading(true)
+    setFollowedError('')
     try {
       const payload = await request<unknown>(
         `/user/${encodeURIComponent(currentUsername)}/groups`,
         {},
         { authenticate: false }
       )
+      // The list response is sufficient for cards; do not fetch every group again.
       const groups = arrayFrom(payload?.data).map(normalizeGroup).filter(Boolean) as Group[]
-      const enriched = await Promise.all(
-        groups.map(async group => {
-          try {
-            const detail = await request<unknown>(
-              `/groups/${encodeURIComponent(String(group.id))}`,
-              {},
-              { authenticate: false }
-            )
-            const value =
-              detail?.data && typeof detail.data === 'object'
-                ? (detail.data as Record<string, unknown>)
-                : {}
-            const memberCount = count(value.member_count)
-            return {
-              ...group,
-              member_count: memberCount !== null ? memberCount : group.member_count,
-              topic_count: count(value.topic_count ?? value.topics_count),
-              avatar: text(value.avatar) || group.avatar,
-              topics: arrayFrom(value.topics)
-            }
-          } catch {
-            return group
-          }
-        })
-      )
-      setFollowedGroups(enriched)
+      if (generation === followedGeneration.current) setFollowedGroups(groups)
     } catch {
-      setFollowedGroups([])
+      if (generation === followedGeneration.current)
+        setFollowedError('关注的小组读取失败，请重试。')
     } finally {
-      setFollowedLoading(false)
+      if (generation === followedGeneration.current) setFollowedLoading(false)
     }
   }, [currentUsername, request])
 
   const searchGroups = useCallback(async () => {
+    const generation = ++searchGeneration.current
+    searchController.current?.abort()
     const keyword = searchQuery.trim()
     if (!keyword) {
       setSearchResults([])
       setSearchError('')
+      setSearchLoading(false)
       return
     }
+    const controller = new AbortController()
+    searchController.current = controller
     setSearchLoading(true)
     setSearchError('')
     try {
-      const response = await fetch(`/api/v1/groups/search?keyword=${encodeURIComponent(keyword)}`, {
-        headers: { Accept: 'application/json' }
-      })
-      const payload = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error('搜索失败')
-      setSearchResults(
-        arrayFrom(payload?.data, 'results').map(normalizeGroup).filter(Boolean) as Group[]
+      const payload = await apiFetch<unknown>(
+        '/groups/search?keyword=' + encodeURIComponent(keyword),
+        { signal: controller.signal }
       )
+      if (generation === searchGeneration.current)
+        setSearchResults(
+          arrayFrom(payload?.data, 'results').map(normalizeGroup).filter(Boolean) as Group[]
+        )
     } catch (error) {
+      if (generation !== searchGeneration.current || controller.signal.aborted) return
       setSearchResults([])
       setSearchError(error instanceof Error ? error.message : '搜索失败')
     } finally {
-      setSearchLoading(false)
+      if (generation === searchGeneration.current) setSearchLoading(false)
     }
   }, [searchQuery])
   const loadAllGroups = useCallback(async () => {
     setAllGroupsLoading(true)
     setAllGroupsError('')
     try {
-      const response = await fetch('/api/v1/groups', { headers: { Accept: 'application/json' } })
-      const payload = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error('小组列表加载失败')
+      const payload = await apiFetch<unknown>('/groups')
       const groups = arrayFrom(payload?.data, 'groups')
         .map(normalizeGroup)
         .filter(Boolean) as Group[]
@@ -300,11 +296,7 @@ export function VueGroupsClient({
     setTopicsLoading(true)
     setTopicsError('')
     try {
-      const response = await fetch('/api/v1/groups/discover', {
-        headers: { Accept: 'application/json' }
-      })
-      const payload = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error('热门话题加载失败')
+      const payload = await apiFetch<unknown>('/groups/discover')
       const topics = arrayFrom(payload?.data, 'topics')
         .map(normalizeTopic)
         .filter(Boolean) as Topic[]
@@ -317,36 +309,51 @@ export function VueGroupsClient({
     }
   }, [])
   useEffect(() => {
+    setFollowedGroups([])
     void loadFollowedGroups()
+    return () => {
+      followedGeneration.current += 1
+    }
   }, [loadFollowedGroups])
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults([])
-      setSearchError('')
-      return
-    }
+    searchGeneration.current += 1
+    searchController.current?.abort()
+    setSearchResults([])
+    setSearchError('')
+    setSearchLoading(Boolean(searchQuery.trim()))
+    if (!searchQuery.trim()) return
     const timer = window.setTimeout(() => void searchGroups(), 300)
-    return () => window.clearTimeout(timer)
+    return () => {
+      window.clearTimeout(timer)
+      searchGeneration.current += 1
+      searchController.current?.abort()
+    }
   }, [searchQuery, searchGroups])
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-5xl">
-      <div className="flex items-center justify-between mb-8 gap-3 flex-wrap">
+    <div className="community-home">
+      <div className="community-heading">
         <div>
-          <h1 className="text-2xl font-bold">小组</h1>
+          <div className="eyebrow">BANGMIO / COMMUNITY</div>
+          <h1>小组与讨论</h1>
           <p className="text-sm text-base-content/50 mt-1">
-            先看你关注的小组，再看看全站正在讨论什么。
+            查看关注的小组，参与讨论，发现新的兴趣。
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="community-search">
           <input
             value={searchQuery}
-            onChange={event => setSearchQuery(event.target.value)}
+            onChange={event => {
+              searchGeneration.current += 1
+              searchController.current?.abort()
+              setSearchQuery(event.target.value)
+            }}
             onKeyDown={event => {
               if (event.key === 'Enter') void searchGroups()
             }}
             type="search"
-            placeholder="搜索小组"
+            placeholder="搜索感兴趣的小组"
+            aria-label="搜索小组"
             className="input input-bordered input-sm w-48"
           />
           <button
@@ -393,8 +400,8 @@ export function VueGroupsClient({
           )}
         </section>
       ) : (
-        <>
-          <section className="mb-8">
+        <div className="community-layout">
+          <section className="community-followed">
             <div className="flex items-center justify-between gap-3 mb-4">
               <div>
                 <h2 className="text-lg font-bold">我关注的小组</h2>
@@ -411,11 +418,21 @@ export function VueGroupsClient({
                 刷新
               </button>
             </div>
+            {followedError ? (
+              <p role="alert" className="community-error">
+                {followedError}
+              </p>
+            ) : null}
             {followedLoading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {Array.from({ length: 3 }, (_, index) => (
                   <div key={index} className="h-24 rounded-xl skeleton" />
                 ))}
+              </div>
+            ) : followedError && !followedGroups.length ? (
+              <div className="panel empty-state">
+                <h3>暂时无法读取小组</h3>
+                <p>这不代表你没有关注的小组，请点击上方刷新重试。</p>
               </div>
             ) : followedGroups.length ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -425,15 +442,24 @@ export function VueGroupsClient({
               </div>
             ) : (
               <div className="panel empty-state compact-empty">
-                <h3>还没有关注的小组</h3>
-                <p>登录并绑定 Bangumi 后，这里会显示你参加的小组。</p>
+                <h3>{currentUsername ? '还没有关注的小组' : '登录后查看关注的小组'}</h3>
+                <p>
+                  {currentUsername
+                    ? '去下方发现感兴趣的小组。'
+                    : '登录并绑定 Bangumi，查看你参加的小组。'}
+                </p>
+                {!currentUsername ? (
+                  <Link className="button primary" href="/login?redirect=/groups">
+                    登录后查看
+                  </Link>
+                ) : null}
               </div>
             )}
           </section>
-          <section className="mb-10">
+          <section className="community-discussions">
             <div className="flex items-end justify-between gap-3 mb-4">
               <div>
-                <h2 className="text-lg font-bold">所有小组的热门帖子</h2>
+                <h2 className="text-lg font-bold">正在讨论</h2>
                 <p className="text-xs text-base-content/50 mt-1">来自 Bangumi 小组发现页。</p>
               </div>
               <button
@@ -462,10 +488,10 @@ export function VueGroupsClient({
               )}
             </div>
           </section>
-          <section>
+          <section className="community-directory">
             <div className="flex items-end justify-between gap-3 mb-4">
               <div>
-                <h2 className="text-lg font-bold">全部小组</h2>
+                <h2 className="text-lg font-bold">发现小组</h2>
                 <p className="text-xs text-base-content/50 mt-1">继续探索其他小组。</p>
               </div>
               <button
@@ -497,7 +523,7 @@ export function VueGroupsClient({
               </div>
             )}
           </section>
-        </>
+        </div>
       )}
     </div>
   )

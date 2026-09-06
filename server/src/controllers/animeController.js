@@ -78,7 +78,7 @@ export async function getAnimeCharacters(c) {
     const data = await bangumiService.getAnimeCharacters(id, { isChina: isChina(c) })
     return c.json({ data })
   } catch {
-    return c.json({ error: '获取角色失败' }, 500)
+    return c.json({ error: '获取角色失败，请稍后重试' }, 502)
   }
 }
 
@@ -89,7 +89,7 @@ export async function getAnimePersons(c) {
     const data = await bangumiService.getAnimePersons(id, { isChina: isChina(c) })
     return c.json({ data })
   } catch {
-    return c.json({ error: '获取制作人员失败' }, 500)
+    return c.json({ error: '获取制作人员失败，请稍后重试' }, 502)
   }
 }
 
@@ -100,7 +100,7 @@ export async function getAnimeRelations(c) {
     const data = await bangumiService.getAnimeRelations(id, { isChina: isChina(c) })
     return c.json({ data })
   } catch {
-    return c.json({ error: '获取关联条目失败' }, 500)
+    return c.json({ error: '获取关联条目失败，请稍后重试' }, 502)
   }
 }
 

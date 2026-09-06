@@ -156,12 +156,15 @@ async function decodeResponseBody(res) {
  * @returns {Promise<string>} HTML 文本内容。
  * @throws {Error} 当请求失败、超时或 HTTP 状态非 2xx 时抛出错误。
  */
-export async function fetchHTML(url, { timeout = 12000, headers = {} } = {}) {
+export async function fetchHTML(
+  url,
+  { timeout = 12000, headers = {}, signal, quiet = false } = {}
+) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeout)
   try {
     const res = await fetch(url, {
-      signal: controller.signal,
+      signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal,
       headers: {
         'User-Agent': SCRAPE_UA,
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -169,13 +172,13 @@ export async function fetchHTML(url, { timeout = 12000, headers = {} } = {}) {
         ...headers
       }
     })
-    clearTimeout(timer)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await decodeResponseBody(res)
   } catch (e) {
-    clearTimeout(timer)
-    logError('fetchHTML failed', { url, error: String(e) })
+    if (!quiet && !signal?.aborted) logError('fetchHTML failed', { url, error: String(e) })
     throw e
+  } finally {
+    clearTimeout(timer)
   }
 }
 
@@ -205,30 +208,53 @@ export async function fetchHTMLMulti(
     throw new Error('All sources failed')
   }
 
-  let lastErr
-
+  const controller = new AbortController()
+  const failures = []
+  let timer
   const fetchOneWithRetry = async url => {
     for (let i = 0; i <= retries; i++) {
+      controller.signal.throwIfAborted()
       try {
-        const html = await fetchHTML(url, { timeout, headers })
+        const html = await fetchHTML(url, {
+          timeout,
+          headers,
+          signal: controller.signal,
+          quiet: true
+        })
         if (html) return { html, url }
-      } catch (e) {
-        lastErr = e
-        if (i === retries) throw e
+        throw new Error('Empty HTML response')
+      } catch (error) {
+        if (controller.signal.aborted) throw error
+        if (i === retries) {
+          failures.push({ url, error })
+          throw error
+        }
       }
     }
-    throw new Error('unreachable')
   }
-
-  const promises = urls.map(url => fetchOneWithRetry(url))
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error(`Overall timeout ${overallTimeout}ms`)), overallTimeout)
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error('Overall timeout ' + overallTimeout + 'ms')
+      controller.abort(error)
+      reject(error)
+    }, overallTimeout)
   })
-
   try {
-    return await Promise.race([Promise.any(promises), timeoutPromise])
-  } catch (e) {
-    throw lastErr || e || new Error('All sources failed')
+    return await Promise.race([Promise.any(urls.map(fetchOneWithRetry)), deadline])
+  } catch (error) {
+    const finalError =
+      error instanceof AggregateError && failures.length
+        ? failures[failures.length - 1].error
+        : error
+    logError('HTML 所有候选源失败', {
+      failures: failures.map(item => ({ url: item.url, error: String(item.error) })),
+      error: String(finalError)
+    })
+    throw finalError
+  } finally {
+    clearTimeout(timer)
+    // A successful response owns the result; losing mirrors must not keep retrying.
+    controller.abort()
   }
 }
 

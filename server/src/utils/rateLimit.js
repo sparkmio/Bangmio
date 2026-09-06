@@ -1,5 +1,9 @@
 import { logWarn } from './logger.js'
 
+// Avoid printing the same migration/configuration failure for every request.
+const d1WarningState = new WeakMap()
+const nonObjectWarningState = new Set()
+
 /**
  * 创建跨实例速率限制中间件。
  *
@@ -53,8 +57,17 @@ export function rateLimit(windowMs, max) {
         count = fallback.count
         resetTime = fallback.resetTime
         if (err?.message && !String(err.message).includes('invalid rate-limit row')) {
-          // 不把 D1 连接/迁移细节返回给客户端。
-          logWarn('D1 速率限制不可用，已回退内存计数', { error: String(err) })
+          // 不把 D1 连接/迁移细节返回给客户端；同一故障只记录一次。
+          const errorText = String(err)
+          if (d1 && typeof d1 === 'object') {
+            if (d1WarningState.get(d1) !== errorText) {
+              d1WarningState.set(d1, errorText)
+              logWarn('D1 速率限制不可用，已回退内存计数', { error: errorText })
+            }
+          } else if (!nonObjectWarningState.has(errorText)) {
+            nonObjectWarningState.add(errorText)
+            logWarn('D1 速率限制不可用，已回退内存计数', { error: errorText })
+          }
         }
       }
     } else {

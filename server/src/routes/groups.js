@@ -16,6 +16,7 @@ const cache = createCache(CACHE_TTL_GROUPS)
 
 // 永不过期的「最近一次成功」缓存，仅在抓取失败时回退使用
 const lastSuccessStore = new Map()
+const lastSuccessTopicStore = new Map()
 
 function getBaseUrls(isChina) {
   // 国内节点优先走代理镜像，海外节点优先走官方
@@ -565,19 +566,53 @@ function parseMemberCount(document) {
  * @param {string} base
  * @returns {object}
  */
+function fallbackGroupTopic(id, base, content = '暂时无法加载该话题正文，请稍后刷新。') {
+  return {
+    id,
+    title: '话题 #' + id,
+    group_id: '',
+    group_name: '',
+    author: '',
+    username: '',
+    nickname: '',
+    avatar: '',
+    creator: { username: '', nickname: '', avatar: '', url: '' },
+    content,
+    reply_count: null,
+    main_post: null,
+    replies: [],
+    url: base + '/group/topic/' + id
+  }
+}
 function parseGroupTopicHTML(html, id, base) {
   const { document } = parseHTML(html)
   const titleEl = document.querySelector('h1, h2.topic_title, .topic_title, .topicTitle')
-  const title = collapseText(titleEl?.textContent || '') || '话题 #' + id
 
-  // 页面导航也包含 /group/discover；优先从 h1 的面包屑中读取真正所属小组。
+  // Bangumi may put the group breadcrumb and topic title in the same heading.
+  // Strip only the linked group breadcrumb; keep the actual title text intact.
   const isGroupAnchor = anchor => {
     const href = safeAbsoluteUrl(anchor.getAttribute('href') || '', base)
-    return /(?:^|\/)group\/[^/?#]+/.test(href) && !/\/group\/topic\//.test(href)
+    const groupId = groupIdFromHref(href)
+    const reservedPaths = new Set(['discover', 'all', 'category', 'new_topic'])
+    return (
+      Boolean(groupId) &&
+      !reservedPaths.has(groupId.toLowerCase()) &&
+      !/\/group\/topic\//.test(href)
+    )
   }
   const groupAnchor =
     Array.from(titleEl?.querySelectorAll('a[href]') || []).find(isGroupAnchor) ||
     Array.from(document.querySelectorAll('a[href]')).find(isGroupAnchor)
+  const titleClone = titleEl?.cloneNode(true)
+  for (const anchor of titleClone?.querySelectorAll?.('a[href]') || []) {
+    if (isGroupAnchor(anchor)) anchor.remove()
+  }
+  const title =
+    collapseText(titleClone?.textContent || titleEl?.textContent || '').replace(
+      /^[\s»›|/:：-]+/,
+      ''
+    ) || '话题 #' + id
+
   const authorLinks = Array.from(document.querySelectorAll('a[href*="/user/"]'))
   const rows = []
   const seen = new Set()
@@ -629,7 +664,7 @@ function parseGroupTopicHTML(html, id, base) {
   // 楼中楼为 .topic_sub_reply > .sub_reply_bg。仅解析这些实际帖子容器，避免把
   // .reply_content 和空白头像链接当成一条回复，从而显示为“匿名用户”。
   const mainPost = document.querySelector('.postTopic[id^="post_"]')
-  if (mainPost) appendRow(mainPost, 1)
+  const mainPostRow = mainPost && appendRow(mainPost, 1) ? rows[0] : null
 
   const replyContainers = Array.from(document.querySelectorAll('#comment_list > .row_reply'))
   if (!replyContainers.length) {
@@ -688,6 +723,8 @@ function parseGroupTopicHTML(html, id, base) {
       : rows.length > 1
         ? rows.length - 1
         : null,
+    // Additive field: legacy consumers still receive the original replies array.
+    main_post: mainPostRow,
     replies: rows,
     url: base + '/group/topic/' + id
   }
@@ -714,7 +751,13 @@ function parseGroupDiscoverHTML(html, base) {
 
     const topicMatch = (topicAnchor.getAttribute('href') || '').match(/\/group\/topic\/([^/?#]+)/)
     if (!topicMatch) continue
-    const id = decodeURIComponent(topicMatch[1])
+    let id
+    try {
+      id = decodeURIComponent(topicMatch[1])
+    } catch {
+      // A malformed upstream link is not a usable topic id; skip only this row.
+      continue
+    }
     if (seen.has(id)) continue
     seen.add(id)
 
@@ -832,12 +875,19 @@ app.get('/topic/:id', async c => {
     if (cached) return c.json({ data: cached.data, degraded: cached.degraded === true })
     const bases = getBaseUrls(isChina)
     const urls = bases.map(base => base + '/group/topic/' + id)
-    const { html, url } = await fetchGroupHTMLCached(urls)
-    const baseUrl = url.replace(/\/group\/topic\/[^/]+\/?$/, '') || bases[0]
-    const topic = parseGroupTopicHTML(html, id, baseUrl)
-    const degraded = topic.title === '话题 #' + id && topic.replies.length === 0
-    cache.set(cacheKey, { data: topic, degraded })
-    return c.json({ data: topic, degraded })
+    try {
+      const { html, url } = await fetchGroupHTMLCached(urls)
+      const baseUrl = url.replace(/\/group\/topic\/[^/]+\/?$/, '') || bases[0]
+      const topic = parseGroupTopicHTML(html, id, baseUrl)
+      const degraded = topic.title === '话题 #' + id && topic.replies.length === 0
+      lastSuccessTopicStore.set(id, topic)
+      cache.set(cacheKey, { data: topic, degraded })
+      return c.json({ data: topic, degraded })
+    } catch {
+      const lastSuccess = lastSuccessTopicStore.get(id)
+      if (lastSuccess) return c.json({ data: lastSuccess, degraded: true })
+      return c.json({ data: fallbackGroupTopic(id, bases[0]), degraded: true })
+    }
   } catch {
     return c.json({ data: null, degraded: true })
   }

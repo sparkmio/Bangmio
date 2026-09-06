@@ -3,7 +3,7 @@ import { requirePositiveId } from '@/lib/page-data'
 import Link from 'next/link'
 import { safeApiFetch } from '@/lib/api'
 import { DiscussionComposer } from '@/components/discussion-composer'
-import { RichText } from '@/components/rich-text'
+import { communityProfile } from '@/lib/community'
 
 function safeText(value: unknown, fallback = ''): string {
   if (typeof value === 'string' || typeof value === 'number') return String(value)
@@ -74,11 +74,17 @@ export default async function SubjectTopicsPage({ params }: { params: Promise<{ 
         <section className="topic-list panel" aria-label="条目话题列表">
           {topics.map((topic: any, index: number) => (
             <Link className="topic-row" href={`/topic/${topic.id}`} key={topic.id || index}>
-              <span className="topic-avatar">话</span>
+              <span className="topic-avatar">
+                {communityProfile(topic).avatar ? (
+                  <img src={communityProfile(topic).avatar} alt="" loading="lazy" />
+                ) : (
+                  topicAuthor(topic).slice(0, 1)
+                )}
+              </span>
               <span className="topic-row-copy">
                 <strong>{safeText(topic.title ?? topic.name, '未命名话题')}</strong>
                 <small>
-                  {topicAuthor(topic)} · {countValue(topic.replies ?? topic.reply_count)} 条回复
+                  {topicAuthor(topic)} · {replyCountLabel(topic.replies ?? topic.reply_count)}
                 </small>
               </span>
               <span className="topic-row-arrow" aria-hidden="true">

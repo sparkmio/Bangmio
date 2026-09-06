@@ -316,169 +316,178 @@ function CollectionEditorState({
     )
 
   return (
-    <section className="bm-collection-editor" data-ai-private="true">
-      <header className="bm-collection-head">
-        <div>
-          <h2>收藏盒</h2>
-          <p>记录收藏状态、评分和短评</p>
-        </div>
-      </header>
-      {isAuthenticated ? (
-        <>
-          <div className="bm-collection-toolbar">
-            <CollectionButton
-              animeId={animeId}
-              disabled={busy}
-              onSavingChange={setBusy}
-              subjectType={subjectType}
-              initialStatus={collectionStatusValue(collection)}
-              onSaved={next =>
-                setCollection(current => ({
-                  ...current,
-                  ...next,
-                  status: collectionStatusValue(next)
-                }))
-              }
-            />
-            <div className="bm-collection-rating">
-              <span>评分</span>
-              <div
-                className="bm-rating-picker"
-                role="radiogroup"
-                tabIndex={-1}
-                aria-label="我的评分"
-                onKeyDown={event => {
-                  if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
-                    event.preventDefault()
-                    moveRating(-1)
-                  }
-                  if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
-                    event.preventDefault()
-                    moveRating(1)
-                  }
-                }}
-              >
-                <div className="bm-rating-picker-stars">
-                  {Array.from({ length: 10 }, (_, index) => {
-                    const value = index + 1
-                    return (
-                      <button
-                        key={value}
-                        type="button"
-                        disabled={busy}
-                        role="radio"
-                        aria-checked={rating === value}
-                        aria-label={`${value} 分`}
-                        className={rating >= value ? 'is-selected' : ''}
-                        onClick={() => chooseRating(value)}
-                      >
-                        {rating >= value ? '★' : '☆'}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-              <small>{rating ? `${rating} 分` : '未评分'}</small>
-            </div>
+    <>
+      <section
+        className={`bm-collection-editor${isAuthenticated ? '' : ' is-guest'}`}
+        data-ai-private="true"
+      >
+        <header className="bm-collection-head">
+          <div>
+            <h2>收藏盒</h2>
+            <p>记录收藏状态、评分和短评</p>
           </div>
-          {watching && episodeTotal ? (
-            <section className="bm-watch-progress-card" aria-label="观看进度管理">
-              <div className="bm-watch-progress-head">
-                <div>
-                  <strong>观看进度管理</strong>
-                  <span>
-                    已看 {episode} / {episodeTotal} 集
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void updateEpisode(episodeTotal)}
-                  disabled={busy || episode === episodeTotal}
+        </header>
+        {isAuthenticated ? (
+          <>
+            <div className="bm-collection-toolbar">
+              <CollectionButton
+                animeId={animeId}
+                disabled={busy}
+                onSavingChange={setBusy}
+                subjectType={subjectType}
+                initialStatus={collectionStatusValue(collection)}
+                onSaved={next =>
+                  setCollection(current => ({
+                    ...current,
+                    ...next,
+                    status: collectionStatusValue(next)
+                  }))
+                }
+              />
+              <div className="bm-collection-rating">
+                <span>评分</span>
+                <div
+                  className="bm-rating-picker"
+                  role="radiogroup"
+                  tabIndex={-1}
+                  aria-label="我的评分"
+                  onKeyDown={event => {
+                    if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+                      event.preventDefault()
+                      moveRating(-1)
+                    }
+                    if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+                      event.preventDefault()
+                      moveRating(1)
+                    }
+                  }}
                 >
-                  全部看过
+                  <div className="bm-rating-picker-stars">
+                    {Array.from({ length: 10 }, (_, index) => {
+                      const value = index + 1
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          disabled={busy}
+                          role="radio"
+                          aria-checked={rating === value}
+                          aria-label={`${value} 分`}
+                          className={rating >= value ? 'is-selected' : ''}
+                          onClick={() => chooseRating(value)}
+                        >
+                          {rating >= value ? '★' : '☆'}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <small>{rating ? `${rating} 分` : '未评分'}</small>
+              </div>
+            </div>
+            {!collectionStatusValue(collection) ? (
+              <p role="status">请先选择收藏状态，再保存评分和短评。</p>
+            ) : null}
+            <form className="bm-collection-form" onSubmit={saveDetails}>
+              <label className="bm-collection-comment">
+                <span>短评</span>
+                <textarea
+                  disabled={busy}
+                  rows={2}
+                  maxLength={2000}
+                  value={comment}
+                  onChange={event => setComment(event.target.value)}
+                  placeholder="写点观后感…"
+                />
+              </label>
+              <div className="bm-collection-actions">
+                <span role="status">{message}</span>
+                <button type="submit" disabled={busy || !collectionStatusValue(collection)}>
+                  {busy ? '保存中…' : '保存记录'}
                 </button>
               </div>
-              <div className="bm-watch-progress-track" aria-hidden="true">
-                <span style={{ width: `${progressPercent}%` }} />
-              </div>
-              {episodeTotal > pageSize ? (
-                <nav aria-label="进度分页" className="bm-progress-pagination">
-                  <button
-                    type="button"
-                    disabled={currentPage === 0 || busy}
-                    onClick={() => setProgressPage(currentPage - 1)}
-                  >
-                    上一组
-                  </button>
-                  <label>
-                    跳到第{' '}
-                    <select
-                      aria-label="进度页"
-                      value={currentPage}
-                      onChange={event => setProgressPage(Number(event.target.value))}
-                    >
-                      {Array.from({ length: maxPage + 1 }, (_, i) => (
-                        <option key={i} value={i}>
-                          {i * pageSize + 1}–{Math.min(episodeTotal, (i + 1) * pageSize)} 集
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <button
-                    type="button"
-                    disabled={currentPage === maxPage || busy}
-                    onClick={() => setProgressPage(currentPage + 1)}
-                  >
-                    下一组
-                  </button>
-                </nav>
-              ) : null}
-              <div className="bm-watch-progress-episodes">
-                {episodeItems.map(item => (
-                  <button
-                    key={item}
-                    type="button"
-                    className={item <= episode ? 'is-watched' : ''}
-                    aria-label={`标记看到第 ${item} 集`}
-                    aria-pressed={item <= episode}
-                    onClick={() => void updateEpisode(item)}
-                    disabled={busy}
-                  >
-                    {String(item).padStart(2, '0')}
-                  </button>
-                ))}
-              </div>
-            </section>
-          ) : null}
-          {!collectionStatusValue(collection) ? (
-            <p role="status">请先选择收藏状态，再保存评分和短评。</p>
-          ) : null}
-          <form className="bm-collection-form" onSubmit={saveDetails}>
-            <label className="bm-collection-comment">
-              <span>短评</span>
-              <textarea
-                disabled={busy}
-                rows={2}
-                maxLength={2000}
-                value={comment}
-                onChange={event => setComment(event.target.value)}
-                placeholder="写点观后感…"
-              />
-            </label>
-            <div className="bm-collection-actions">
-              <span role="status">{message}</span>
-              <button type="submit" disabled={busy || !collectionStatusValue(collection)}>
-                {busy ? '保存中…' : '保存记录'}
-              </button>
+            </form>
+          </>
+        ) : (
+          <div className="bm-collection-login">
+            <span>登录后可以记录进度、评分和短评。</span>
+            <Link href={`/login?redirect=/anime/${animeId}`}>登录后继续 →</Link>
+          </div>
+        )}
+      </section>
+      {isAuthenticated && watching && episodeTotal ? (
+        <section
+          className="bm-watch-progress-card"
+          aria-label="观看进度管理"
+          data-ai-private="true"
+        >
+          <div className="bm-watch-progress-head">
+            <div>
+              <strong>观看进度管理</strong>
+              <span>
+                已看 {episode} / {episodeTotal} 集
+              </span>
             </div>
-          </form>
-        </>
-      ) : (
-        <div className="bm-collection-login">
-          <span>登录后可以记录进度、评分和短评。</span>
-          <Link href={`/login?redirect=/anime/${animeId}`}>登录后继续 →</Link>
-        </div>
-      )}
-    </section>
+            <button
+              type="button"
+              onClick={() => void updateEpisode(episodeTotal)}
+              disabled={busy || episode === episodeTotal}
+            >
+              全部看过
+            </button>
+          </div>
+          <div className="bm-watch-progress-track" aria-hidden="true">
+            <span style={{ width: `${progressPercent}%` }} />
+          </div>
+          {episodeTotal > pageSize ? (
+            <nav aria-label="进度分页" className="bm-progress-pagination">
+              <button
+                type="button"
+                disabled={currentPage === 0 || busy}
+                onClick={() => setProgressPage(currentPage - 1)}
+              >
+                上一组
+              </button>
+              <label>
+                跳到第{' '}
+                <select
+                  aria-label="进度页"
+                  value={currentPage}
+                  onChange={event => setProgressPage(Number(event.target.value))}
+                >
+                  {Array.from({ length: maxPage + 1 }, (_, i) => (
+                    <option key={i} value={i}>
+                      {i * pageSize + 1}–{Math.min(episodeTotal, (i + 1) * pageSize)} 集
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                disabled={currentPage === maxPage || busy}
+                onClick={() => setProgressPage(currentPage + 1)}
+              >
+                下一组
+              </button>
+            </nav>
+          ) : null}
+          <div className="bm-watch-progress-episodes">
+            {episodeItems.map(item => (
+              <button
+                key={item}
+                type="button"
+                className={item <= episode ? 'is-watched' : ''}
+                aria-label={`标记看到第 ${item} 集`}
+                aria-pressed={item <= episode}
+                onClick={() => void updateEpisode(item)}
+                disabled={busy}
+              >
+                {String(item).padStart(2, '0')}
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </>
   )
 }

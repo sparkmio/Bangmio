@@ -1,12 +1,12 @@
 import { requiredPageData, requirePositiveId } from '@/lib/page-data'
+import { groupTopicView } from '@/lib/community'
 import { TopicThread } from '@/components/topic-thread'
 
 export default async function GroupTopicPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   requirePositiveId(id)
   const response = await requiredPageData<any>(`/groups/topic/${encodeURIComponent(id)}`)
-  const topic = response
-  const replies = Array.isArray(topic.replies) ? topic.replies : []
+  const { topic, replies } = groupTopicView(response)
   const composerTopicId = Number(id)
   return (
     <TopicThread

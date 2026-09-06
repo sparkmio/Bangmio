@@ -234,6 +234,14 @@ describe('parseGroupDiscoverHTML', () => {
     expect(parseGroupDiscoverHTML('<h1>小组</h1>', BASE)).toEqual([])
   })
 
+  it('跳过坏编码的单条链接，不影响其他话题解析', () => {
+    const html = `<table class="topic_list">
+      <tr><td><a href="/group/topic/%E0%A4%A">坏链接</a></td><td><a href="/group/test">测试</a></td></tr>
+      <tr><td><a href="/group/topic/203">正常话题</a></td><td><a href="/group/test">测试</a></td></tr>
+    </table>`
+    expect(parseGroupDiscoverHTML(html, BASE).map(topic => topic.id)).toEqual(['203'])
+  })
+
   it('无法解析统计值时保留未知状态，并为作者返回完整资料', () => {
     const [topic] = parseGroupDiscoverHTML(
       '<table class="topic_list"><tr><td><a href="/group/topic/201">无统计话题</a></td><td><a href="/group/other">其他</a></td><td><a href="/user/reader"><img src="/avatar/reader.jpg" alt="">读者</a></td></tr></table>',
@@ -364,6 +372,25 @@ describe('group submission response handling', () => {
   })
 })
 
+it('忽略发现、全部、分类和新话题等导航链接，继续寻找真实小组', () => {
+  const topic = parseGroupTopicHTML(
+    '<header><a href="/group/discover">发现</a><a href="/group/all">全部</a><a href="/group/category">分类</a><a href="/group/new_topic">新话题</a></header><h1>导航污染测试</h1><a href="/group/forum">站务论坛</a>',
+    '906',
+    BASE
+  )
+  expect(topic.group_id).toBe('forum')
+  expect(topic.group_name).toBe('站务论坛')
+})
+it('从带小组面包屑的标题中分离真实话题标题', () => {
+  const topic = parseGroupTopicHTML(
+    '<h1><a href="/group/forum">站务论坛</a> » 测试话题</h1><div id="post_1" class="postTopic"><a href="/user/sai">sai</a><div class="topic_content"><div class="message">正文</div></div></div>',
+    '905',
+    BASE
+  )
+  expect(topic.title).toBe('测试话题')
+  expect(topic.group_name).toBe('站务论坛')
+})
+
 it('无法解析小组帖子回复数时保留未知值，而不是伪造为 0', () => {
   const topic = parseGroupTopicHTML(
     '<h1>无统计话题</h1><div id="post_1" class="postTopic"><a href="/user/sai">sai</a><div class="topic_content"><div class="message">正文</div></div></div>',
@@ -400,7 +427,12 @@ it('跳过无文字头像链接，保留当前页面中的真实用户名、楼�
     `
 
   const topic = parseGroupTopicHTML(html, '901', BASE)
-  expect(topic).toMatchObject({ group_id: 'forum', group_name: '站务论坛', author: 'Sai' })
+  expect(topic).toMatchObject({
+    group_id: 'forum',
+    group_name: '站务论坛',
+    author: 'Sai',
+    main_post: { id: '901-1', content: '首帖内容', timestamp: '2026-8-16 20:00' }
+  })
   expect(topic.replies).toMatchObject([
     {
       id: '901-1',

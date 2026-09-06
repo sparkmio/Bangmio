@@ -3732,6 +3732,8 @@ function logWarn(msg, meta = {}) {
 }
 
 // server/src/utils/rateLimit.js
+var d1WarningState = /* @__PURE__ */ new WeakMap();
+var nonObjectWarningState = /* @__PURE__ */ new Set();
 function rateLimit(windowMs, max) {
   const localStore = /* @__PURE__ */ new Map();
   const keyPrefix = `rate:${windowMs}:${max}`;
@@ -3767,7 +3769,16 @@ function rateLimit(windowMs, max) {
         count = fallback.count;
         resetTime = fallback.resetTime;
         if (err?.message && !String(err.message).includes("invalid rate-limit row")) {
-          logWarn("D1 \u901F\u7387\u9650\u5236\u4E0D\u53EF\u7528\uFF0C\u5DF2\u56DE\u9000\u5185\u5B58\u8BA1\u6570", { error: String(err) });
+          const errorText = String(err);
+          if (d1 && typeof d1 === "object") {
+            if (d1WarningState.get(d1) !== errorText) {
+              d1WarningState.set(d1, errorText);
+              logWarn("D1 \u901F\u7387\u9650\u5236\u4E0D\u53EF\u7528\uFF0C\u5DF2\u56DE\u9000\u5185\u5B58\u8BA1\u6570", { error: errorText });
+            }
+          } else if (!nonObjectWarningState.has(errorText)) {
+            nonObjectWarningState.add(errorText);
+            logWarn("D1 \u901F\u7387\u9650\u5236\u4E0D\u53EF\u7528\uFF0C\u5DF2\u56DE\u9000\u5185\u5B58\u8BA1\u6570", { error: errorText });
+          }
         }
       }
     } else {
@@ -4449,7 +4460,7 @@ function apiError(status, data, cause) {
   if (cause) err.cause = cause;
   return err;
 }
-async function bgmRequest(method, path, { token, body, params, isChina: isChina7 = false } = {}) {
+async function bgmRequest(method, path, { token, body, params, isChina: isChina7 = false, timeout = 8e3 } = {}) {
   let lastError;
   const canRetry = method === "GET" || method === "POST" && path === "/v0/search/subjects";
   for (const base of apiBases(isChina7)) {
@@ -4461,7 +4472,7 @@ async function bgmRequest(method, path, { token, body, params, isChina: isChina7
       const res = await fetch(url.toString(), {
         ...method === "GET" ? {} : { method },
         headers: requestHeaders,
-        signal: AbortSignal.timeout(8e3),
+        signal: AbortSignal.timeout(timeout),
         ...body === void 0 ? {} : { body: JSON.stringify(body) }
       });
       const text = await res.text();
@@ -4493,8 +4504,8 @@ async function bgmRequest(method, path, { token, body, params, isChina: isChina7
   }
   throw lastError || new Error("Bangumi API unavailable");
 }
-async function bgmGet(path, token, params, isChina7 = false) {
-  return bgmRequest("GET", path, { token, params, isChina: isChina7 });
+async function bgmGet(path, token, params, isChina7 = false, timeout = 8e3) {
+  return bgmRequest("GET", path, { token, params, isChina: isChina7, timeout });
 }
 async function bgmPost(path, body, token, params, isChina7 = false) {
   return bgmRequest("POST", path, { token, body, params, isChina: isChina7 });
@@ -4541,15 +4552,33 @@ async function getAnimeEpisodes(id, { offset = 0, limit = 100, isChina: isChina7
 }
 async function getAnimeCharacters(id, opts) {
   const subjectId = requiredId(id);
-  return bgmGet(`/v0/subjects/${subjectId}/characters`, null, null, opts?.isChina);
+  return bgmGet(
+    `/v0/subjects/${subjectId}/characters`,
+    null,
+    null,
+    opts?.isChina,
+    opts?.timeout || 4500
+  );
 }
 async function getAnimeRelations(id, opts) {
   const subjectId = requiredId(id);
-  return bgmGet(`/v0/subjects/${subjectId}/subjects`, null, null, opts?.isChina);
+  return bgmGet(
+    `/v0/subjects/${subjectId}/subjects`,
+    null,
+    null,
+    opts?.isChina,
+    opts?.timeout || 4500
+  );
 }
 async function getAnimePersons(id, opts) {
   const subjectId = requiredId(id);
-  return bgmGet(`/v0/subjects/${subjectId}/persons`, null, null, opts?.isChina);
+  return bgmGet(
+    `/v0/subjects/${subjectId}/persons`,
+    null,
+    null,
+    opts?.isChina,
+    opts?.timeout || 4500
+  );
 }
 async function getAnimeCalendar(opts) {
   return bgmGet("/calendar", null, null, opts?.isChina);
@@ -5509,12 +5538,12 @@ async function decodeResponseBody(res) {
   }
   return repairMojibake(new TextDecoder("utf-8").decode(buffer));
 }
-async function fetchHTML(url, { timeout = 12e3, headers: headers2 = {} } = {}) {
+async function fetchHTML(url, { timeout = 12e3, headers: headers2 = {}, signal, quiet = false } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
   try {
     const res = await fetch(url, {
-      signal: controller.signal,
+      signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal,
       headers: {
         "User-Agent": SCRAPE_UA,
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
@@ -5522,40 +5551,62 @@ async function fetchHTML(url, { timeout = 12e3, headers: headers2 = {} } = {}) {
         ...headers2
       }
     });
-    clearTimeout(timer);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await decodeResponseBody(res);
   } catch (e) {
-    clearTimeout(timer);
-    logError("fetchHTML failed", { url, error: String(e) });
+    if (!quiet && !signal?.aborted) logError("fetchHTML failed", { url, error: String(e) });
     throw e;
+  } finally {
+    clearTimeout(timer);
   }
 }
 async function fetchHTMLMulti(urls, { timeout = 8e3, overallTimeout = 18e3, retries = 1, headers: headers2 = {} } = {}) {
   if (!urls || urls.length === 0) {
     throw new Error("All sources failed");
   }
-  let lastErr;
+  const controller = new AbortController();
+  const failures = [];
+  let timer;
   const fetchOneWithRetry = async (url) => {
     for (let i = 0; i <= retries; i++) {
+      controller.signal.throwIfAborted();
       try {
-        const html = await fetchHTML(url, { timeout, headers: headers2 });
+        const html = await fetchHTML(url, {
+          timeout,
+          headers: headers2,
+          signal: controller.signal,
+          quiet: true
+        });
         if (html) return { html, url };
-      } catch (e) {
-        lastErr = e;
-        if (i === retries) throw e;
+        throw new Error("Empty HTML response");
+      } catch (error) {
+        if (controller.signal.aborted) throw error;
+        if (i === retries) {
+          failures.push({ url, error });
+          throw error;
+        }
       }
     }
-    throw new Error("unreachable");
   };
-  const promises = urls.map((url) => fetchOneWithRetry(url));
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error(`Overall timeout ${overallTimeout}ms`)), overallTimeout);
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error("Overall timeout " + overallTimeout + "ms");
+      controller.abort(error);
+      reject(error);
+    }, overallTimeout);
   });
   try {
-    return await Promise.race([Promise.any(promises), timeoutPromise]);
-  } catch (e) {
-    throw lastErr || e || new Error("All sources failed");
+    return await Promise.race([Promise.any(urls.map(fetchOneWithRetry)), deadline]);
+  } catch (error) {
+    const finalError = error instanceof AggregateError && failures.length ? failures[failures.length - 1].error : error;
+    logError("HTML \u6240\u6709\u5019\u9009\u6E90\u5931\u8D25", {
+      failures: failures.map((item) => ({ url: item.url, error: String(item.error) })),
+      error: String(finalError)
+    });
+    throw finalError;
+  } finally {
+    clearTimeout(timer);
+    controller.abort();
   }
 }
 function stripTags(str) {
@@ -6093,7 +6144,7 @@ async function getAnimeCharacters2(c) {
     const data = await getAnimeCharacters(id, { isChina: isChina3(c) });
     return c.json({ data });
   } catch {
-    return c.json({ error: "\u83B7\u53D6\u89D2\u8272\u5931\u8D25" }, 500);
+    return c.json({ error: "\u83B7\u53D6\u89D2\u8272\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5" }, 502);
   }
 }
 async function getAnimePersons2(c) {
@@ -6103,7 +6154,7 @@ async function getAnimePersons2(c) {
     const data = await getAnimePersons(id, { isChina: isChina3(c) });
     return c.json({ data });
   } catch {
-    return c.json({ error: "\u83B7\u53D6\u5236\u4F5C\u4EBA\u5458\u5931\u8D25" }, 500);
+    return c.json({ error: "\u83B7\u53D6\u5236\u4F5C\u4EBA\u5458\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5" }, 502);
   }
 }
 async function getAnimeRelations2(c) {
@@ -6113,7 +6164,7 @@ async function getAnimeRelations2(c) {
     const data = await getAnimeRelations(id, { isChina: isChina3(c) });
     return c.json({ data });
   } catch {
-    return c.json({ error: "\u83B7\u53D6\u5173\u8054\u6761\u76EE\u5931\u8D25" }, 500);
+    return c.json({ error: "\u83B7\u53D6\u5173\u8054\u6761\u76EE\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5" }, 502);
   }
 }
 async function getAnimeCalendar2(c) {
@@ -18677,6 +18728,7 @@ var HOSTS = {
 };
 var cache6 = createCache(CACHE_TTL_GROUPS);
 var lastSuccessStore = /* @__PURE__ */ new Map();
+var lastSuccessTopicStore = /* @__PURE__ */ new Map();
 function getBaseUrls(isChina7) {
   if (isChina7) {
     return [HOSTS.mirror1, HOSTS.mirror2, HOSTS.main];
@@ -19081,15 +19133,42 @@ function parseMemberCount(document) {
   }
   return null;
 }
+function fallbackGroupTopic(id, base, content = "\u6682\u65F6\u65E0\u6CD5\u52A0\u8F7D\u8BE5\u8BDD\u9898\u6B63\u6587\uFF0C\u8BF7\u7A0D\u540E\u5237\u65B0\u3002") {
+  return {
+    id,
+    title: "\u8BDD\u9898 #" + id,
+    group_id: "",
+    group_name: "",
+    author: "",
+    username: "",
+    nickname: "",
+    avatar: "",
+    creator: { username: "", nickname: "", avatar: "", url: "" },
+    content,
+    reply_count: null,
+    main_post: null,
+    replies: [],
+    url: base + "/group/topic/" + id
+  };
+}
 function parseGroupTopicHTML(html, id, base) {
   const { document } = parseHTML(html);
   const titleEl = document.querySelector("h1, h2.topic_title, .topic_title, .topicTitle");
-  const title = collapseText(titleEl?.textContent || "") || "\u8BDD\u9898 #" + id;
   const isGroupAnchor = (anchor) => {
     const href = safeAbsoluteUrl(anchor.getAttribute("href") || "", base);
-    return /(?:^|\/)group\/[^/?#]+/.test(href) && !/\/group\/topic\//.test(href);
+    const groupId = groupIdFromHref(href);
+    const reservedPaths = /* @__PURE__ */ new Set(["discover", "all", "category", "new_topic"]);
+    return Boolean(groupId) && !reservedPaths.has(groupId.toLowerCase()) && !/\/group\/topic\//.test(href);
   };
   const groupAnchor = Array.from(titleEl?.querySelectorAll("a[href]") || []).find(isGroupAnchor) || Array.from(document.querySelectorAll("a[href]")).find(isGroupAnchor);
+  const titleClone = titleEl?.cloneNode(true);
+  for (const anchor of titleClone?.querySelectorAll?.("a[href]") || []) {
+    if (isGroupAnchor(anchor)) anchor.remove();
+  }
+  const title = collapseText(titleClone?.textContent || titleEl?.textContent || "").replace(
+    /^[\s»›|/:：-]+/,
+    ""
+  ) || "\u8BDD\u9898 #" + id;
   const authorLinks = Array.from(document.querySelectorAll('a[href*="/user/"]'));
   const rows = [];
   const seen = /* @__PURE__ */ new Set();
@@ -19128,7 +19207,7 @@ function parseGroupTopicHTML(html, id, base) {
     return true;
   };
   const mainPost = document.querySelector('.postTopic[id^="post_"]');
-  if (mainPost) appendRow(mainPost, 1);
+  const mainPostRow = mainPost && appendRow(mainPost, 1) ? rows[0] : null;
   const replyContainers = Array.from(document.querySelectorAll("#comment_list > .row_reply"));
   if (!replyContainers.length) {
     replyContainers.push(...document.querySelectorAll(".row_reply, .topic-reply, .reply"));
@@ -19176,6 +19255,8 @@ function parseGroupTopicHTML(html, id, base) {
     avatar: rows[0]?.avatar || "",
     creator: rows[0]?.creator || { username: "", nickname: "", avatar: "", url: "" },
     reply_count: replyMatch ? Math.max(rows.length - 1, parseNumber(replyMatch[1])) : rows.length > 1 ? rows.length - 1 : null,
+    // Additive field: legacy consumers still receive the original replies array.
+    main_post: mainPostRow,
     replies: rows,
     url: base + "/group/topic/" + id
   };
@@ -19193,7 +19274,12 @@ function parseGroupDiscoverHTML(html, base) {
     if (!topicAnchor) continue;
     const topicMatch = (topicAnchor.getAttribute("href") || "").match(/\/group\/topic\/([^/?#]+)/);
     if (!topicMatch) continue;
-    const id = decodeURIComponent(topicMatch[1]);
+    let id;
+    try {
+      id = decodeURIComponent(topicMatch[1]);
+    } catch {
+      continue;
+    }
     if (seen.has(id)) continue;
     seen.add(id);
     const groupAnchor = Array.from(row.querySelectorAll("a[href]")).find((anchor) => {
@@ -19281,12 +19367,19 @@ app10.get("/topic/:id", async (c) => {
     if (cached) return c.json({ data: cached.data, degraded: cached.degraded === true });
     const bases = getBaseUrls(isChina7);
     const urls = bases.map((base) => base + "/group/topic/" + id);
-    const { html, url } = await fetchGroupHTMLCached(urls);
-    const baseUrl = url.replace(/\/group\/topic\/[^/]+\/?$/, "") || bases[0];
-    const topic = parseGroupTopicHTML(html, id, baseUrl);
-    const degraded = topic.title === "\u8BDD\u9898 #" + id && topic.replies.length === 0;
-    cache6.set(cacheKey2, { data: topic, degraded });
-    return c.json({ data: topic, degraded });
+    try {
+      const { html, url } = await fetchGroupHTMLCached(urls);
+      const baseUrl = url.replace(/\/group\/topic\/[^/]+\/?$/, "") || bases[0];
+      const topic = parseGroupTopicHTML(html, id, baseUrl);
+      const degraded = topic.title === "\u8BDD\u9898 #" + id && topic.replies.length === 0;
+      lastSuccessTopicStore.set(id, topic);
+      cache6.set(cacheKey2, { data: topic, degraded });
+      return c.json({ data: topic, degraded });
+    } catch {
+      const lastSuccess = lastSuccessTopicStore.get(id);
+      if (lastSuccess) return c.json({ data: lastSuccess, degraded: true });
+      return c.json({ data: fallbackGroupTopic(id, bases[0]), degraded: true });
+    }
   } catch {
     return c.json({ data: null, degraded: true });
   }

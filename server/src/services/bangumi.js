@@ -41,7 +41,11 @@ function apiError(status, data, cause) {
  * 统一请求 Bangumi API。优先按地区选择的源；网络异常、5xx 或无效 JSON 时自动
  * 回退另一个 API 域名（仅 GET 和只读搜索 POST）。写操作不重放；401/403 直接返回。
  */
-async function bgmRequest(method, path, { token, body, params, isChina = false } = {}) {
+async function bgmRequest(
+  method,
+  path,
+  { token, body, params, isChina = false, timeout = 8000 } = {}
+) {
   let lastError
   const canRetry = method === 'GET' || (method === 'POST' && path === '/v0/search/subjects')
 
@@ -57,7 +61,7 @@ async function bgmRequest(method, path, { token, body, params, isChina = false }
       const res = await fetch(url.toString(), {
         ...(method === 'GET' ? {} : { method }),
         headers: requestHeaders,
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(timeout),
         ...(body === undefined ? {} : { body: JSON.stringify(body) })
       })
       const text = await res.text()
@@ -97,8 +101,8 @@ async function bgmRequest(method, path, { token, body, params, isChina = false }
   throw lastError || new Error('Bangumi API unavailable')
 }
 
-async function bgmGet(path, token, params, isChina = false) {
-  return bgmRequest('GET', path, { token, params, isChina })
+async function bgmGet(path, token, params, isChina = false, timeout = 8000) {
+  return bgmRequest('GET', path, { token, params, isChina, timeout })
 }
 
 async function bgmPost(path, body, token, params, isChina = false) {
@@ -219,7 +223,13 @@ export async function getAnimeEpisodes(id, { offset = 0, limit = 100, isChina } 
  */
 export async function getAnimeCharacters(id, opts) {
   const subjectId = requiredId(id)
-  return bgmGet(`/v0/subjects/${subjectId}/characters`, null, null, opts?.isChina)
+  return bgmGet(
+    `/v0/subjects/${subjectId}/characters`,
+    null,
+    null,
+    opts?.isChina,
+    opts?.timeout || 4500
+  )
 }
 
 /**
@@ -231,7 +241,13 @@ export async function getAnimeCharacters(id, opts) {
  */
 export async function getAnimeRelations(id, opts) {
   const subjectId = requiredId(id)
-  return bgmGet(`/v0/subjects/${subjectId}/subjects`, null, null, opts?.isChina)
+  return bgmGet(
+    `/v0/subjects/${subjectId}/subjects`,
+    null,
+    null,
+    opts?.isChina,
+    opts?.timeout || 4500
+  )
 }
 
 /**
@@ -243,7 +259,13 @@ export async function getAnimeRelations(id, opts) {
  */
 export async function getAnimePersons(id, opts) {
   const subjectId = requiredId(id)
-  return bgmGet(`/v0/subjects/${subjectId}/persons`, null, null, opts?.isChina)
+  return bgmGet(
+    `/v0/subjects/${subjectId}/persons`,
+    null,
+    null,
+    opts?.isChina,
+    opts?.timeout || 4500
+  )
 }
 
 /**

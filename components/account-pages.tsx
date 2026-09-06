@@ -6,6 +6,7 @@ import type { Collection, Subject, User } from '@/lib/types'
 import { avatarUrl, displayName, imageUrl } from '@/lib/api'
 import { CollectionButton, collectionStatusLabel } from './collection-button'
 import { useAuth } from './auth-provider'
+import { AppearanceSettings } from './appearance-provider'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { ready, isAuthenticated } = useAuth()
@@ -184,16 +185,12 @@ function StatsPanel({ collections }: { collections: Collection[] }) {
       ).toFixed(2)
     : '-'
   const cards = [
-    ['border-pink-500/30 bg-pink-500/10 text-pink-700', total, '收藏数'],
-    ['border-green-500/30 bg-green-500/10 text-green-700', completed, '完成数'],
-    [
-      'border-blue-500/30 bg-blue-500/10 text-blue-700',
-      `${total ? Math.round((completed / total) * 100) : 0}%`,
-      '完成率'
-    ],
-    ['border-orange-500/30 bg-orange-500/10 text-orange-700', average, '平均分'],
-    ['border-purple-500/30 bg-purple-500/10 text-purple-700', deviation, '标准差'],
-    ['border-cyan-500/30 bg-cyan-500/10 text-cyan-700', rated.length, '评分数']
+    ['bm-stat-card', total, '收藏数'],
+    ['bm-stat-card', completed, '完成数'],
+    ['bm-stat-card', `${total ? Math.round((completed / total) * 100) : 0}%`, '完成率'],
+    ['bm-stat-card', average, '平均分'],
+    ['bm-stat-card', deviation, '标准差'],
+    ['bm-stat-card', rated.length, '评分数']
   ] as const
   return (
     <div id="stats" className="card bg-base-100 border border-base-300">
@@ -674,72 +671,85 @@ export function SettingsPage() {
     }
   }
   return (
-    <RequireAuth>
-      <div className="max-w-2xl">
+    <>
+      <div className="max-w-2xl bm-settings-page">
         <h1 className="text-xl font-bold mb-4">设置</h1>
-        <div className="card bg-base-100 border border-base-300">
-          <div className="card-body p-5">
-            <h2 className="font-bold">{account?.email || '当前账号'}</h2>
-            <p className="text-sm text-base-content/60">
-              {isBangmioUser ? '当前使用 Bangmio 账号。' : '当前使用 Bangumi Access Token 直登。'}
-            </p>
-            {isBangmioUser ? (
-              <>
-                <button
-                  className="btn btn-outline btn-sm mt-3"
-                  type="button"
-                  onClick={() =>
-                    void fetchBgmUserProfile().then(value =>
-                      setMessage(value ? 'Bangumi 资料已刷新' : '未能刷新资料')
-                    )
-                  }
-                >
-                  刷新 Bangumi 资料
-                </button>
-                <Link href="/bind-bangumi" className="link link-primary block mt-3">
-                  重新绑定 Bangumi →
-                </Link>
-              </>
-            ) : null}
-            <button className="btn btn-ghost btn-sm mt-3 text-error" type="button" onClick={logout}>
-              退出当前账号
-            </button>
-          </div>
-        </div>
-        {isBangmioUser ? (
-          <form className="card bg-base-100 border border-base-300 mt-4" onSubmit={changePassword}>
+        <AppearanceSettings />
+      </div>
+      <RequireAuth>
+        <div className="max-w-2xl">
+          <h1 className="text-xl font-bold mb-4">设置</h1>
+          <div className="card bg-base-100 border border-base-300">
             <div className="card-body p-5">
-              <h2 className="font-bold">修改密码</h2>
-              <label className="form-control">
-                <span className="label-text">当前密码</span>
-                <input
-                  className="input input-bordered"
-                  type="password"
-                  value={currentPassword}
-                  onChange={event => setCurrentPassword(event.target.value)}
-                  required
-                />
-              </label>
-              <label className="form-control">
-                <span className="label-text">新密码</span>
-                <input
-                  className="input input-bordered"
-                  type="password"
-                  value={newPassword}
-                  onChange={event => setNewPassword(event.target.value)}
-                  minLength={8}
-                  required
-                />
-              </label>
-              <button className="btn btn-primary" type="submit" disabled={busy}>
-                {busy ? '保存中…' : '保存新密码'}
+              <h2 className="font-bold">{account?.email || '当前账号'}</h2>
+              <p className="text-sm text-base-content/60">
+                {isBangmioUser ? '当前使用 Bangmio 账号。' : '当前使用 Bangumi Access Token 直登。'}
+              </p>
+              {isBangmioUser ? (
+                <>
+                  <button
+                    className="btn btn-outline btn-sm mt-3"
+                    type="button"
+                    onClick={() =>
+                      void fetchBgmUserProfile().then(value =>
+                        setMessage(value ? 'Bangumi 资料已刷新' : '未能刷新资料')
+                      )
+                    }
+                  >
+                    刷新 Bangumi 资料
+                  </button>
+                  <Link href="/bind-bangumi" className="link link-primary block mt-3">
+                    重新绑定 Bangumi →
+                  </Link>
+                </>
+              ) : null}
+              <button
+                className="btn btn-ghost btn-sm mt-3 text-error"
+                type="button"
+                onClick={logout}
+              >
+                退出当前账号
               </button>
             </div>
-          </form>
-        ) : null}
-        {message ? <p className="text-sm text-primary mt-3">{message}</p> : null}
-      </div>
-    </RequireAuth>
+          </div>
+          {isBangmioUser ? (
+            <form
+              className="card bg-base-100 border border-base-300 mt-4"
+              onSubmit={changePassword}
+            >
+              <div className="card-body p-5">
+                <h2 className="font-bold">修改密码</h2>
+                <label className="form-control">
+                  <span className="label-text">当前密码</span>
+                  <input
+                    className="input input-bordered"
+                    type="password"
+                    value={currentPassword}
+                    onChange={event => setCurrentPassword(event.target.value)}
+                    required
+                  />
+                </label>
+                <label className="form-control">
+                  <span className="label-text">新密码</span>
+                  <input
+                    className="input input-bordered"
+                    type="password"
+                    value={newPassword}
+                    onChange={event => setNewPassword(event.target.value)}
+                    minLength={8}
+                    required
+                  />
+                </label>
+                <button className="btn btn-primary" type="submit" disabled={busy}>
+                  {busy ? '保存中…' : '保存新密码'}
+                </button>
+              </div>
+            </form>
+          ) : null}
+          {message ? <p className="text-sm text-primary mt-3">{message}</p> : null}
+        </div>
+      </RequireAuth>
+    </>
   )
 }
 

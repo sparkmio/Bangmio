@@ -68,7 +68,12 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
     <div className="group-detail-page">
       <header className="panel group-detail-hero">
         <div className="group-detail-mark" aria-hidden="true">
-          {title.slice(0, 1)}
+          {typeof (group.avatar ?? group.icon) === 'string' &&
+          /^https?:\/\//i.test(group.avatar ?? group.icon) ? (
+            <img src={group.avatar ?? group.icon} alt="" />
+          ) : (
+            title.slice(0, 1)
+          )}
         </div>
         <div className="group-detail-copy">
           <div className="eyebrow">Community group</div>

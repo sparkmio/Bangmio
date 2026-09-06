@@ -109,3 +109,11 @@ it('locks details while the collection status write is pending', async () => {
   await act(async () => resolveWrite({ data: { type: 2 } }))
   expect((container.querySelector('textarea') as HTMLTextAreaElement).disabled).toBe(false)
 })
+it('keeps watching progress outside the collection card while retaining the privacy boundary', async () => {
+  await act(async () => root.render(<CollectionEditor animeId={42} totalEpisodes={1200} />))
+  const editor = container.querySelector('.bm-collection-editor')!
+  const progress = container.querySelector('.bm-watch-progress-card')!
+  expect(editor.contains(progress)).toBe(false)
+  expect(editor.parentElement).toBe(progress.parentElement)
+  expect(progress.getAttribute('data-ai-private')).toBe('true')
+})

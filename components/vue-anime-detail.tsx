@@ -881,6 +881,7 @@ export function VueAnimeDetail({
   infobox
 }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
+  const [failedPoster, setFailedPoster] = useState('')
   const image = imageUrl(subject.images)
   const title = displayName(subject)
   const typeLabel =
@@ -928,17 +929,18 @@ export function VueAnimeDetail({
           <div className="bm-detail-hero-grid">
             <div className="bm-detail-left">
               <div className="bm-detail-poster">
-                {image ? (
+                {image && failedPoster !== image ? (
                   <img
                     src={image}
                     alt={title}
+                    onError={() => setFailedPoster(image)}
                     loading="eager"
                     decoding="async"
                     className="w-full rounded-2xl shadow-2xl ring-1 ring-white/10"
                   />
                 ) : (
                   <div className="w-full aspect-[2/3] rounded-2xl bg-base-300 flex items-center justify-center">
-                    暂无封面
+                    {image ? '封面暂时无法加载' : '暂无封面'}
                   </div>
                 )}
               </div>
@@ -970,13 +972,13 @@ export function VueAnimeDetail({
                   <span className="badge badge-lg badge-ghost">{subject.eps}话</span>
                 ) : null}
               </div>
-              <CollectionEditor
-                animeId={subject.id}
-                subjectType={subject.type}
-                episodes={episodes}
-                totalEpisodes={subject.eps || subject.eps_count || episodes.length}
-              />
             </div>
+            <CollectionEditor
+              animeId={subject.id}
+              subjectType={subject.type}
+              episodes={episodes}
+              totalEpisodes={subject.eps || subject.eps_count || episodes.length}
+            />
           </div>
         </div>
       </div>

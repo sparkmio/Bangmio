@@ -5,8 +5,14 @@ export default async function TopicPage({ params }: { params: Promise<{ id: stri
   const { id } = await params
   requirePositiveId(id)
   const response = await requiredPageData<any>(`/comments/topic/${id}`)
-  const topic = response
-  const replies = Array.isArray(topic.replies) ? topic.replies : []
+  // comments.js returns the opening post under `op`; TopicThread consumes a
+  // flattened topic shape shared with the group-topic page.
+  const topic = response?.op && typeof response.op === 'object' ? response.op : response
+  const replies = Array.isArray(response?.replies)
+    ? response.replies
+    : Array.isArray(topic?.replies)
+      ? topic.replies
+      : []
   return (
     <TopicThread
       topic={topic}

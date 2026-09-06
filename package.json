@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev -p 3001",
+    "db:local:init": "node scripts/db-local-init.mjs",
     "dev:server": "node --watch server/src/index.js",
     "server:start": "node server/src/index.js",
     "dev:all": "concurrently -n server,next -c yellow,cyan \"npm:dev:server\" \"npm:dev:next\"",
