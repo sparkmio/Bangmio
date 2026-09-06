@@ -49,6 +49,12 @@ function topicAuthor(topic: any) {
   )
 }
 
+function topicId(topic: any) {
+  const value = String(topic?.id ?? topic?.topic_id ?? '').trim()
+  if (!/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value))) return null
+  return value
+}
+
 export default async function SubjectTopicsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   requirePositiveId(id)
@@ -72,26 +78,34 @@ export default async function SubjectTopicsPage({ params }: { params: Promise<{ 
         <DataUnavailable label="讨论" />
       ) : topics.length ? (
         <section className="topic-list panel" aria-label="条目话题列表">
-          {topics.map((topic: any, index: number) => (
-            <Link className="topic-row" href={`/topic/${topic.id}`} key={topic.id || index}>
-              <span className="topic-avatar">
-                {communityProfile(topic).avatar ? (
-                  <img src={communityProfile(topic).avatar} alt="" loading="lazy" />
-                ) : (
-                  topicAuthor(topic).slice(0, 1)
-                )}
-              </span>
-              <span className="topic-row-copy">
-                <strong>{safeText(topic.title ?? topic.name, '未命名话题')}</strong>
-                <small>
-                  {topicAuthor(topic)} · {replyCountLabel(topic.replies ?? topic.reply_count)}
-                </small>
-              </span>
-              <span className="topic-row-arrow" aria-hidden="true">
-                →
-              </span>
-            </Link>
-          ))}
+          {topics.map((topic: any) => {
+            const topicIdValue = topicId(topic)
+            if (!topicIdValue) return null
+            return (
+              <Link
+                className="topic-row"
+                href={`/topic/${topicIdValue}?from=subject&subject=${encodeURIComponent(id)}`}
+                key={topicIdValue}
+              >
+                <span className="topic-avatar">
+                  {communityProfile(topic).avatar ? (
+                    <img src={communityProfile(topic).avatar} alt="" loading="lazy" />
+                  ) : (
+                    topicAuthor(topic).slice(0, 1)
+                  )}
+                </span>
+                <span className="topic-row-copy">
+                  <strong>{safeText(topic.title ?? topic.name, '未命名话题')}</strong>
+                  <small>
+                    {topicAuthor(topic)} · {replyCountLabel(topic.replies ?? topic.reply_count)}
+                  </small>
+                </span>
+                <span className="topic-row-arrow" aria-hidden="true">
+                  →
+                </span>
+              </Link>
+            )
+          })}
         </section>
       ) : (
         <div className="panel empty-state">

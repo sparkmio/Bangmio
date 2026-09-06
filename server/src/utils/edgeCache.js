@@ -58,3 +58,18 @@ export async function edgeCachePut(key, html, maxAge = 600) {
     // 写入失败不影响主流程
   }
 }
+
+/**
+ * 删除使用原始 URL 作为 Cache API key 的缓存条目。
+ * @param {string} url
+ * @returns {Promise<void>}
+ */
+export async function edgeCacheDeleteUrl(url) {
+  const cache = getEdgeCache()
+  if (!cache || !url) return
+  try {
+    await cache.delete(url)
+  } catch {
+    // 缓存失效失败不影响已经完成的上游写入
+  }
+}

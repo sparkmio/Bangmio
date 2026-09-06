@@ -37,4 +37,25 @@ describe('createCache', () => {
     cache.set('objKey', obj)
     expect(cache.get('objKey')).toEqual(obj)
   })
+
+  it('命中后更新 LRU 顺序，并淘汰最久未使用的条目', () => {
+    cache = createCache(1000, 2)
+    cache.set('old', 1)
+    cache.set('recent', 2)
+    expect(cache.get('old')).toBe(1)
+    cache.set('new', 3)
+    expect(cache.get('old')).toBe(1)
+    expect(cache.get('recent')).toBeNull()
+  })
+
+  it('支持删除单项和按前缀失效', () => {
+    cache.set('topic:1', 1)
+    cache.set('topic:2', 2)
+    cache.set('group:1', 3)
+    cache.delete('topic:1')
+    cache.deleteByPrefix('topic:')
+    expect(cache.get('topic:1')).toBeNull()
+    expect(cache.get('topic:2')).toBeNull()
+    expect(cache.get('group:1')).toBe(3)
+  })
 })

@@ -17083,7 +17083,7 @@ function Document4() {
 setPrototypeOf(Document4, Document2).prototype = Document2.prototype;
 
 // server/src/utils/cache.js
-function createCache(ttl) {
+function createCache(ttl, maxEntries = 500) {
   const store = /* @__PURE__ */ new Map();
   return {
     /**
@@ -17099,6 +17099,8 @@ function createCache(ttl) {
         store.delete(key2);
         return null;
       }
+      store.delete(key2);
+      store.set(key2, entry);
       return entry.data;
     },
     /**
@@ -17108,7 +17110,17 @@ function createCache(ttl) {
      * @returns {void}
      */
     set(key2, data) {
+      store.delete(key2);
       store.set(key2, { data, time: Date.now() });
+      while (store.size > Math.max(1, maxEntries)) store.delete(store.keys().next().value);
+    },
+    delete(key2) {
+      store.delete(key2);
+    },
+    deleteByPrefix(prefix) {
+      for (const key2 of store.keys()) {
+        if (key2.startsWith(prefix)) store.delete(key2);
+      }
     },
     /**
      * 清空所有缓存条目。
@@ -17127,6 +17139,9 @@ var BGM_TV = "https://bgm.tv";
 var BGM_PROXY2 = "https://bangumi.pro";
 function getBase(isChina7) {
   return isChina7 ? BGM_PROXY2 : BGM_TV;
+}
+function invalidateCacheFor(prefix, id) {
+  for (const isChina7 of [false, true]) cache.delete(`${prefix}_${id}_${isChina7}`);
 }
 function absoluteAvatar(raw2) {
   const value = String(raw2 || "").trim();
@@ -17259,6 +17274,8 @@ function parseTopics(html) {
   rows.forEach((el) => {
     const titleLink = el.querySelector("td.subject a");
     const href = titleLink ? titleLink.getAttribute("href") || "" : "";
+    const topicId = href.match(/\/subject\/topic\/([^/?#]+)/i)?.[1] || "";
+    if (parsePositiveId(topicId) === null) return;
     const title = titleLink ? titleLink.getAttribute("title") || titleLink.textContent.trim() : "";
     if (!href || !title) return;
     const authorLink = el.querySelector("td:nth-child(2) a");
@@ -17268,7 +17285,7 @@ function parseTopics(html) {
     const dateEl = el.querySelector("td:nth-child(4) small.grey");
     const dateText = dateEl ? dateEl.textContent.trim() : "";
     topics.push({
-      id: href.split("/").pop(),
+      id: topicId,
       title,
       href: `https://bgm.tv${href}`,
       author: authorLink ? authorLink.textContent.trim() : "",
@@ -17354,7 +17371,7 @@ app5.get("/subject/:id/topics", async (c) => {
     const cached = cache.get(key2);
     if (cached) return c.json({ data: cached });
     const html = await fetchHTML(`${getBase(isChina7)}/subject/${id}/board`);
-    const topics = parseTopics(html);
+    const topics = parseTopics(html).map((topic) => ({ ...topic, subject_id: id }));
     cache.set(key2, topics);
     return c.json({ data: topics });
   } catch {
@@ -17471,6 +17488,7 @@ app5.post("/subject/:id/comment", async (c) => {
       redirect: "manual"
     });
     await acceptCommentSubmission(res);
+    invalidateCacheFor("subj", subjectId);
     return c.json({ success: true });
   } catch {
     return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 500);
@@ -17509,6 +17527,7 @@ app5.post("/topic/:topicId/reply", async (c) => {
       redirect: "manual"
     });
     await acceptCommentSubmission(res);
+    invalidateCacheFor("topic", topicId);
     return c.json({ success: true });
   } catch {
     return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 500);
@@ -17547,6 +17566,7 @@ app5.post("/subject/:id/talkbox", async (c) => {
       redirect: "manual"
     });
     await acceptCommentSubmission(res);
+    invalidateCacheFor("subj", subjectId);
     return c.json({ success: true });
   } catch {
     return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 500);
@@ -17584,6 +17604,7 @@ app5.post("/person/:id/talkbox", async (c) => {
       redirect: "manual"
     });
     await acceptCommentSubmission(res);
+    invalidateCacheFor("person", personId);
     return c.json({ success: true });
   } catch {
     return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 500);
@@ -17623,6 +17644,7 @@ app5.post("/subject/:id/topic", async (c) => {
       redirect: "manual"
     });
     await acceptCommentSubmission(res);
+    invalidateCacheFor("topics", subjectId);
     return c.json({ success: true });
   } catch {
     return c.json({ error: "\u53D1\u9001\u5931\u8D25" }, 500);
@@ -17799,6 +17821,14 @@ async function edgeCachePut(key2, html, maxAge = 600) {
         }
       })
     );
+  } catch {
+  }
+}
+async function edgeCacheDeleteUrl(url) {
+  const cache8 = getEdgeCache();
+  if (!cache8 || !url) return;
+  try {
+    await cache8.delete(url);
   } catch {
   }
 }
@@ -18727,8 +18757,12 @@ var HOSTS = {
   mirror2: "https://bangumi.one"
 };
 var cache6 = createCache(CACHE_TTL_GROUPS);
-var lastSuccessStore = /* @__PURE__ */ new Map();
-var lastSuccessTopicStore = /* @__PURE__ */ new Map();
+var lastSuccessStore = createCache(30 * 60 * 1e3, 500);
+var lastSuccessTopicStore = createCache(30 * 60 * 1e3, 500);
+async function invalidateGroupPages(paths) {
+  const urls = getBaseUrls(false).concat(getBaseUrls(true)).flatMap((base) => paths.map((path) => `${base}${path}`));
+  await Promise.all(urls.map((url) => edgeCacheDeleteUrl(url)));
+}
 function getBaseUrls(isChina7) {
   if (isChina7) {
     return [HOSTS.mirror1, HOSTS.mirror2, HOSTS.main];
@@ -19541,6 +19575,13 @@ app10.post("/:id/topic", async (c) => {
       token,
       fields: { title, content }
     });
+    cache6.deleteByPrefix("groups_");
+    lastSuccessStore.delete(groupId);
+    await invalidateGroupPages([
+      `/group/${encodeURIComponent(groupId)}`,
+      "/group/all",
+      "/group/discover"
+    ]);
     return c.json({ data: { success: true }, code: 200 });
   } catch (error) {
     return c.json(
@@ -19569,6 +19610,9 @@ app10.post("/topic/:topicId/reply", async (c) => {
       token,
       fields: { content }
     });
+    cache6.deleteByPrefix("groups_");
+    lastSuccessTopicStore.delete(topicId);
+    await invalidateGroupPages([`/group/topic/${encodeURIComponent(topicId)}`]);
     return c.json({ data: { success: true }, code: 200 });
   } catch (error) {
     return c.json(

@@ -68,25 +68,34 @@ function replyLabel(value: unknown) {
   const number = count(value)
   return number !== null ? `${number} 回复` : '回复数暂不可用'
 }
-function normalizeGroup(value: unknown, index = 0): Group | null {
+function validTopicId(value: unknown): string | null {
+  const id = String(value ?? '').trim()
+  if (!/^[1-9]\d*$/.test(id)) return null
+  const number = Number(id)
+  return Number.isSafeInteger(number) ? id : null
+}
+function normalizeGroup(value: unknown): Group | null {
   if (!value || typeof value !== 'object') return null
   const item = value as Record<string, unknown>
-  const id = item.id ?? item.group_id ?? item.slug ?? index
+  const id = item.id ?? item.group_id ?? item.slug
+  if (typeof id !== 'string' && typeof id !== 'number') return null
+  if (!String(id).trim()) return null
   return {
     ...item,
-    id: typeof id === 'string' || typeof id === 'number' ? id : index,
+    id,
     name: text(item.name ?? item.title, '未命名小组'),
     avatar: text(item.avatar ?? item.icon),
     description: text(item.description ?? item.desc ?? item.summary)
   } as Group
 }
-function normalizeTopic(value: unknown, index = 0): Topic | null {
+function normalizeTopic(value: unknown): Topic | null {
   if (!value || typeof value !== 'object') return null
   const item = value as Record<string, unknown>
-  const id = item.id ?? item.topic_id ?? index
+  const id = validTopicId(item.id ?? item.topic_id)
+  if (!id) return null
   return {
     ...item,
-    id: typeof id === 'string' || typeof id === 'number' ? id : index,
+    id,
     title: text(item.title ?? item.name, '未命名话题'),
     group_name: text(
       item.group_name ?? (item.group as Record<string, unknown> | undefined)?.name,
@@ -153,25 +162,29 @@ function GroupCard({ group, followed = false }: { group: Group; followed?: boole
 function TopicList({ topics }: { topics: Topic[] }) {
   return (
     <div className="community-topics">
-      {topics.map((topic, index) => (
-        <Link
-          href={`/group/topic/${encodeURIComponent(String(topic.id || topic.topic_id || index))}`}
-          className="community-topic-row"
-          key={topic.id || topic.topic_id || index}
-        >
-          <div className="min-w-0 flex-1">
-            <p className="font-medium line-clamp-2">{text(topic.title, '未命名话题')}</p>
-            <div className="mt-1 flex items-center gap-x-2 gap-y-1 flex-wrap text-xs text-base-content/50">
-              <span>{text(topic.group_name || topic.group?.name, '小组')}</span>
-              {text(topic.author) ? <span>{text(topic.author)}</span> : null}
-              {text(topic.last_reply_time) ? <span>{text(topic.last_reply_time)}</span> : null}
+      {topics.map(topic => {
+        const id = validTopicId(topic.id ?? topic.topic_id)
+        if (!id) return null
+        return (
+          <Link
+            href={`/group/topic/${encodeURIComponent(id)}`}
+            className="community-topic-row"
+            key={id}
+          >
+            <div className="min-w-0 flex-1">
+              <p className="font-medium line-clamp-2">{text(topic.title, '未命名话题')}</p>
+              <div className="mt-1 flex items-center gap-x-2 gap-y-1 flex-wrap text-xs text-base-content/50">
+                <span>{text(topic.group_name || topic.group?.name, '小组')}</span>
+                {text(topic.author) ? <span>{text(topic.author)}</span> : null}
+                {text(topic.last_reply_time) ? <span>{text(topic.last_reply_time)}</span> : null}
+              </div>
             </div>
-          </div>
-          <span className="community-reply-count">
-            {replyLabel(topic.reply_count ?? topic.replies)}
-          </span>
-        </Link>
-      ))}
+            <span className="community-reply-count">
+              {replyLabel(topic.reply_count ?? topic.replies)}
+            </span>
+          </Link>
+        )
+      })}
     </div>
   )
 }

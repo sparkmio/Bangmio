@@ -24,7 +24,9 @@ function groupTitle(group: any) {
 
 function topicHref(topic: any) {
   const id = String(topic.id || topic.topic_id || '').trim()
-  return id ? `/group/topic/${encodeURIComponent(id)}` : '/groups'
+  return /^[1-9]\d*$/.test(id) && Number.isSafeInteger(Number(id))
+    ? `/group/topic/${encodeURIComponent(id)}`
+    : null
 }
 
 function countValue(value: unknown, fallback: number | string = '—') {
@@ -106,40 +108,41 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
         />
         {topics.length ? (
           <div className="topic-list panel">
-            {topics.map((topic: any, index: number) => (
-              <Link
-                className="topic-row"
-                href={topicHref(topic)}
-                key={topic.id || topic.topic_id || index}
-              >
-                {(() => {
-                  const profile = communityProfile(topic)
-                  return (
-                    <span className="topic-avatar">
-                      {profile.avatar ? (
-                        <img src={profile.avatar} alt="" loading="lazy" />
-                      ) : (
-                        profile.name.slice(0, 1)
-                      )}
-                    </span>
-                  )
-                })()}
-                {(() => {
-                  const profile = communityProfile(topic)
-                  return (
-                    <span className="topic-row-copy">
-                      <strong>{safeText(topic.title ?? topic.name, '未命名话题')}</strong>
-                      <small>
-                        {profile.name} · {countValue(topic.replies ?? topic.reply_count)} 回复
-                      </small>
-                    </span>
-                  )
-                })()}
-                <span className="topic-row-arrow" aria-hidden="true">
-                  →
-                </span>
-              </Link>
-            ))}
+            {topics.map((topic: any) => {
+              const href = topicHref(topic)
+              if (!href) return null
+              const id = String(topic.id || topic.topic_id)
+              return (
+                <Link className="topic-row" href={href} key={id}>
+                  {(() => {
+                    const profile = communityProfile(topic)
+                    return (
+                      <span className="topic-avatar">
+                        {profile.avatar ? (
+                          <img src={profile.avatar} alt="" loading="lazy" />
+                        ) : (
+                          profile.name.slice(0, 1)
+                        )}
+                      </span>
+                    )
+                  })()}
+                  {(() => {
+                    const profile = communityProfile(topic)
+                    return (
+                      <span className="topic-row-copy">
+                        <strong>{safeText(topic.title ?? topic.name, '未命名话题')}</strong>
+                        <small>
+                          {profile.name} · {countValue(topic.replies ?? topic.reply_count)} 回复
+                        </small>
+                      </span>
+                    )
+                  })()}
+                  <span className="topic-row-arrow" aria-hidden="true">
+                    →
+                  </span>
+                </Link>
+              )
+            })}
           </div>
         ) : (
           <div className="panel empty-state">

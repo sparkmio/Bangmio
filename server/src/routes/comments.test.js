@@ -4,7 +4,8 @@ import {
   commentSubmissionAccepted,
   extractFormhash,
   parseUserLink,
-  parseTopicPage
+  parseTopicPage,
+  parseTopics
 } from './comments.js'
 
 describe('comment form helpers', () => {
@@ -52,5 +53,17 @@ describe('comment author parsing', () => {
   it('does not treat unrelated links as a community author', () => {
     const { document } = parseHTML('<div><a href="/subject/1">条目</a></div>')
     expect(parseUserLink(document)).toEqual({ username: '', nickname: '', url: '', avatar: '' })
+  })
+})
+
+describe('topic parsing', () => {
+  it('ignores topic rows without a positive numeric topic id', () => {
+    const html = `
+      <table class="topic_list"><tbody>
+        <tr><td class="subject"><a href="/subject/topic/not-an-id">坏链接</a></td></tr>
+        <tr><td class="subject"><a href="/subject/topic/0">零 ID</a></td></tr>
+        <tr><td class="subject"><a href="/subject/topic/123">有效话题</a></td></tr>
+      </tbody></table>`
+    expect(parseTopics(html).map(topic => topic.id)).toEqual(['123'])
   })
 })

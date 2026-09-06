@@ -16,6 +16,10 @@ function getBase(isChina) {
   return isChina ? BGM_PROXY : BGM_TV
 }
 
+function invalidateCacheFor(prefix, id) {
+  for (const isChina of [false, true]) cache.delete(`${prefix}_${id}_${isChina}`)
+}
+
 function absoluteAvatar(raw) {
   const value = String(raw || '').trim()
   if (!value) return ''
@@ -166,6 +170,8 @@ function parseTopics(html) {
   rows.forEach(el => {
     const titleLink = el.querySelector('td.subject a')
     const href = titleLink ? titleLink.getAttribute('href') || '' : ''
+    const topicId = href.match(/\/subject\/topic\/([^/?#]+)/i)?.[1] || ''
+    if (parsePositiveId(topicId) === null) return
     const title = titleLink ? titleLink.getAttribute('title') || titleLink.textContent.trim() : ''
     if (!href || !title) return
     const authorLink = el.querySelector('td:nth-child(2) a')
@@ -175,7 +181,7 @@ function parseTopics(html) {
     const dateEl = el.querySelector('td:nth-child(4) small.grey')
     const dateText = dateEl ? dateEl.textContent.trim() : ''
     topics.push({
-      id: href.split('/').pop(),
+      id: topicId,
       title,
       href: `https://bgm.tv${href}`,
       author: authorLink ? authorLink.textContent.trim() : '',
@@ -275,7 +281,7 @@ app.get('/subject/:id/topics', async c => {
     const cached = cache.get(key)
     if (cached) return c.json({ data: cached })
     const html = await fetchHTML(`${getBase(isChina)}/subject/${id}/board`)
-    const topics = parseTopics(html)
+    const topics = parseTopics(html).map(topic => ({ ...topic, subject_id: id }))
     cache.set(key, topics)
     return c.json({ data: topics })
   } catch {
@@ -408,6 +414,7 @@ app.post('/subject/:id/comment', async c => {
     })
 
     await acceptCommentSubmission(res)
+    invalidateCacheFor('subj', subjectId)
     return c.json({ success: true })
   } catch {
     return c.json({ error: '发送失败' }, 500)
@@ -451,6 +458,7 @@ app.post('/topic/:topicId/reply', async c => {
     })
 
     await acceptCommentSubmission(res)
+    invalidateCacheFor('topic', topicId)
     return c.json({ success: true })
   } catch {
     return c.json({ error: '发送失败' }, 500)
@@ -494,6 +502,7 @@ app.post('/subject/:id/talkbox', async c => {
     })
 
     await acceptCommentSubmission(res)
+    invalidateCacheFor('subj', subjectId)
     return c.json({ success: true })
   } catch {
     return c.json({ error: '发送失败' }, 500)
@@ -536,6 +545,7 @@ app.post('/person/:id/talkbox', async c => {
     })
 
     await acceptCommentSubmission(res)
+    invalidateCacheFor('person', personId)
     return c.json({ success: true })
   } catch {
     return c.json({ error: '发送失败' }, 500)
@@ -579,6 +589,7 @@ app.post('/subject/:id/topic', async c => {
     })
 
     await acceptCommentSubmission(res)
+    invalidateCacheFor('topics', subjectId)
     return c.json({ success: true })
   } catch {
     return c.json({ error: '发送失败' }, 500)
@@ -591,6 +602,7 @@ export {
   parseTalkbox,
   parseSubjectTalkbox,
   parseTopicPage,
-  parseUserLink
+  parseUserLink,
+  parseTopics
 }
 export default app

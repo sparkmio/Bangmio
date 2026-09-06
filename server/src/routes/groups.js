@@ -3,6 +3,7 @@ import { parseHTML } from 'linkedom'
 import { createCache } from '../utils/cache.js'
 import { fetchHTML, fetchHTMLMulti, parseNumber, fixUrl, repairMojibake } from '../utils/http.js'
 import { CACHE_TTL_GROUPS } from '../config.js'
+import { edgeCacheDeleteUrl } from '../utils/edgeCache.js'
 
 const app = new Hono()
 
@@ -14,9 +15,16 @@ const HOSTS = {
 
 const cache = createCache(CACHE_TTL_GROUPS)
 
-// 永不过期的「最近一次成功」缓存，仅在抓取失败时回退使用
-const lastSuccessStore = new Map()
-const lastSuccessTopicStore = new Map()
+// 降级回退缓存也必须有生命周期和容量上限，避免长驻实例持续积累旧数据。
+const lastSuccessStore = createCache(30 * 60 * 1000, 500)
+const lastSuccessTopicStore = createCache(30 * 60 * 1000, 500)
+
+async function invalidateGroupPages(paths) {
+  const urls = getBaseUrls(false)
+    .concat(getBaseUrls(true))
+    .flatMap(base => paths.map(path => `${base}${path}`))
+  await Promise.all(urls.map(url => edgeCacheDeleteUrl(url)))
+}
 
 function getBaseUrls(isChina) {
   // 国内节点优先走代理镜像，海外节点优先走官方
@@ -1078,6 +1086,13 @@ app.post('/:id/topic', async c => {
       token,
       fields: { title, content }
     })
+    cache.deleteByPrefix('groups_')
+    lastSuccessStore.delete(groupId)
+    await invalidateGroupPages([
+      `/group/${encodeURIComponent(groupId)}`,
+      '/group/all',
+      '/group/discover'
+    ])
     return c.json({ data: { success: true }, code: 200 })
   } catch (error) {
     return c.json(
@@ -1107,6 +1122,9 @@ app.post('/topic/:topicId/reply', async c => {
       token,
       fields: { content }
     })
+    cache.deleteByPrefix('groups_')
+    lastSuccessTopicStore.delete(topicId)
+    await invalidateGroupPages([`/group/topic/${encodeURIComponent(topicId)}`])
     return c.json({ data: { success: true }, code: 200 })
   } catch (error) {
     return c.json(
