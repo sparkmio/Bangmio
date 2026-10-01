@@ -4,6 +4,8 @@ import router from '../router'
 import api from '../api/index'
 import { authStorage, migrateOldAuthKeys } from '../utils/authStorage'
 
+const COOKIE_AUTH = '__bangumi_cookie__'
+
 export const useAuthStore = defineStore('auth', () => {
   // 旧 key 迁移需在读取 state 之前完成（迁移逻辑集中见 authStorage.js）
   migrateOldAuthKeys()
@@ -35,7 +37,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isBound = computed(() => !!bangmioUser.value?.bgmUid || isBangumiDirectUser.value)
   const effectiveBgmToken = computed(() => {
     if (bangmioToken.value) return bgmToken.value
-    return token.value
+    return token.value === COOKIE_AUTH ? '' : token.value
   })
 
   // 统一用户对象：屏蔽 Bangmio / Bangumi 直登差异
@@ -60,15 +62,16 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function saveBangumiAuth(t, u) {
-    token.value = t
+    token.value = t || COOKIE_AUTH
     user.value = u
-    authStorage.setBangumiToken(t)
+    authStorage.setBangumiToken('')
     authStorage.setBangumiUser(u)
   }
 
   function saveBgmTokenCached(t) {
+    // 仅保留当前页面生命周期内的兼容缓存；永不写入 localStorage。
     bgmToken.value = t || ''
-    authStorage.setBgmTokenCached(t)
+    authStorage.setBgmTokenCached('')
   }
 
   function saveBgmUserProfile(profile) {
@@ -171,9 +174,9 @@ export const useAuthStore = defineStore('auth', () => {
     if (!bangmioToken.value) return null
     try {
       const res = await api.get('/auth/bgm-token')
-      if (res.data?.data?.bgmToken) {
-        saveBgmTokenCached(res.data.data.bgmToken)
-        return res.data.data.bgmToken
+      if (res.data?.data?.available || res.data?.data?.bgmToken) {
+        saveBgmTokenCached(res.data?.data?.bgmToken || '')
+        return bgmToken.value
       }
     } catch (err) {
       // 404 表示未绑定，静默处理
@@ -194,8 +197,10 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       // 首次注册、换设备或 OAuth 回调后本地尚无缓存时，先取绑定 token，
       // 避免 /user/me 因携带空 token 而失败。
-      if (!bgmToken.value) await fetchBgmToken()
-      if (!bgmToken.value) throw new Error('未绑定 Bangumi 账号')
+      if (!bgmToken.value) {
+        const restored = await fetchBgmToken()
+        if (restored === null) throw new Error('未绑定 Bangumi 账号')
+      }
       const res = await api.get('/user/me')
       const profile = res.data?.data || null
       if (!profile?.username) throw new Error('未获取到 Bangumi 用户资料')
@@ -223,9 +228,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const res = await api.post('/auth/oauth-bind-callback', { code, state })
       saveBangmioAuth(res.data.data.token, res.data.data.user)
-      if (res.data.data.bgmToken) {
-        saveBgmTokenCached(res.data.data.bgmToken)
-      }
+      saveBgmTokenCached(res.data.data.bgmToken || '')
       // OAuth 绑定成功后拉取 Bangumi 用户资料
       await fetchBgmUserProfile()
       return res.data.data
@@ -247,7 +250,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (!data?.user) {
         throw new Error('Token 验证响应异常，缺少用户信息')
       }
-      saveBangumiAuth(accessToken, data.user)
+      saveBangumiAuth('', data.user)
       error.value = ''
       await redirectAfterAuth()
     } catch (err) {
@@ -265,10 +268,10 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const res = await api.post('/user/oauth-callback', { code, state })
       const data = res.data?.data
-      if (!data?.token || !data?.user) {
-        throw new Error('授权响应异常，缺少必要信息')
+      if (!data?.user) {
+        throw new Error('授权响应异常，缺少用户信息')
       }
-      saveBangumiAuth(data.token, data.user)
+      saveBangumiAuth('', data.user)
       error.value = ''
       await redirectAfterAuth()
     } catch (err) {
@@ -286,7 +289,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const res = await api.post('/auth/bind-bangumi', { bangumiToken: bangumiTokenToBind })
       saveBangmioAuth(res.data.data.token, res.data.data.user)
-      saveBgmTokenCached(bangumiTokenToBind)
+      saveBgmTokenCached(res.data.data.bgmToken || '')
       // 绑定成功后拉取 Bangumi 用户资料，使 Profile / 番剧功能页立即可用
       await fetchBgmUserProfile()
       return res.data.data
@@ -423,6 +426,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   // 退出登录：清空所有 token 和 user
   function logout() {
+    void api.post('/user/logout').catch(() => {})
     clearBangmioAuth()
     clearBangumiAuth()
     showBindModal.value = false

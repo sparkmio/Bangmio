@@ -1,9 +1,17 @@
 import { Hono } from 'hono'
 import { parseHTML } from 'linkedom'
 import { createCache } from '../utils/cache.js'
-import { fetchHTML, fetchHTMLMulti, parseNumber, fixUrl, repairMojibake } from '../utils/http.js'
+import {
+  fetchHTML,
+  fetchHTMLMulti,
+  fetchWithTimeout,
+  parseNumber,
+  fixUrl,
+  repairMojibake
+} from '../utils/http.js'
 import { CACHE_TTL_GROUPS } from '../config.js'
 import { edgeCacheDeleteUrl } from '../utils/edgeCache.js'
+import { getBangumiAccessToken } from '../utils/bangumiAuth.js'
 
 const app = new Hono()
 
@@ -268,7 +276,7 @@ async function submitGroupForm({ base, path, submitPath = path, token, fields })
   const formhash = formhashFrom(pageHtml)
   if (!formhash) throw new Error('无法获取表单 token，请重新登录')
   const params = new URLSearchParams({ formhash, ...fields, submit: 'submit' })
-  const response = await fetch(base + submitPath, {
+  const response = await fetchWithTimeout(base + submitPath, {
     method: 'POST',
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -1076,7 +1084,7 @@ app.post('/:id/topic', async c => {
     const groupId = c.req.param('id')
     if (!groupId || groupId.length > 80 || /[\\/?#]/.test(groupId))
       return c.json({ data: null, error: '小组 ID 不合法', code: 400 }, 400)
-    const token = (c.req.header('Authorization') || '').replace(/^Bearer\s+/i, '').trim()
+    const token = getBangumiAccessToken(c)
     if (!token) return c.json({ data: null, error: '未登录', code: 401 }, 401)
     const body = await c.req.json().catch(() => ({}))
     const title = String(body?.title || '').trim()
@@ -1113,7 +1121,7 @@ app.post('/topic/:topicId/reply', async c => {
     const topicId = c.req.param('topicId')
     if (!/^\d+$/.test(topicId) || !Number.isSafeInteger(Number(topicId)) || Number(topicId) <= 0)
       return c.json({ data: null, error: '话题 ID 不合法', code: 400 }, 400)
-    const token = (c.req.header('Authorization') || '').replace(/^Bearer\s+/i, '').trim()
+    const token = getBangumiAccessToken(c)
     if (!token) return c.json({ data: null, error: '未登录', code: 401 }, 401)
     const body = await c.req.json().catch(() => ({}))
     const content = String(body?.content || '').trim()

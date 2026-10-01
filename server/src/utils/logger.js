@@ -5,6 +5,31 @@
  * 日志格式：{ level, msg, meta, timestamp }
  */
 
+function maskEmail(value) {
+  const email = String(value || '')
+  const at = email.indexOf('@')
+  if (at <= 1) return '[REDACTED_EMAIL]'
+  return email[0] + '***' + email.slice(at - 1)
+}
+
+function sanitizeMeta(value, key = '') {
+  const normalizedKey = key.toLowerCase()
+  if (/token|secret|password|passwd|authorization|cookie|set-cookie|code/.test(normalizedKey)) {
+    return '[REDACTED]'
+  }
+  if (normalizedKey === 'email') return maskEmail(value)
+  if (Array.isArray(value)) return value.map(item => sanitizeMeta(item))
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([childKey, childValue]) => [
+        childKey,
+        sanitizeMeta(childValue, childKey)
+      ])
+    )
+  }
+  return value
+}
+
 /**
  * 内部：输出一条结构化日志。
  * @param {'info'|'error'|'warn'} level - 日志级别。
@@ -16,7 +41,7 @@ function emit(level, msg, meta) {
   const payload = {
     level,
     msg,
-    meta,
+    meta: sanitizeMeta(meta),
     timestamp: new Date().toISOString()
   }
   console.log(JSON.stringify(payload))

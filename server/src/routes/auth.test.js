@@ -28,7 +28,12 @@ vi.mock('../utils/oauthConfig.js', () => ({
 }))
 
 import app from './auth.js'
-import { verifyOAuthBindState, bindBangumiByOAuth } from '../services/auth.js'
+import {
+  verifyOAuthBindState,
+  bindBangumiByOAuth,
+  bindBangumi,
+  getUserBgmToken
+} from '../services/auth.js'
 
 const env = { DB: {}, JWT_SECRET: 'test-secret-at-least-32-characters-long' }
 
@@ -71,14 +76,83 @@ describe('POST /oauth-bind-callback', () => {
       env
     )
     expect(res.status).toBe(200)
-    await expect(res.json()).resolves.toMatchObject({
-      data: { token: 'new-jwt', user: { bgmUid: '12345' }, bgmToken: 'bgm-token' }
+    const payload = await res.json()
+    expect(payload).toMatchObject({
+      data: { token: 'new-jwt', user: { bgmUid: '12345' } }
     })
     expect(bindBangumiByOAuth).toHaveBeenCalledWith(
       env.DB,
       env,
       expect.objectContaining({ code: 'authorization-code', state: 'signed-state' })
     )
+    const cookie = res.headers.get('set-cookie')
+    expect(cookie).toContain('bangumi_access_token=bgm-token')
+    expect(cookie).toContain('HttpOnly')
+    expect(JSON.stringify(payload)).not.toContain('bgm-token')
+  })
+})
+
+describe('Bangumi access token Cookie', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('仅通过 HttpOnly Cookie 暴露已绑定的 Bangumi Token', async () => {
+    getUserBgmToken.mockResolvedValue('stored-bgm-token')
+
+    const res = await app.request(
+      'https://bangmio.site/bgm-token',
+      { method: 'GET', headers: { Authorization: 'Bearer bangmio-jwt' } },
+      env
+    )
+
+    expect(res.status).toBe(200)
+    await expect(res.json()).resolves.toEqual({ data: { available: true }, code: 200 })
+    const cookie = res.headers.get('set-cookie')
+    expect(cookie).toContain('bangumi_access_token=stored-bgm-token')
+    expect(cookie).toContain('HttpOnly')
+    expect(cookie).toContain('Secure')
+    expect(cookie).toContain('Domain=.bangmio.site')
+    expect(cookie).toContain('SameSite=Lax')
+  })
+
+  it('绑定成功后写入 Cookie，响应体不再返回原始 Token', async () => {
+    bindBangumi.mockResolvedValue({
+      token: 'new-jwt',
+      user: { id: 'current-user', bgmUid: '12345' }
+    })
+
+    const res = await app.request(
+      'https://bangmio.site/bind-bangumi',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bangumiToken: 'submitted-bgm-token' })
+      },
+      env
+    )
+
+    expect(res.status).toBe(200)
+    const payload = await res.json()
+    expect(payload).toEqual({
+      data: { token: 'new-jwt', user: { id: 'current-user', bgmUid: '12345' } },
+      code: 200
+    })
+    expect(JSON.stringify(payload)).not.toContain('submitted-bgm-token')
+    expect(res.headers.get('set-cookie')).toContain('bangumi_access_token=submitted-bgm-token')
+  })
+
+  it('退出 Bangumi 登录会清除 HttpOnly Cookie', async () => {
+    const res = await app.request('https://bangmio.site/logout-bangumi', { method: 'POST' }, env)
+
+    expect(res.status).toBe(200)
+    await expect(res.json()).resolves.toEqual({ data: { success: true }, code: 200 })
+    const cookie = res.headers.get('set-cookie')
+    expect(cookie).toContain('bangumi_access_token=')
+    expect(cookie).toContain('bangumi_refresh_token=')
+    expect(cookie).toContain('Max-Age=0')
+    expect(cookie).toContain('HttpOnly')
+    expect(cookie).toContain('Domain=.bangmio.site')
   })
 })
 

@@ -2,11 +2,12 @@
  * 邮箱验证码数据访问层（Cloudflare D1）。
  *
  * 表结构见 `server/db/schema.sql` 的 `email_codes` 表：
- *   email_codes(id, email, code, purpose, expires_at, consumed, created_at)
+ *   email_codes(id, email, code_hash, attempts, purpose, expires_at, consumed, created_at)
  *
  * 约定：
- * - 6 位数字验证码，10 分钟过期
+ * - 6 位数字验证码，10 分钟过期；数据库只保存 SHA-256 哈希
  * - 同一邮箱+purpose 1 分钟内仅允许 1 条（应用层在插入前查询最新一条的时间戳）
+ * - 每条验证码最多允许 5 次错误尝试
  * - 验证成功后置 consumed=1，不可重用
  * - 过期未使用的记录由后台清理（这里只提供查询与插入，不做自动清理）
  */
@@ -18,6 +19,9 @@ const CODE_TTL_MS = 10 * 60 * 1000
 
 /** 同一邮箱+purpose 发送间隔（毫秒）：60 秒 */
 const CODE_RESEND_INTERVAL_MS = 60 * 1000
+
+/** 单条验证码允许的最大错误尝试次数 */
+const MAX_CODE_ATTEMPTS = 5
 
 /**
  * 生成 6 位数字验证码（前缀 0 保留）。
@@ -31,6 +35,19 @@ export function generateNumericCode() {
     code += String(bytes[i] % 10)
   }
   return code
+}
+
+async function hashCode(code) {
+  const bytes = new TextEncoder().encode(String(code ?? ''))
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
+function constantTimeEqual(left, right) {
+  if (left.length !== right.length) return false
+  let diff = 0
+  for (let i = 0; i < left.length; i++) diff |= left.charCodeAt(i) ^ right.charCodeAt(i)
+  return diff === 0
 }
 
 /**
@@ -48,7 +65,7 @@ export async function getLatestCode(db, email, purpose) {
   try {
     const row = await db
       .prepare(
-        `SELECT id, code, expires_at AS expiresAt, consumed, created_at AS createdAt
+        `SELECT id, code, code_hash AS codeHash, attempts, expires_at AS expiresAt, consumed, created_at AS createdAt
            FROM email_codes
           WHERE email = ? AND purpose = ?
           ORDER BY created_at DESC
@@ -59,6 +76,44 @@ export async function getLatestCode(db, email, purpose) {
     return row || null
   } catch {
     return null
+  }
+}
+
+/**
+ * 原子占用邮箱验证码发送窗口，避免并发请求在“查询→发送→写入”之间重复发信。
+ * D1 未提供时回退到旧查询逻辑，仅用于本地开发兼容。
+ * @returns {Promise<{ allowed: boolean, cooldownSeconds: number }}>
+ */
+export async function reserveCodeSendSlot(db, email, purpose) {
+  const normalizedEmail = normalizeEmail(email)
+  const now = Date.now()
+  const key = 'email-code:' + purpose + ':' + normalizedEmail
+  try {
+    const row = await db
+      .prepare(
+        'INSERT INTO rate_limits (key, count, reset_at) ' +
+          'VALUES (?, 1, ?) ' +
+          'ON CONFLICT(key) DO UPDATE SET ' +
+          'count = CASE WHEN rate_limits.reset_at <= ? THEN 1 ELSE rate_limits.count + 1 END, ' +
+          'reset_at = CASE WHEN rate_limits.reset_at <= ? THEN ? ELSE rate_limits.reset_at END ' +
+          'RETURNING count, reset_at'
+      )
+      .bind(key, now + CODE_RESEND_INTERVAL_MS, now, now, now + CODE_RESEND_INTERVAL_MS)
+      .first()
+    const count = Number(row?.count)
+    const resetAt = Number(row?.reset_at)
+    if (!Number.isFinite(count) || !Number.isFinite(resetAt))
+      throw new Error('invalid send slot row')
+    return {
+      allowed: count === 1,
+      cooldownSeconds: count === 1 ? 0 : Math.max(1, Math.ceil((resetAt - now) / 1000))
+    }
+  } catch {
+    const latest = await getLatestCode(db, normalizedEmail, purpose)
+    return {
+      allowed: canResend(latest),
+      cooldownSeconds: canResend(latest) ? 0 : resendCooldownSeconds(latest)
+    }
   }
 }
 
@@ -78,10 +133,10 @@ export async function createCode(db, { email, code, purpose }) {
   try {
     const result = await db
       .prepare(
-        `INSERT INTO email_codes (id, email, code, purpose, expires_at, consumed, created_at)
-         VALUES (?, ?, ?, ?, ?, 0, ?)`
+        `INSERT INTO email_codes (id, email, code, code_hash, attempts, purpose, expires_at, consumed, created_at)
+         VALUES (?, ?, '', ?, 0, ?, ?, 0, ?)`
       )
-      .bind(id, normalizedEmail, code, purpose, expiresAt, now)
+      .bind(id, normalizedEmail, await hashCode(code), purpose, expiresAt, now)
       .run()
     if (!result.success) throw new Error('D1 run() 返回 success=false')
   } catch (err) {
@@ -115,23 +170,37 @@ export async function verifyCode(db, email, code, purpose) {
   if (record.consumed) return false
   const now = Date.now()
   if (now > record.expiresAt) return false
-  const inputCode = String(code ?? '')
-  const storedCode = String(record.code ?? '')
-  // 常量时间比较，防止时序攻击
-  if (storedCode.length !== inputCode.length) return false
-  let diff = 0
-  for (let i = 0; i < inputCode.length; i++) {
-    diff |= storedCode.charCodeAt(i) ^ inputCode.charCodeAt(i)
+  if (Number(record.attempts || 0) >= MAX_CODE_ATTEMPTS) return false
+
+  const inputHash = await hashCode(code)
+  const storedHash = String(record.codeHash || '')
+  // 兼容迁移前尚未过期的记录；新记录不会再写入 plaintext code。
+  const legacyHash = storedHash ? '' : await hashCode(record.code || '')
+  const matches = storedHash
+    ? constantTimeEqual(storedHash, inputHash)
+    : constantTimeEqual(legacyHash, inputHash)
+
+  if (!matches) {
+    try {
+      await db
+        .prepare(
+          'UPDATE email_codes SET attempts = attempts + 1 WHERE id = ? AND consumed = 0 AND expires_at > ? AND attempts < ?'
+        )
+        .bind(record.id, now, MAX_CODE_ATTEMPTS)
+        .run()
+    } catch {
+      // 失败尝试不应暴露数据库错误；本次校验仍然失败。
+    }
+    return false
   }
-  if (diff !== 0) return false
 
   // 带条件的原子消费：并发请求中只有一个请求可以把 consumed 从 0 改成 1。
   try {
     const result = await db
       .prepare(
-        'UPDATE email_codes SET consumed = 1 WHERE id = ? AND consumed = 0 AND expires_at > ? AND code = ?'
+        'UPDATE email_codes SET consumed = 1 WHERE id = ? AND consumed = 0 AND expires_at > ? AND attempts < ?'
       )
-      .bind(record.id, now, storedCode)
+      .bind(record.id, now, MAX_CODE_ATTEMPTS)
       .run()
     if (result?.success === false) return false
     const changes = result?.meta?.changes ?? result?.changes

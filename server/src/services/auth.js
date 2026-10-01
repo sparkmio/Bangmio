@@ -36,10 +36,8 @@ import {
 import {
   generateNumericCode,
   createCode,
-  getLatestCode,
-  verifyCode,
-  canResend,
-  resendCooldownSeconds
+  reserveCodeSendSlot,
+  verifyCode
 } from '../db/emailCodes.js'
 import { sendEmail, buildVerificationEmailHTML } from '../utils/email.js'
 import { exchangeBangumiOAuthCode } from './oauth.js'
@@ -96,9 +94,9 @@ function httpError(status, message) {
  */
 export async function sendVerificationCode(db, env, { email, purpose = 'register' }) {
   const normalizedEmail = normalizeEmail(email)
-  const latest = await getLatestCode(db, normalizedEmail, purpose)
-  if (!canResend(latest)) {
-    return { sent: false, cooldownSeconds: resendCooldownSeconds(latest) }
+  const slot = await reserveCodeSendSlot(db, normalizedEmail, purpose)
+  if (!slot.allowed) {
+    return { sent: false, cooldownSeconds: slot.cooldownSeconds }
   }
   if (!env.RESEND_API_KEY) {
     throw httpError(500, '邮件服务未配置（缺少 RESEND_API_KEY）')

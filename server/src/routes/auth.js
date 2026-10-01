@@ -34,6 +34,11 @@ import { logError } from '../utils/logger.js'
 import { getOAuthCredentials } from '../utils/oauthConfig.js'
 import { errorResponse } from '../utils/errors.js'
 import { normalizeEmail } from '../utils/emailAddress.js'
+import {
+  clearBangumiAccessCookie,
+  clearBangumiRefreshCookie,
+  setBangumiAccessCookie
+} from '../utils/bangumiAuth.js'
 
 const app = new Hono()
 
@@ -262,6 +267,7 @@ app.post('/bind-bangumi', jwtAuth(), async c => {
     }
     const currentUser = c.get('user')
     const result = await bindBangumi(c.env.DB, c.env, currentUser.userId, bangumiToken, isChina(c))
+    setBangumiAccessCookie(c, bangumiToken)
     return c.json({ data: { token: result.token, user: result.user }, code: 200 })
   } catch (err) {
     return errorResponse(err)
@@ -277,10 +283,19 @@ app.delete('/bind-bangumi', jwtAuth(), async c => {
   try {
     const currentUser = c.get('user')
     const result = await unbindBangumi(c.env.DB, c.env, currentUser.userId)
+    clearBangumiAccessCookie(c)
+    clearBangumiRefreshCookie(c)
     return c.json({ data: { success: result.success }, code: 200 })
   } catch (err) {
     return errorResponse(err)
   }
+})
+
+/** 清除当前浏览器中的 Bangumi HttpOnly 会话 Cookie。 */
+app.post('/logout-bangumi', c => {
+  clearBangumiAccessCookie(c)
+  clearBangumiRefreshCookie(c)
+  return c.json({ data: { success: true }, code: 200 })
 })
 
 /**
@@ -302,10 +317,8 @@ app.get('/me', jwtAuth(), async c => {
  * GET /bgm-token
  * Header: Authorization: Bearer <jwt>
  *
- * 返回当前用户解密后的 Bangumi Access Token。
- *
- * 用于：Bangmio 用户登录后前端获取 bgm token 以访问 Bangumi 相关 API
- * （如收藏、评论）。token 在 D1 中以 AES-GCM 加密存储，本接口解密后返回明文。
+ * 将 D1 中加密保存的 Bangumi Access Token 写入 HttpOnly Cookie。
+ * 原始 token 不再通过 JSON 返回，浏览器也不需要写入 localStorage。
  *
  * 未绑定 Bangumi 时返回 404。
  */
@@ -316,7 +329,8 @@ app.get('/bgm-token', jwtAuth(), async c => {
     if (!bgmToken) {
       return c.json({ data: null, error: '未绑定 Bangumi 账号', code: 404 }, 404)
     }
-    return c.json({ data: { bgmToken }, code: 200 })
+    setBangumiAccessCookie(c, bgmToken)
+    return c.json({ data: { available: true }, code: 200 })
   } catch (err) {
     return errorResponse(err)
   }
@@ -379,8 +393,9 @@ app.post('/oauth-bind-callback', jwtAuth(), async c => {
       redirectUri: redirectUri(c),
       isChina: isChina(c)
     })
+    setBangumiAccessCookie(c, result.bgmToken)
     return c.json({
-      data: { token: result.token, user: result.user, bgmToken: result.bgmToken },
+      data: { token: result.token, user: result.user },
       code: 200
     })
   } catch (err) {

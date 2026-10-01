@@ -1,7 +1,5 @@
--- Bangmio 用户表（Cloudflare D1）
--- 生产/本地初始化请执行 migrations；本文件仅保留最终结构导出，便于人工检查。
--- `npm run db:local:init` 会统一执行 server/db/migrations/。
-
+-- v4.0.0: baseline schema for a new D1 database.
+-- session_version is included in the baseline so a new database is immediately compatible.
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
@@ -17,7 +15,6 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_bgm_uid ON users(bgm_uid);
 
--- 分布式速率限制计数（Cloudflare D1；本地无 D1 时回退到进程内计数）
 CREATE TABLE IF NOT EXISTS rate_limits (
   key TEXT PRIMARY KEY,
   count INTEGER NOT NULL,
@@ -25,15 +22,10 @@ CREATE TABLE IF NOT EXISTS rate_limits (
 );
 CREATE INDEX IF NOT EXISTS idx_rate_limits_reset_at ON rate_limits(reset_at);
 
--- 邮箱验证码表（注册/找回密码等场景）
--- 同一邮箱 + purpose 1 分钟内仅允许 1 条有效记录（应用层控制）
--- 验证码哈希存储，10 分钟过期，最多允许有限次错误尝试，使用后置为 consumed=1
 CREATE TABLE IF NOT EXISTS email_codes (
   id TEXT PRIMARY KEY,
   email TEXT NOT NULL,
   code TEXT NOT NULL DEFAULT '',
-  code_hash TEXT,
-  attempts INTEGER NOT NULL DEFAULT 0,
   purpose TEXT NOT NULL,
   expires_at INTEGER NOT NULL,
   consumed INTEGER NOT NULL DEFAULT 0,

@@ -22,9 +22,10 @@ const nextConfig = {
   poweredByHeader: false,
   compress: true,
   images: {
+    // 仅允许 Bangumi 主站/镜像图片域名；普通 <img> 仍由业务 URL 校验负责。
     remotePatterns: [
-      { protocol: 'https', hostname: '**' },
-      { protocol: 'http', hostname: '**' }
+      { protocol: 'https', hostname: 'lain.bgm.tv', pathname: '/**' },
+      { protocol: 'https', hostname: 'lain.bangumi.pro', pathname: '/**' }
     ],
     formats: ['image/avif', 'image/webp']
   }

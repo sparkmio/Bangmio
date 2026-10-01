@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { getClient } from '../services/bangumi.js'
 import { verifyBangumiUsername } from '../services/userVerify.js'
 import { upstreamError } from '../utils/errors.js'
+import { getBangumiAccessToken } from '../utils/bangumiAuth.js'
 
 const app = new Hono()
 
@@ -10,7 +11,7 @@ function isChina(c) {
 }
 
 function extractToken(c) {
-  return (c.req.header('Authorization') || '').replace('Bearer ', '')
+  return getBangumiAccessToken(c)
 }
 
 function extractUsername(c) {

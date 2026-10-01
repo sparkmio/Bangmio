@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { parseHTML } from 'linkedom'
 import { createCache } from '../utils/cache.js'
-import { fetchHTMLMulti, fixUrl } from '../utils/http.js'
+import { fetchHTMLMulti } from '../utils/http.js'
+import { sanitizeExternalDocument } from '../utils/sanitizeHtml.js'
 import { edgeCacheGet, edgeCachePut } from '../utils/edgeCache.js'
 import { getMoegirlSummary } from '../services/moegirl.js'
 import { CACHE_TTL_MOEGIRL } from '../config.js'
@@ -117,13 +118,7 @@ export function cleanMoegirlPage(html, base = MOEGIRL_CN_BASE) {
     img.removeAttribute('data-src')
   })
 
-  // 相对链接绝对化
-  document.querySelectorAll('[href], [src]').forEach(el => {
-    const href = el.getAttribute('href')
-    if (href) el.setAttribute('href', fixUrl(href, base))
-    const src = el.getAttribute('src')
-    if (src) el.setAttribute('src', fixUrl(src, base))
-  })
+  sanitizeExternalDocument(document, { baseUrl: base, removeSelectors: [] })
 
   const parserOutput = document.querySelector('.mw-parser-output')
   const fragment = parserOutput

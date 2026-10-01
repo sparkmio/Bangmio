@@ -12,6 +12,8 @@
  *   await sendEmail({ to, subject, html }, env.RESEND_API_KEY, env.RESEND_FROM)
  */
 
+import { fetchWithTimeout } from './http.js'
+
 const RESEND_API = 'https://api.resend.com/emails'
 
 /** 未配置 RESEND_FROM 时使用的默认发件人 */
@@ -33,7 +35,7 @@ export async function sendEmail({ to, subject, html }, apiKey, from) {
   if (!normalizedApiKey) throw new Error('RESEND_API_KEY 未配置')
   if (!normalizedTo) throw new Error('收件人不能为空')
 
-  const res = await fetch(RESEND_API, {
+  const res = await fetchWithTimeout(RESEND_API, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${normalizedApiKey}`,

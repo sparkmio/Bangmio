@@ -70,7 +70,11 @@ export const authStorage = {
   // ===== 读取 =====
   getBangmioToken: () => localStorage.getItem(AUTH_KEYS.bangmioToken) || '',
   getBangmioUser: () => readJSON(AUTH_KEYS.bangmioUser),
-  getBgmTokenCached: () => localStorage.getItem(AUTH_KEYS.bgmTokenCached) || '',
+  getBgmTokenCached: () => {
+    const legacy = localStorage.getItem(AUTH_KEYS.bgmTokenCached) || ''
+    localStorage.removeItem(AUTH_KEYS.bgmTokenCached)
+    return legacy
+  },
   getBgmUserProfile: () => readJSON(AUTH_KEYS.bgmUserProfile),
   getBangumiToken: () => localStorage.getItem(AUTH_KEYS.bangumiToken) || '',
   getBangumiUser: () => readJSON(AUTH_KEYS.bangumiUser),
@@ -78,12 +82,9 @@ export const authStorage = {
   // ===== 写入 =====
   setBangmioToken: token => localStorage.setItem(AUTH_KEYS.bangmioToken, token || ''),
   setBangmioUser: user => writeJSON(AUTH_KEYS.bangmioUser, user),
-  setBgmTokenCached: token =>
-    token
-      ? localStorage.setItem(AUTH_KEYS.bgmTokenCached, token)
-      : localStorage.removeItem(AUTH_KEYS.bgmTokenCached),
+  setBgmTokenCached: () => localStorage.removeItem(AUTH_KEYS.bgmTokenCached),
   setBgmUserProfile: profile => writeJSON(AUTH_KEYS.bgmUserProfile, profile),
-  setBangumiToken: token => localStorage.setItem(AUTH_KEYS.bangumiToken, token || ''),
+  setBangumiToken: () => localStorage.removeItem(AUTH_KEYS.bangumiToken),
   setBangumiUser: user => writeJSON(AUTH_KEYS.bangumiUser, user),
 
   // ===== 清除 =====

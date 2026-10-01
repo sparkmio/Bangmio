@@ -47,6 +47,8 @@ type AuthContextValue = {
   logout: () => void
 }
 
+const COOKIE_AUTH = '__bangumi_cookie__'
+
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 function readJson<T>(value: string | null): T | null {
@@ -87,8 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshPromise = useRef<Promise<string | null> | null>(null)
 
   const persistBgmToken = useCallback((nextToken: string) => {
-    if (nextToken) localStorage.setItem(KEYS.bgmToken, nextToken)
-    else localStorage.removeItem(KEYS.bgmToken)
+    localStorage.removeItem(KEYS.bgmToken)
     setBgmToken(nextToken)
   }, [])
 
@@ -96,29 +97,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const jwt = localStorage.getItem(KEYS.bangmioToken) || ''
     if (!jwt) return null
     const response = await fetch(apiPath('/auth/bgm-token'), {
+      credentials: 'include',
       headers: { Accept: 'application/json', Authorization: `Bearer ${jwt}` }
     })
-    const payload = (await response.json().catch(() => ({}))) as ApiResult<{ bgmToken?: string }>
-    if (!response.ok || !payload.data?.bgmToken) return null
-    persistBgmToken(payload.data.bgmToken)
-    return payload.data.bgmToken
+    const payload = (await response.json().catch(() => ({}))) as ApiResult<{
+      available?: boolean
+      bgmToken?: string
+    }>
+    if (!response.ok || (!payload.data?.available && !payload.data?.bgmToken)) return null
+    const legacyToken = payload.data?.bgmToken || ''
+    persistBgmToken(legacyToken)
+    return legacyToken
   }, [persistBgmToken])
 
   const fetchBgmUserProfile = useCallback(async () => {
     const jwt = localStorage.getItem(KEYS.bangmioToken) || ''
-    let currentBgmToken = localStorage.getItem(KEYS.bgmToken) || ''
+    let currentBgmToken = bgmToken
     if (!jwt) return null
     if (!currentBgmToken) currentBgmToken = (await fetchBgmToken()) || ''
-    if (!currentBgmToken) return null
     const response = await fetch(apiPath('/user/me'), {
-      headers: { Accept: 'application/json', Authorization: `Bearer ${currentBgmToken}` }
+      credentials: 'include',
+      headers: {
+        Accept: 'application/json',
+        ...(currentBgmToken ? { Authorization: `Bearer ${currentBgmToken}` } : {})
+      }
     })
     const payload = (await response.json().catch(() => ({}))) as ApiResult<User>
     if (!response.ok || !payload.data?.username) return null
     localStorage.setItem(KEYS.bgmProfile, JSON.stringify(payload.data))
     setUser(payload.data)
     return payload.data
-  }, [fetchBgmToken])
+  }, [bgmToken, fetchBgmToken])
 
   const refreshBangmioToken = useCallback(async () => {
     if (refreshPromise.current) return refreshPromise.current
@@ -158,15 +167,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let currentToken = useBangmioToken
         ? token || localStorage.getItem(KEYS.bangmioToken) || ''
         : requestedKind === 'bangumi' || kind === 'bangumi'
-          ? token ||
-            bgmToken ||
-            localStorage.getItem(KEYS.bgmToken) ||
-            localStorage.getItem(KEYS.bangumiToken) ||
-            ''
-          : bgmToken ||
-            localStorage.getItem(KEYS.bgmToken) ||
-            localStorage.getItem(KEYS.bangumiToken) ||
-            ''
+          ? token && token !== COOKIE_AUTH
+            ? token
+            : bgmToken
+          : bgmToken
       if (!currentToken && !useBangmioToken && kind === 'bangmio' && account?.bgmUid) {
         currentToken = (await fetchBgmToken()) || ''
       }
@@ -215,14 +219,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setKind('bangmio')
         setUser(readJson<User>(localStorage.getItem(KEYS.bgmProfile)) || nextUser)
       } else {
-        localStorage.setItem(KEYS.bangumiToken, nextToken)
+        localStorage.removeItem(KEYS.bangumiToken)
         localStorage.setItem(KEYS.bangumiUser, JSON.stringify(nextUser))
         localStorage.removeItem(KEYS.bangmioToken)
         localStorage.removeItem(KEYS.bangmioUser)
         localStorage.removeItem(KEYS.bgmToken)
         localStorage.removeItem(KEYS.bgmProfile)
-        setToken(nextToken)
-        setBgmToken(nextToken)
+        setToken(COOKIE_AUTH)
+        setBgmToken('')
         setAccount(null)
         setKind('bangumi')
         setUser(nextUser)
@@ -252,7 +256,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(payload.error || '绑定失败')
       localStorage.setItem(KEYS.bangmioToken, payload.data.token)
       localStorage.setItem(KEYS.bangmioUser, JSON.stringify(payload.data.user))
-      persistBgmToken(bangumiToken)
+      persistBgmToken('')
       setToken(payload.data.token)
       setAccount(payload.data.user)
       setKind('bangmio')
@@ -273,6 +277,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return payload.data.url
   }, [])
   const logout = useCallback(() => {
+    void fetch(apiPath('/user/logout'), { method: 'POST', credentials: 'include' })
     Object.values(KEYS).forEach(key => localStorage.removeItem(key))
     localStorage.removeItem('bangmio_oauth_flow')
     setToken('')
@@ -292,21 +297,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setKind('bangmio')
       setToken(storedBangmioToken)
       setAccount(storedAccount)
-      setBgmToken(localStorage.getItem(KEYS.bgmToken) || '')
+      setBgmToken('')
       setUser(readJson<User>(localStorage.getItem(KEYS.bgmProfile)) || storedAccount)
       void (async () => {
         await fetchBgmToken()
         await fetchBgmUserProfile()
       })()
     } else if (storedBangumiToken) {
-      const directUser = readJson<User>(localStorage.getItem(KEYS.bangumiUser))
-      setKind('bangumi')
-      setToken(storedBangumiToken)
-      setBgmToken(storedBangumiToken)
-      setUser(directUser)
+      void fetch(apiPath('/user/auth'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ token: storedBangumiToken })
+      })
+        .then(response => response.json().catch(() => ({})))
+        .then(payload => {
+          localStorage.removeItem(KEYS.bangumiToken)
+          if (payload?.data?.user) setAuth('', payload.data.user, 'bangumi')
+          else localStorage.removeItem(KEYS.bangumiUser)
+        })
+    } else {
+      void fetch(apiPath('/user/me'), { credentials: 'include' })
+        .then(response => (response.ok ? response.json() : null))
+        .then(payload => {
+          if (payload?.data) {
+            setKind('bangumi')
+            setToken(COOKIE_AUTH)
+            setBgmToken('')
+            setUser(payload.data)
+          }
+        })
     }
     setReady(true)
-  }, [fetchBgmToken, fetchBgmUserProfile])
+  }, [fetchBgmToken, fetchBgmUserProfile, setAuth])
 
   const value = useMemo<AuthContextValue>(
     () => ({

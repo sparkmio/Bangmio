@@ -9,7 +9,8 @@ import {
   getDoubanSummary
 } from '../services/douban.js'
 import { createCache } from '../utils/cache.js'
-import { fetchHTML, fixUrl } from '../utils/http.js'
+import { fetchHTML } from '../utils/http.js'
+import { sanitizeExternalDocument } from '../utils/sanitizeHtml.js'
 import { edgeCacheGet, edgeCachePut } from '../utils/edgeCache.js'
 import { CACHE_TTL_DOUBAN } from '../config.js'
 import { parsePositiveId } from '../utils/validation.js'
@@ -105,13 +106,7 @@ export function cleanDoubanPage(html) {
     if (isAdElement(el)) el.remove()
   })
 
-  // 相对链接绝对化
-  document.querySelectorAll('[href], [src]').forEach(el => {
-    const href = el.getAttribute('href')
-    if (href) el.setAttribute('href', fixUrl(href, DOUBAN_BASE_URL))
-    const src = el.getAttribute('src')
-    if (src) el.setAttribute('src', fixUrl(src, DOUBAN_BASE_URL))
-  })
+  sanitizeExternalDocument(document, { baseUrl: DOUBAN_BASE_URL, removeSelectors: [] })
 
   const fragment = document.body ? document.body.innerHTML : document.documentElement.innerHTML
   return wrapDocument(fragment)

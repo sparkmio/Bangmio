@@ -17,6 +17,7 @@ vi.mock('../db/users.js', () => ({
 vi.mock('../db/emailCodes.js', () => ({
   generateNumericCode: vi.fn(() => '123456'),
   createCode: vi.fn(),
+  reserveCodeSendSlot: vi.fn(() => ({ allowed: true, cooldownSeconds: 0 })),
   getLatestCode: vi.fn(),
   verifyCode: vi.fn(),
   canResend: vi.fn(() => true),
@@ -56,7 +57,7 @@ import {
   getUserCredentialsById,
   updateUserPassword
 } from '../db/users.js'
-import { verifyCode, createCode, getLatestCode } from '../db/emailCodes.js'
+import { verifyCode, createCode, reserveCodeSendSlot } from '../db/emailCodes.js'
 import { sendEmail } from '../utils/email.js'
 import { getClient } from './bangumi.js'
 import { hashPassword, generateSalt, encryptToken } from '../utils/crypto.js'
@@ -76,6 +77,7 @@ beforeEach(() => {
   getClient.mockReturnValue({
     get: vi.fn().mockResolvedValue({ id: 999, username: 'bgm-user' })
   })
+  reserveCodeSendSlot.mockResolvedValue({ allowed: true, cooldownSeconds: 0 })
 })
 
 describe('registerUser', () => {
@@ -190,12 +192,8 @@ describe('registerUser', () => {
 
 describe('sendVerificationCode', () => {
   it('冷却时间内返回 sent: false 与剩余秒数', async () => {
-    getLatestCode.mockResolvedValue({ createdAt: Date.now() })
-    // canResend 默认返回 true，需覆盖
-    const { canResend } = await import('../db/emailCodes.js')
-    canResend.mockReturnValue(false)
-    const { resendCooldownSeconds } = await import('../db/emailCodes.js')
-    resendCooldownSeconds.mockReturnValue(45)
+    const { reserveCodeSendSlot } = await import('../db/emailCodes.js')
+    reserveCodeSendSlot.mockResolvedValue({ allowed: false, cooldownSeconds: 45 })
 
     const result = await sendVerificationCode(DB, ENV, { email: 'a@b.c', purpose: 'register' })
 
@@ -205,9 +203,8 @@ describe('sendVerificationCode', () => {
   })
 
   it('未配置 RESEND_API_KEY 时抛 500 错误', async () => {
-    getLatestCode.mockResolvedValue(null)
-    const { canResend } = await import('../db/emailCodes.js')
-    canResend.mockReturnValue(true)
+    const { reserveCodeSendSlot } = await import('../db/emailCodes.js')
+    reserveCodeSendSlot.mockResolvedValue({ allowed: true, cooldownSeconds: 0 })
 
     await expect(
       sendVerificationCode(DB, { ...ENV, RESEND_API_KEY: '' }, { email: 'a@b.c' })
@@ -215,9 +212,7 @@ describe('sendVerificationCode', () => {
   })
 
   it('正常发送验证码 → 生成 6 位码、写入 D1、调用 Resend', async () => {
-    getLatestCode.mockResolvedValue(null)
-    const { canResend } = await import('../db/emailCodes.js')
-    canResend.mockReturnValue(true)
+    reserveCodeSendSlot.mockResolvedValue({ allowed: true, cooldownSeconds: 0 })
     sendEmail.mockResolvedValue({ id: 'email-id' })
 
     const result = await sendVerificationCode(DB, ENV, { email: 'a@b.c', purpose: 'register' })

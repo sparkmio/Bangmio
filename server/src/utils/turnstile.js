@@ -15,6 +15,8 @@
  *   if (!result.success) return c.json({ error: '人机验证失败' }, 400)
  */
 
+import { fetchWithTimeout } from './http.js'
+
 const TURNSTILE_VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
 
 /**
@@ -45,10 +47,14 @@ export async function verifyTurnstile(token, secret, remoteip, expected = {}) {
   if (remoteip) body.append('remoteip', remoteip)
 
   try {
-    const res = await fetch(TURNSTILE_VERIFY_URL, {
-      method: 'POST',
-      body
-    })
+    const res = await fetchWithTimeout(
+      TURNSTILE_VERIFY_URL,
+      {
+        method: 'POST',
+        body
+      },
+      10000
+    )
     const data = await res.json()
     const expectedAction = String(expected.action || '').trim()
     const hostnames = Array.isArray(expected.hostnames) ? expected.hostnames.filter(Boolean) : []

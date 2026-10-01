@@ -1,2 +1,2 @@
--- v4.1.0: invalidate all existing sessions when password changes.
-ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0;
+-- v4.1.0 legacy migration marker.
+-- The baseline migration already includes session_version, so this migration is intentionally a no-op.

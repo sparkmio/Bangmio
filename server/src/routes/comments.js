@@ -1,9 +1,10 @@
 import { Hono } from 'hono'
 import { parseHTML } from 'linkedom'
 import { createCache } from '../utils/cache.js'
-import { fetchHTML } from '../utils/http.js'
+import { fetchHTML, fetchWithTimeout } from '../utils/http.js'
 import { CACHE_TTL_COMMENTS, MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH } from '../config.js'
 import { parsePositiveId } from '../utils/validation.js'
+import { getBangumiAccessToken } from '../utils/bangumiAuth.js'
 
 const app = new Hono()
 
@@ -383,7 +384,7 @@ app.post('/subject/:id/comment', async c => {
     if (subjectId === null) return c.json({ error: 'ID 不合法' }, 400)
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
     const base = getBase(isChina)
-    const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
+    const token = getBangumiAccessToken(c)
     if (!token) return c.json({ error: '未登录' }, 401)
     const submission = await readSubmissionFields(c)
     if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400)
@@ -401,17 +402,21 @@ app.post('/subject/:id/comment', async c => {
     params.append('comment_content', content)
     params.append('submit', 'submit')
 
-    const res = await fetch(`${base}/subject/${subjectId}/comment`, {
-      method: 'POST',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Cookie: cookie,
-        Referer: `${base}/subject/${subjectId}`
+    const res = await fetchWithTimeout(
+      `${base}/subject/${subjectId}/comment`,
+      {
+        method: 'POST',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Cookie: cookie,
+          Referer: `${base}/subject/${subjectId}`
+        },
+        body: params.toString(),
+        redirect: 'manual'
       },
-      body: params.toString(),
-      redirect: 'manual'
-    })
+      10000
+    )
 
     await acceptCommentSubmission(res)
     invalidateCacheFor('subj', subjectId)
@@ -427,7 +432,7 @@ app.post('/topic/:topicId/reply', async c => {
     if (topicId === null) return c.json({ error: 'ID 不合法' }, 400)
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
     const base = getBase(isChina)
-    const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
+    const token = getBangumiAccessToken(c)
     if (!token) return c.json({ error: '未登录' }, 401)
     const submission = await readSubmissionFields(c)
     if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400)
@@ -445,17 +450,21 @@ app.post('/topic/:topicId/reply', async c => {
     params.append('content', content)
     params.append('submit', 'submit')
 
-    const res = await fetch(`${base}/subject/topic/${topicId}/new_reply`, {
-      method: 'POST',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Cookie: cookie,
-        Referer: `${base}/subject/topic/${topicId}`
+    const res = await fetchWithTimeout(
+      `${base}/subject/topic/${topicId}/new_reply`,
+      {
+        method: 'POST',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Cookie: cookie,
+          Referer: `${base}/subject/topic/${topicId}`
+        },
+        body: params.toString(),
+        redirect: 'manual'
       },
-      body: params.toString(),
-      redirect: 'manual'
-    })
+      10000
+    )
 
     await acceptCommentSubmission(res)
     invalidateCacheFor('topic', topicId)
@@ -471,7 +480,7 @@ app.post('/subject/:id/talkbox', async c => {
     if (subjectId === null) return c.json({ error: 'ID 不合法' }, 400)
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
     const base = getBase(isChina)
-    const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
+    const token = getBangumiAccessToken(c)
     if (!token) return c.json({ error: '未登录' }, 401)
     const submission = await readSubmissionFields(c)
     if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400)
@@ -489,17 +498,21 @@ app.post('/subject/:id/talkbox', async c => {
     params.append('content', content)
     params.append('submit', 'submit')
 
-    const res = await fetch(`${base}/subject/${subjectId}/talkbox`, {
-      method: 'POST',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Cookie: cookie,
-        Referer: `${base}/subject/${subjectId}/talkbox`
+    const res = await fetchWithTimeout(
+      `${base}/subject/${subjectId}/talkbox`,
+      {
+        method: 'POST',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Cookie: cookie,
+          Referer: `${base}/subject/${subjectId}/talkbox`
+        },
+        body: params.toString(),
+        redirect: 'manual'
       },
-      body: params.toString(),
-      redirect: 'manual'
-    })
+      10000
+    )
 
     await acceptCommentSubmission(res)
     invalidateCacheFor('subj', subjectId)
@@ -515,7 +528,7 @@ app.post('/person/:id/talkbox', async c => {
     if (personId === null) return c.json({ error: 'ID 不合法' }, 400)
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
     const base = getBase(isChina)
-    const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
+    const token = getBangumiAccessToken(c)
     if (!token) return c.json({ error: '未登录' }, 401)
     const submission = await readSubmissionFields(c)
     if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400)
@@ -532,17 +545,21 @@ app.post('/person/:id/talkbox', async c => {
     params.append('content', content)
     params.append('submit', 'submit')
 
-    const res = await fetch(`${base}/person/${personId}/talkbox`, {
-      method: 'POST',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Cookie: extractChiiAuth(token),
-        Referer: `${base}/person/${personId}/talkbox`
+    const res = await fetchWithTimeout(
+      `${base}/person/${personId}/talkbox`,
+      {
+        method: 'POST',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Cookie: extractChiiAuth(token),
+          Referer: `${base}/person/${personId}/talkbox`
+        },
+        body: params.toString(),
+        redirect: 'manual'
       },
-      body: params.toString(),
-      redirect: 'manual'
-    })
+      10000
+    )
 
     await acceptCommentSubmission(res)
     invalidateCacheFor('person', personId)
@@ -557,7 +574,7 @@ app.post('/subject/:id/topic', async c => {
     if (subjectId === null) return c.json({ error: 'ID 不合法' }, 400)
     const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
     const base = getBase(isChina)
-    const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
+    const token = getBangumiAccessToken(c)
     if (!token) return c.json({ error: '未登录' }, 401)
     const submission = await readSubmissionFields(c, { title: true })
     if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400)
@@ -576,17 +593,21 @@ app.post('/subject/:id/topic', async c => {
     params.append('content', content)
     params.append('submit', 'submit')
 
-    const res = await fetch(`${base}/subject/${subjectId}/board/new`, {
-      method: 'POST',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Cookie: cookie,
-        Referer: `${base}/subject/${subjectId}/board`
+    const res = await fetchWithTimeout(
+      `${base}/subject/${subjectId}/board/new`,
+      {
+        method: 'POST',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Cookie: cookie,
+          Referer: `${base}/subject/${subjectId}/board`
+        },
+        body: params.toString(),
+        redirect: 'manual'
       },
-      body: params.toString(),
-      redirect: 'manual'
-    })
+      10000
+    )
 
     await acceptCommentSubmission(res)
     invalidateCacheFor('topics', subjectId)

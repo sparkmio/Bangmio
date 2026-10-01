@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { parseHTML } from 'linkedom'
 import { createCache } from '../utils/cache.js'
-import { fetchHTML, fixUrl, stripTags } from '../utils/http.js'
+import { fetchHTML, stripTags } from '../utils/http.js'
+import { sanitizeExternalDocument } from '../utils/sanitizeHtml.js'
 
 const app = new Hono()
 const cache = createCache(30 * 60 * 1000)
@@ -90,11 +91,9 @@ export function cleanWikipediaPage(html) {
   REMOVE_SELECTORS.forEach(selector =>
     document.querySelectorAll(selector).forEach(el => el.remove())
   )
-  document.querySelectorAll('[href], [src]').forEach(el => {
-    const href = el.getAttribute('href')
-    if (href) el.setAttribute('href', fixUrl(href, WIKIPEDIA_BASE))
-    const src = el.getAttribute('src')
-    if (src) el.setAttribute('src', fixUrl(src, WIKIPEDIA_BASE))
+  sanitizeExternalDocument(document, {
+    baseUrl: WIKIPEDIA_BASE,
+    removeSelectors: []
   })
   return document.body?.innerHTML || ''
 }

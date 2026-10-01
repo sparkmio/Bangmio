@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import * as bangumiService from '../services/bangumi.js'
 import { createCache } from '../utils/cache.js'
-import { SCRAPE_UA } from '../utils/http.js'
+import { fetchWithTimeout, SCRAPE_UA } from '../utils/http.js'
 import { CACHE_TTL_BILIBILI } from '../config.js'
 import { parsePositiveId } from '../utils/validation.js'
 
@@ -37,7 +37,7 @@ function stripTags(s) {
 async function searchBilibiliBangumi(name) {
   if (!name) return null
   const url = `https://api.bilibili.com/x/web-interface/search/type?search_type=media_bangumi&keyword=${encodeURIComponent(name)}`
-  const res = await fetch(url, { headers: BILIBILI_HEADERS })
+  const res = await fetchWithTimeout(url, { headers: BILIBILI_HEADERS }, 9000)
   if (!res.ok) return null
   const json = await res.json()
   if (json.code !== 0) return null

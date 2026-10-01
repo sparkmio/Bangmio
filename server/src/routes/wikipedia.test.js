@@ -43,7 +43,7 @@ describe('cleanWikipediaPage', () => {
 
   it('将相对链接与协议相对图片地址绝对化', () => {
     const result = cleanWikipediaPage(SAMPLE_PAGE)
-    expect(result).toContain('https://zh.wikipedia.org/wiki/动画')
+    expect(result).toContain('https://zh.wikipedia.org/wiki/%E5%8A%A8%E7%94%BB')
     expect(result).toContain('https://upload.wikimedia.org/example.png')
   })
 })

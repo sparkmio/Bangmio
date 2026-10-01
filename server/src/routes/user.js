@@ -5,6 +5,14 @@ import { exchangeBangumiOAuthCode } from '../services/oauth.js'
 import { fetchHTML, stripTags, unescapeHtml, parseNumber, fixUrl } from '../utils/http.js'
 import { getOAuthCredentials } from '../utils/oauthConfig.js'
 import { logError } from '../utils/logger.js'
+import {
+  clearBangumiAccessCookie,
+  clearBangumiRefreshCookie,
+  getBangumiAccessToken,
+  getBangumiRefreshToken,
+  setBangumiAccessCookie,
+  setBangumiRefreshCookie
+} from '../utils/bangumiAuth.js'
 import { upstreamError } from '../utils/errors.js'
 import { parseBoundedInteger } from '../utils/validation.js'
 
@@ -86,7 +94,8 @@ app.post('/auth', async c => {
     if (!token) return c.json({ data: null, error: '请输入 Access Token', code: 400 }, 400)
     const client = getClient(token, isChina(c))
     const user = await client.get('/v0/me')
-    return c.json({ data: { user, token }, code: 200 })
+    setBangumiAccessCookie(c, token)
+    return c.json({ data: { user, authenticated: true }, code: 200 })
   } catch (err) {
     if (err.response?.status === 401 || err.response?.status === 403) {
       return c.json({ data: null, error: 'Token 无效，请检查', code: 401 }, 401)
@@ -122,7 +131,9 @@ app.post('/oauth-callback', async c => {
     })
     const client = getClient(accessToken, isChina(c))
     const user = await client.get('/v0/me')
-    return c.json({ data: { user, token: accessToken, refreshToken: refreshToken || '' } })
+    setBangumiAccessCookie(c, accessToken)
+    setBangumiRefreshCookie(c, refreshToken)
+    return c.json({ data: { user, authenticated: true } })
   } catch (err) {
     if (err?.code === 'provider_error') {
       logError('Bangumi OAuth token exchange failed', {
@@ -158,7 +169,8 @@ app.post('/oauth-callback', async c => {
 
 app.post('/refresh-token', async c => {
   try {
-    const { refreshToken } = await c.req.json()
+    const body = await c.req.json().catch(() => ({}))
+    const refreshToken = String(body?.refreshToken || getBangumiRefreshToken(c) || '').trim()
     if (!refreshToken) return c.json({ error: '缺少 refresh token' }, 400)
     const { appId, appSecret } = getOAuthCredentials(c.env, '/user/refresh-token')
     const { accessToken, refreshToken: returnedRefreshToken } = await exchangeBangumiOAuthCode({
@@ -173,7 +185,9 @@ app.post('/refresh-token', async c => {
     if (!accessToken) return c.json({ error: '刷新 Token 失败' }, 400)
     const client = getClient(accessToken, isChina(c))
     const user = await client.get('/v0/me')
-    return c.json({ data: { user, token: accessToken, refreshToken: newRefreshToken } })
+    setBangumiAccessCookie(c, accessToken)
+    setBangumiRefreshCookie(c, newRefreshToken)
+    return c.json({ data: { user, authenticated: true } })
   } catch (err) {
     return c.json({ error: '刷新失败，请重新登录' }, 500)
   }
@@ -181,7 +195,7 @@ app.post('/refresh-token', async c => {
 
 app.get('/me', async c => {
   try {
-    const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
+    const token = getBangumiAccessToken(c)
     if (!token) return c.json({ error: '未登录' }, 401)
     const client = getClient(token, isChina(c))
     const user = await client.get('/v0/me')
@@ -189,6 +203,12 @@ app.get('/me', async c => {
   } catch (err) {
     return c.json({ error: '登录过期' }, 401)
   }
+})
+
+app.post('/logout', c => {
+  clearBangumiAccessCookie(c)
+  clearBangumiRefreshCookie(c)
+  return c.json({ data: { success: true }, code: 200 })
 })
 
 app.get('/:username/collections', async c => {
@@ -218,7 +238,7 @@ app.get('/:username/characters', async c => {
   try {
     const username = c.req.param('username')
     if (!username) return c.json({ error: '缺少用户名' }, 400)
-    const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
+    const token = getBangumiAccessToken(c)
     const client = token ? getClient(token, isChina(c)) : getClient('', isChina(c))
     const data = await client.get(`/v0/users/${userPathSegment(username)}/characters`, {
       limit: 10
@@ -233,7 +253,7 @@ app.get('/:username/persons', async c => {
   try {
     const username = c.req.param('username')
     if (!username) return c.json({ error: '缺少用户名' }, 400)
-    const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
+    const token = getBangumiAccessToken(c)
     const client = token ? getClient(token, isChina(c)) : getClient('', isChina(c))
     const data = await client.get(`/v0/users/${userPathSegment(username)}/persons`, { limit: 10 })
     return c.json({ data: data.data || [] })
@@ -246,7 +266,7 @@ app.get('/:username/indexes', async c => {
   try {
     const username = c.req.param('username')
     if (!username) return c.json({ error: '缺少用户名' }, 400)
-    const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
+    const token = getBangumiAccessToken(c)
     const client = token ? getClient(token, isChina(c)) : getClient('', isChina(c))
     // Bangumi v0 API 可能没有 /indexes，尝试调用，失败返回空数组
     const data = await client.get(`/v0/users/${userPathSegment(username)}/indexes`)
@@ -539,7 +559,7 @@ app.get('/:username', async c => {
   try {
     const username = c.req.param('username')
     if (!username) return c.json({ error: '缺少用户名' }, 400)
-    const token = (c.req.header('Authorization') || '').replace('Bearer ', '')
+    const token = getBangumiAccessToken(c)
     const client = token ? getClient(token, isChina(c)) : getClient('', isChina(c))
     const user = await client.get(`/v0/users/${userPathSegment(username)}`)
     return c.json({ data: user })

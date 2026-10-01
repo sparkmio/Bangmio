@@ -3712,11 +3712,34 @@ var cors = (options) => {
 };
 
 // server/src/utils/logger.js
+function maskEmail(value) {
+  const email = String(value || "");
+  const at = email.indexOf("@");
+  if (at <= 1) return "[REDACTED_EMAIL]";
+  return email[0] + "***" + email.slice(at - 1);
+}
+function sanitizeMeta(value, key2 = "") {
+  const normalizedKey = key2.toLowerCase();
+  if (/token|secret|password|passwd|authorization|cookie|set-cookie|code/.test(normalizedKey)) {
+    return "[REDACTED]";
+  }
+  if (normalizedKey === "email") return maskEmail(value);
+  if (Array.isArray(value)) return value.map((item) => sanitizeMeta(item));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([childKey, childValue]) => [
+        childKey,
+        sanitizeMeta(childValue, childKey)
+      ])
+    );
+  }
+  return value;
+}
 function emit(level, msg, meta) {
   const payload = {
     level,
     msg,
-    meta,
+    meta: sanitizeMeta(meta),
     timestamp: (/* @__PURE__ */ new Date()).toISOString()
   };
   console.log(JSON.stringify(payload));
@@ -3734,11 +3757,12 @@ function logWarn(msg, meta = {}) {
 // server/src/utils/rateLimit.js
 var d1WarningState = /* @__PURE__ */ new WeakMap();
 var nonObjectWarningState = /* @__PURE__ */ new Set();
-function rateLimit(windowMs, max) {
+function rateLimit(windowMs, max, { fallback = "memory", keyFn } = {}) {
   const localStore = /* @__PURE__ */ new Map();
   const keyPrefix = `rate:${windowMs}:${max}`;
   return async (c, next) => {
     const ip = c.req.header("cf-connecting-ip") || c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const key2 = String(await keyFn?.(c) || ip);
     const now = Date.now();
     const d1 = c.env?.DB;
     let count;
@@ -3752,22 +3776,29 @@ function rateLimit(windowMs, max) {
                count = CASE WHEN rate_limits.reset_at <= ? THEN 1 ELSE rate_limits.count + 1 END,
                reset_at = CASE WHEN rate_limits.reset_at <= ? THEN ? ELSE rate_limits.reset_at END
              RETURNING count, reset_at`
-        ).bind(`${keyPrefix}:${ip}`, now + windowMs, now, now, now + windowMs).first();
+        ).bind(`${keyPrefix}:${key2}`, now + windowMs, now, now, now + windowMs).first();
         count = Number(row?.count);
         resetTime = Number(row?.reset_at);
         if (!Number.isFinite(count) || !Number.isFinite(resetTime))
           throw new Error("D1 returned invalid rate-limit row");
       } catch (err) {
+        if (fallback === "reject") {
+          logWarn("D1 \u901F\u7387\u9650\u5236\u4E0D\u53EF\u7528\uFF0C\u4E25\u683C\u9650\u6D41\u63A5\u53E3\u5DF2\u62D2\u7EDD\u8BF7\u6C42", {
+            error: String(err),
+            path: c.req.path
+          });
+          return c.json({ data: null, error: "\u670D\u52A1\u6682\u65F6\u4E0D\u53EF\u7528\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5", code: 503 }, 503);
+        }
         localStoreCleanup(localStore, now);
-        const entry = localStore.get(ip);
+        const entry = localStore.get(key2);
         if (!entry || now > entry.resetTime) {
-          localStore.set(ip, { count: 1, resetTime: now + windowMs });
+          localStore.set(key2, { count: 1, resetTime: now + windowMs });
         } else {
           entry.count += 1;
         }
-        const fallback = localStore.get(ip);
-        count = fallback.count;
-        resetTime = fallback.resetTime;
+        const fallbackEntry = localStore.get(key2);
+        count = fallbackEntry.count;
+        resetTime = fallbackEntry.resetTime;
         if (err?.message && !String(err.message).includes("invalid rate-limit row")) {
           const errorText = String(err);
           if (d1 && typeof d1 === "object") {
@@ -3782,16 +3813,20 @@ function rateLimit(windowMs, max) {
         }
       }
     } else {
+      if (fallback === "reject") {
+        logWarn("\u4E25\u683C\u9650\u6D41\u63A5\u53E3\u7F3A\u5C11 D1\uFF0C\u5DF2\u62D2\u7EDD\u8BF7\u6C42", { path: c.req.path });
+        return c.json({ data: null, error: "\u670D\u52A1\u6682\u65F6\u4E0D\u53EF\u7528\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5", code: 503 }, 503);
+      }
       localStoreCleanup(localStore, now);
-      const entry = localStore.get(ip);
+      const entry = localStore.get(key2);
       if (!entry || now > entry.resetTime) {
-        localStore.set(ip, { count: 1, resetTime: now + windowMs });
+        localStore.set(key2, { count: 1, resetTime: now + windowMs });
       } else {
         entry.count += 1;
       }
-      const fallback = localStore.get(ip);
-      count = fallback.count;
-      resetTime = fallback.resetTime;
+      const fallbackEntry = localStore.get(key2);
+      count = fallbackEntry.count;
+      resetTime = fallbackEntry.resetTime;
     }
     if (count > max) {
       const retryAfter = Math.max(1, Math.ceil((resetTime - now) / 1e3));
@@ -3819,12 +3854,14 @@ function securityHeaders() {
     c.header("Referrer-Policy", "strict-origin-when-cross-origin");
     c.header("X-XSS-Protection", "1; mode=block");
     const csp = [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      "default-src 'none'",
+      "script-src 'none'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
-      "img-src 'self' data: https: http:",
+      "img-src 'self' data: https:",
       "connect-src 'self' https:",
+      "base-uri 'none'",
+      "form-action 'none'",
       embeddablePage ? "frame-ancestors 'self'" : "frame-ancestors 'none'"
     ].join("; ");
     c.header("Content-Security-Policy", csp);
@@ -4214,6 +4251,7 @@ async function decryptToken(encryptedHex, ivHex, secret) {
 // server/src/db/emailCodes.js
 var CODE_TTL_MS = 10 * 60 * 1e3;
 var CODE_RESEND_INTERVAL_MS = 60 * 1e3;
+var MAX_CODE_ATTEMPTS = 5;
 function generateNumericCode() {
   const bytes = crypto.getRandomValues(new Uint8Array(6));
   let code = "";
@@ -4222,11 +4260,22 @@ function generateNumericCode() {
   }
   return code;
 }
+async function hashCode(code) {
+  const bytes = new TextEncoder().encode(String(code ?? ""));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+function constantTimeEqual(left, right) {
+  if (left.length !== right.length) return false;
+  let diff = 0;
+  for (let i = 0; i < left.length; i++) diff |= left.charCodeAt(i) ^ right.charCodeAt(i);
+  return diff === 0;
+}
 async function getLatestCode(db, email, purpose) {
   const normalizedEmail = normalizeEmail(email);
   try {
     const row = await db.prepare(
-      `SELECT id, code, expires_at AS expiresAt, consumed, created_at AS createdAt
+      `SELECT id, code, code_hash AS codeHash, attempts, expires_at AS expiresAt, consumed, created_at AS createdAt
            FROM email_codes
           WHERE email = ? AND purpose = ?
           ORDER BY created_at DESC
@@ -4237,6 +4286,30 @@ async function getLatestCode(db, email, purpose) {
     return null;
   }
 }
+async function reserveCodeSendSlot(db, email, purpose) {
+  const normalizedEmail = normalizeEmail(email);
+  const now = Date.now();
+  const key2 = "email-code:" + purpose + ":" + normalizedEmail;
+  try {
+    const row = await db.prepare(
+      "INSERT INTO rate_limits (key, count, reset_at) VALUES (?, 1, ?) ON CONFLICT(key) DO UPDATE SET count = CASE WHEN rate_limits.reset_at <= ? THEN 1 ELSE rate_limits.count + 1 END, reset_at = CASE WHEN rate_limits.reset_at <= ? THEN ? ELSE rate_limits.reset_at END RETURNING count, reset_at"
+    ).bind(key2, now + CODE_RESEND_INTERVAL_MS, now, now, now + CODE_RESEND_INTERVAL_MS).first();
+    const count = Number(row?.count);
+    const resetAt = Number(row?.reset_at);
+    if (!Number.isFinite(count) || !Number.isFinite(resetAt))
+      throw new Error("invalid send slot row");
+    return {
+      allowed: count === 1,
+      cooldownSeconds: count === 1 ? 0 : Math.max(1, Math.ceil((resetAt - now) / 1e3))
+    };
+  } catch {
+    const latest = await getLatestCode(db, normalizedEmail, purpose);
+    return {
+      allowed: canResend(latest),
+      cooldownSeconds: canResend(latest) ? 0 : resendCooldownSeconds(latest)
+    };
+  }
+}
 async function createCode(db, { email, code, purpose }) {
   const normalizedEmail = normalizeEmail(email);
   const id = crypto.randomUUID();
@@ -4244,9 +4317,9 @@ async function createCode(db, { email, code, purpose }) {
   const expiresAt = now + CODE_TTL_MS;
   try {
     const result = await db.prepare(
-      `INSERT INTO email_codes (id, email, code, purpose, expires_at, consumed, created_at)
-         VALUES (?, ?, ?, ?, ?, 0, ?)`
-    ).bind(id, normalizedEmail, code, purpose, expiresAt, now).run();
+      `INSERT INTO email_codes (id, email, code, code_hash, attempts, purpose, expires_at, consumed, created_at)
+         VALUES (?, ?, '', ?, 0, ?, ?, 0, ?)`
+    ).bind(id, normalizedEmail, await hashCode(code), purpose, expiresAt, now).run();
     if (!result.success) throw new Error("D1 run() \u8FD4\u56DE success=false");
   } catch (err) {
     throw new Error(`createCode: \u5199\u5165\u5931\u8D25 (email=${normalizedEmail}, purpose=${purpose})`, {
@@ -4261,18 +4334,24 @@ async function verifyCode(db, email, code, purpose) {
   if (record.consumed) return false;
   const now = Date.now();
   if (now > record.expiresAt) return false;
-  const inputCode = String(code ?? "");
-  const storedCode = String(record.code ?? "");
-  if (storedCode.length !== inputCode.length) return false;
-  let diff = 0;
-  for (let i = 0; i < inputCode.length; i++) {
-    diff |= storedCode.charCodeAt(i) ^ inputCode.charCodeAt(i);
+  if (Number(record.attempts || 0) >= MAX_CODE_ATTEMPTS) return false;
+  const inputHash = await hashCode(code);
+  const storedHash = String(record.codeHash || "");
+  const legacyHash = storedHash ? "" : await hashCode(record.code || "");
+  const matches2 = storedHash ? constantTimeEqual(storedHash, inputHash) : constantTimeEqual(legacyHash, inputHash);
+  if (!matches2) {
+    try {
+      await db.prepare(
+        "UPDATE email_codes SET attempts = attempts + 1 WHERE id = ? AND consumed = 0 AND expires_at > ? AND attempts < ?"
+      ).bind(record.id, now, MAX_CODE_ATTEMPTS).run();
+    } catch {
+    }
+    return false;
   }
-  if (diff !== 0) return false;
   try {
     const result = await db.prepare(
-      "UPDATE email_codes SET consumed = 1 WHERE id = ? AND consumed = 0 AND expires_at > ? AND code = ?"
-    ).bind(record.id, now, storedCode).run();
+      "UPDATE email_codes SET consumed = 1 WHERE id = ? AND consumed = 0 AND expires_at > ? AND attempts < ?"
+    ).bind(record.id, now, MAX_CODE_ATTEMPTS).run();
     if (result?.success === false) return false;
     const changes = result?.meta?.changes ?? result?.changes;
     return typeof changes === "number" ? changes === 1 : false;
@@ -4291,6 +4370,195 @@ function resendCooldownSeconds(latest) {
   return Math.ceil((CODE_RESEND_INTERVAL_MS - elapsed) / 1e3);
 }
 
+// server/src/utils/http.js
+async function fetchWithTimeout(url, init = {}, timeoutMs = 12e3) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const signal = init.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal;
+  try {
+    return await fetch(url, { ...init, signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+var SCRAPE_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+var ENCODING_SUPPORT = (() => {
+  const support = {};
+  for (const label of ["gb18030", "gbk", "big5"]) {
+    try {
+      const decoder = new TextDecoder(label);
+      decoder.decode(new Uint8Array(0));
+      support[label] = true;
+    } catch {
+      support[label] = false;
+      logError("TextDecoder \u4E0D\u652F\u6301\u7F16\u7801 label", { label });
+    }
+  }
+  return support;
+})();
+var WINDOWS_1252_BYTES = /* @__PURE__ */ new Map([
+  [8364, 128],
+  [8218, 130],
+  [402, 131],
+  [8222, 132],
+  [8230, 133],
+  [8224, 134],
+  [8225, 135],
+  [710, 136],
+  [8240, 137],
+  [352, 138],
+  [8249, 139],
+  [338, 140],
+  [381, 142],
+  [8216, 145],
+  [8217, 146],
+  [8220, 147],
+  [8221, 148],
+  [8226, 149],
+  [8211, 150],
+  [8212, 151],
+  [732, 152],
+  [8482, 153],
+  [353, 154],
+  [8250, 155],
+  [339, 156],
+  [382, 158],
+  [376, 159]
+]);
+function mojibakeMarkerCount(text) {
+  return (text.match(/[ÃÂâ]|(?:[à-ï][\u0080-\u00bf])/g) || []).length;
+}
+function repairMojibake(text) {
+  if (!text || !/[ÃÂâ]|[à-ï][\u0080-\u00bf]/.test(text)) return text;
+  const bytes = [];
+  for (const char of text) {
+    const code = char.codePointAt(0);
+    if (code <= 255) bytes.push(code);
+    else if (WINDOWS_1252_BYTES.has(code)) bytes.push(WINDOWS_1252_BYTES.get(code));
+    else return text;
+  }
+  try {
+    const repaired = new TextDecoder("utf-8", { fatal: true }).decode(new Uint8Array(bytes));
+    const beforeMarkers = mojibakeMarkerCount(text);
+    const afterMarkers = mojibakeMarkerCount(repaired);
+    const beforeCjk = (text.match(/[\u3400-\u9fff]/g) || []).length;
+    const afterCjk = (repaired.match(/[\u3400-\u9fff]/g) || []).length;
+    return afterMarkers < beforeMarkers || afterCjk > beforeCjk ? repaired : text;
+  } catch {
+    return text;
+  }
+}
+async function decodeResponseBody(res) {
+  const buffer = await res.arrayBuffer();
+  let text = "";
+  try {
+    text = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
+    if (!text.includes("\uFFFD")) return repairMojibake(text);
+  } catch {
+  }
+  for (const label of ["gb18030", "gbk"]) {
+    if (!ENCODING_SUPPORT[label]) {
+      logError("\u89E3\u7801\u56DE\u9000\u8DF3\u8FC7\u4E0D\u652F\u6301\u7684\u7F16\u7801", { label });
+      continue;
+    }
+    try {
+      const decoder = new TextDecoder(label, { fatal: true });
+      return repairMojibake(decoder.decode(buffer));
+    } catch {
+    }
+  }
+  return repairMojibake(new TextDecoder("utf-8").decode(buffer));
+}
+async function fetchHTML(url, { timeout = 12e3, headers: headers2 = {}, signal, quiet = false } = {}) {
+  try {
+    const res = await fetchWithTimeout(
+      url,
+      {
+        signal,
+        headers: {
+          "User-Agent": SCRAPE_UA,
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+          "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+          ...headers2
+        }
+      },
+      timeout
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await decodeResponseBody(res);
+  } catch (e) {
+    if (!quiet && !signal?.aborted) logError("fetchHTML failed", { url, error: String(e) });
+    throw e;
+  }
+}
+async function fetchHTMLMulti(urls, { timeout = 8e3, overallTimeout = 18e3, retries = 1, headers: headers2 = {} } = {}) {
+  if (!urls || urls.length === 0) {
+    throw new Error("All sources failed");
+  }
+  const controller = new AbortController();
+  const failures = [];
+  let timer;
+  const fetchOneWithRetry = async (url) => {
+    for (let i = 0; i <= retries; i++) {
+      controller.signal.throwIfAborted();
+      try {
+        const html = await fetchHTML(url, {
+          timeout,
+          headers: headers2,
+          signal: controller.signal,
+          quiet: true
+        });
+        if (html) return { html, url };
+        throw new Error("Empty HTML response");
+      } catch (error) {
+        if (controller.signal.aborted) throw error;
+        if (i === retries) {
+          failures.push({ url, error });
+          throw error;
+        }
+      }
+    }
+  };
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error("Overall timeout " + overallTimeout + "ms");
+      controller.abort(error);
+      reject(error);
+    }, overallTimeout);
+  });
+  try {
+    return await Promise.race([Promise.any(urls.map(fetchOneWithRetry)), deadline]);
+  } catch (error) {
+    const finalError = error instanceof AggregateError && failures.length ? failures[failures.length - 1].error : error;
+    logError("HTML \u6240\u6709\u5019\u9009\u6E90\u5931\u8D25", {
+      failures: failures.map((item) => ({ url: item.url, error: String(item.error) })),
+      error: String(finalError)
+    });
+    throw finalError;
+  } finally {
+    clearTimeout(timer);
+    controller.abort();
+  }
+}
+function stripTags(str) {
+  return (str || "").replace(/<[^>]+>/g, "").trim();
+}
+function unescapeHtml(str) {
+  return (str || "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+}
+function parseNumber(str) {
+  if (str == null) return 0;
+  const m = String(str).replace(/[^0-9]/g, "");
+  const n = parseInt(m);
+  return isNaN(n) ? 0 : n;
+}
+function fixUrl(url, base = "") {
+  if (!url) return "";
+  if (url.startsWith("//")) return `https:${url}`;
+  if (url.startsWith("/")) return `${base}${url}`;
+  return url;
+}
+
 // server/src/utils/email.js
 var RESEND_API = "https://api.resend.com/emails";
 var DEFAULT_FROM = "Bangmio <signup@bangmio.site>";
@@ -4300,7 +4568,7 @@ async function sendEmail({ to, subject, html }, apiKey, from) {
   const normalizedTo = String(to || "").trim();
   if (!normalizedApiKey) throw new Error("RESEND_API_KEY \u672A\u914D\u7F6E");
   if (!normalizedTo) throw new Error("\u6536\u4EF6\u4EBA\u4E0D\u80FD\u4E3A\u7A7A");
-  const res = await fetch(RESEND_API, {
+  const res = await fetchWithTimeout(RESEND_API, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${normalizedApiKey}`,
@@ -4652,9 +4920,9 @@ function httpError(status, message) {
 }
 async function sendVerificationCode(db, env, { email, purpose = "register" }) {
   const normalizedEmail = normalizeEmail(email);
-  const latest = await getLatestCode(db, normalizedEmail, purpose);
-  if (!canResend(latest)) {
-    return { sent: false, cooldownSeconds: resendCooldownSeconds(latest) };
+  const slot = await reserveCodeSendSlot(db, normalizedEmail, purpose);
+  if (!slot.allowed) {
+    return { sent: false, cooldownSeconds: slot.cooldownSeconds };
   }
   if (!env.RESEND_API_KEY) {
     throw httpError(500, "\u90AE\u4EF6\u670D\u52A1\u672A\u914D\u7F6E\uFF08\u7F3A\u5C11 RESEND_API_KEY\uFF09");
@@ -4919,10 +5187,14 @@ async function verifyTurnstile(token, secret, remoteip, expected = {}) {
   });
   if (remoteip) body.append("remoteip", remoteip);
   try {
-    const res = await fetch(TURNSTILE_VERIFY_URL, {
-      method: "POST",
-      body
-    });
+    const res = await fetchWithTimeout(
+      TURNSTILE_VERIFY_URL,
+      {
+        method: "POST",
+        body
+      },
+      1e4
+    );
     const data = await res.json();
     const expectedAction = String(expected.action || "").trim();
     const hostnames = Array.isArray(expected.hostnames) ? expected.hostnames.filter(Boolean) : [];
@@ -4982,302 +5254,6 @@ function upstreamError(status, detail, fallback) {
   if (status === 404) return { code: 404, error: null };
   return { code: 500, error: detail?.description || detail?.message || fallback };
 }
-
-// server/src/routes/auth.js
-var app = new Hono2();
-function isChina(c) {
-  return (c.env?.CF_IP_COUNTRY || "") === "CN";
-}
-function oauthBase(c) {
-  return isChina(c) ? "https://bangumi.pro" : "https://bgm.tv";
-}
-function redirectUri(c) {
-  return c.env?.OAUTH_REDIRECT_URI || "http://localhost:3001/login/callback";
-}
-function turnstileOptions(c, action) {
-  const hostnames = String(c.env?.TURNSTILE_HOSTNAMES || "").split(",").map((value) => value.trim()).filter(Boolean);
-  return { action, hostnames };
-}
-function turnstileConfig(c) {
-  const siteKey = String(c.env?.TURNSTILE_SITE_KEY || "").trim();
-  const secretKey = String(c.env?.TURNSTILE_SECRET_KEY || "").trim();
-  const enabled = Boolean(siteKey && secretKey);
-  return { enabled, siteKey: enabled ? siteKey : null, secretKey: enabled ? secretKey : null };
-}
-function publicTurnstileConfig(c) {
-  const { enabled, siteKey } = turnstileConfig(c);
-  return { required: enabled, siteKey };
-}
-app.use("*", async (c, next) => {
-  if (c.req.method === "POST" && (!c.env?.DB || !c.env?.JWT_SECRET)) {
-    const missing = [];
-    if (!c.env?.DB) missing.push("D1 \u6570\u636E\u5E93");
-    if (!c.env?.JWT_SECRET) missing.push("JWT_SECRET \u73AF\u5883\u53D8\u91CF");
-    return c.json(
-      {
-        data: null,
-        error: `\u8D26\u53F7\u7CFB\u7EDF\u6682\u672A\u5F00\u653E\uFF08\u7F3A\u5C11 ${missing.join("\u3001")}\uFF09\uFF0C\u8BF7\u4F7F\u7528 Bangumi \u76F4\u767B`,
-        code: 503
-      },
-      503
-    );
-  }
-  await next();
-});
-var EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-app.get("/config", (c) => c.json({ data: publicTurnstileConfig(c), code: 200 }));
-app.post("/send-code", async (c) => {
-  try {
-    const body = await c.req.json().catch(() => ({}));
-    const { email: rawEmail, captchaToken, purpose = "register" } = body || {};
-    const email = normalizeEmail(rawEmail);
-    if (!email || !EMAIL_REGEX.test(email)) {
-      return c.json({ data: null, error: "\u90AE\u7BB1\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
-    }
-    const { enabled: turnstileEnabled, secretKey } = turnstileConfig(c);
-    const turnstile = await verifyTurnstile(
-      captchaToken,
-      turnstileEnabled ? secretKey : null,
-      c.req.header("CF-Connecting-IP"),
-      turnstileOptions(c, purpose === "reset" ? "reset_password" : "register")
-    );
-    if (!turnstile.success) {
-      return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
-    }
-    if (!["register", "reset"].includes(purpose)) {
-      return c.json({ data: null, error: "\u9A8C\u8BC1\u7801\u7528\u9014\u4E0D\u5408\u6CD5", code: 400 }, 400);
-    }
-    const result = await sendVerificationCode(c.env.DB, c.env, { email, purpose });
-    return c.json({ data: result, code: 200 });
-  } catch (err) {
-    return errorResponse(err);
-  }
-});
-app.post("/register", async (c) => {
-  try {
-    const body = await c.req.json().catch(() => ({}));
-    const { email: rawEmail, password, code, captchaToken } = body || {};
-    const email = normalizeEmail(rawEmail);
-    if (!email || !EMAIL_REGEX.test(email)) {
-      return c.json({ data: null, error: "\u90AE\u7BB1\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
-    }
-    if (!password || String(password).length < 8) {
-      return c.json({ data: null, error: "\u5BC6\u7801\u81F3\u5C11 8 \u4F4D", code: 400 }, 400);
-    }
-    const { enabled: turnstileEnabled, secretKey } = turnstileConfig(c);
-    if (turnstileEnabled) {
-      const turnstile = await verifyTurnstile(
-        captchaToken,
-        secretKey,
-        c.req.header("CF-Connecting-IP"),
-        turnstileOptions(c, "register")
-      );
-      if (!turnstile.success) {
-        return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
-      }
-    }
-    const result = await registerUser(c.env.DB, c.env, { email, password, code });
-    return c.json({ data: { token: result.token, user: result.user }, code: 200 });
-  } catch (err) {
-    return errorResponse(err);
-  }
-});
-app.post("/login", async (c) => {
-  try {
-    const body = await c.req.json().catch(() => ({}));
-    const { email: rawEmail, password, captchaToken } = body || {};
-    const email = normalizeEmail(rawEmail);
-    if (!email || !password) {
-      return c.json({ data: null, error: "\u90AE\u7BB1\u6216\u5BC6\u7801\u4E0D\u80FD\u4E3A\u7A7A", code: 400 }, 400);
-    }
-    const { enabled: turnstileEnabled, secretKey } = turnstileConfig(c);
-    if (turnstileEnabled) {
-      const turnstile = await verifyTurnstile(
-        captchaToken,
-        secretKey,
-        c.req.header("CF-Connecting-IP"),
-        turnstileOptions(c, "login")
-      );
-      if (!turnstile.success) {
-        return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
-      }
-    }
-    const result = await loginUser(c.env.DB, c.env, { email, password });
-    return c.json({ data: { token: result.token, user: result.user }, code: 200 });
-  } catch (err) {
-    return errorResponse(err);
-  }
-});
-app.post("/refresh", async (c) => {
-  try {
-    const authHeader = c.req.header("Authorization") || "";
-    const match2 = authHeader.match(/^Bearer\s+(.+)$/i);
-    if (!match2) {
-      return c.json({ data: null, error: "\u672A\u767B\u5F55", code: 401 }, 401);
-    }
-    const result = await refreshJwt(c.env.DB, c.env, match2[1]);
-    return c.json({ data: { token: result.token, user: result.user }, code: 200 });
-  } catch (err) {
-    return errorResponse(err);
-  }
-});
-app.post("/bind-bangumi", jwtAuth(), async (c) => {
-  try {
-    const body = await c.req.json().catch(() => ({}));
-    const bangumiToken = String(body?.bangumiToken || "").trim();
-    if (!bangumiToken) {
-      return c.json({ data: null, error: "Bangumi Token \u4E0D\u80FD\u4E3A\u7A7A", code: 400 }, 400);
-    }
-    const currentUser = c.get("user");
-    const result = await bindBangumi(c.env.DB, c.env, currentUser.userId, bangumiToken, isChina(c));
-    return c.json({ data: { token: result.token, user: result.user }, code: 200 });
-  } catch (err) {
-    return errorResponse(err);
-  }
-});
-app.delete("/bind-bangumi", jwtAuth(), async (c) => {
-  try {
-    const currentUser = c.get("user");
-    const result = await unbindBangumi(c.env.DB, c.env, currentUser.userId);
-    return c.json({ data: { success: result.success }, code: 200 });
-  } catch (err) {
-    return errorResponse(err);
-  }
-});
-app.get("/me", jwtAuth(), async (c) => {
-  try {
-    const currentUser = c.get("user");
-    const result = await getCurrentUser(c.env.DB, c.env, currentUser.userId);
-    return c.json({ data: { user: result.user }, code: 200 });
-  } catch (err) {
-    return errorResponse(err);
-  }
-});
-app.get("/bgm-token", jwtAuth(), async (c) => {
-  try {
-    const currentUser = c.get("user");
-    const bgmToken = await getUserBgmToken(c.env.DB, c.env, currentUser.userId);
-    if (!bgmToken) {
-      return c.json({ data: null, error: "\u672A\u7ED1\u5B9A Bangumi \u8D26\u53F7", code: 404 }, 404);
-    }
-    return c.json({ data: { bgmToken }, code: 200 });
-  } catch (err) {
-    return errorResponse(err);
-  }
-});
-app.get("/oauth-bind-url", jwtAuth(), async (c) => {
-  try {
-    const currentUser = c.get("user");
-    const state = await createOAuthBindState(c.env, currentUser.userId);
-    const { appId } = getOAuthCredentials(c.env, "/auth/oauth-bind-url");
-    const url = `${oauthBase(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}&state=${encodeURIComponent(state)}`;
-    return c.json({ data: { url }, code: 200 });
-  } catch (err) {
-    return errorResponse(err);
-  }
-});
-app.post("/oauth-bind-callback", jwtAuth(), async (c) => {
-  try {
-    const body = await c.req.json().catch(() => ({}));
-    const { code, state } = body || {};
-    if (!code || !state) {
-      return c.json({ data: null, error: "\u7F3A\u5C11\u6388\u6743\u7801\u6216 state", code: 400 }, 400);
-    }
-    const currentUser = c.get("user");
-    const stateResult = await verifyOAuthBindState(c.env, state);
-    if (!stateResult.valid || stateResult.userId !== currentUser.userId) {
-      return c.json(
-        {
-          data: null,
-          error: "\u6388\u6743\u72B6\u6001\u65E0\u6548\u6216\u4E0E\u5F53\u524D\u8D26\u53F7\u4E0D\u5339\u914D\uFF0C\u8BF7\u91CD\u65B0\u53D1\u8D77\u7ED1\u5B9A",
-          code: 400
-        },
-        400
-      );
-    }
-    const { appId, appSecret } = getOAuthCredentials(c.env, "/auth/oauth-bind-callback");
-    const result = await bindBangumiByOAuth(c.env.DB, c.env, {
-      code,
-      state,
-      oauthBase: oauthBase(c),
-      appId,
-      appSecret,
-      redirectUri: redirectUri(c),
-      isChina: isChina(c)
-    });
-    return c.json({
-      data: { token: result.token, user: result.user, bgmToken: result.bgmToken },
-      code: 200
-    });
-  } catch (err) {
-    return errorResponse(err);
-  }
-});
-app.post("/change-password", jwtAuth(), async (c) => {
-  try {
-    const body = await c.req.json().catch(() => ({}));
-    const { currentPassword, newPassword } = body || {};
-    if (!currentPassword || !newPassword) {
-      return c.json({ data: null, error: "\u539F\u5BC6\u7801\u4E0E\u65B0\u5BC6\u7801\u4E0D\u80FD\u4E3A\u7A7A", code: 400 }, 400);
-    }
-    const currentUser = c.get("user");
-    await changeUserPassword(c.env.DB, c.env, currentUser.userId, currentPassword, newPassword);
-    return c.json({ data: { success: true }, code: 200 });
-  } catch (err) {
-    return errorResponse(err);
-  }
-});
-app.post("/forgot-password", async (c) => {
-  try {
-    const body = await c.req.json().catch(() => ({}));
-    const { email: rawEmail, captchaToken } = body || {};
-    const email = normalizeEmail(rawEmail);
-    if (!email || !EMAIL_REGEX.test(email)) {
-      return c.json({ data: null, error: "\u90AE\u7BB1\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
-    }
-    const { enabled: turnstileEnabled, secretKey } = turnstileConfig(c);
-    if (turnstileEnabled) {
-      const turnstile = await verifyTurnstile(
-        captchaToken,
-        secretKey,
-        c.req.header("CF-Connecting-IP"),
-        turnstileOptions(c, "reset_password")
-      );
-      if (!turnstile.success) {
-        return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
-      }
-    }
-    const exists = await userExistsByEmail(c.env.DB, email);
-    if (exists) {
-      try {
-        await sendVerificationCode(c.env.DB, c.env, { email, purpose: "reset" });
-      } catch (err) {
-        logError("forgot-password \u53D1\u9001\u9A8C\u8BC1\u7801\u5931\u8D25", { email, error: String(err) });
-      }
-    }
-    return c.json({ data: { success: true }, code: 200 });
-  } catch (err) {
-    return errorResponse(err);
-  }
-});
-app.post("/reset-password", async (c) => {
-  try {
-    const body = await c.req.json().catch(() => ({}));
-    const { email: rawEmail, code, newPassword } = body || {};
-    const email = normalizeEmail(rawEmail);
-    if (!email || !EMAIL_REGEX.test(email)) {
-      return c.json({ data: null, error: "\u90AE\u7BB1\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
-    }
-    if (!code || !newPassword) {
-      return c.json({ data: null, error: "\u9A8C\u8BC1\u7801\u4E0E\u65B0\u5BC6\u7801\u4E0D\u80FD\u4E3A\u7A7A", code: 400 }, 400);
-    }
-    await resetUserPassword(c.env.DB, c.env, { email, code, newPassword });
-    return c.json({ data: { success: true }, code: 200 });
-  } catch (err) {
-    return errorResponse(err);
-  }
-});
-var auth_default = app;
 
 // node_modules/hono/dist/utils/cookie.js
 var validCookieNameRegEx = /^[\w!#$%&'*.^`|~+-]+$/;
@@ -5449,184 +5425,356 @@ var deleteCookie = (c, name, opt) => {
   return deletedCookie;
 };
 
-// server/src/utils/http.js
-var SCRAPE_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
-var ENCODING_SUPPORT = (() => {
-  const support = {};
-  for (const label of ["gb18030", "gbk", "big5"]) {
-    try {
-      const decoder = new TextDecoder(label);
-      decoder.decode(new Uint8Array(0));
-      support[label] = true;
-    } catch {
-      support[label] = false;
-      logError("TextDecoder \u4E0D\u652F\u6301\u7F16\u7801 label", { label });
-    }
-  }
-  return support;
-})();
-var WINDOWS_1252_BYTES = /* @__PURE__ */ new Map([
-  [8364, 128],
-  [8218, 130],
-  [402, 131],
-  [8222, 132],
-  [8230, 133],
-  [8224, 134],
-  [8225, 135],
-  [710, 136],
-  [8240, 137],
-  [352, 138],
-  [8249, 139],
-  [338, 140],
-  [381, 142],
-  [8216, 145],
-  [8217, 146],
-  [8220, 147],
-  [8221, 148],
-  [8226, 149],
-  [8211, 150],
-  [8212, 151],
-  [732, 152],
-  [8482, 153],
-  [353, 154],
-  [8250, 155],
-  [339, 156],
-  [382, 158],
-  [376, 159]
-]);
-function mojibakeMarkerCount(text) {
-  return (text.match(/[ÃÂâ]|(?:[à-ï][\u0080-\u00bf])/g) || []).length;
+// server/src/utils/bangumiAuth.js
+var BANGUMI_ACCESS_COOKIE = "bangumi_access_token";
+var BANGUMI_REFRESH_COOKIE = "bangumi_refresh_token";
+function getBangumiAccessToken(c) {
+  const header = (c.req.header("Authorization") || "").match(/^Bearer\s+(.+)$/i);
+  return String(header?.[1] || getCookie(c, BANGUMI_ACCESS_COOKIE) || "").trim();
 }
-function repairMojibake(text) {
-  if (!text || !/[ÃÂâ]|[à-ï][\u0080-\u00bf]/.test(text)) return text;
-  const bytes = [];
-  for (const char of text) {
-    const code = char.codePointAt(0);
-    if (code <= 255) bytes.push(code);
-    else if (WINDOWS_1252_BYTES.has(code)) bytes.push(WINDOWS_1252_BYTES.get(code));
-    else return text;
-  }
+function cookieOptions(c, overrides = {}) {
+  const url = String(c.req.url || "");
+  let domain;
   try {
-    const repaired = new TextDecoder("utf-8", { fatal: true }).decode(new Uint8Array(bytes));
-    const beforeMarkers = mojibakeMarkerCount(text);
-    const afterMarkers = mojibakeMarkerCount(repaired);
-    const beforeCjk = (text.match(/[\u3400-\u9fff]/g) || []).length;
-    const afterCjk = (repaired.match(/[\u3400-\u9fff]/g) || []).length;
-    return afterMarkers < beforeMarkers || afterCjk > beforeCjk ? repaired : text;
-  } catch {
-    return text;
-  }
-}
-async function decodeResponseBody(res) {
-  const buffer = await res.arrayBuffer();
-  let text = "";
-  try {
-    text = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
-    if (!text.includes("\uFFFD")) return repairMojibake(text);
+    const hostname = new URL(url).hostname;
+    if (hostname === "bangmio.site" || hostname.endsWith(".bangmio.site")) domain = ".bangmio.site";
   } catch {
   }
-  for (const label of ["gb18030", "gbk"]) {
-    if (!ENCODING_SUPPORT[label]) {
-      logError("\u89E3\u7801\u56DE\u9000\u8DF3\u8FC7\u4E0D\u652F\u6301\u7684\u7F16\u7801", { label });
-      continue;
-    }
-    try {
-      const decoder = new TextDecoder(label, { fatal: true });
-      return repairMojibake(decoder.decode(buffer));
-    } catch {
-    }
-  }
-  return repairMojibake(new TextDecoder("utf-8").decode(buffer));
-}
-async function fetchHTML(url, { timeout = 12e3, headers: headers2 = {}, signal, quiet = false } = {}) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
-  try {
-    const res = await fetch(url, {
-      signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal,
-      headers: {
-        "User-Agent": SCRAPE_UA,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-        ...headers2
-      }
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await decodeResponseBody(res);
-  } catch (e) {
-    if (!quiet && !signal?.aborted) logError("fetchHTML failed", { url, error: String(e) });
-    throw e;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-async function fetchHTMLMulti(urls, { timeout = 8e3, overallTimeout = 18e3, retries = 1, headers: headers2 = {} } = {}) {
-  if (!urls || urls.length === 0) {
-    throw new Error("All sources failed");
-  }
-  const controller = new AbortController();
-  const failures = [];
-  let timer;
-  const fetchOneWithRetry = async (url) => {
-    for (let i = 0; i <= retries; i++) {
-      controller.signal.throwIfAborted();
-      try {
-        const html = await fetchHTML(url, {
-          timeout,
-          headers: headers2,
-          signal: controller.signal,
-          quiet: true
-        });
-        if (html) return { html, url };
-        throw new Error("Empty HTML response");
-      } catch (error) {
-        if (controller.signal.aborted) throw error;
-        if (i === retries) {
-          failures.push({ url, error });
-          throw error;
-        }
-      }
-    }
+  return {
+    httpOnly: true,
+    secure: url.startsWith("https://"),
+    sameSite: "Lax",
+    path: "/",
+    maxAge: 30 * 24 * 60 * 60,
+    ...domain ? { domain } : {},
+    ...overrides
   };
-  const deadline = new Promise((_, reject) => {
-    timer = setTimeout(() => {
-      const error = new Error("Overall timeout " + overallTimeout + "ms");
-      controller.abort(error);
-      reject(error);
-    }, overallTimeout);
-  });
-  try {
-    return await Promise.race([Promise.any(urls.map(fetchOneWithRetry)), deadline]);
-  } catch (error) {
-    const finalError = error instanceof AggregateError && failures.length ? failures[failures.length - 1].error : error;
-    logError("HTML \u6240\u6709\u5019\u9009\u6E90\u5931\u8D25", {
-      failures: failures.map((item) => ({ url: item.url, error: String(item.error) })),
-      error: String(finalError)
-    });
-    throw finalError;
-  } finally {
-    clearTimeout(timer);
-    controller.abort();
+}
+function setBangumiAccessCookie(c, token) {
+  const value = String(token || "").trim();
+  if (!value) return;
+  setCookie(c, BANGUMI_ACCESS_COOKIE, value, cookieOptions(c));
+}
+function clearBangumiAccessCookie(c) {
+  deleteCookie(c, BANGUMI_ACCESS_COOKIE, cookieOptions(c, { maxAge: 0 }));
+}
+function getBangumiRefreshToken(c) {
+  return String(getCookie(c, BANGUMI_REFRESH_COOKIE) || "").trim();
+}
+function setBangumiRefreshCookie(c, token) {
+  const value = String(token || "").trim();
+  if (!value) return;
+  setCookie(c, BANGUMI_REFRESH_COOKIE, value, cookieOptions(c));
+}
+function clearBangumiRefreshCookie(c) {
+  deleteCookie(c, BANGUMI_REFRESH_COOKIE, cookieOptions(c, { maxAge: 0 }));
+}
+
+// server/src/routes/auth.js
+var app = new Hono2();
+function isChina(c) {
+  return (c.env?.CF_IP_COUNTRY || "") === "CN";
+}
+function oauthBase(c) {
+  return isChina(c) ? "https://bangumi.pro" : "https://bgm.tv";
+}
+function redirectUri(c) {
+  return c.env?.OAUTH_REDIRECT_URI || "http://localhost:3001/login/callback";
+}
+function turnstileOptions(c, action) {
+  const hostnames = String(c.env?.TURNSTILE_HOSTNAMES || "").split(",").map((value) => value.trim()).filter(Boolean);
+  return { action, hostnames };
+}
+function turnstileConfig(c) {
+  const siteKey = String(c.env?.TURNSTILE_SITE_KEY || "").trim();
+  const secretKey = String(c.env?.TURNSTILE_SECRET_KEY || "").trim();
+  const enabled = Boolean(siteKey && secretKey);
+  return { enabled, siteKey: enabled ? siteKey : null, secretKey: enabled ? secretKey : null };
+}
+function publicTurnstileConfig(c) {
+  const { enabled, siteKey } = turnstileConfig(c);
+  return { required: enabled, siteKey };
+}
+app.use("*", async (c, next) => {
+  if (c.req.method === "POST" && (!c.env?.DB || !c.env?.JWT_SECRET)) {
+    const missing = [];
+    if (!c.env?.DB) missing.push("D1 \u6570\u636E\u5E93");
+    if (!c.env?.JWT_SECRET) missing.push("JWT_SECRET \u73AF\u5883\u53D8\u91CF");
+    return c.json(
+      {
+        data: null,
+        error: `\u8D26\u53F7\u7CFB\u7EDF\u6682\u672A\u5F00\u653E\uFF08\u7F3A\u5C11 ${missing.join("\u3001")}\uFF09\uFF0C\u8BF7\u4F7F\u7528 Bangumi \u76F4\u767B`,
+        code: 503
+      },
+      503
+    );
   }
-}
-function stripTags(str) {
-  return (str || "").replace(/<[^>]+>/g, "").trim();
-}
-function unescapeHtml(str) {
-  return (str || "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
-}
-function parseNumber(str) {
-  if (str == null) return 0;
-  const m = String(str).replace(/[^0-9]/g, "");
-  const n = parseInt(m);
-  return isNaN(n) ? 0 : n;
-}
-function fixUrl(url, base = "") {
-  if (!url) return "";
-  if (url.startsWith("//")) return `https:${url}`;
-  if (url.startsWith("/")) return `${base}${url}`;
-  return url;
-}
+  await next();
+});
+var EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+app.get("/config", (c) => c.json({ data: publicTurnstileConfig(c), code: 200 }));
+app.post("/send-code", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { email: rawEmail, captchaToken, purpose = "register" } = body || {};
+    const email = normalizeEmail(rawEmail);
+    if (!email || !EMAIL_REGEX.test(email)) {
+      return c.json({ data: null, error: "\u90AE\u7BB1\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
+    }
+    const { enabled: turnstileEnabled, secretKey } = turnstileConfig(c);
+    const turnstile = await verifyTurnstile(
+      captchaToken,
+      turnstileEnabled ? secretKey : null,
+      c.req.header("CF-Connecting-IP"),
+      turnstileOptions(c, purpose === "reset" ? "reset_password" : "register")
+    );
+    if (!turnstile.success) {
+      return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
+    }
+    if (!["register", "reset"].includes(purpose)) {
+      return c.json({ data: null, error: "\u9A8C\u8BC1\u7801\u7528\u9014\u4E0D\u5408\u6CD5", code: 400 }, 400);
+    }
+    const result = await sendVerificationCode(c.env.DB, c.env, { email, purpose });
+    return c.json({ data: result, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.post("/register", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { email: rawEmail, password, code, captchaToken } = body || {};
+    const email = normalizeEmail(rawEmail);
+    if (!email || !EMAIL_REGEX.test(email)) {
+      return c.json({ data: null, error: "\u90AE\u7BB1\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
+    }
+    if (!password || String(password).length < 8) {
+      return c.json({ data: null, error: "\u5BC6\u7801\u81F3\u5C11 8 \u4F4D", code: 400 }, 400);
+    }
+    const { enabled: turnstileEnabled, secretKey } = turnstileConfig(c);
+    if (turnstileEnabled) {
+      const turnstile = await verifyTurnstile(
+        captchaToken,
+        secretKey,
+        c.req.header("CF-Connecting-IP"),
+        turnstileOptions(c, "register")
+      );
+      if (!turnstile.success) {
+        return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
+      }
+    }
+    const result = await registerUser(c.env.DB, c.env, { email, password, code });
+    return c.json({ data: { token: result.token, user: result.user }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.post("/login", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { email: rawEmail, password, captchaToken } = body || {};
+    const email = normalizeEmail(rawEmail);
+    if (!email || !password) {
+      return c.json({ data: null, error: "\u90AE\u7BB1\u6216\u5BC6\u7801\u4E0D\u80FD\u4E3A\u7A7A", code: 400 }, 400);
+    }
+    const { enabled: turnstileEnabled, secretKey } = turnstileConfig(c);
+    if (turnstileEnabled) {
+      const turnstile = await verifyTurnstile(
+        captchaToken,
+        secretKey,
+        c.req.header("CF-Connecting-IP"),
+        turnstileOptions(c, "login")
+      );
+      if (!turnstile.success) {
+        return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
+      }
+    }
+    const result = await loginUser(c.env.DB, c.env, { email, password });
+    return c.json({ data: { token: result.token, user: result.user }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.post("/refresh", async (c) => {
+  try {
+    const authHeader = c.req.header("Authorization") || "";
+    const match2 = authHeader.match(/^Bearer\s+(.+)$/i);
+    if (!match2) {
+      return c.json({ data: null, error: "\u672A\u767B\u5F55", code: 401 }, 401);
+    }
+    const result = await refreshJwt(c.env.DB, c.env, match2[1]);
+    return c.json({ data: { token: result.token, user: result.user }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.post("/bind-bangumi", jwtAuth(), async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const bangumiToken = String(body?.bangumiToken || "").trim();
+    if (!bangumiToken) {
+      return c.json({ data: null, error: "Bangumi Token \u4E0D\u80FD\u4E3A\u7A7A", code: 400 }, 400);
+    }
+    const currentUser = c.get("user");
+    const result = await bindBangumi(c.env.DB, c.env, currentUser.userId, bangumiToken, isChina(c));
+    setBangumiAccessCookie(c, bangumiToken);
+    return c.json({ data: { token: result.token, user: result.user }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.delete("/bind-bangumi", jwtAuth(), async (c) => {
+  try {
+    const currentUser = c.get("user");
+    const result = await unbindBangumi(c.env.DB, c.env, currentUser.userId);
+    clearBangumiAccessCookie(c);
+    clearBangumiRefreshCookie(c);
+    return c.json({ data: { success: result.success }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.post("/logout-bangumi", (c) => {
+  clearBangumiAccessCookie(c);
+  clearBangumiRefreshCookie(c);
+  return c.json({ data: { success: true }, code: 200 });
+});
+app.get("/me", jwtAuth(), async (c) => {
+  try {
+    const currentUser = c.get("user");
+    const result = await getCurrentUser(c.env.DB, c.env, currentUser.userId);
+    return c.json({ data: { user: result.user }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.get("/bgm-token", jwtAuth(), async (c) => {
+  try {
+    const currentUser = c.get("user");
+    const bgmToken = await getUserBgmToken(c.env.DB, c.env, currentUser.userId);
+    if (!bgmToken) {
+      return c.json({ data: null, error: "\u672A\u7ED1\u5B9A Bangumi \u8D26\u53F7", code: 404 }, 404);
+    }
+    setBangumiAccessCookie(c, bgmToken);
+    return c.json({ data: { available: true }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.get("/oauth-bind-url", jwtAuth(), async (c) => {
+  try {
+    const currentUser = c.get("user");
+    const state = await createOAuthBindState(c.env, currentUser.userId);
+    const { appId } = getOAuthCredentials(c.env, "/auth/oauth-bind-url");
+    const url = `${oauthBase(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}&state=${encodeURIComponent(state)}`;
+    return c.json({ data: { url }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.post("/oauth-bind-callback", jwtAuth(), async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { code, state } = body || {};
+    if (!code || !state) {
+      return c.json({ data: null, error: "\u7F3A\u5C11\u6388\u6743\u7801\u6216 state", code: 400 }, 400);
+    }
+    const currentUser = c.get("user");
+    const stateResult = await verifyOAuthBindState(c.env, state);
+    if (!stateResult.valid || stateResult.userId !== currentUser.userId) {
+      return c.json(
+        {
+          data: null,
+          error: "\u6388\u6743\u72B6\u6001\u65E0\u6548\u6216\u4E0E\u5F53\u524D\u8D26\u53F7\u4E0D\u5339\u914D\uFF0C\u8BF7\u91CD\u65B0\u53D1\u8D77\u7ED1\u5B9A",
+          code: 400
+        },
+        400
+      );
+    }
+    const { appId, appSecret } = getOAuthCredentials(c.env, "/auth/oauth-bind-callback");
+    const result = await bindBangumiByOAuth(c.env.DB, c.env, {
+      code,
+      state,
+      oauthBase: oauthBase(c),
+      appId,
+      appSecret,
+      redirectUri: redirectUri(c),
+      isChina: isChina(c)
+    });
+    setBangumiAccessCookie(c, result.bgmToken);
+    return c.json({
+      data: { token: result.token, user: result.user },
+      code: 200
+    });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.post("/change-password", jwtAuth(), async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { currentPassword, newPassword } = body || {};
+    if (!currentPassword || !newPassword) {
+      return c.json({ data: null, error: "\u539F\u5BC6\u7801\u4E0E\u65B0\u5BC6\u7801\u4E0D\u80FD\u4E3A\u7A7A", code: 400 }, 400);
+    }
+    const currentUser = c.get("user");
+    await changeUserPassword(c.env.DB, c.env, currentUser.userId, currentPassword, newPassword);
+    return c.json({ data: { success: true }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.post("/forgot-password", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { email: rawEmail, captchaToken } = body || {};
+    const email = normalizeEmail(rawEmail);
+    if (!email || !EMAIL_REGEX.test(email)) {
+      return c.json({ data: null, error: "\u90AE\u7BB1\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
+    }
+    const { enabled: turnstileEnabled, secretKey } = turnstileConfig(c);
+    if (turnstileEnabled) {
+      const turnstile = await verifyTurnstile(
+        captchaToken,
+        secretKey,
+        c.req.header("CF-Connecting-IP"),
+        turnstileOptions(c, "reset_password")
+      );
+      if (!turnstile.success) {
+        return c.json({ data: null, error: "\u4EBA\u673A\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5", code: 400 }, 400);
+      }
+    }
+    const exists = await userExistsByEmail(c.env.DB, email);
+    if (exists) {
+      try {
+        await sendVerificationCode(c.env.DB, c.env, { email, purpose: "reset" });
+      } catch (err) {
+        logError("forgot-password \u53D1\u9001\u9A8C\u8BC1\u7801\u5931\u8D25", { email, error: String(err) });
+      }
+    }
+    return c.json({ data: { success: true }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+app.post("/reset-password", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { email: rawEmail, code, newPassword } = body || {};
+    const email = normalizeEmail(rawEmail);
+    if (!email || !EMAIL_REGEX.test(email)) {
+      return c.json({ data: null, error: "\u90AE\u7BB1\u683C\u5F0F\u4E0D\u6B63\u786E", code: 400 }, 400);
+    }
+    if (!code || !newPassword) {
+      return c.json({ data: null, error: "\u9A8C\u8BC1\u7801\u4E0E\u65B0\u5BC6\u7801\u4E0D\u80FD\u4E3A\u7A7A", code: 400 }, 400);
+    }
+    await resetUserPassword(c.env.DB, c.env, { email, code, newPassword });
+    return c.json({ data: { success: true }, code: 200 });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+var auth_default = app;
 
 // server/src/routes/user.js
 var app2 = new Hono2();
@@ -5691,7 +5839,8 @@ app2.post("/auth", async (c) => {
     if (!token) return c.json({ data: null, error: "\u8BF7\u8F93\u5165 Access Token", code: 400 }, 400);
     const client = getClient(token, isChina2(c));
     const user = await client.get("/v0/me");
-    return c.json({ data: { user, token }, code: 200 });
+    setBangumiAccessCookie(c, token);
+    return c.json({ data: { user, authenticated: true }, code: 200 });
   } catch (err) {
     if (err.response?.status === 401 || err.response?.status === 403) {
       return c.json({ data: null, error: "Token \u65E0\u6548\uFF0C\u8BF7\u68C0\u67E5", code: 401 }, 401);
@@ -5725,7 +5874,9 @@ app2.post("/oauth-callback", async (c) => {
     });
     const client = getClient(accessToken, isChina2(c));
     const user = await client.get("/v0/me");
-    return c.json({ data: { user, token: accessToken, refreshToken: refreshToken || "" } });
+    setBangumiAccessCookie(c, accessToken);
+    setBangumiRefreshCookie(c, refreshToken);
+    return c.json({ data: { user, authenticated: true } });
   } catch (err) {
     if (err?.code === "provider_error") {
       logError("Bangumi OAuth token exchange failed", {
@@ -5760,7 +5911,8 @@ app2.post("/oauth-callback", async (c) => {
 });
 app2.post("/refresh-token", async (c) => {
   try {
-    const { refreshToken } = await c.req.json();
+    const body = await c.req.json().catch(() => ({}));
+    const refreshToken = String(body?.refreshToken || getBangumiRefreshToken(c) || "").trim();
     if (!refreshToken) return c.json({ error: "\u7F3A\u5C11 refresh token" }, 400);
     const { appId, appSecret } = getOAuthCredentials(c.env, "/user/refresh-token");
     const { accessToken, refreshToken: returnedRefreshToken } = await exchangeBangumiOAuthCode({
@@ -5775,14 +5927,16 @@ app2.post("/refresh-token", async (c) => {
     if (!accessToken) return c.json({ error: "\u5237\u65B0 Token \u5931\u8D25" }, 400);
     const client = getClient(accessToken, isChina2(c));
     const user = await client.get("/v0/me");
-    return c.json({ data: { user, token: accessToken, refreshToken: newRefreshToken } });
+    setBangumiAccessCookie(c, accessToken);
+    setBangumiRefreshCookie(c, newRefreshToken);
+    return c.json({ data: { user, authenticated: true } });
   } catch (err) {
     return c.json({ error: "\u5237\u65B0\u5931\u8D25\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55" }, 500);
   }
 });
 app2.get("/me", async (c) => {
   try {
-    const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
+    const token = getBangumiAccessToken(c);
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
     const client = getClient(token, isChina2(c));
     const user = await client.get("/v0/me");
@@ -5790,6 +5944,11 @@ app2.get("/me", async (c) => {
   } catch (err) {
     return c.json({ error: "\u767B\u5F55\u8FC7\u671F" }, 401);
   }
+});
+app2.post("/logout", (c) => {
+  clearBangumiAccessCookie(c);
+  clearBangumiRefreshCookie(c);
+  return c.json({ data: { success: true }, code: 200 });
 });
 app2.get("/:username/collections", async (c) => {
   try {
@@ -5817,7 +5976,7 @@ app2.get("/:username/characters", async (c) => {
   try {
     const username = c.req.param("username");
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
-    const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
+    const token = getBangumiAccessToken(c);
     const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
     const data = await client.get(`/v0/users/${userPathSegment(username)}/characters`, {
       limit: 10
@@ -5831,7 +5990,7 @@ app2.get("/:username/persons", async (c) => {
   try {
     const username = c.req.param("username");
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
-    const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
+    const token = getBangumiAccessToken(c);
     const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
     const data = await client.get(`/v0/users/${userPathSegment(username)}/persons`, { limit: 10 });
     return c.json({ data: data.data || [] });
@@ -5843,7 +6002,7 @@ app2.get("/:username/indexes", async (c) => {
   try {
     const username = c.req.param("username");
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
-    const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
+    const token = getBangumiAccessToken(c);
     const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
     const data = await client.get(`/v0/users/${userPathSegment(username)}/indexes`);
     return c.json({ data: data.data || [] });
@@ -6062,7 +6221,7 @@ app2.get("/:username", async (c) => {
   try {
     const username = c.req.param("username");
     if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
-    const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
+    const token = getBangumiAccessToken(c);
     const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
     const user = await client.get(`/v0/users/${userPathSegment(username)}`);
     return c.json({ data: user });
@@ -6294,7 +6453,7 @@ function isChina4(c) {
   return (c.env?.CF_IP_COUNTRY || "") === "CN";
 }
 function extractToken(c) {
-  return (c.req.header("Authorization") || "").replace("Bearer ", "");
+  return getBangumiAccessToken(c);
 }
 function extractUsername(c) {
   return c.req.header("X-Bangumi-Username") || "";
@@ -17461,7 +17620,7 @@ app5.post("/subject/:id/comment", async (c) => {
     if (subjectId === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const base = getBase(isChina7);
-    const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
+    const token = getBangumiAccessToken(c);
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
     const submission = await readSubmissionFields(c);
     if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400);
@@ -17476,17 +17635,21 @@ app5.post("/subject/:id/comment", async (c) => {
     params.append("formhash", formhash);
     params.append("comment_content", content);
     params.append("submit", "submit");
-    const res = await fetch(`${base}/subject/${subjectId}/comment`, {
-      method: "POST",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Content-Type": "application/x-www-form-urlencoded",
-        Cookie: cookie,
-        Referer: `${base}/subject/${subjectId}`
+    const res = await fetchWithTimeout(
+      `${base}/subject/${subjectId}/comment`,
+      {
+        method: "POST",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Content-Type": "application/x-www-form-urlencoded",
+          Cookie: cookie,
+          Referer: `${base}/subject/${subjectId}`
+        },
+        body: params.toString(),
+        redirect: "manual"
       },
-      body: params.toString(),
-      redirect: "manual"
-    });
+      1e4
+    );
     await acceptCommentSubmission(res);
     invalidateCacheFor("subj", subjectId);
     return c.json({ success: true });
@@ -17500,7 +17663,7 @@ app5.post("/topic/:topicId/reply", async (c) => {
     if (topicId === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const base = getBase(isChina7);
-    const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
+    const token = getBangumiAccessToken(c);
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
     const submission = await readSubmissionFields(c);
     if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400);
@@ -17515,17 +17678,21 @@ app5.post("/topic/:topicId/reply", async (c) => {
     params.append("formhash", formhash);
     params.append("content", content);
     params.append("submit", "submit");
-    const res = await fetch(`${base}/subject/topic/${topicId}/new_reply`, {
-      method: "POST",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Content-Type": "application/x-www-form-urlencoded",
-        Cookie: cookie,
-        Referer: `${base}/subject/topic/${topicId}`
+    const res = await fetchWithTimeout(
+      `${base}/subject/topic/${topicId}/new_reply`,
+      {
+        method: "POST",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Content-Type": "application/x-www-form-urlencoded",
+          Cookie: cookie,
+          Referer: `${base}/subject/topic/${topicId}`
+        },
+        body: params.toString(),
+        redirect: "manual"
       },
-      body: params.toString(),
-      redirect: "manual"
-    });
+      1e4
+    );
     await acceptCommentSubmission(res);
     invalidateCacheFor("topic", topicId);
     return c.json({ success: true });
@@ -17539,7 +17706,7 @@ app5.post("/subject/:id/talkbox", async (c) => {
     if (subjectId === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const base = getBase(isChina7);
-    const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
+    const token = getBangumiAccessToken(c);
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
     const submission = await readSubmissionFields(c);
     if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400);
@@ -17554,17 +17721,21 @@ app5.post("/subject/:id/talkbox", async (c) => {
     params.append("formhash", formhash);
     params.append("content", content);
     params.append("submit", "submit");
-    const res = await fetch(`${base}/subject/${subjectId}/talkbox`, {
-      method: "POST",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Content-Type": "application/x-www-form-urlencoded",
-        Cookie: cookie,
-        Referer: `${base}/subject/${subjectId}/talkbox`
+    const res = await fetchWithTimeout(
+      `${base}/subject/${subjectId}/talkbox`,
+      {
+        method: "POST",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Content-Type": "application/x-www-form-urlencoded",
+          Cookie: cookie,
+          Referer: `${base}/subject/${subjectId}/talkbox`
+        },
+        body: params.toString(),
+        redirect: "manual"
       },
-      body: params.toString(),
-      redirect: "manual"
-    });
+      1e4
+    );
     await acceptCommentSubmission(res);
     invalidateCacheFor("subj", subjectId);
     return c.json({ success: true });
@@ -17578,7 +17749,7 @@ app5.post("/person/:id/talkbox", async (c) => {
     if (personId === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const base = getBase(isChina7);
-    const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
+    const token = getBangumiAccessToken(c);
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
     const submission = await readSubmissionFields(c);
     if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400);
@@ -17592,17 +17763,21 @@ app5.post("/person/:id/talkbox", async (c) => {
     params.append("formhash", formhash);
     params.append("content", content);
     params.append("submit", "submit");
-    const res = await fetch(`${base}/person/${personId}/talkbox`, {
-      method: "POST",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Content-Type": "application/x-www-form-urlencoded",
-        Cookie: extractChiiAuth(token),
-        Referer: `${base}/person/${personId}/talkbox`
+    const res = await fetchWithTimeout(
+      `${base}/person/${personId}/talkbox`,
+      {
+        method: "POST",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Content-Type": "application/x-www-form-urlencoded",
+          Cookie: extractChiiAuth(token),
+          Referer: `${base}/person/${personId}/talkbox`
+        },
+        body: params.toString(),
+        redirect: "manual"
       },
-      body: params.toString(),
-      redirect: "manual"
-    });
+      1e4
+    );
     await acceptCommentSubmission(res);
     invalidateCacheFor("person", personId);
     return c.json({ success: true });
@@ -17616,7 +17791,7 @@ app5.post("/subject/:id/topic", async (c) => {
     if (subjectId === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
     const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
     const base = getBase(isChina7);
-    const token = (c.req.header("Authorization") || "").replace("Bearer ", "");
+    const token = getBangumiAccessToken(c);
     if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
     const submission = await readSubmissionFields(c, { title: true });
     if (submission.error) return c.json({ data: null, error: submission.error, code: 400 }, 400);
@@ -17632,17 +17807,21 @@ app5.post("/subject/:id/topic", async (c) => {
     params.append("title", title);
     params.append("content", content);
     params.append("submit", "submit");
-    const res = await fetch(`${base}/subject/${subjectId}/board/new`, {
-      method: "POST",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Content-Type": "application/x-www-form-urlencoded",
-        Cookie: cookie,
-        Referer: `${base}/subject/${subjectId}/board`
+    const res = await fetchWithTimeout(
+      `${base}/subject/${subjectId}/board/new`,
+      {
+        method: "POST",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Content-Type": "application/x-www-form-urlencoded",
+          Cookie: cookie,
+          Referer: `${base}/subject/${subjectId}/board`
+        },
+        body: params.toString(),
+        redirect: "manual"
       },
-      body: params.toString(),
-      redirect: "manual"
-    });
+      1e4
+    );
     await acceptCommentSubmission(res);
     invalidateCacheFor("topics", subjectId);
     return c.json({ success: true });
@@ -17659,7 +17838,7 @@ var MOBILE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWeb
 function collapseSpace(s) {
   return (s || "").replace(/\s+/g, " ").trim();
 }
-async function fetchWithTimeout(url, headers2 = {}) {
+async function fetchWithTimeout2(url, headers2 = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8e3);
   try {
@@ -17677,7 +17856,7 @@ var MOBILE_HEADERS = {
 async function fetchMobileJson(path) {
   try {
     const separator = path.includes("?") ? "&" : "?";
-    const res = await fetchWithTimeout(
+    const res = await fetchWithTimeout2(
       `${MOBILE_API}/${path}${separator}for_mobile=1`,
       MOBILE_HEADERS
     );
@@ -17791,6 +17970,104 @@ async function getDoubanSummary(id) {
   };
 }
 
+// server/src/utils/sanitizeHtml.js
+var DROP_TAGS = /* @__PURE__ */ new Set([
+  "base",
+  "embed",
+  "form",
+  "iframe",
+  "input",
+  "link",
+  "meta",
+  "object",
+  "script",
+  "select",
+  "style",
+  "textarea",
+  "template"
+]);
+var SAFE_ATTRIBUTES = /* @__PURE__ */ new Set([
+  "alt",
+  "aria-label",
+  "aria-hidden",
+  "class",
+  "colspan",
+  "dir",
+  "height",
+  "id",
+  "lang",
+  "loading",
+  "name",
+  "rowspan",
+  "role",
+  "target",
+  "title",
+  "width"
+]);
+var SAFE_HREF_PROTOCOLS = /* @__PURE__ */ new Set(["http:", "https:", "mailto:"]);
+var SAFE_RESOURCE_PROTOCOLS = /* @__PURE__ */ new Set(["http:", "https:"]);
+var SAFE_DATA_IMAGE = /^data:image\/(?:gif|jpe?g|png|webp|avif);/i;
+function safeAbsoluteUrl(value, baseUrl, { resource = false } = {}) {
+  const raw2 = String(value || "").trim();
+  if (!raw2) return "";
+  if (raw2.startsWith("#")) return raw2;
+  if (/^data:/i.test(raw2)) return !resource || !SAFE_DATA_IMAGE.test(raw2) ? "" : raw2;
+  try {
+    const url = new URL(raw2, baseUrl);
+    const protocols = resource ? SAFE_RESOURCE_PROTOCOLS : SAFE_HREF_PROTOCOLS;
+    return protocols.has(url.protocol) ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+function setSafeLinkAttributes(element) {
+  if (element.tagName?.toLowerCase() !== "a") return;
+  const target = element.getAttribute("target");
+  if (target && target.toLowerCase() === "_blank") {
+    const rel = new Set((element.getAttribute("rel") || "").split(/\s+/).filter(Boolean));
+    rel.add("noopener");
+    rel.add("noreferrer");
+    element.setAttribute("rel", [...rel].join(" "));
+  }
+}
+function sanitizeExternalDocument(document, { baseUrl, removeSelectors = [] }) {
+  for (const selector of removeSelectors) {
+    document.querySelectorAll(selector).forEach((element) => element.remove());
+  }
+  document.querySelectorAll("*").forEach((element) => {
+    const tagName19 = element.tagName?.toLowerCase() || "";
+    if (DROP_TAGS.has(tagName19)) {
+      element.remove();
+      return;
+    }
+    for (const attribute2 of Array.from(element.attributes || [])) {
+      const name = attribute2.name.toLowerCase();
+      const value = attribute2.value;
+      if (name.startsWith("on") || name === "srcdoc" || name === "style" || name === "srcset") {
+        element.removeAttribute(attribute2.name);
+        continue;
+      }
+      if (name === "href") {
+        const safe = safeAbsoluteUrl(value, baseUrl);
+        if (safe) element.setAttribute(attribute2.name, safe);
+        else element.removeAttribute(attribute2.name);
+        continue;
+      }
+      if (name === "src" || name === "poster") {
+        const safe = safeAbsoluteUrl(value, baseUrl, { resource: true });
+        if (safe) element.setAttribute(attribute2.name, safe);
+        else element.removeAttribute(attribute2.name);
+        continue;
+      }
+      if (!SAFE_ATTRIBUTES.has(name) && !name.startsWith("aria-")) {
+        element.removeAttribute(attribute2.name);
+      }
+    }
+    setSafeLinkAttributes(element);
+  });
+  return document;
+}
+
 // server/src/utils/edgeCache.js
 var CACHE_NAMESPACE = "https://bangmio-cache.internal";
 function getEdgeCache() {
@@ -17892,12 +18169,7 @@ function cleanDoubanPage(html) {
   document.querySelectorAll("[class]").forEach((el) => {
     if (isAdElement(el)) el.remove();
   });
-  document.querySelectorAll("[href], [src]").forEach((el) => {
-    const href = el.getAttribute("href");
-    if (href) el.setAttribute("href", fixUrl(href, DOUBAN_BASE_URL));
-    const src = el.getAttribute("src");
-    if (src) el.setAttribute("src", fixUrl(src, DOUBAN_BASE_URL));
-  });
+  sanitizeExternalDocument(document, { baseUrl: DOUBAN_BASE_URL, removeSelectors: [] });
   const fragment = document.body ? document.body.innerHTML : document.documentElement.innerHTML;
   return wrapDocument(fragment);
 }
@@ -18171,7 +18443,7 @@ function stripTags2(s) {
 async function searchBilibiliBangumi(name) {
   if (!name) return null;
   const url = `https://api.bilibili.com/x/web-interface/search/type?search_type=media_bangumi&keyword=${encodeURIComponent(name)}`;
-  const res = await fetch(url, { headers: BILIBILI_HEADERS });
+  const res = await fetchWithTimeout(url, { headers: BILIBILI_HEADERS }, 9e3);
   if (!res.ok) return null;
   const json = await res.json();
   if (json.code !== 0) return null;
@@ -18402,12 +18674,7 @@ function cleanMoegirlPage(html, base = MOEGIRL_CN_BASE) {
     img.setAttribute("src", img.getAttribute("data-src"));
     img.removeAttribute("data-src");
   });
-  document.querySelectorAll("[href], [src]").forEach((el) => {
-    const href = el.getAttribute("href");
-    if (href) el.setAttribute("href", fixUrl(href, base));
-    const src = el.getAttribute("src");
-    if (src) el.setAttribute("src", fixUrl(src, base));
-  });
+  sanitizeExternalDocument(document, { baseUrl: base, removeSelectors: [] });
   const parserOutput = document.querySelector(".mw-parser-output");
   const fragment = parserOutput ? parserOutput.innerHTML : document.body ? document.body.innerHTML : "";
   return wrapDocument2(fragment);
@@ -18634,11 +18901,9 @@ function cleanWikipediaPage(html) {
   REMOVE_SELECTORS.forEach(
     (selector) => document.querySelectorAll(selector).forEach((el) => el.remove())
   );
-  document.querySelectorAll("[href], [src]").forEach((el) => {
-    const href = el.getAttribute("href");
-    if (href) el.setAttribute("href", fixUrl(href, WIKIPEDIA_BASE));
-    const src = el.getAttribute("src");
-    if (src) el.setAttribute("src", fixUrl(src, WIKIPEDIA_BASE));
+  sanitizeExternalDocument(document, {
+    baseUrl: WIKIPEDIA_BASE,
+    removeSelectors: []
   });
   return document.body?.innerHTML || "";
 }
@@ -18877,7 +19142,7 @@ function contentText2(element, base = HOSTS.main) {
   }
   return repairMojibake(String(clone.textContent || "")).replace(/\r\n?/g, "\n").split("\n").map((line) => line.replace(/[ \t]+/g, " ").trim()).join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
-function safeAbsoluteUrl(rawHref, base) {
+function safeAbsoluteUrl2(rawHref, base) {
   try {
     const resolved = new URL(String(rawHref || ""), base);
     return resolved.protocol === "http:" || resolved.protocol === "https:" ? resolved.href : "";
@@ -18935,7 +19200,7 @@ async function submitGroupForm({ base, path, submitPath = path, token, fields })
   const formhash = formhashFrom(pageHtml);
   if (!formhash) throw new Error("\u65E0\u6CD5\u83B7\u53D6\u8868\u5355 token\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55");
   const params = new URLSearchParams({ formhash, ...fields, submit: "submit" });
-  const response = await fetch(base + submitPath, {
+  const response = await fetchWithTimeout(base + submitPath, {
     method: "POST",
     headers: {
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -19189,7 +19454,7 @@ function parseGroupTopicHTML(html, id, base) {
   const { document } = parseHTML(html);
   const titleEl = document.querySelector("h1, h2.topic_title, .topic_title, .topicTitle");
   const isGroupAnchor = (anchor) => {
-    const href = safeAbsoluteUrl(anchor.getAttribute("href") || "", base);
+    const href = safeAbsoluteUrl2(anchor.getAttribute("href") || "", base);
     const groupId = groupIdFromHref(href);
     const reservedPaths = /* @__PURE__ */ new Set(["discover", "all", "category", "new_topic"]);
     return Boolean(groupId) && !reservedPaths.has(groupId.toLowerCase()) && !/\/group\/topic\//.test(href);
@@ -19320,7 +19585,7 @@ function parseGroupDiscoverHTML(html, base) {
     if (seen.has(id)) continue;
     seen.add(id);
     const groupAnchor = Array.from(row.querySelectorAll("a[href]")).find((anchor) => {
-      const href = safeAbsoluteUrl(anchor.getAttribute("href") || "", base);
+      const href = safeAbsoluteUrl2(anchor.getAttribute("href") || "", base);
       return /(?:^|\/)group\/[^/?#]+/.test(href) && !/\/group\/topic\//.test(href);
     });
     const authorAnchor = Array.from(row.querySelectorAll("a[href]")).find(
@@ -19562,7 +19827,7 @@ app10.post("/:id/topic", async (c) => {
     const groupId = c.req.param("id");
     if (!groupId || groupId.length > 80 || /[\\/?#]/.test(groupId))
       return c.json({ data: null, error: "\u5C0F\u7EC4 ID \u4E0D\u5408\u6CD5", code: 400 }, 400);
-    const token = (c.req.header("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
+    const token = getBangumiAccessToken(c);
     if (!token) return c.json({ data: null, error: "\u672A\u767B\u5F55", code: 401 }, 401);
     const body = await c.req.json().catch(() => ({}));
     const title = String(body?.title || "").trim();
@@ -19598,7 +19863,7 @@ app10.post("/topic/:topicId/reply", async (c) => {
     const topicId = c.req.param("topicId");
     if (!/^\d+$/.test(topicId) || !Number.isSafeInteger(Number(topicId)) || Number(topicId) <= 0)
       return c.json({ data: null, error: "\u8BDD\u9898 ID \u4E0D\u5408\u6CD5", code: 400 }, 400);
-    const token = (c.req.header("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
+    const token = getBangumiAccessToken(c);
     if (!token) return c.json({ data: null, error: "\u672A\u767B\u5F55", code: 401 }, 401);
     const body = await c.req.json().catch(() => ({}));
     const content = String(body?.content || "").trim();
@@ -19901,7 +20166,7 @@ app14.use("/api/v1/*", async (c, next) => {
   const limiter = method === "POST" || method === "PUT" || method === "DELETE" ? postLimiter : getLimiter;
   return limiter(c, next);
 });
-var authLimiter = rateLimit(RATE_LIMIT_WINDOW, 5);
+var authLimiter = rateLimit(RATE_LIMIT_WINDOW, 5, { fallback: "reject" });
 app14.use("/api/v1/auth/*", async (c, next) => {
   const path = c.req.path;
   const method = c.req.method.toUpperCase();
@@ -19923,7 +20188,9 @@ app14.route("/api/v1/geo", geo_default);
 app14.route("/api/v1/groups", groups_default);
 app14.route("/api/v1/music", music_default);
 app14.route("/api/v1/ai", ai_default);
-app14.get("/api/health", (c) => c.json({ status: "ok", country: c.env?.CF_IP_COUNTRY || "unknown" }));
+var healthResponse = (c) => c.json({ status: "ok", country: c.env?.CF_IP_COUNTRY || "unknown" });
+app14.get("/api/health", healthResponse);
+app14.get("/api/v1/health", healthResponse);
 app14.all("*", (c) => {
   return c.json({ data: null, error: "Not Found", code: 404 }, 404);
 });

@@ -15,6 +15,26 @@
 import { logError } from './logger.js'
 
 /**
+ * 使用 AbortController 为任意上游请求提供统一超时。
+ * 不自动重试，调用方可根据请求是否幂等自行决定是否重试。
+ *
+ * @param {string|URL} url
+ * @param {RequestInit} [init]
+ * @param {number} [timeoutMs]
+ * @returns {Promise<Response>}
+ */
+export async function fetchWithTimeout(url, init = {}, timeoutMs = 12000) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  const signal = init.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal
+  try {
+    return await fetch(url, { ...init, signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
  * 抓取页面时使用的 User-Agent。
  * 与现有路由（groups.js / comments.js / user.js）保持一致。
  * @type {string}
@@ -160,25 +180,25 @@ export async function fetchHTML(
   url,
   { timeout = 12000, headers = {}, signal, quiet = false } = {}
 ) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeout)
   try {
-    const res = await fetch(url, {
-      signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal,
-      headers: {
-        'User-Agent': SCRAPE_UA,
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-        ...headers
-      }
-    })
+    const res = await fetchWithTimeout(
+      url,
+      {
+        signal,
+        headers: {
+          'User-Agent': SCRAPE_UA,
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+          ...headers
+        }
+      },
+      timeout
+    )
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await decodeResponseBody(res)
   } catch (e) {
     if (!quiet && !signal?.aborted) logError('fetchHTML failed', { url, error: String(e) })
     throw e
-  } finally {
-    clearTimeout(timer)
   }
 }
 
