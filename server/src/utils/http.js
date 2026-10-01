@@ -336,7 +336,11 @@ export function parseNumber(str) {
  */
 export function fixUrl(url, base = '') {
   if (!url) return ''
-  if (url.startsWith('//')) return `https:${url}`
-  if (url.startsWith('/')) return `${base}${url}`
-  return url
+  const value = String(url).trim()
+  if (!value) return ''
+  if (value.startsWith('//')) return `https:${value}`
+  if (value.startsWith('/')) return `${base}${value}`
+  // 公共页面可能仍返回 HTTP 图片；生产站点为 HTTPS 时升级协议，避免混合内容被浏览器拦截。
+  if (/^http:\/\//i.test(value)) return value.replace(/^http:\/\//i, 'https://')
+  return value
 }

@@ -4554,9 +4554,12 @@ function parseNumber(str) {
 }
 function fixUrl(url, base = "") {
   if (!url) return "";
-  if (url.startsWith("//")) return `https:${url}`;
-  if (url.startsWith("/")) return `${base}${url}`;
-  return url;
+  const value = String(url).trim();
+  if (!value) return "";
+  if (value.startsWith("//")) return `https:${value}`;
+  if (value.startsWith("/")) return `${base}${value}`;
+  if (/^http:\/\//i.test(value)) return value.replace(/^http:\/\//i, "https://");
+  return value;
 }
 
 // server/src/utils/email.js
@@ -4707,7 +4710,9 @@ function requiredId(value) {
   return id;
 }
 function rewriteImageUrls(data) {
-  if (typeof data === "string") return data.replace(/lain\.bgm\.tv/g, "lain.bangumi.pro");
+  if (typeof data === "string") {
+    return data.replace(/^\/\/lain\.bgm\.tv/i, "https://lain.bangumi.pro").replace(/^http:\/\/lain\.bgm\.tv/i, "https://lain.bangumi.pro").replace(/^http:\/\/lain\.bangumi\.pro/i, "https://lain.bangumi.pro").replace(/lain\.bgm\.tv/g, "lain.bangumi.pro");
+  }
   if (Array.isArray(data)) return data.map(rewriteImageUrls);
   if (data && typeof data === "object") {
     const out = {};

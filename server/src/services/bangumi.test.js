@@ -237,7 +237,7 @@ describe('getAnimeDetail', () => {
 
     const result = await getAnimeDetail(1)
 
-    expect(result.images.large).toContain('lain.bangumi.pro')
+    expect(result.images.large).toBe('https://lain.bangumi.pro/pic/large.jpg')
     expect(result.images.large).not.toContain('lain.bgm.tv')
   })
 })

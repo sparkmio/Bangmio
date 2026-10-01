@@ -10,7 +10,13 @@ function requiredId(value) {
 }
 
 function rewriteImageUrls(data) {
-  if (typeof data === 'string') return data.replace(/lain\.bgm\.tv/g, 'lain.bangumi.pro')
+  if (typeof data === 'string') {
+    return data
+      .replace(/^\/\/lain\.bgm\.tv/i, 'https://lain.bangumi.pro')
+      .replace(/^http:\/\/lain\.bgm\.tv/i, 'https://lain.bangumi.pro')
+      .replace(/^http:\/\/lain\.bangumi\.pro/i, 'https://lain.bangumi.pro')
+      .replace(/lain\.bgm\.tv/g, 'lain.bangumi.pro')
+  }
   if (Array.isArray(data)) return data.map(rewriteImageUrls)
   if (data && typeof data === 'object') {
     const out = {}

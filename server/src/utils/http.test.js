@@ -66,7 +66,8 @@ describe('fixUrl', () => {
     expect(fixUrl('//example.com/image.jpg')).toMatch(/^https?:\/\//)
   })
 
-  it('已完整 URL 不变', () => {
+  it('升级 HTTP 图片地址并保留 HTTPS 地址', () => {
+    expect(fixUrl('http://lain.bangumi.pro/image.jpg')).toBe('https://lain.bangumi.pro/image.jpg')
     const url = 'https://example.com/image.jpg'
     expect(fixUrl(url)).toBe(url)
   })
