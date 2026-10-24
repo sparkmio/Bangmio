@@ -1,10 +1,10 @@
 # Bangmio 项目资料与维护手册
 
 > 文档用途：给后续开发 Agent、维护者和项目协作者提供一份集中式项目资料。  
-> 生成日期：2026-09-25  
-> 当前分支：`master`  
-> 当前基线提交：`3b66694 fix: restore group topic content and mobile layout`  
-> 当前远端状态：创建本文档前 `master` 与 `origin/master` 同步，工作树干净。  
+> 创建日期：2026-09-25<br>
+> 最后更新：2026-10-24<br>
+> 当前分支：`master`<br>
+> 本轮改动起点：`6cbce37 fix: normalize remote image URLs to HTTPS`；本轮 UI 与文档提交前，`master` 与 `origin/master` 均位于该提交。<br>
 > 本文档只记录项目事实、已确认决策、历史审计结论和维护规则；不包含任何 Token、密码、Cookie、OAuth Secret、邮件 API Key 或用户隐私数据。
 
 ---
@@ -57,7 +57,7 @@ git log --oneline -5
 修改 Next.js 代码、路由、缓存或构建配置前：
 
 - 阅读根目录 `AGENTS.md`；
-- 按任务阅读 `node_modules/next/dist/docs/` 中对应的 Next.js 16.3.1 文档；
+- 按任务阅读 `node_modules/next/dist/docs/` 中对应的 Next.js 16.3.6 文档；
 - 不手改 `next-env.d.ts`；
 - 不删除 `AGENTS.md` 中由 `next dev` 自动维护的规则块。
 
@@ -67,7 +67,7 @@ git log --oneline -5
 - 不使用 `git reset`、`git restore`、`git checkout --` 清理不明修改；
 - 不把 `.dev.vars`、Cookie、密钥、临时日志、构建缓存提交到仓库；
 - `commit`、`push`、`release`、`wrangler deploy`、生产 D1 写操作是独立动作，必须得到用户明确授权；
-- 本文档由用户要求创建，当前任务明确要求不 commit；创建后保持未提交状态。
+- 文档或实现是否提交、推送、发布，按当前用户对各项动作的明确授权执行；commit 与 push 始终视为独立动作。
 
 ---
 
@@ -75,7 +75,7 @@ git log --oneline -5
 
 | 层       | 技术                                                                                                        |
 | -------- | ----------------------------------------------------------------------------------------------------------- |
-| 主前端   | Next.js 16.3.1、React 19、TypeScript                                                                        |
+| 主前端   | Next.js 16.3.6、React 19.2、TypeScript                                                                      |
 | UI       | TailwindCSS、DaisyUI、历史 Vue design CSS、自定义 CSS tokens                                                |
 | 后端     | Hono，集成到 Next API route                                                                                 |
 | 上游     | Bangumi API v0、Bangumi HTML、bangumi.pro / bangumi.one 镜像、豆瓣、Bilibili、萌娘百科、Wikipedia、音乐服务 |
@@ -303,7 +303,7 @@ npm run build:vue
 
 ## 8. 线上审计记录（最后一次已知快照）
 
-> 以下结论来自 2026-09-06 的线上审计，不代表 2026-09-25 的实时状态。再次修复前必须重新访问线上页面确认。
+> 以下问题观察来自 2026-09-06 的线上审计，是历史快照，不代表 2026-10-24 的实时状态。修复进展与后续验证边界见第 16 节；其余线上现象再次处理前仍须重新访问线上确认。
 
 ### 8.1 已观察到的问题
 
@@ -359,7 +359,7 @@ D1_ERROR: no such table: rate_limits
 D1 速率限制不可用，已回退内存计数
 ```
 
-仓库已有 `server/db/migrations/002_rate_limits.sql`，生产 D1 是否已应用需要通过 Wrangler 重新核验。
+当时未记录生产迁移清单。2026-10-24 的后续 Wrangler 核验显示生产 D1 仅有 `000_initial_schema.sql` 和 `003_email_codes_hardening.sql` 待执行；经用户授权，两项均已成功应用。旧日志中的 `rate_limits` 缺表问题须结合此次迁移结果及后续 Worker 日志复核，不应仅凭旧日志判定仍存在。
 
 ### 8.2 线上 UI 观察
 
@@ -655,9 +655,9 @@ npm run next:deploy
 
 ---
 
-## 13. 当前 Git 基线
+## 13. Git 基线与历史快照
 
-创建本文档前已确认：
+本文档创建于 2026-09-25，当时的历史基线为：
 
 ```text
 HEAD: 3b66694 fix: restore group topic content and mobile layout
@@ -678,7 +678,7 @@ d010471 fix(ui): rebalance anime detail layout
 5b73a5a fix(deploy): build OpenNext artifacts for Cloudflare
 ```
 
-本次创建 `agent.md` 后，**不执行 commit、push、tag、release 或部署**。
+2026-10-24 本轮工作起点为 `6cbce37 fix: normalize remote image URLs to HTTPS`，且当时本地 `master` 与 `origin/master` 同步。该提交及其前一项近期提交已推送远端；本轮新增的 UI/文档提交状态与验证结果记录在第 16 节。
 
 ---
 
@@ -712,3 +712,81 @@ d010471 fix(ui): rebalance anime detail layout
 - 测试命令、端口或构建流程。
 
 一次性截图、临时猜测、未验证的线上现象不要直接升级为长期规则；应写成带日期的审计记录。
+
+---
+
+## 16. 近期工作与 Codex 协作记录（截至 2026-10-24）
+
+本节汇总本项目近期 Codex 对话中的用户要求、已确认决定、已执行工作和仍待验证事项；16.1 保留本线程当前可见的用户原始要求，此前已完成工作的助手侧过程按现存交接摘要记录。它不是逐字聊天导出；不记录模型内部推理，也不包含密钥、账号资料或其他项目的对话。
+
+### 16.1 对话时间线与已确认决定
+
+1. 用户先要求全面扫描项目全部文件，梳理问题、整改方式和后续发展方向；随后要求继续既定扫描/整改工作，并批准先修复已经识别的问题。
+2. 用户要求先把当时已有修改提交并推送到远端，然后继续后续工作。该阶段形成并推送了 `326b98f` 与 `6cbce37` 两项提交（具体摘要见 16.2）。
+3. 用户要求继续原有计划，并明确希望移除 Bangmio 登录入口，只保留 Bangumi 登录；同时说明 Bangmio 入口未来可能恢复。
+4. 用户进一步限定本轮范围为前端界面：后端 Bangmio 登录、注册等相关接口继续保留；完成后提交，并尽可能详细地更新本文件，记录近期改动和本项目 Codex 历史对话。
+5. 因而当前认证产品决定是：用户可见登录入口仅展示 Bangumi OAuth/Access Token 登录；页面不再提供 Bangmio 邮箱密码登录/注册入口；后端接口、认证服务、数据结构、Vue 注册页面源码和 React 认证组件中的 Bangmio 流程暂不删除，以便以后恢复。此决定只改变入口呈现，不代表 Bangmio 认证已下线或后端接口已废弃。
+
+本线程中可见的用户原始要求（按出现顺序）：
+
+1. “全面扫描一下项目下的全部文件，看看有哪些问题，又要怎么整改，后续有什么合适的发展方向”
+2. “继续”
+3. “行，按照你的计划，先把现有的问题都解决修复吧”
+4. “继续之前的工作”
+5. “先提交当前全部修改包括commit到远端仓库然后继续完成后续工作”
+6. “按你的计划继续操作吧，注意一下我希望展示移除bangmio登录入口（后续可能恢复），只保留bangumi登录”
+7. “只调整前端界面就行，后端仍保留相关接口，然后提交，然后把所有近期改动，codex的历史对话全写进agent.md进行更新，项目情况等内容越详细越好”
+
+### 16.2 近期已推送提交
+
+以下两项在本轮 UI/文档工作开始前已位于 `origin/master`：
+
+| 提交                                                           | 主要内容                                                                                                                                  | 交付边界                                                                                |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `326b98f fix: harden auth security and deployment reliability` | 加固认证和会话安全、验证码处理、用户/API 输入校验与 HTML 清理、限流/日志/错误处理；补齐健康路由、迁移基线及相关测试；同步构建与部署配置。 | 这项是后端与安全整改，不是本轮 UI 隐藏 Bangmio 入口的依据；保留所有仍需兼容的认证 API。 |
+| `6cbce37 fix: normalize remote image URLs to HTTPS`            | 统一远程图片 URL 的 HTTPS 规范化与请求行为，并补充 Bangumi 服务/HTTP 工具测试；同步 Cloudflare API 构建产物。                             | 解决混合内容风险；没有执行 Worker 部署。                                                |
+
+这两项之前的 `3b66694` 等提交记录在第 13 节历史基线中。近期改动不意味着第 8 节列出的社区/上游问题已经全部解决；逐项线上状态需以最新页面、日志和测试为准。
+
+### 16.3 生产 D1 与外部状态
+
+- 2026-10-24 通过 Wrangler 检查生产 D1 迁移清单时，待应用项为 `000_initial_schema.sql` 与 `003_email_codes_hardening.sql`；经用户授权后两项已成功应用。
+- 上述是生产 D1 schema 迁移操作，不等于 Worker 已部署，也不代表认证、邮件或 OAuth 真实链路已完成线上端到端验收。本轮未部署 Worker。
+- 最近一次远端推送的工具输出报告 GitHub 依赖安全告警共 25 项（1 critical、8 high、11 moderate、5 low）。当时未能重新读取 `npm audit` 与 GitHub 告警明细；此计数仅记录为当时提示，当前告警状态、可修复版本和影响范围均待重新核验，不能宣称依赖已无漏洞。
+- 后续未获新的生产写操作/部署授权前，不继续修改生产 D1，也不执行 Worker 部署。只读核验与本地测试仍可按任务范围开展。
+
+### 16.4 本轮前端入口调整
+
+本轮从 `6cbce37` 开始，在下列文件中调整可见登录/注册入口：
+
+- `app/login/page.tsx` 将登录表单固定为 `AuthForm` 的 Bangumi 模式，提供 Bangumi OAuth 和 Access Token 登录。
+- `app/register/page.tsx` 将 `/register` 页面重定向到 `/login`。Next.js 16.3.6 的本地 `redirect` 文档已核对；它是服务端页面重定向，不改动 API。
+- `components/home-client.tsx`、`components/site-shell.tsx`、`components/account-pages.tsx` 将用户可见的登录提示改成 Bangumi 登录，并从首页移除注册按钮。
+- 旧 Vue 客户端的 `client/src/views/Login.vue` 默认 Bangumi 登录；Bangmio Tab/邮箱密码表单保留在源码中，由 `showBangmioLogin = false` 隐藏，同时默认选择 Bangumi Tab 且不加载仅供 Bangmio 登录使用的 Turnstile。
+- `client/src/router/index.js` 将旧客户端 `/register` 路由重定向到 `/login`；`client/src/views/Register.vue` 和注册实现保留。
+- `client/src/views/Home.vue` 移除注册入口并使用 Bangumi 登录文案；`client/src/components/Sidebar.vue`、`client/src/views/Profile.vue` 的未登录入口统一使用 Bangumi 登录文案。
+
+本轮仅调整界面和页面路由呈现。没有修改 `server/src/routes/auth.js`、`server/src/services/auth.js`、`client/src/stores/auth.js`、`components/auth-provider.tsx` 或后端 API 路由；Bangmio 注册、登录、邮箱验证码、密码恢复、Bangumi 绑定等服务端能力继续保留。恢复入口时应同时检查 Next 与 Vue 两套前端：恢复 Next 登录模式/注册页入口，恢复 Vue 的 `showBangmioLogin` 与 `/register` 页面路由，并重新做登录、注册、验证码和 Turnstile 验收。
+
+### 16.5 本轮验证和待办
+
+本轮本地验证结果：
+
+- `npm run lint`：通过，包含 Vue/React ESLint 与 TypeScript typecheck。
+- `npm test`：通过，51 个测试文件、403 项测试全部通过。
+- `npm run build:vue`：通过，Vite 生产构建成功。
+- `npm run next:build`：通过，Next.js 16.3.6 生产构建成功，`/login` 与 `/register` 均生成路由。
+- `npm run build`：OpenNext Cloudflare 构建成功；esbuild 对打包产物报告 Hono CORS 配置中的 `origin`、`allowHeaders`、`allowMethods` 重复键警告，需另行核查，不属于本轮前端改动。
+- 浏览器验收：登录页只显示 Bangumi OAuth 与 Access Token 两种登录方式；`/register` 实际重定向至 `/login`；首页只有 Bangumi 登录入口，没有注册入口；390×844 窄屏页面没有横向溢出，宽屏登录页布局正常。
+- 本地首页验收时热门番剧数据请求 `/api/v1/anime/browse?sort=heat&type=2&limit=12` 返回 HTTP 500，页面框架与登录入口仍正常渲染。该 API 故障不属于本轮前端入口范围，尚未定位，需后续单独排查。
+- `git diff --check`：通过。OpenNext 构建后 `functions/api/_server.js` 与 `_meta.json` 未形成工作区差异；Next dev 自动更新的 `next-env.d.ts` 仅是 `.next/types` 到 `.next/dev/types` 路径差异，不属于本轮交付。
+
+以上结果只覆盖相应本地静态检查、测试、构建和浏览器呈现；不代表生产 Worker 已部署或第三方 OAuth、邮件和真实账号流程已经完成端到端验收。本轮提交仅本地提交，不推送远端。
+
+后续建议按优先级推进：
+
+1. 重新检查 GitHub Dependabot/安全告警和 `npm audit`，逐项确认可利用性、直接/传递依赖、升级兼容性，再单独制定升级提交。
+2. 在本地或专用测试环境完成 Bangumi OAuth 回调、Token 登录、旧 session 失效、邮箱验证码和注册 API 保留情况的端到端检查；不得用生产账号做未经授权的写操作。
+3. 对第 8 节历史线上问题逐项复测并更新状态，包括社区话题、成员数、列表导航、角色/关联接口、图片加载和缓存降级。
+4. 建立版本、Git commit、OpenNext 构建物、Worker 部署和 D1 migration 的可追踪对应关系；所有生产部署与数据库写操作继续单独确认授权。
+5. 维持 Next.js + React 为主前端、Vue 为兼容客户端的渐进治理路线；未验证生产已无引用前，不删除 Vue 客户端或 Bangmio 认证实现。

@@ -9,11 +9,11 @@
             class="w-16 h-16 mx-auto rounded-2xl mb-3"
             decoding="async"
           />
-          <h1 class="text-2xl font-bold text-base-content">登录 Bangmio</h1>
+          <h1 class="text-2xl font-bold text-base-content">Bangumi 登录</h1>
         </div>
 
         <!-- Tab 切换 -->
-        <div class="flex gap-1 mb-4 bg-base-200 p-1 rounded-lg">
+        <div v-if="showBangmioLogin" class="flex gap-1 mb-4 bg-base-200 p-1 rounded-lg">
           <button
             class="flex-1 py-1.5 text-sm font-medium rounded-md transition-all"
             :class="
@@ -44,7 +44,7 @@
 
         <!-- Tab 1: Bangmio 账号登录 -->
         <form
-          v-if="activeTab === 'bangmio'"
+          v-if="showBangmioLogin && activeTab === 'bangmio'"
           class="flex flex-col gap-3"
           @submit.prevent="handleBangmioLogin"
         >
@@ -148,7 +148,8 @@ import { userAPI } from '../api/endpoints'
 const route = useRoute()
 const auth = useAuthStore()
 const toast = useToastStore()
-const activeTab = ref('bangmio')
+const showBangmioLogin = false
+const activeTab = ref('bangumi')
 const email = ref('')
 const password = ref('')
 const token = ref('')
@@ -276,7 +277,7 @@ function handleTokenLogin() {
 }
 
 onMounted(() => {
-  loadTurnstile()
+  if (showBangmioLogin) loadTurnstile()
   // Bangumi 直登 401 被拦截器带 reason=expired 跳回时，给用户明确提示（PROJECT_ISSUES 7.1）
   if (route.query.reason === 'expired') {
     toast.info('登录已失效，请重新登录')

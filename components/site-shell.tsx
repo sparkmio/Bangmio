@@ -204,7 +204,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
               href="/login"
               className="btn btn-primary btn-sm w-full rounded-full shadow-lg shadow-primary/20"
             >
-              登录 Bangmio
+              使用 Bangumi 登录
             </Link>
           )}
           <button

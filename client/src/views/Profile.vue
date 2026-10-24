@@ -3,7 +3,7 @@
     <!-- 未登录且未指定用户名时提示 -->
     <div v-if="!auth.isLoggedIn && !route.params.username" class="py-20 text-center">
       <p class="text-base-content/50 mb-3">请先登录</p>
-      <router-link to="/login" class="btn btn-primary btn-sm"> 登录 Bangmio </router-link>
+      <router-link to="/login" class="btn btn-primary btn-sm"> 使用 Bangumi 登录 </router-link>
     </div>
 
     <div v-else>

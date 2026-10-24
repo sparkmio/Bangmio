@@ -199,12 +199,9 @@ export function HomeClient({ initialHot }: { initialHot: Subject[] }) {
             <p className="text-base-content/60 text-sm sm:text-base mb-6 max-w-md mx-auto">
               发现、记录、分享你的番剧世界
             </p>
-            <div className="flex items-center justify-center gap-3">
+            <div className="flex items-center justify-center">
               <Link href="/login" className="btn btn-primary rounded-full px-6">
-                登录 Bangmio
-              </Link>
-              <Link href="/register" className="btn btn-outline rounded-full px-6">
-                注册
+                使用 Bangumi 登录
               </Link>
             </div>
           </div>

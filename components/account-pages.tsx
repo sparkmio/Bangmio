@@ -21,7 +21,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
       <div className="py-20 text-center">
         <p className="text-base-content/50 mb-3">请先登录</p>
         <Link href="/login" className="btn btn-primary btn-sm">
-          登录 Bangmio
+          使用 Bangumi 登录
         </Link>
       </div>
     )

@@ -9,11 +9,10 @@
         <p class="text-base-content/60 text-sm sm:text-base mb-6 max-w-md mx-auto">
           发现、记录、分享你的番剧世界
         </p>
-        <div class="flex items-center justify-center gap-3">
+        <div class="flex items-center justify-center">
           <router-link to="/login" class="btn btn-primary rounded-full px-6"
-            >登录 Bangmio</router-link
+            >使用 Bangumi 登录</router-link
           >
-          <router-link to="/register" class="btn btn-outline rounded-full px-6">注册</router-link>
         </div>
       </div>
     </section>
