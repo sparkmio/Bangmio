@@ -6274,8 +6274,16 @@ async function browseAnime2(c) {
     if (q.tag) params.tag = q.tag;
     const result = await browseAnime(params);
     return c.json({ data: result.data, total: result.total });
-  } catch {
-    return c.json({ error: "\u6D4F\u89C8\u5931\u8D25" }, 500);
+  } catch (error) {
+    logError("\u756A\u5267\u6D4F\u89C8\u5931\u8D25", {
+      path: c.req.path,
+      errorName: error?.name,
+      message: error?.message || String(error),
+      upstreamStatus: error?.response?.status,
+      causeName: error?.cause?.name,
+      causeMessage: error?.cause?.message
+    });
+    return c.json({ error: "\u6D4F\u89C8\u5931\u8D25" }, 502);
   }
 }
 async function getAnimeDetail2(c) {

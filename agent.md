@@ -783,6 +783,16 @@ d010471 fix(ui): rebalance anime detail layout
 
 以上结果只覆盖相应本地静态检查、测试、构建和浏览器呈现；不代表生产 Worker 已部署或第三方 OAuth、邮件和真实账号流程已经完成端到端验收。本轮提交仅本地提交，不推送远端。
 
+### 16.6 2026-10-24 后续推送与 API 排查
+
+- 已将前端登录入口提交 `793b30c feat(ui): retain only Bangumi login entry` 推送到 `origin/master`；该次推送成功，Git 输出中有本机 `credential-manager-core` 插件不可用提示，但不影响远端更新。没有执行 Worker 部署或生产数据库写操作。
+- 再次请求本地 `GET /api/v1/anime/browse?sort=heat&type=2&limit=12` 得到 500；同服务的 `/api/v1/health` 与 `/api/health` 均为 200。服务源码将热门列表请求转成 Bangumi `/v0/search/subjects` 只读搜索 POST，参数为 `sort=heat`、类型 2、每页 12 项。
+- 在普通沙箱中直接调用该服务时，网络 `fetch` 报 `EACCES`；在获准的外网诊断调用中，两处上游源最终返回 `ECONNRESET`，没有获得 Bangumi 响应。该结果说明当前环境无法验证上游连通性，不足以证明 Bangumi 服务故障，也没有证据表明搜索请求参数构造错误。
+- 对首页浏览控制器做了范围有限的错误处理修正：上游失败从错误的 500 改为网关错误 502；保留既有响应 JSON 字段，同时使用结构化日志记录路径、异常类型、上游状态及网络错误原因，不记录认证数据或请求头。新增过滤参数转发和上游失败回归测试。该修正改善了故障分类与可诊断性，但在外网连通恢复前，不能宣称热门列表数据已恢复。
+- CORS 警告复核：当前 `server/src/app.js` 的 `cors()` 配置没有重复的 `origin`、`allowHeaders`、`allowMethods` 属性；将该源码及跟踪的 `functions/api/_server.js` 分别临时打包到系统临时目录，均未复现 esbuild 重复键警告。未据此改动 CORS 配置。
+- 本轮重新运行 `npm run build` 时，OpenNext 在开始构建前尝试清理已有忽略目录 `.open-next`，Node 在 Windows 上以 `EPERM` 退出。目录保持原样；没有递归删除或覆盖该现有构建目录。此前记录的成功构建结果是更早一次运行，本轮未能复验完整 OpenNext 构建。
+- 尚待解决/验证：在可连通 `api.bgm.tv` 或 `api.bangumi.pro` 的环境中重新验证热门列表接口；待 `.open-next` Windows 删除权限/文件占用原因查明后重跑 OpenNext 构建，并确认历史 CORS 警告是否仍存在。不得因本轮外网重置而将 API 500 归因于生产故障。
+
 后续建议按优先级推进：
 
 1. 重新检查 GitHub Dependabot/安全告警和 `npm audit`，逐项确认可利用性、直接/传递依赖、升级兼容性，再单独制定升级提交。

@@ -1,5 +1,6 @@
 import * as bangumiService from '../services/bangumi.js'
 import { parseBoundedInteger, parsePositiveId } from '../utils/validation.js'
+import { logError } from '../utils/logger.js'
 
 function requiredId(c) {
   const id = parsePositiveId(c.req.param('id'))
@@ -41,8 +42,16 @@ export async function browseAnime(c) {
     if (q.tag) params.tag = q.tag
     const result = await bangumiService.browseAnime(params)
     return c.json({ data: result.data, total: result.total })
-  } catch {
-    return c.json({ error: '浏览失败' }, 500)
+  } catch (error) {
+    logError('番剧浏览失败', {
+      path: c.req.path,
+      errorName: error?.name,
+      message: error?.message || String(error),
+      upstreamStatus: error?.response?.status,
+      causeName: error?.cause?.name,
+      causeMessage: error?.cause?.message
+    })
+    return c.json({ error: '浏览失败' }, 502)
   }
 }
 
