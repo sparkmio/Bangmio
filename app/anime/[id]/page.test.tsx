@@ -10,7 +10,7 @@ vi.mock('@/lib/api', () => ({
   displayName: () => 'fixture',
   imageUrl: () => ''
 }))
-vi.mock('@/components/vue-anime-detail', () => ({ VueAnimeDetail: () => null }))
+vi.mock('@/components/anime-detail', () => ({ AnimeDetail: () => null }))
 import { apiFetch, safeApiFetch } from '@/lib/api'
 import Page from './page'
 beforeEach(() => {

@@ -12,11 +12,11 @@
     "build": "opennextjs-cloudflare build",
     "server:build": "npx esbuild server/src/app.js --bundle --platform=node --format=esm --outfile=functions/api/_server.js --metafile=functions/api/_meta.json",
     "bundle:size": "node scripts/bundle-size.mjs",
-    "postinstall": "npm ci --prefix client && npm ci --prefix tooling/eslint --ignore-scripts --install-strategy=nested",
+    "postinstall": "npm ci --prefix tooling/eslint --ignore-scripts --install-strategy=nested",
     "prepare": "husky",
-    "lint": "npm run lint:vue && npm run lint:react && npm run typecheck",
-    "lint:fix": "npm run lint:vue -- --fix && npm run lint:react -- --fix",
-    "format": "prettier --write \"**/*.{js,vue,json,css,md}\"",
+    "lint": "npm run lint:react && npm run typecheck",
+    "lint:fix": "npm run lint:react -- --fix",
+    "format": "prettier --write \"**/*.{ts,tsx,json,css,md}\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "release:notes": "node scripts/release-notes.mjs",
@@ -26,9 +26,6 @@
     "next:start": "next start",
     "next:open": "npm run build",
     "next:deploy": "npm run build && wrangler deploy",
-    "dev:vue": "npm run dev --prefix client",
-    "build:vue": "npm run build --prefix client",
-    "lint:vue": "eslint . --ext .js,.vue",
     "next:dry-run": "npm run build && wrangler deploy --dry-run",
     "lint:react": "eslint app components lib --ext .ts,.tsx --no-eslintrc --config .eslintrc.react.cjs --max-warnings=0",
     "check": "npm run lint && npm test && npm run next:build"
@@ -67,10 +64,6 @@
     "react-dom": "^19.2.8"
   },
   "lint-staged": {
-    "*.{js,vue}": [
-      "eslint --fix",
-      "prettier --write"
-    ],
     "*.{json,css,md}": [
       "prettier --write"
     ],

@@ -17,7 +17,7 @@ vi.mock('next/link', () => ({
     </a>
   )
 }))
-import { VueGroupsClient } from './vue-groups-client'
+import { GroupsClient } from './groups-client'
 let container: HTMLDivElement, root: Root
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
@@ -35,7 +35,7 @@ afterEach(async () => {
   vi.useRealTimers()
 })
 async function render() {
-  await act(async () => root.render(<VueGroupsClient initialGroups={[]} initialTopics={[]} />))
+  await act(async () => root.render(<GroupsClient initialGroups={[]} initialTopics={[]} />))
 }
 async function query(value: string) {
   const input = container.querySelector('input')!

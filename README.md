@@ -34,12 +34,12 @@ Bangumi (bgm.tv) 第三方客户端。支持 OAuth 登录、动画浏览与搜�
 
 ## 技术栈
 
-| 层   | 技术                                     |
-| ---- | ---------------------------------------- |
-| 前端 | Next.js + React + TailwindCSS + DaisyUI  |
-| 后端 | Hono（集成到 Next.js API 路由）          |
-| API  | 代理 Bangumi API v0 + 网页抓取第三方平台 |
-| 部署 | Cloudflare Workers（OpenNext）           |
+| 层   | 技术                                          |
+| ---- | --------------------------------------------- |
+| 前端 | Next.js 16 + React 19 + TailwindCSS + DaisyUI |
+| 后端 | Hono（集成到 Next.js API 路由）               |
+| API  | 代理 Bangumi API v0 + 网页抓取第三方平台      |
+| 部署 | Cloudflare Workers（OpenNext）                |
 
 ## Cloudflare Workers OAuth 配置
 
@@ -98,19 +98,19 @@ npm run release:notes -- --from v1.0.0 --to HEAD
 
 ## 当前维护方向与质量门禁（2026-09-05）
 
-生产前端继续采用 **Next.js + React**，不进行整站 Vue/Nuxt 回迁。旧 Vue 目录和引用样式暂时作为兼容资产保留，不再作为新增业务功能的默认实现位置。
+生产环境采用 **Next.js 16 + React 19**。旧 Vue 目录已完全移除，项目现在是纯 Next.js + React 架构。
 
 治理记录见 [docs/GOVERNANCE-2026-09-05.md](docs/GOVERNANCE-2026-09-05.md)。
 
 ```bash
-npm ci                 # 按根、旧客户端、ESLint 工具链的锁文件安装
-npm run lint           # 旧 JS/Vue + React/Hooks/a11y 零警告 + TypeScript
-npm test               # 前后端和兼容回归
-npm run next:build     # Next 生产构建；不部署
+npm ci                 # 按根和 ESLint 工具链的锁文件安装
+npm run lint           # React/Hooks/a11y 零警告 + TypeScript
+npm test               # 前后端测试
+npm run next:build     # Next 生产构建
 npm run check          # 顺序执行以上质量门禁（不含安装）
 ```
 
-React ESLint 的解析器工具链隔离在 `tooling/eslint`，详见该目录 README；业务类型检查仍使用根目录 TypeScript 7。不得使用 `--force` 或 `--legacy-peer-deps` 掩盖版本冲突。
+React ESLint 的解析器工具链隔离在 `tooling/eslint`，详见该目录 README；业务类型检查使用根目录 TypeScript 7。不得使用 `--force` 或 `--legacy-peer-deps` 掩盖版本冲突。
 
 上述检查通过不代表已完成真实账号、移动端、读屏或 Cloudflare Worker 验收。提交、推送、dry-run、部署需要分别明确授权。
 

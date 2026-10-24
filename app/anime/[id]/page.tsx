@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { VueAnimeDetail } from '@/components/vue-anime-detail'
+import { AnimeDetail } from '@/components/anime-detail'
 import { apiFetch, displayName, safeApiFetch } from '@/lib/api'
 import type { ImageSet, Subject } from '@/lib/types'
 
@@ -74,7 +74,7 @@ export default async function AnimeDetailPage({ params }: { params: Promise<{ id
     : []
 
   return (
-    <VueAnimeDetail
+    <AnimeDetail
       subject={subject}
       relations={relations}
       characters={characters}

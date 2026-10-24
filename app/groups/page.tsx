@@ -1,5 +1,5 @@
 import { safeApiFetch } from '@/lib/api'
-import { VueGroupsClient } from '@/components/vue-groups-client'
+import { GroupsClient } from '@/components/groups-client'
 
 export default async function GroupsPage() {
   const [list, discover] = await Promise.all([
@@ -7,7 +7,7 @@ export default async function GroupsPage() {
     safeApiFetch<unknown>('/groups/discover')
   ])
   return (
-    <VueGroupsClient
+    <GroupsClient
       initialGroups={list?.data || []}
       initialTopics={discover?.data || []}
       groupsFailed={!list}

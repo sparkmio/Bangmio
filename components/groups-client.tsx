@@ -189,7 +189,7 @@ function TopicList({ topics }: { topics: Topic[] }) {
   )
 }
 
-export function VueGroupsClient({
+export function GroupsClient({
   initialGroups,
   initialTopics,
   groupsFailed = false,

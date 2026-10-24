@@ -869,7 +869,7 @@ function WikiPanel({ subject, infobox }: { subject: Subject; infobox: InfoboxIte
   )
 }
 
-export function VueAnimeDetail({
+export function AnimeDetail({
   subject,
   relations,
   characters,
