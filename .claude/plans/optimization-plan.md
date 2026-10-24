@@ -17,7 +17,7 @@
 
 #### 1. **严重安全问题**
 
-- ✗ `send_email.js` 硬编码 API 密钥 (re_NRTy98hx_JuF6JcyHAJ424da8jpMyvMXE)
+- ✗ `send_email.js` 硬编码 API 密钥 (已删除，密钥已屏蔽)
 - ✗ 该密钥已暴露在代码中，需要立即撤销
 - ✗ 包含特定邮件内容（YUZUSOFT 配音邀请），应该是测试/临时文件
 

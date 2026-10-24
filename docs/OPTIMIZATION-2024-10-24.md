@@ -13,7 +13,7 @@
 
 **问题**: `send_email.js` 文件硬编码了 Resend API 密钥
 
-- 删除了包含暴露 API 密钥的文件 (`re_NRTy98hx_JuF6JcyHAJ424da8jpMyvMXE`)
+- 删除了包含暴露 API 密钥的文件（密钥已屏蔽以符合 GitHub Push Protection）
 - **重要**: 需要在 Resend 控制台撤销此密钥并生成新密钥
 
 **安全建议**:
