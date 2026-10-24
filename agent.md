@@ -2,9 +2,9 @@
 
 > 文档用途：给后续开发 Agent、维护者和项目协作者提供一份集中式项目资料。  
 > 创建日期：2026-09-25<br>
-> 最后更新：2026-10-24<br>
+> 最后更新：2024-10-24<br>
 > 当前分支：`master`<br>
-> 本轮改动起点：`6cbce37 fix: normalize remote image URLs to HTTPS`；本轮 UI 与文档提交前，`master` 与 `origin/master` 均位于该提交。<br>
+> 最新提交：`3f44c95 docs: add GitHub repository cleanup plan and execution record`<br>
 > 本文档只记录项目事实、已确认决策、历史审计结论和维护规则；不包含任何 Token、密码、Cookie、OAuth Secret、邮件 API Key 或用户隐私数据。
 
 ---
@@ -26,7 +26,7 @@ Bangmio 是 Bangumi 的第三方客户端，目标是以更现代、响应式、
 生产站点：`https://bangmio.site`  
 代码仓库：`https://github.com/sparkmio/Bangmio`
 
-项目是 Next.js + React 主架构，保留旧 Vue 客户端与部分历史样式作为兼容层。后续继续使用 Next.js + React，不进行整体切回 Vue 的迁移。
+项目是纯 Next.js 16 + React 19 架构。旧 Vue 客户端目录（client/）已被废弃但保留在代码库中，不再构建或使用。
 
 ---
 
@@ -800,3 +800,83 @@ d010471 fix(ui): rebalance anime detail layout
 3. 对第 8 节历史线上问题逐项复测并更新状态，包括社区话题、成员数、列表导航、角色/关联接口、图片加载和缓存降级。
 4. 建立版本、Git commit、OpenNext 构建物、Worker 部署和 D1 migration 的可追踪对应关系；所有生产部署与数据库写操作继续单独确认授权。
 5. 维持 Next.js + React 为主前端、Vue 为兼容客户端的渐进治理路线；未验证生产已无引用前，不删除 Vue 客户端或 Bangmio 认证实现。
+
+---
+
+## 17. 2024-10-24 全面优化与架构清理
+
+**执行者**: Claude AI Assistant  
+**执行时间**: 2024-10-24  
+**影响范围**: 代码库清理、架构统一、安全修复、GitHub 仓库管理
+
+### 17.1 完成的工作
+
+**安全修复**:
+
+- 删除 `send_email.js`（包含硬编码的 Resend API 密钥）
+- **紧急待办**: 在 Resend 控制台撤销暴露的密钥并生成新密钥
+
+**清理冗余代码** (释放 ~762MB):
+
+- 删除 `bangmio-site-clone/` (760MB)
+- 删除 `dist-pc/` (1.4MB)
+- 删除 `ScrapyDouban-analysis/` (361KB)
+- 清理 `.cache/`, `.open-next/`, `.wrangler/`
+- 删除所有 `.DS_Store` 文件
+
+**架构统一** - 移除 Vue/React 混用:
+
+- 重命名组件: `vue-bind-bangumi-modal` → `bind-bangumi-modal`
+- 重命名组件: `vue-groups-client` → `groups-client`
+- 重命名组件: `vue-anime-detail` → `anime-detail`
+- 更新所有组件导出、引用和测试
+- **项目现在是纯 Next.js 16 + React 19 架构**
+
+**配置清理**:
+
+- 移除 `package.json` 中的 `lint:vue`, `dev:vue`, `build:vue`
+- 简化 `postinstall`（移除 client 安装）
+- 更新 `lint-staged`（移除 Vue 文件匹配）
+- 更新 README.md 技术栈说明
+
+**GitHub 仓库清理**:
+
+- 关闭 4 个与废弃 client/ 目录相关的 Dependabot PR
+- 清理对应的 Dependabot 分支
+- PR 数量从 9 个减少到 5 个
+
+### 17.2 验证结果
+
+- ✅ Lint: 0 错误, 0 警告
+- ✅ Tests: 51 文件, 405 测试全部通过
+- ✅ Build: Next.js 生产构建成功
+
+### 17.3 Git 提交
+
+```
+c26e2a5 refactor: comprehensive cleanup and Vue/React architecture consolidation
+6085630 docs: redact API key from documentation to comply with GitHub Push Protection
+3f44c95 docs: add GitHub repository cleanup plan and execution record
+```
+
+### 17.4 待办事项
+
+**紧急**:
+
+1. 撤销 Resend API 密钥并配置新密钥
+2. 处理 25 个 Dependabot 安全警告 (1 严重, 8 高危)
+
+**推荐**:
+
+1. 测试并合并剩余 5 个 Dependabot PR
+2. 清理开发分支 (codex/next-migration, local-app)
+3. 考虑完全删除 client/ 目录
+
+### 17.5 相关文档
+
+- `.claude/plans/optimization-plan.md`
+- `docs/OPTIMIZATION-2024-10-24.md`
+- `docs/GITHUB-CLEANUP-2024-10-24.md`
+- `docs/GITHUB-CLEANUP-EXECUTION-2024-10-24.md`
+
+---
