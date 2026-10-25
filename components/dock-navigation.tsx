@@ -1,19 +1,24 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { Suspense } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/components/auth-provider'
 import { useAppearance } from '@/components/appearance-provider'
+import { DETAIL_TABS, detailTabFrom, type DetailTabKey } from '@/lib/detail-tabs'
 
 // 导航项配置
 const navItems = [
-  { href: '/', label: '首页', icon: 'home' },
-  { href: '/trending', label: '新番时间表', icon: 'trending' },
-  { href: '/anime', label: '浏览', icon: 'browse' },
-  { href: '/groups', label: '小组', icon: 'groups' },
-  { href: '/about', label: '关于', icon: 'about' },
-  { href: '/settings', label: '设置', icon: 'settings' }
+  { href: '/', label: '首页', shortLabel: '首页', icon: 'home' },
+  { href: '/trending', label: '新番时间表', shortLabel: '新番', icon: 'trending' },
+  { href: '/anime', label: '浏览', shortLabel: '浏览', icon: 'browse' },
+  { href: '/groups', label: '小组', shortLabel: '小组', icon: 'groups' },
+  { href: '/about', label: '关于', shortLabel: '关于', icon: 'about' },
+  { href: '/settings', label: '设置', shortLabel: '设置', icon: 'settings' }
 ] as const
+
+// 移动端底部栏只放最常用的 4 项 + 我的/登录，等分整行避免挤压；其余入口在桌面 Dock 和页面内可达。
+const mobileNavItems = navItems.slice(0, 4)
 
 // 图标 SVG 组件
 function HomeIcon({ className }: { className?: string }) {
@@ -187,156 +192,304 @@ const iconComponents = {
   user: UserIcon
 }
 
+
+function BackIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+    </svg>
+  )
+}
+
+// 每个 Dock 按钮都是独立的椭圆胶囊（参考 iOS 悬浮按钮），而不是挤在一个大卡片里。
+const glassStyle = {
+  background: 'var(--bm-glass-surface)',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
+  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.10)',
+  borderColor: 'var(--bm-glass-border)'
+} as const
+
+const ACTIVE_BG = 'rgba(232, 144, 156, 0.18)'
+const ACTIVE_COLOR = '#E8909C'
+
+function DesktopDetailTabPills({
+  detailId,
+  activeTab
+}: {
+  detailId: string
+  activeTab: DetailTabKey
+}) {
+  return (
+    <>
+      {DETAIL_TABS.map(([key, label]) => {
+        const isActive = activeTab === key
+        return (
+          <Link
+            key={key}
+            href={`/anime/${detailId}?tab=${key}`}
+            aria-current={isActive ? 'page' : undefined}
+            className="flex items-center justify-center w-[104px] h-10 px-3 rounded-full border text-[13px] font-medium whitespace-nowrap transition-all duration-300 hover:scale-[1.04]"
+            style={{
+              ...glassStyle,
+              background: isActive ? ACTIVE_BG : glassStyle.background,
+              color: isActive ? ACTIVE_COLOR : 'var(--bm-muted)',
+              fontWeight: isActive ? 600 : 500
+            }}
+          >
+            {label}
+          </Link>
+        )
+      })}
+    </>
+  )
+}
+
+function MobileDetailTabPills({
+  detailId,
+  activeTab
+}: {
+  detailId: string
+  activeTab: DetailTabKey
+}) {
+  return (
+    <>
+      {DETAIL_TABS.map(([key, label]) => {
+        const isActive = activeTab === key
+        return (
+          <Link
+            key={key}
+            href={`/anime/${detailId}?tab=${key}`}
+            aria-current={isActive ? 'page' : undefined}
+            className="flex flex-none items-center h-11 px-4 rounded-full text-sm whitespace-nowrap transition-all"
+            style={{
+              background: isActive ? ACTIVE_BG : 'transparent',
+              color: isActive ? ACTIVE_COLOR : 'var(--bm-muted)',
+              fontWeight: isActive ? 600 : 500
+            }}
+          >
+            {label}
+          </Link>
+        )
+      })}
+    </>
+  )
+}
+
+// 只有这个小组件读 ?tab=，并被 Suspense 包裹，保证 Dock 其余部分（全局导航）在静态页也能服务端渲染。
+function DetailTabPills({
+  detailId,
+  sub,
+  variant
+}: {
+  detailId: string
+  sub?: string
+  variant: 'desktop' | 'mobile'
+}) {
+  const searchParams = useSearchParams()
+  const activeTab: DetailTabKey = sub
+    ? (sub as DetailTabKey)
+    : detailTabFrom(searchParams.get('tab'))
+  return variant === 'desktop' ? (
+    <DesktopDetailTabPills detailId={detailId} activeTab={activeTab} />
+  ) : (
+    <MobileDetailTabPills detailId={detailId} activeTab={activeTab} />
+  )
+}
+
 export function DockNavigation() {
   const pathname = usePathname()
+  const router = useRouter()
   const auth = useAuth()
   const appearance = useAppearance()
 
+  // 番剧详情页（含吐槽/讨论子页）：Dock 切换为「返回 + 板块栏」
+  const detailMatch = pathname.match(/^\/anime\/(\d+)(?:\/(talkbox|topics))?\/?$/)
+  const detailId = detailMatch?.[1]
+  const detailSub = detailMatch?.[2] as DetailTabKey | undefined
+
+  const avatarSrc =
+    auth.isAuthenticated && auth.user?.avatar
+      ? typeof auth.user.avatar === 'string'
+        ? auth.user.avatar
+        : auth.user.avatar.medium || ''
+      : ''
+
   return (
     <>
-      {/* PC 端左侧 Dock */}
-      <aside className="hidden md:flex fixed left-5 top-1/2 -translate-y-1/2 z-50">
-        <nav
-          className="bm-dock flex flex-col gap-2 p-3 rounded-[20px] border"
-          style={{
-            background: 'var(--bm-glass-surface)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-            borderColor: 'var(--bm-glass-border)'
-          }}
-        >
-          {/* 导航图标 */}
-          {navItems.map(item => {
-            const Icon = iconComponents[item.icon as keyof typeof iconComponents]
-            const isActive = pathname === item.href
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-label={item.label}
-                className={`
-                  flex flex-col items-center justify-center gap-0.5 w-14 h-14 rounded-xl transition-all duration-300
-                  hover:scale-105
-                  ${
-                    isActive
-                      ? 'bg-[rgba(232,144,156,0.12)] text-[#E8909C]'
-                      : 'hover:text-[var(--bm-text)]'
-                  }
-                `}
-                style={{
-                  color: isActive ? '#E8909C' : 'var(--bm-muted)'
-                }}
-                title={item.label}
+      {/* PC / 横屏（≥1024px）：左侧一列独立椭圆按钮，正文区预留了大于 Dock 右边缘的左边距 */}
+      <aside className="hidden lg:flex fixed left-4 top-1/2 -translate-y-1/2 z-50">
+        <nav className="flex flex-col gap-2 max-h-[calc(100vh-2rem)] overflow-y-auto scrollbar-hide p-1">
+          {detailId ? (
+            <>
+              <button
+                type="button"
+                onClick={() => router.back()}
+                aria-label="返回上一页"
+                className="flex items-center gap-2 w-[104px] h-11 px-4 rounded-full border text-sm font-semibold transition-all duration-300 hover:scale-[1.04]"
+                style={{ ...glassStyle, color: 'var(--bm-text)' }}
               >
-                <Icon className="w-6 h-6" />
-                <span className="text-[10px] font-medium leading-none">{item.label}</span>
-              </Link>
-            )
-          })}
-
-          {/* 分隔线 */}
-          <div className="h-px bg-[var(--bm-line)] my-1" />
-
-          {/* 主题切换按钮 */}
-          <button
-            onClick={() => appearance.toggleTheme()}
-            aria-label={appearance.theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
-            className="flex items-center justify-center w-12 h-12 self-center rounded-xl transition-all duration-300 hover:scale-105"
-            style={{ color: 'var(--bm-muted)' }}
-          >
-            {appearance.theme === 'dark' ? (
-              <SunIcon className="w-6 h-6" />
-            ) : (
-              <MoonIcon className="w-6 h-6" />
-            )}
-          </button>
-
-          {/* 用户头像 / 登录按钮 */}
-          <Link
-            href={auth.isAuthenticated ? '/profile' : '/login'}
-            aria-label={auth.isAuthenticated ? '我的' : '登录'}
-            className="flex items-center justify-center w-12 h-12 self-center rounded-xl transition-all duration-300 hover:scale-105"
-            style={{ color: 'var(--bm-muted)' }}
-          >
-            {auth.isAuthenticated && auth.user?.avatar ? (
-              <img
-                src={
-                  typeof auth.user.avatar === 'string'
-                    ? auth.user.avatar
-                    : auth.user.avatar.medium || ''
+                <BackIcon className="w-5 h-5 shrink-0" />
+                返回
+              </button>
+              <Suspense
+                fallback={
+                  <DesktopDetailTabPills
+                    detailId={detailId}
+                    activeTab={detailSub ?? 'overview'}
+                  />
                 }
-                alt={auth.user?.nickname || auth.user?.username || ''}
-                className="w-10 h-10 rounded-full ring-2 ring-[#E8909C]/20 object-cover"
-              />
-            ) : (
-              <UserIcon className="w-6 h-6" />
-            )}
-          </Link>
+              >
+                <DetailTabPills detailId={detailId} sub={detailSub} variant="desktop" />
+              </Suspense>
+            </>
+          ) : (
+            <>
+              {navItems.map(item => {
+                const Icon = iconComponents[item.icon as keyof typeof iconComponents]
+                const isActive = pathname === item.href
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-label={item.label}
+                    aria-current={isActive ? 'page' : undefined}
+                    className="flex items-center gap-2 w-[104px] h-11 px-4 rounded-full border text-sm transition-all duration-300 hover:scale-[1.04]"
+                    style={{
+                      ...glassStyle,
+                      background: isActive ? ACTIVE_BG : glassStyle.background,
+                      color: isActive ? ACTIVE_COLOR : 'var(--bm-muted)',
+                      fontWeight: isActive ? 600 : 500
+                    }}
+                    title={item.label}
+                  >
+                    <Icon className="w-5 h-5 shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                )
+              })}
+
+              {/* 主题切换：圆形按钮 */}
+              <button
+                type="button"
+                onClick={() => appearance.toggleTheme()}
+                aria-label={appearance.theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
+                className="flex items-center justify-center w-11 h-11 self-center rounded-full border transition-all duration-300 hover:scale-105"
+                style={{ ...glassStyle, color: 'var(--bm-muted)' }}
+              >
+                {appearance.theme === 'dark' ? (
+                  <SunIcon className="w-5 h-5" />
+                ) : (
+                  <MoonIcon className="w-5 h-5" />
+                )}
+              </button>
+
+              {/* 用户头像 / 登录：圆形按钮 */}
+              <Link
+                href={auth.isAuthenticated ? '/profile' : '/login'}
+                aria-label={auth.isAuthenticated ? '我的' : '登录'}
+                className="flex items-center justify-center w-11 h-11 self-center rounded-full border transition-all duration-300 hover:scale-105 overflow-hidden"
+                style={{ ...glassStyle, color: 'var(--bm-muted)' }}
+              >
+                {avatarSrc ? (
+                  <img
+                    src={avatarSrc}
+                    alt={auth.user?.nickname || auth.user?.username || ''}
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (
+                  <UserIcon className="w-5 h-5" />
+                )}
+              </Link>
+            </>
+          )}
         </nav>
       </aside>
 
-      {/* 移动端底部 Dock */}
+      {/* 移动端 / 竖屏（<1024px）：底部悬浮胶囊栏，按钮等分整行、选中项填充成椭圆，不再挤在一起 */}
       <nav
-        className="md:hidden fixed left-4 right-4 z-50 bm-dock"
-        style={{
-          bottom: '12px',
-          paddingBottom: 'env(safe-area-inset-bottom)'
-        }}
+        className="lg:hidden fixed left-3 right-3 z-50"
+        style={{ bottom: '12px', paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <div
-          className="flex justify-around items-center h-[68px] rounded-[24px] px-4 border"
-          style={{
-            background: 'var(--bm-glass-surface)',
-            backdropFilter: 'blur(24px)',
-            WebkitBackdropFilter: 'blur(24px)',
-            boxShadow: '0 -4px 24px rgba(0, 0, 0, 0.06)',
-            borderColor: 'var(--bm-glass-border)'
-          }}
-        >
-          {navItems.slice(0, 4).map(item => {
-            const Icon = iconComponents[item.icon as keyof typeof iconComponents]
-            const isActive = pathname === item.href
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-label={item.label}
-                className="flex flex-col items-center justify-center gap-1 min-w-[44px] transition-all duration-300"
-                style={{ color: isActive ? '#E8909C' : 'var(--bm-muted)' }}
-              >
-                <Icon className="w-6 h-6" />
-                <span className="text-[10px] font-medium">{item.label}</span>
-              </Link>
-            )
-          })}
-          <Link
-            href={auth.isAuthenticated ? '/profile' : '/login'}
-            aria-label={auth.isAuthenticated ? '我的' : '登录'}
-            className="flex flex-col items-center justify-center gap-1 min-w-[44px] transition-all duration-300"
-            style={{ color: 'var(--bm-muted)' }}
+        {detailId ? (
+          <div
+            className="flex items-center gap-2 h-[60px] rounded-[24px] px-2 border overflow-x-auto scrollbar-hide"
+            style={glassStyle}
           >
-            {auth.isAuthenticated && auth.user?.avatar ? (
-              <>
+            <button
+              type="button"
+              onClick={() => router.back()}
+              aria-label="返回上一页"
+              className="flex flex-none items-center gap-1 h-11 px-4 rounded-full border text-sm font-semibold"
+              style={{ ...glassStyle, boxShadow: 'none', color: 'var(--bm-text)' }}
+            >
+              <BackIcon className="w-5 h-5" />
+              返回
+            </button>
+            <Suspense
+              fallback={
+                <MobileDetailTabPills detailId={detailId} activeTab={detailSub ?? 'overview'} />
+              }
+            >
+              <DetailTabPills detailId={detailId} sub={detailSub} variant="mobile" />
+            </Suspense>
+          </div>
+        ) : (
+          <div
+            className="flex items-center h-[68px] rounded-[28px] px-2 border"
+            style={glassStyle}
+          >
+            {mobileNavItems.map(item => {
+              const Icon = iconComponents[item.icon as keyof typeof iconComponents]
+              const isActive = pathname === item.href
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-label={item.label}
+                  aria-current={isActive ? 'page' : undefined}
+                  className="flex flex-1 min-w-0 flex-col items-center justify-center gap-0.5 h-[52px] rounded-full transition-all duration-300"
+                  style={{
+                    background: isActive ? ACTIVE_BG : 'transparent',
+                    color: isActive ? ACTIVE_COLOR : 'var(--bm-muted)'
+                  }}
+                >
+                  <Icon className="w-6 h-6" />
+                  <span className="text-[10px] font-medium leading-none">{item.shortLabel}</span>
+                </Link>
+              )
+            })}
+            <Link
+              href={auth.isAuthenticated ? '/profile' : '/login'}
+              aria-label={auth.isAuthenticated ? '我的' : '登录'}
+              aria-current={pathname === '/profile' ? 'page' : undefined}
+              className="flex flex-1 min-w-0 flex-col items-center justify-center gap-0.5 h-[52px] rounded-full transition-all duration-300"
+              style={{
+                background: pathname === '/profile' ? ACTIVE_BG : 'transparent',
+                color: pathname === '/profile' ? ACTIVE_COLOR : 'var(--bm-muted)'
+              }}
+            >
+              {avatarSrc ? (
                 <img
-                  src={
-                    typeof auth.user.avatar === 'string'
-                      ? auth.user.avatar
-                      : auth.user.avatar.medium || ''
-                  }
+                  src={avatarSrc}
                   alt={auth.user?.nickname || auth.user?.username || ''}
-                  className="w-6 h-6 rounded-full ring-2 ring-[#E8909C]/20 object-cover"
+                  className="w-6 h-6 rounded-full object-cover"
                 />
-                <span className="text-[10px] font-medium">我的</span>
-              </>
-            ) : (
-              <>
+              ) : (
                 <UserIcon className="w-6 h-6" />
-                <span className="text-[10px] font-medium">登录</span>
-              </>
-            )}
-          </Link>
-        </div>
+              )}
+              <span className="text-[10px] font-medium leading-none">
+                {auth.isAuthenticated ? '我的' : '登录'}
+              </span>
+            </Link>
+          </div>
+        )}
       </nav>
     </>
   )

@@ -8,6 +8,7 @@ import { CollectionEditor } from './collection-button'
 import { AnimeGrid } from './anime-card'
 import { RichText } from './rich-text'
 import { apiFetch as requestApi, displayName, imageUrl, imageUrls } from '@/lib/api'
+import type { DetailTabKey } from '@/lib/detail-tabs'
 import type { ApiResult, ImageSet, Subject } from '@/lib/types'
 
 type Episode = {
@@ -40,19 +41,10 @@ type Props = {
   episodesFailed?: boolean
   failedSections?: Array<'characters' | 'staff' | 'relations'>
   infobox: InfoboxItem[]
+  /** 由 URL ?tab= 决定、在 Dock 里切换的当前板块 */
+  initialTab?: TabKey
 }
-type TabKey =
-  | 'overview'
-  | 'episodes'
-  | 'characters'
-  | 'staff'
-  | 'relations'
-  | 'talkbox'
-  | 'topics'
-  | 'douban'
-  | 'music'
-  | 'streaming'
-  | 'wiki'
+type TabKey = DetailTabKey
 type DoubanData = {
   id?: string | number
   title?: string
@@ -89,20 +81,6 @@ type BilibiliData = {
   score?: number | null
   episodes?: number
 }
-
-const tabs: Array<[TabKey, string]> = [
-  ['overview', '概览'],
-  ['episodes', '章节'],
-  ['characters', '角色'],
-  ['staff', '制作人员'],
-  ['relations', '关联'],
-  ['douban', '豆瓣'],
-  ['music', '音乐'],
-  ['streaming', '在线观看'],
-  ['wiki', 'Wiki'],
-  ['talkbox', '吐槽'],
-  ['topics', '讨论版']
-]
 
 function valueText(value: unknown) {
   if (Array.isArray(value))
@@ -878,9 +856,12 @@ export function AnimeDetail({
   episodeTotal = episodes.length,
   episodesFailed = false,
   failedSections = [],
-  infobox
+  infobox,
+  initialTab = 'overview'
 }: Props) {
-  const [activeTab, setActiveTab] = useState<TabKey>('overview')
+  // 板块切换已经移到 Dock，Dock 通过 URL ?tab= 导航，服务端把解析结果从 initialTab 传进来。
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab)
+  useEffect(() => setActiveTab(initialTab), [initialTab])
   // 详情页封面按尺寸从大到小依次回退，全部失败后才显示占位，
   // 避免大图单点失败时列表能看、详情页却只剩“封面暂时无法加载”。
   const posterCandidates = useMemo(() => imageUrls(subject.images), [subject.images])
@@ -924,12 +905,6 @@ export function AnimeDetail({
           <div className="absolute inset-0 bg-gradient-to-b from-base-100/60 via-base-100/90 to-base-100" />
         </div>
         <div className="relative max-w-5xl mx-auto px-4 md:px-8 py-10 md:py-16">
-          <Link
-            href="/anime"
-            className="btn btn-ghost btn-sm text-primary/80 mb-4 inline-flex items-center gap-1"
-          >
-            ← 返回
-          </Link>
           <div className="bm-detail-hero-grid">
             <div className="bm-detail-left">
               <div className="bm-detail-poster">
@@ -988,21 +963,7 @@ export function AnimeDetail({
         </div>
       </div>
 
-      <div className="sticky top-0 z-30 bg-base-100/80 backdrop-blur-md border-b border-base-300/50">
-        <div className="max-w-5xl mx-auto px-4 md:px-8 flex gap-1 overflow-x-auto scrollbar-hide">
-          {tabs.map(([key, label]) => (
-            <button
-              key={key}
-              className={`px-4 py-3 min-h-[44px] text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeTab === key ? 'border-primary text-primary' : 'border-transparent text-base-content/60 hover:text-base-content'}`}
-              type="button"
-              onClick={() => setActiveTab(key)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
+      {/* 板块栏已经移到 Dock（返回 + 各板块），这里不再重复渲染 */}
       <div className="max-w-5xl mx-auto px-4 md:px-8 py-6">
         {activeTab === 'overview' ? (
           <div className="space-y-6">

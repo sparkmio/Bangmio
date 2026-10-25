@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { AnimeDetail } from '@/components/anime-detail'
 import { apiFetch, displayName, safeApiFetch } from '@/lib/api'
+import { detailTabFrom } from '@/lib/detail-tabs'
 import type { ImageSet, Subject } from '@/lib/types'
 
 type DetailData = Subject & { relations?: Subject[] }
@@ -46,8 +47,16 @@ export async function generateMetadata({
   }
 }
 
-export default async function AnimeDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AnimeDetailPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ id: string }>
+  searchParams?: Promise<{ tab?: string | string[] }>
+}) {
   const { id } = await params
+  const { tab } = (await searchParams) ?? {}
+  const initialTab = detailTabFrom(Array.isArray(tab) ? tab[0] : tab)
   if (!/^[1-9]\d*$/.test(id) || !Number.isSafeInteger(Number(id))) notFound()
   const detail = await apiFetch<DetailData>(`/anime/${id}`).catch(
     (error: Error & { status?: number }) => {
@@ -88,6 +97,7 @@ export default async function AnimeDetailPage({ params }: { params: Promise<{ id
         ...(!relationsResponse ? ['relations' as const] : [])
       ]}
       infobox={infobox}
+      initialTab={initialTab}
     />
   )
 }
