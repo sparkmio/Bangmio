@@ -44,7 +44,7 @@ export default function AboutContent() {
           </p>
           <p className="mb-3">
             <strong>这是一个高中生好玩做的 VibeCoding 项目</strong>，主要是用 DeepSeek V4 Pro 和
-            MiMo-V2.5-Pro 做的，用了快 2亿 tokens，要不是 <strong>Deepseek</strong>{' '}
+            MiMo-V2.5-Pro 做的，用了快 2亿 tokens，要不是 <strong>DeepSeek</strong>{' '}
             便宜根本负担不起......
           </p>
           <p>
@@ -72,6 +72,10 @@ export default function AboutContent() {
               </li>
             ))}
           </ul>
+          <p className="mt-3 text-xs text-base-content/50">
+            提醒：手动粘贴 Access Token 登录只建议在自己的设备上使用，Token
+            等同于账号凭证，不要分享给他人，也不要在公共设备上保存。
+          </p>
         </section>
         <div className="border-t border-base-300/30" />
         <section>

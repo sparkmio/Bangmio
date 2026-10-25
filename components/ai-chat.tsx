@@ -24,11 +24,18 @@ const OPENING: Message = {
   content:
     '你好，我是澪，Bangmio 的番剧资料助手。\n\n我可以结合你当前正在浏览的页面，帮你梳理剧情、角色、制作信息、音乐和观看顺序。你也可以直接问我：“这页最值得关注的是什么？”'
 }
-const DEFAULT_SUGGESTIONS = [
+const DETAIL_SUGGESTIONS = [
   '用当前页面内容概括这部作品',
   '介绍页面里的主要角色和关系',
   '找出这部作品的音乐与演唱者',
   '这部作品适合什么顺序观看？'
+]
+// 非作品详情页没有“这部作品”可指，换成通用推荐类问题，避免首页快捷问题对不上场景。
+const GENERAL_SUGGESTIONS = [
+  '推荐几部高分动画',
+  '本周新番有哪些值得追？',
+  '有什么适合周末一口气看完的短篇动画？',
+  '介绍一下 Bangumi 的评分是怎么来的'
 ]
 
 function readConversations(): Conversation[] {
@@ -200,14 +207,15 @@ export function AiChat({ context }: { context?: string }) {
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const suggestions = DEFAULT_SUGGESTIONS
+  const isDetailPage = /^\/(anime|person|character)\/\d+\/?$/.test(pathname)
+  const suggestions = isDetailPage ? DETAIL_SUGGESTIONS : GENERAL_SUGGESTIONS
   const [includeContext, setIncludeContext] = useState(false)
   const [error, setError] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const active = conversations.find(item => item.id === conversationId)
   const messages = useMemo(() => active?.messages || [OPENING], [active?.messages])
-  const contextAllowed = /^\/(anime|person|character)\/\d+\/?$/.test(pathname)
+  const contextAllowed = isDetailPage
   useEffect(() => {
     setIncludeContext(false)
   }, [pathname])

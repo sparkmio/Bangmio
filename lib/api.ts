@@ -76,14 +76,26 @@ export async function safeApiFetch<T>(path: string, init: RequestInit = {}) {
   }
 }
 
+export function imageUrls(images?: {
+  large?: string
+  medium?: string
+  common?: string
+  grid?: string
+}) {
+  if (!images) return []
+  // Bangumi 的不同尺寸封面走同一图床但并非总能一起加载成功，
+  // 保留全部候选，调用方可以在大图失败时依次回退到更小的尺寸。
+  return [...new Set([images.large, images.medium, images.common, images.grid].filter(Boolean))]
+    .filter((url): url is string => typeof url === 'string' && url.length > 0)
+}
+
 export function imageUrl(images?: {
   large?: string
   medium?: string
   common?: string
   grid?: string
 }) {
-  if (!images) return ''
-  return images.large || images.medium || images.common || images.grid || ''
+  return imageUrls(images)[0] || ''
 }
 
 export function displayName(subject?: { name?: string; name_cn?: string }) {
