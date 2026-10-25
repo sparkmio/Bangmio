@@ -1,0 +1,3 @@
+Bangmio Vue UI reference snapshot
+Commit: 5008843a7167bbf922f7a0b62378573c22532060
+Original path: client/

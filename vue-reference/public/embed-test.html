@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bangmio 嵌入跨浏览器测试页</title>
+  <style>
+    :root {
+      --bg: #fafafa;
+      --card: #ffffff;
+      --text: #222222;
+      --muted: #666666;
+      --border: #e5e5e5;
+      --primary: #ff6b81;
+      --primary-dark: #ff8fa3;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08);
+      --radius: 12px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0a0a0a;
+        --card: #171717;
+        --text: #f5f5f5;
+        --muted: #a3a3a3;
+        --border: #2a2a2a;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 1rem;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    h1 { font-size: 1.35rem; margin: 0 0 0.5rem; }
+    .subtitle { color: var(--muted); font-size: 0.85rem; margin-bottom: 1.25rem; }
+    .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1rem;
+    }
+    .card h2 { font-size: 1rem; margin: 0 0 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      background: #fff0f2;
+      color: var(--primary);
+      border: 1px solid #ffd6dd;
+    }
+    .form { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .form input {
+      flex: 1;
+      min-width: 140px;
+      padding: 0.45rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text);
+      font-size: 0.85rem;
+    }
+    .form input:focus { outline: 2px solid var(--primary-dark); }
+    .btn {
+      padding: 0.45rem 0.9rem;
+      border: 0;
+      border-radius: 8px;
+      background: var(--primary);
+      color: #fff;
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .btn:hover { opacity: 0.92; }
+    .btn.secondary { background: #f0f0f0; color: #333; }
+    @media (prefers-color-scheme: dark) { .btn.secondary { background: #2a2a2a; color: #e5e5e5; } }
+    .mode { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .mode label { display: flex; align-items: center; gap: 0.3rem; font-size: 0.85rem; cursor: pointer; }
+    .status {
+      min-height: 1.5rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    }
+    .status.error { color: #dc2626; }
+    .status.ok { color: #16a34a; }
+    iframe {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      min-height: 180px;
+    }
+    .log {
+      margin-top: 1.5rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1rem;
+    }
+    .log h2 { font-size: 1rem; margin: 0 0 0.75rem; }
+    #logOutput {
+      width: 100%;
+      min-height: 140px;
+      background: #0f0f0f;
+      color: #d4d4d4;
+      border: 0;
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.8rem;
+      resize: vertical;
+    }
+    .tip {
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      background: #fff5f6;
+      border: 1px solid #ffd6dd;
+      border-radius: var(--radius);
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Bangmio 嵌入跨浏览器测试页</h1>
+  <p class="subtitle">测试豆瓣与萌娘百科在 iframe srcdoc / src 两种模式下的表现。请在 Chrome / Safari / Firefox / Edge 及移动端浏览器中打开并记录结果。</p>
+
+  <div class="grid">
+    <!-- 豆瓣 -->
+    <div class="card">
+      <h2><span class="badge">豆瓣</span> 页面嵌入</h2>
+      <div class="form">
+        <input id="doubanId" type="text" value="26990214" placeholder="豆瓣条目 ID">
+        <button class="btn" onclick="loadDouban()">加载</button>
+      </div>
+      <div class="mode">
+        <label><input type="radio" name="doubanMode" value="srcdoc" checked onchange="loadDouban()"> srcdoc</label>
+        <label><input type="radio" name="doubanMode" value="src" onchange="loadDouban()"> src</label>
+      </div>
+      <div id="doubanStatus" class="status">等待加载...</div>
+      <iframe id="doubanFrame" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+    </div>
+
+    <!-- 萌娘百科 -->
+    <div class="card">
+      <h2><span class="badge" style="background:#f0f7ff;color:#0066cc;border-color:#cfe5ff">萌娘百科</span> 页面嵌入</h2>
+      <div class="form">
+        <input id="moegirlName" type="text" value="进击的巨人" placeholder="萌娘百科页面名">
+        <button class="btn" onclick="loadMoegirl()">加载</button>
+      </div>
+      <div class="mode">
+        <label><input type="radio" name="moegirlMode" value="srcdoc" checked onchange="loadMoegirl()"> srcdoc</label>
+        <label><input type="radio" name="moegirlMode" value="src" onchange="loadMoegirl()"> src</label>
+      </div>
+      <div id="moegirlStatus" class="status">等待加载...</div>
+      <iframe id="moegirlFrame" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+    </div>
+  </div>
+
+  <div class="log">
+    <h2>测试日志（自动记录）</h2>
+    <textarea id="logOutput" readonly></textarea>
+    <div class="form" style="margin-top:0.75rem">
+      <button class="btn secondary" onclick="copyLog()">复制日志</button>
+      <button class="btn secondary" onclick="clearLog()">清空</button>
+    </div>
+  </div>
+
+  <div class="tip">
+    <strong>使用说明：</strong>
+    1. 选择模式后点击「加载」；2. 观察 iframe 是否空白、样式是否正常、高度是否自适应、链接是否可点击；3. 将下方日志复制到测试矩阵中。
+    <br>
+    <strong>浏览器信息：</strong><span id="browserInfo"></span>
+  </div>
+
+  <script>
+    const API_PREFIX = '/api/v1'
+
+    function log(section, message, type = 'info') {
+      const now = new Date().toLocaleTimeString()
+      const line = `[${now}] [${section}] ${message}`
+      const output = document.getElementById('logOutput')
+      output.value += line + '\n'
+      output.scrollTop = output.scrollHeight
+      console.log(line)
+    }
+
+    function setStatus(id, text, type) {
+      const el = document.getElementById(id)
+      el.textContent = text
+      el.className = 'status ' + (type || '')
+    }
+
+    function injectHeightSync(doc) {
+      const script = doc.createElement('script')
+      script.textContent = `
+        (function () {
+          function sendHeight() {
+            if (!document.body) return
+            try {
+              window.parent.postMessage({ type: 'iframe-height', id: '${doc.defaultView.frameElement?.id || ''}', height: document.body.scrollHeight }, '*')
+            } catch (e) {}
+          }
+          window.addEventListener('load', sendHeight)
+          window.addEventListener('resize', sendHeight)
+          document.addEventListener('DOMContentLoaded', sendHeight)
+          document.querySelectorAll('img').forEach(function (img) {
+            if (img.complete) return
+            img.addEventListener('load', sendHeight)
+            img.addEventListener('error', sendHeight)
+          })
+          setTimeout(sendHeight, 300)
+          setTimeout(sendHeight, 1000)
+          setTimeout(sendHeight, 2000)
+        })()
+      `
+      doc.body.appendChild(script)
+    }
+
+    window.addEventListener('message', function (event) {
+      const data = event.data
+      if (data && data.type === 'iframe-height' && data.id) {
+        const iframe = document.getElementById(data.id)
+        if (iframe && data.height > 0) {
+          iframe.style.height = data.height + 'px'
+          log(data.id.replace('Frame', ''), `postMessage 设置高度: ${data.height}px`)
+        }
+      }
+    })
+
+    async function loadIframe({ section, id, endpoint, mode, name }) {
+      const iframe = document.getElementById(id)
+      const statusId = id.replace('Frame', 'Status')
+      iframe.style.height = '180px'
+      iframe.removeAttribute('srcdoc')
+      iframe.removeAttribute('src')
+      setStatus(statusId, '加载中...')
+      log(section, `开始加载: mode=${mode}, endpoint=${endpoint}`)
+      const start = performance.now()
+
+      try {
+        if (mode === 'src') {
+          iframe.src = endpoint
+        } else {
+          const res = await fetch(endpoint)
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          const html = await res.text()
+          const fullDoc = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base target="_blank">
+<style>
+body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.6;padding:0.5rem;margin:0;color:#333;background:#fff}
+img{max-width:100%;height:auto}
+a{color:#3b82f6;text-decoration:none}
+table{border-collapse:collapse;width:100%;font-size:0.875rem}
+td,th{border:1px solid #ddd;padding:0.4rem 0.6rem}
+</style>
+</head>
+<body>
+${html}
+</body>
+</html>`
+          iframe.srcdoc = fullDoc
+        }
+
+        iframe.onload = function () {
+          const elapsed = Math.round(performance.now() - start)
+          setStatus(statusId, `已加载 (${elapsed}ms)`, 'ok')
+          log(section, `iframe load 事件触发，耗时 ${elapsed}ms`)
+          try {
+            const body = iframe.contentDocument?.body
+            if (body) {
+              const height = body.scrollHeight
+              iframe.style.height = Math.max(height, 180) + 'px'
+              log(section, `contentDocument 读取高度: ${height}px`)
+              if (mode === 'srcdoc') injectHeightSync(iframe.contentDocument)
+            } else {
+              log(section, 'contentDocument 不可访问（跨域或 sandbox 限制）')
+            }
+          } catch (e) {
+            log(section, `读取高度异常: ${e.message}`, 'error')
+          }
+        }
+
+        iframe.onerror = function (e) {
+          setStatus(statusId, '加载失败', 'error')
+          log(section, `iframe error 事件`, 'error')
+        }
+      } catch (e) {
+        setStatus(statusId, `错误: ${e.message}`, 'error')
+        log(section, `加载异常: ${e.message}`, 'error')
+      }
+    }
+
+    function loadDouban() {
+      const id = document.getElementById('doubanId').value.trim()
+      const mode = document.querySelector('input[name="doubanMode"]:checked').value
+      loadIframe({
+        section: '豆瓣',
+        id: 'doubanFrame',
+        endpoint: `${API_PREFIX}/douban/page/${encodeURIComponent(id)}`,
+        mode
+      })
+    }
+
+    function loadMoegirl() {
+      const name = document.getElementById('moegirlName').value.trim()
+      const mode = document.querySelector('input[name="moegirlMode"]:checked').value
+      loadIframe({
+        section: '萌娘百科',
+        id: 'moegirlFrame',
+        endpoint: `${API_PREFIX}/moegirl/page/${encodeURIComponent(name)}`,
+        mode
+      })
+    }
+
+    function copyLog() {
+      const el = document.getElementById('logOutput')
+      el.select()
+      document.execCommand('copy')
+      log('系统', '日志已复制到剪贴板')
+    }
+
+    function clearLog() {
+      document.getElementById('logOutput').value = ''
+    }
+
+    document.getElementById('browserInfo').textContent = navigator.userAgent
+    log('系统', `页面加载完成，UA: ${navigator.userAgent}`)
+
+    // 初始加载
+    loadDouban()
+    loadMoegirl()
+  </script>
+</body>
+</html>
