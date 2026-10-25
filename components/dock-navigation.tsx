@@ -235,7 +235,7 @@ function DesktopDetailTabPills({
             key={key}
             href={`/anime/${detailId}?tab=${key}`}
             aria-current={isActive ? 'page' : undefined}
-            className="flex items-center justify-center w-[104px] h-10 px-3 rounded-full border text-[13px] font-medium whitespace-nowrap transition-all duration-300 hover:scale-[1.04]"
+            className="flex items-center justify-center bm-dock-pill-w h-10 px-3 rounded-full border text-[13px] font-medium whitespace-nowrap transition-all duration-300 hover:scale-[1.04]"
             style={{
               ...glassStyle,
               background: isActive ? ACTIVE_BG : glassStyle.background,
@@ -267,7 +267,7 @@ function MobileDetailTabPills({
             key={key}
             href={`/anime/${detailId}?tab=${key}`}
             aria-current={isActive ? 'page' : undefined}
-            className="flex flex-none items-center h-11 px-4 rounded-full text-sm whitespace-nowrap transition-all"
+            className="bm-flex-none flex items-center h-11 px-4 rounded-full text-sm whitespace-nowrap transition-all"
             style={{
               background: isActive ? ACTIVE_BG : 'transparent',
               color: isActive ? ACTIVE_COLOR : 'var(--bm-muted)',
@@ -323,16 +323,16 @@ export function DockNavigation() {
 
   return (
     <>
-      {/* PC / 横屏（≥1024px）：左侧一列独立椭圆按钮，正文区预留了大于 Dock 右边缘的左边距 */}
-      <aside className="hidden lg:flex fixed left-4 top-1/2 -translate-y-1/2 z-50">
-        <nav className="flex flex-col gap-2 max-h-[calc(100vh-2rem)] overflow-y-auto scrollbar-hide p-1">
+      {/* PC / 横屏（宽≥820px 且横屏，规则在 globals.css 的 .bm-dock-desktop）：左侧一列独立椭圆按钮，正文区预留了大于 Dock 右边缘的左边距 */}
+      <aside className="bm-dock-desktop fixed left-4 top-1/2 -translate-y-1/2 z-50">
+        <nav className="bm-dock-scroll flex flex-col gap-2 overflow-y-auto scrollbar-hide p-1">
           {detailId ? (
             <>
               <button
                 type="button"
                 onClick={() => router.back()}
                 aria-label="返回上一页"
-                className="flex items-center gap-2 w-[104px] h-11 px-4 rounded-full border text-sm font-semibold transition-all duration-300 hover:scale-[1.04]"
+                className="flex items-center gap-2 bm-dock-pill-w h-11 px-4 rounded-full border text-sm font-semibold transition-all duration-300 hover:scale-[1.04]"
                 style={{ ...glassStyle, color: 'var(--bm-text)' }}
               >
                 <BackIcon className="w-5 h-5 shrink-0" />
@@ -360,7 +360,7 @@ export function DockNavigation() {
                     href={item.href}
                     aria-label={item.label}
                     aria-current={isActive ? 'page' : undefined}
-                    className="flex items-center gap-2 w-[104px] h-11 px-4 rounded-full border text-sm transition-all duration-300 hover:scale-[1.04]"
+                    className="flex items-center gap-2 bm-dock-pill-w h-11 px-4 rounded-full border text-sm transition-all duration-300 hover:scale-[1.04]"
                     style={{
                       ...glassStyle,
                       background: isActive ? ACTIVE_BG : glassStyle.background,
@@ -380,7 +380,7 @@ export function DockNavigation() {
                 type="button"
                 onClick={() => appearance.toggleTheme()}
                 aria-label={appearance.theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
-                className="flex items-center justify-center w-11 h-11 self-center rounded-full border transition-all duration-300 hover:scale-105"
+                className="flex items-center justify-center w-11 h-11 bm-self-center rounded-full border transition-all duration-300 hover:scale-105"
                 style={{ ...glassStyle, color: 'var(--bm-muted)' }}
               >
                 {appearance.theme === 'dark' ? (
@@ -394,7 +394,7 @@ export function DockNavigation() {
               <Link
                 href={auth.isAuthenticated ? '/profile' : '/login'}
                 aria-label={auth.isAuthenticated ? '我的' : '登录'}
-                className="flex items-center justify-center w-11 h-11 self-center rounded-full border transition-all duration-300 hover:scale-105 overflow-hidden"
+                className="flex items-center justify-center w-11 h-11 bm-self-center rounded-full border transition-all duration-300 hover:scale-105 overflow-hidden"
                 style={{ ...glassStyle, color: 'var(--bm-muted)' }}
               >
                 {avatarSrc ? (
@@ -412,21 +412,21 @@ export function DockNavigation() {
         </nav>
       </aside>
 
-      {/* 移动端 / 竖屏（<1024px）：底部悬浮胶囊栏，按钮等分整行、选中项填充成椭圆，不再挤在一起 */}
+      {/* 移动端 / 竖屏（非横屏宽屏时）：底部悬浮胶囊栏，按钮等分整行、选中项填充成椭圆，不再挤在一起 */}
       <nav
-        className="lg:hidden fixed left-3 right-3 z-50"
+        className="bm-dock-mobile fixed left-3 right-3 z-50"
         style={{ bottom: '12px', paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {detailId ? (
           <div
-            className="flex items-center gap-2 h-[60px] rounded-[24px] px-2 border overflow-x-auto scrollbar-hide"
+            className="bm-dock-bar-detail flex items-center gap-2 px-2 border overflow-x-auto scrollbar-hide"
             style={glassStyle}
           >
             <button
               type="button"
               onClick={() => router.back()}
               aria-label="返回上一页"
-              className="flex flex-none items-center gap-1 h-11 px-4 rounded-full border text-sm font-semibold"
+              className="bm-flex-none flex items-center gap-1 h-11 px-4 rounded-full border text-sm font-semibold"
               style={{ ...glassStyle, boxShadow: 'none', color: 'var(--bm-text)' }}
             >
               <BackIcon className="w-5 h-5" />
@@ -442,7 +442,7 @@ export function DockNavigation() {
           </div>
         ) : (
           <div
-            className="flex items-center h-[68px] rounded-[28px] px-2 border"
+            className="bm-dock-bar flex items-center px-2 border"
             style={glassStyle}
           >
             {mobileNavItems.map(item => {
@@ -454,14 +454,14 @@ export function DockNavigation() {
                   href={item.href}
                   aria-label={item.label}
                   aria-current={isActive ? 'page' : undefined}
-                  className="flex flex-1 min-w-0 flex-col items-center justify-center gap-0.5 h-[52px] rounded-full transition-all duration-300"
+                  className="flex flex-1 min-w-0 flex-col items-center justify-center gap-0.5 bm-dock-item rounded-full transition-all duration-300"
                   style={{
                     background: isActive ? ACTIVE_BG : 'transparent',
                     color: isActive ? ACTIVE_COLOR : 'var(--bm-muted)'
                   }}
                 >
                   <Icon className="w-6 h-6" />
-                  <span className="text-[10px] font-medium leading-none">{item.shortLabel}</span>
+                  <span className="bm-leading-none text-[10px] font-medium">{item.shortLabel}</span>
                 </Link>
               )
             })}
@@ -469,7 +469,7 @@ export function DockNavigation() {
               href={auth.isAuthenticated ? '/profile' : '/login'}
               aria-label={auth.isAuthenticated ? '我的' : '登录'}
               aria-current={pathname === '/profile' ? 'page' : undefined}
-              className="flex flex-1 min-w-0 flex-col items-center justify-center gap-0.5 h-[52px] rounded-full transition-all duration-300"
+              className="flex flex-1 min-w-0 flex-col items-center justify-center gap-0.5 bm-dock-item rounded-full transition-all duration-300"
               style={{
                 background: pathname === '/profile' ? ACTIVE_BG : 'transparent',
                 color: pathname === '/profile' ? ACTIVE_COLOR : 'var(--bm-muted)'
@@ -484,7 +484,7 @@ export function DockNavigation() {
               ) : (
                 <UserIcon className="w-6 h-6" />
               )}
-              <span className="text-[10px] font-medium leading-none">
+              <span className="bm-leading-none text-[10px] font-medium">
                 {auth.isAuthenticated ? '我的' : '登录'}
               </span>
             </Link>

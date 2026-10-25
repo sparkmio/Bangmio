@@ -27,9 +27,9 @@ export function SiteShell({ children }: { children: ReactNode }) {
       {/* Dock 导航 */}
       <DockNavigation />
 
-      {/* 主内容区：左侧 Dock 只在 ≥1024px 出现（按钮宽 104px + 左偏移 16px，右边缘 120px），
-          左边距 160px 留足间隙不遮挡正文；<1024px 改用底部 Dock，预留底部间距。 */}
-      <div className="mb-28 lg:ml-40 lg:mb-0 transition-all duration-300">
+      {/* 主内容区：与 Dock 的间距在 globals.css 的 .bm-shell-content 里定义
+          （编译好的工具类样式表没有 lg: 变体，写在这里才能保证生效） */}
+      <div className="bm-shell-content transition-all duration-300">
         <main className="max-w-[1200px] mx-auto px-4 py-4 md:px-8 md:py-6">{children}</main>
         <footer className="max-w-[1200px] mx-auto px-4 md:px-8 pb-10 pt-2">
           <div className="border-t border-[var(--bm-line)] pt-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-xs text-[var(--bm-muted)]">

@@ -2682,3 +2682,57 @@ html[data-theme='dark'] .bm-card {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Dock 布局（手写，不要用工具类变体）：
+   本站的工具类样式来自编译好的 Vue 设计系统，其中并不包含 lg: 等断点变体和
+   一些任意值类（如 w-[104px]），写在 className 里也不会生效——左侧栏遮挡正文
+   的根源正是壳层间距类从未命中。Dock 的定位、断点和尺寸统一在这里定义。
+   规则：宽 ≥820px 且横屏 → 左侧 Dock；否则（竖屏/窄屏）→ 底部 Dock。 */
+.bm-dock-desktop {
+  display: none;
+}
+.bm-dock-mobile {
+  display: block;
+}
+.bm-shell-content {
+  margin-left: 0;
+  padding-bottom: 7rem; /* 给底部 Dock（高约 80px + 间距）留白，用 padding 避免外边距折叠把页脚压到栏下 */
+}
+@media (min-width: 820px) and (orientation: landscape) {
+  .bm-dock-desktop {
+    display: flex;
+  }
+  .bm-dock-mobile {
+    display: none;
+  }
+  .bm-shell-content {
+    margin-left: 10rem; /* Dock 右边缘 = 左偏移 16px + 按钮宽 104px + 内边距 ≈ 128px，留 32px 间隙 */
+    padding-bottom: 0;
+  }
+}
+.bm-dock-pill-w {
+  width: 104px;
+}
+.bm-dock-scroll {
+  max-height: calc(100vh - 2rem);
+}
+.bm-dock-bar {
+  height: 68px;
+  border-radius: 28px;
+}
+.bm-dock-bar-detail {
+  height: 60px;
+  border-radius: 24px;
+}
+.bm-dock-item {
+  height: 52px;
+}
+.bm-flex-none {
+  flex: none;
+}
+.bm-self-center {
+  align-self: center;
+}
+.bm-leading-none {
+  line-height: 1;
+}
