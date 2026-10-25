@@ -192,7 +192,6 @@ const iconComponents = {
   user: UserIcon
 }
 
-
 function BackIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -207,17 +206,11 @@ function BackIcon({ className }: { className?: string }) {
   )
 }
 
-// 每个 Dock 按钮都是独立的椭圆胶囊（参考 iOS 悬浮按钮），而不是挤在一个大卡片里。
-const glassStyle = {
-  background: 'var(--bm-glass-surface)',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.10)',
-  borderColor: 'var(--bm-glass-border)'
-} as const
-
 const ACTIVE_BG = 'rgba(232, 144, 156, 0.18)'
-const ACTIVE_COLOR = '#E8909C'
+const activePillStyle = {
+  background: ACTIVE_BG,
+  color: 'var(--bm-accent)'
+} as const
 
 function DesktopDetailTabPills({
   detailId,
@@ -235,13 +228,8 @@ function DesktopDetailTabPills({
             key={key}
             href={`/anime/${detailId}?tab=${key}`}
             aria-current={isActive ? 'page' : undefined}
-            className="flex items-center justify-center bm-dock-pill-w h-10 px-3 rounded-full border text-[13px] font-medium whitespace-nowrap transition-all duration-300 hover:scale-[1.04]"
-            style={{
-              ...glassStyle,
-              background: isActive ? ACTIVE_BG : glassStyle.background,
-              color: isActive ? ACTIVE_COLOR : 'var(--bm-muted)',
-              fontWeight: isActive ? 600 : 500
-            }}
+            className={`bm-dock-pill bm-dock-desktop-detail-pill ${isActive ? 'bm-dock-pill-active' : ''}`}
+            style={isActive ? activePillStyle : undefined}
           >
             {label}
           </Link>
@@ -267,12 +255,8 @@ function MobileDetailTabPills({
             key={key}
             href={`/anime/${detailId}?tab=${key}`}
             aria-current={isActive ? 'page' : undefined}
-            className="bm-flex-none flex items-center h-11 px-4 rounded-full text-sm whitespace-nowrap transition-all"
-            style={{
-              background: isActive ? ACTIVE_BG : 'transparent',
-              color: isActive ? ACTIVE_COLOR : 'var(--bm-muted)',
-              fontWeight: isActive ? 600 : 500
-            }}
+            className={`bm-dock-pill bm-dock-mobile-detail-pill ${isActive ? 'bm-dock-pill-active' : ''}`}
+            style={isActive ? activePillStyle : undefined}
           >
             {label}
           </Link>
@@ -309,6 +293,21 @@ export function DockNavigation() {
   const auth = useAuth()
   const appearance = useAppearance()
 
+  const handleBack = () => {
+    if (typeof window === 'undefined') return
+    const sameOriginReferrer = document.referrer.startsWith(window.location.origin)
+    if (!sameOriginReferrer || window.history.length <= 1) {
+      router.push('/anime')
+      return
+    }
+    const currentPath = `${window.location.pathname}${window.location.search}`
+    router.back()
+    window.setTimeout(() => {
+      const nextPath = `${window.location.pathname}${window.location.search}`
+      if (nextPath === currentPath) router.push('/anime')
+    }, 400)
+  }
+
   // 番剧详情页（含吐槽/讨论子页）：Dock 切换为「返回 + 板块栏」
   const detailMatch = pathname.match(/^\/anime\/(\d+)(?:\/(talkbox|topics))?\/?$/)
   const detailId = detailMatch?.[1]
@@ -323,27 +322,23 @@ export function DockNavigation() {
 
   return (
     <>
-      {/* PC / 横屏（宽≥820px 且横屏，规则在 globals.css 的 .bm-dock-desktop）：左侧一列独立椭圆按钮，正文区预留了大于 Dock 右边缘的左边距 */}
-      <aside className="bm-dock-desktop fixed left-4 top-1/2 -translate-y-1/2 z-50">
-        <nav className="bm-dock-scroll flex flex-col gap-2 overflow-y-auto scrollbar-hide p-1">
+      {/* PC / 横屏：左侧独立椭圆按钮。 */}
+      <aside className="bm-dock-desktop" aria-label="主导航">
+        <nav className="bm-dock-scroll">
           {detailId ? (
             <>
               <button
                 type="button"
-                onClick={() => router.back()}
+                onClick={handleBack}
                 aria-label="返回上一页"
-                className="flex items-center gap-2 bm-dock-pill-w h-11 px-4 rounded-full border text-sm font-semibold transition-all duration-300 hover:scale-[1.04]"
-                style={{ ...glassStyle, color: 'var(--bm-text)' }}
+                className="bm-dock-pill bm-dock-desktop-action"
               >
                 <BackIcon className="w-5 h-5 shrink-0" />
                 返回
               </button>
               <Suspense
                 fallback={
-                  <DesktopDetailTabPills
-                    detailId={detailId}
-                    activeTab={detailSub ?? 'overview'}
-                  />
+                  <DesktopDetailTabPills detailId={detailId} activeTab={detailSub ?? 'overview'} />
                 }
               >
                 <DetailTabPills detailId={detailId} sub={detailSub} variant="desktop" />
@@ -360,13 +355,8 @@ export function DockNavigation() {
                     href={item.href}
                     aria-label={item.label}
                     aria-current={isActive ? 'page' : undefined}
-                    className="flex items-center gap-2 bm-dock-pill-w h-11 px-4 rounded-full border text-sm transition-all duration-300 hover:scale-[1.04]"
-                    style={{
-                      ...glassStyle,
-                      background: isActive ? ACTIVE_BG : glassStyle.background,
-                      color: isActive ? ACTIVE_COLOR : 'var(--bm-muted)',
-                      fontWeight: isActive ? 600 : 500
-                    }}
+                    className={`bm-dock-pill bm-dock-desktop-action ${isActive ? 'bm-dock-pill-active' : ''}`}
+                    style={isActive ? activePillStyle : undefined}
                     title={item.label}
                   >
                     <Icon className="w-5 h-5 shrink-0" />
@@ -375,59 +365,52 @@ export function DockNavigation() {
                 )
               })}
 
-              {/* 主题切换：圆形按钮 */}
+              {/* 主题切换也保持和其他入口一致的椭圆按钮。 */}
               <button
                 type="button"
                 onClick={() => appearance.toggleTheme()}
                 aria-label={appearance.theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
-                className="flex items-center justify-center w-11 h-11 bm-self-center rounded-full border transition-all duration-300 hover:scale-105"
-                style={{ ...glassStyle, color: 'var(--bm-muted)' }}
+                className="bm-dock-pill bm-dock-desktop-action"
               >
                 {appearance.theme === 'dark' ? (
                   <SunIcon className="w-5 h-5" />
                 ) : (
                   <MoonIcon className="w-5 h-5" />
                 )}
+                <span>主题</span>
               </button>
 
-              {/* 用户头像 / 登录：圆形按钮 */}
+              {/* 用户头像 / 登录 */}
               <Link
                 href={auth.isAuthenticated ? '/profile' : '/login'}
                 aria-label={auth.isAuthenticated ? '我的' : '登录'}
-                className="flex items-center justify-center w-11 h-11 bm-self-center rounded-full border transition-all duration-300 hover:scale-105 overflow-hidden"
-                style={{ ...glassStyle, color: 'var(--bm-muted)' }}
+                className="bm-dock-pill bm-dock-desktop-action"
               >
                 {avatarSrc ? (
                   <img
                     src={avatarSrc}
                     alt={auth.user?.nickname || auth.user?.username || ''}
-                    className="w-full h-full rounded-full object-cover"
+                    className="w-6 h-6 rounded-full object-cover shrink-0"
                   />
                 ) : (
                   <UserIcon className="w-5 h-5" />
                 )}
+                <span>{auth.isAuthenticated ? '我的' : '登录'}</span>
               </Link>
             </>
           )}
         </nav>
       </aside>
 
-      {/* 移动端 / 竖屏（非横屏宽屏时）：底部悬浮胶囊栏，按钮等分整行、选中项填充成椭圆，不再挤在一起 */}
-      <nav
-        className="bm-dock-mobile fixed left-3 right-3 z-50"
-        style={{ bottom: '12px', paddingBottom: 'env(safe-area-inset-bottom)' }}
-      >
+      {/* 移动端 / 竖屏：底部独立椭圆按钮，详情页允许横向滚动。 */}
+      <nav className="bm-dock-mobile" aria-label="移动端导航">
         {detailId ? (
-          <div
-            className="bm-dock-bar-detail flex items-center gap-2 px-2 border overflow-x-auto scrollbar-hide"
-            style={glassStyle}
-          >
+          <div className="bm-dock-mobile-track bm-dock-mobile-track-detail">
             <button
               type="button"
-              onClick={() => router.back()}
+              onClick={handleBack}
               aria-label="返回上一页"
-              className="bm-flex-none flex items-center gap-1 h-11 px-4 rounded-full border text-sm font-semibold"
-              style={{ ...glassStyle, boxShadow: 'none', color: 'var(--bm-text)' }}
+              className="bm-dock-pill bm-dock-mobile-back"
             >
               <BackIcon className="w-5 h-5" />
               返回
@@ -441,10 +424,7 @@ export function DockNavigation() {
             </Suspense>
           </div>
         ) : (
-          <div
-            className="bm-dock-bar flex items-center px-2 border"
-            style={glassStyle}
-          >
+          <div className="bm-dock-mobile-track">
             {mobileNavItems.map(item => {
               const Icon = iconComponents[item.icon as keyof typeof iconComponents]
               const isActive = pathname === item.href
@@ -454,11 +434,8 @@ export function DockNavigation() {
                   href={item.href}
                   aria-label={item.label}
                   aria-current={isActive ? 'page' : undefined}
-                  className="flex flex-1 min-w-0 flex-col items-center justify-center gap-0.5 bm-dock-item rounded-full transition-all duration-300"
-                  style={{
-                    background: isActive ? ACTIVE_BG : 'transparent',
-                    color: isActive ? ACTIVE_COLOR : 'var(--bm-muted)'
-                  }}
+                  className={`bm-dock-pill bm-dock-mobile-pill ${isActive ? 'bm-dock-pill-active' : ''}`}
+                  style={isActive ? activePillStyle : undefined}
                 >
                   <Icon className="w-6 h-6" />
                   <span className="bm-leading-none text-[10px] font-medium">{item.shortLabel}</span>
@@ -469,11 +446,8 @@ export function DockNavigation() {
               href={auth.isAuthenticated ? '/profile' : '/login'}
               aria-label={auth.isAuthenticated ? '我的' : '登录'}
               aria-current={pathname === '/profile' ? 'page' : undefined}
-              className="flex flex-1 min-w-0 flex-col items-center justify-center gap-0.5 bm-dock-item rounded-full transition-all duration-300"
-              style={{
-                background: pathname === '/profile' ? ACTIVE_BG : 'transparent',
-                color: pathname === '/profile' ? ACTIVE_COLOR : 'var(--bm-muted)'
-              }}
+              className={`bm-dock-pill bm-dock-mobile-pill ${pathname === '/profile' ? 'bm-dock-pill-active' : ''}`}
+              style={pathname === '/profile' ? activePillStyle : undefined}
             >
               {avatarSrc ? (
                 <img

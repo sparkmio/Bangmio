@@ -2683,20 +2683,29 @@ html[data-theme='dark'] .bm-card {
   }
 }
 
-/* Dock 布局（手写，不要用工具类变体）：
-   本站的工具类样式来自编译好的 Vue 设计系统，其中并不包含 lg: 等断点变体和
-   一些任意值类（如 w-[104px]），写在 className 里也不会生效——左侧栏遮挡正文
-   的根源正是壳层间距类从未命中。Dock 的定位、断点和尺寸统一在这里定义。
-   规则：宽 ≥820px 且横屏 → 左侧 Dock；否则（竖屏/窄屏）→ 底部 Dock。 */
+/* Dock 布局：宽屏横屏在左侧，窄屏或竖屏固定在底部。 */
 .bm-dock-desktop {
   display: none;
+  position: fixed;
+  top: 50%;
+  left: 16px;
+  z-index: 50;
+  width: 136px;
+  transform: translateY(-50%);
 }
 .bm-dock-mobile {
   display: block;
+  position: fixed;
+  right: 12px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: 12px;
+  z-index: 50;
+  padding-bottom: env(safe-area-inset-bottom);
+  pointer-events: none;
 }
 .bm-shell-content {
   margin-left: 0;
-  padding-bottom: 7rem; /* 给底部 Dock（高约 80px + 间距）留白，用 padding 避免外边距折叠把页脚压到栏下 */
+  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
 }
 @media (min-width: 820px) and (orientation: landscape) {
   .bm-dock-desktop {
@@ -2706,33 +2715,133 @@ html[data-theme='dark'] .bm-card {
     display: none;
   }
   .bm-shell-content {
-    margin-left: 10rem; /* Dock 右边缘 = 左偏移 16px + 按钮宽 104px + 内边距 ≈ 128px，留 32px 间隙 */
+    margin-left: 168px;
     padding-bottom: 0;
   }
 }
-.bm-dock-pill-w {
-  width: 104px;
-}
 .bm-dock-scroll {
-  max-height: calc(100vh - 2rem);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: calc(100dvh - 32px);
+  padding: 4px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
 }
-.bm-dock-bar {
-  height: 68px;
-  border-radius: 28px;
+.bm-dock-scroll::-webkit-scrollbar,
+.bm-dock-mobile-track::-webkit-scrollbar {
+  display: none;
 }
-.bm-dock-bar-detail {
-  height: 60px;
-  border-radius: 24px;
+.bm-dock-pill {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 44px;
+  padding: 0 14px;
+  color: var(--bm-muted);
+  border: 1px solid var(--bm-glass-border);
+  border-radius: 999px;
+  background: var(--bm-glass-surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(20px) saturate(135%);
+  -webkit-backdrop-filter: blur(20px) saturate(135%);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    color 180ms ease;
+  pointer-events: auto;
 }
-.bm-dock-item {
+.bm-dock-pill:hover {
+  border-color: color-mix(in srgb, var(--bm-accent) 45%, var(--bm-glass-border));
+  transform: translateY(-1px) scale(1.025);
+}
+.bm-dock-pill:focus-visible {
+  outline: 2px solid var(--bm-accent);
+  outline-offset: 2px;
+}
+.bm-dock-pill-active {
+  border-color: color-mix(in srgb, var(--bm-accent) 45%, var(--bm-glass-border));
+  font-weight: 700;
+}
+.bm-dock-desktop-action {
+  width: 136px;
+  gap: 8px;
+}
+.bm-dock-desktop-action span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bm-dock-desktop-detail-pill {
+  width: 136px;
+}
+.bm-dock-mobile-track {
+  display: flex;
+  align-items: center;
+  justify-content: stretch;
+  gap: 6px;
+  width: 100%;
+  min-height: 68px;
+  padding: 8px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.bm-dock-mobile-track-detail {
+  justify-content: flex-start;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.bm-dock-mobile-pill {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
   height: 52px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 600;
 }
-.bm-flex-none {
-  flex: none;
+.bm-dock-mobile-pill svg {
+  width: 22px;
+  height: 22px;
 }
-.bm-self-center {
-  align-self: center;
+.bm-dock-mobile-back,
+.bm-dock-mobile-detail-pill {
+  height: 48px;
+  padding: 0 14px;
+}
+.bm-dock-mobile-detail-pill {
+  min-width: max-content;
+}
+.bm-dock-mobile-back {
+  gap: 4px;
 }
 .bm-leading-none {
   line-height: 1;
+}
+
+@media (max-width: 360px) {
+  .bm-dock-mobile-track {
+    gap: 4px;
+    padding: 6px;
+  }
+  .bm-dock-mobile-pill {
+    height: 50px;
+    font-size: 9px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bm-dock-pill {
+    transition: none;
+  }
 }

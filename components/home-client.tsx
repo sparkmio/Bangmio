@@ -197,7 +197,7 @@ export function HomeClient({ initialHot }: { initialHot: Subject[] }) {
           <div className="rounded-2xl bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 border border-primary/20 p-8 sm:p-12 text-center">
             <h1 className="text-3xl sm:text-4xl font-black text-primary mb-3">Bangmio</h1>
             <p className="text-base-content/60 text-sm sm:text-base mb-6 max-w-md mx-auto">
-              发现、记录、分享你的番剧世界
+              愿你活的热烈，活的盛大，活的恣意，活的义无反顾
             </p>
             <div className="flex items-center justify-center">
               <Link href="/login" className="btn btn-primary rounded-full px-6">

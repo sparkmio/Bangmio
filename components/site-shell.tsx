@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, type ReactNode } from 'react'
 import { useAuth } from './auth-provider'
@@ -31,30 +30,6 @@ export function SiteShell({ children }: { children: ReactNode }) {
           （编译好的工具类样式表没有 lg: 变体，写在这里才能保证生效） */}
       <div className="bm-shell-content transition-all duration-300">
         <main className="max-w-[1200px] mx-auto px-4 py-4 md:px-8 md:py-6">{children}</main>
-        <footer className="max-w-[1200px] mx-auto px-4 md:px-8 pb-10 pt-2">
-          <div className="border-t border-[var(--bm-line)] pt-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-xs text-[var(--bm-muted)]">
-            <span>Bangmio · 发现、记录、分享你的番剧世界</span>
-            <span>
-              数据来源：
-              <a
-                href="https://bgm.tv"
-                target="_blank"
-                rel="noreferrer"
-                className="underline underline-offset-2"
-              >
-                Bangumi 番组计划
-              </a>
-            </span>
-            <span className="sm:ml-auto flex gap-4">
-              <Link href="/privacy" className="underline underline-offset-2">
-                隐私说明
-              </Link>
-              <Link href="/about" className="underline underline-offset-2">
-                关于 / 反馈
-              </Link>
-            </span>
-          </div>
-        </footer>
       </div>
     </div>
   )

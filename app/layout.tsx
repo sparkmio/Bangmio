@@ -4,7 +4,10 @@ import './globals.css'
 import './community.css'
 
 export const metadata: Metadata = {
-  title: { default: 'Bangmio - 发现、记录、分享你的番剧世界', template: '%s · Bangmio' },
+  title: {
+    default: 'Bangmio - 愿你活的热烈，活的盛大，活的恣意，活的义无反顾',
+    template: '%s · Bangmio'
+  },
   description: 'Bangmio - 一站式追番社区，聚合 Bangumi、豆瓣、B站、萌娘百科多平台数据。'
 }
 
