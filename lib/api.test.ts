@@ -1,8 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { apiFetch } from './api'
+import { apiFetch, imageUrl, imageUrls } from './api'
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.unstubAllEnvs()
+})
+describe('image candidates', () => {
+  it('keeps every size as a fallback candidate, largest first and de-duplicated', () => {
+    const images = { large: 'l.jpg', medium: 'm.jpg', common: 'l.jpg', grid: 'g.jpg' }
+    expect(imageUrls(images)).toEqual(['l.jpg', 'm.jpg', 'g.jpg'])
+    expect(imageUrl(images)).toBe('l.jpg')
+  })
+  it('returns no candidates when images are missing or empty', () => {
+    expect(imageUrls(undefined)).toEqual([])
+    expect(imageUrls({})).toEqual([])
+    expect(imageUrl(undefined)).toBe('')
+  })
 })
 describe('API requests', () => {
   it('uses dev port 3001 without configuration', async () => {

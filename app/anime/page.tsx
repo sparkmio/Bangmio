@@ -110,7 +110,7 @@ export default function AnimeBrowsePage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold mb-4 text-base-content">
-          {query.keyword ? `搜索：${query.keyword}` : selectedTags.length ? '筛选结果' : '热门番剧'}
+          {query.keyword ? `搜索：${query.keyword}` : selectedTags.length ? '筛选结果' : '浏览番剧'}
         </h1>
         <form
           className="flex flex-wrap gap-3 items-center mb-4"

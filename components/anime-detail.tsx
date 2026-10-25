@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { CollectionEditor } from './collection-button'
 import { AnimeGrid } from './anime-card'
 import { RichText } from './rich-text'
-import { apiFetch as requestApi, displayName, imageUrl } from '@/lib/api'
+import { apiFetch as requestApi, displayName, imageUrl, imageUrls } from '@/lib/api'
 import type { ApiResult, ImageSet, Subject } from '@/lib/types'
 
 type Episode = {
@@ -205,9 +205,9 @@ function Credits({ items, kind }: { items: Credit[]; kind: 'character' | 'person
 function StarRating({ score, size = 'text-base' }: { score?: number; size?: string }) {
   const value = Math.max(0, Math.min(5, Number(score || 0) / 2))
   return (
-    <span className={`bm-star-rating ${size}`} aria-label={`${value.toFixed(1)} / 5 星`}>
-      <span className="bm-star-rating-base">★★★★★</span>
-      <span className="bm-star-rating-fill" style={{ width: `${(value / 5) * 100}%` }}>
+    <span className={`bm-star-rating ${size}`} role="img" aria-label={`${value.toFixed(1)} / 5 星`}>
+      <span className="bm-star-rating-base" aria-hidden="true">★★★★★</span>
+      <span className="bm-star-rating-fill" aria-hidden="true" style={{ width: `${(value / 5) * 100}%` }}>
         ★★★★★
       </span>
     </span>
@@ -881,8 +881,12 @@ export function AnimeDetail({
   infobox
 }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
-  const [failedPoster, setFailedPoster] = useState('')
-  const image = imageUrl(subject.images)
+  // 详情页封面按尺寸从大到小依次回退，全部失败后才显示占位，
+  // 避免大图单点失败时列表能看、详情页却只剩“封面暂时无法加载”。
+  const posterCandidates = useMemo(() => imageUrls(subject.images), [subject.images])
+  const [posterIndex, setPosterIndex] = useState(0)
+  useEffect(() => setPosterIndex(0), [subject.id])
+  const image = posterCandidates[posterIndex] || ''
   const title = displayName(subject)
   const typeLabel =
     subject.type === 2
@@ -929,18 +933,19 @@ export function AnimeDetail({
           <div className="bm-detail-hero-grid">
             <div className="bm-detail-left">
               <div className="bm-detail-poster">
-                {image && failedPoster !== image ? (
+                {image ? (
                   <img
+                    key={image}
                     src={image}
                     alt={title}
-                    onError={() => setFailedPoster(image)}
+                    onError={() => setPosterIndex(index => index + 1)}
                     loading="eager"
                     decoding="async"
                     className="w-full rounded-2xl shadow-2xl ring-1 ring-white/10"
                   />
                 ) : (
                   <div className="w-full aspect-[2/3] rounded-2xl bg-base-300 flex items-center justify-center">
-                    {image ? '封面暂时无法加载' : '暂无封面'}
+                    {posterCandidates.length ? '封面暂时无法加载' : '暂无封面'}
                   </div>
                 )}
               </div>

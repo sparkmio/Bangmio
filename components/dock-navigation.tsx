@@ -9,7 +9,7 @@ import { useAppearance } from '@/components/appearance-provider'
 const navItems = [
   { href: '/', label: '首页', icon: 'home' },
   { href: '/trending', label: '新番时间表', icon: 'trending' },
-  { href: '/anime', label: '搜索', icon: 'browse' },
+  { href: '/anime', label: '浏览', icon: 'browse' },
   { href: '/groups', label: '小组', icon: 'groups' },
   { href: '/about', label: '关于', icon: 'about' },
   { href: '/settings', label: '设置', icon: 'settings' }
@@ -216,7 +216,7 @@ export function DockNavigation() {
                 href={item.href}
                 aria-label={item.label}
                 className={`
-                  flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-300
+                  flex flex-col items-center justify-center gap-0.5 w-14 h-14 rounded-xl transition-all duration-300
                   hover:scale-105
                   ${
                     isActive
@@ -230,6 +230,7 @@ export function DockNavigation() {
                 title={item.label}
               >
                 <Icon className="w-6 h-6" />
+                <span className="text-[10px] font-medium leading-none">{item.label}</span>
               </Link>
             )
           })}
@@ -241,7 +242,7 @@ export function DockNavigation() {
           <button
             onClick={() => appearance.toggleTheme()}
             aria-label={appearance.theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
-            className="flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-300 hover:scale-105"
+            className="flex items-center justify-center w-12 h-12 self-center rounded-xl transition-all duration-300 hover:scale-105"
             style={{ color: 'var(--bm-muted)' }}
           >
             {appearance.theme === 'dark' ? (
@@ -255,7 +256,7 @@ export function DockNavigation() {
           <Link
             href={auth.isAuthenticated ? '/profile' : '/login'}
             aria-label={auth.isAuthenticated ? '我的' : '登录'}
-            className="flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-300 hover:scale-105"
+            className="flex items-center justify-center w-12 h-12 self-center rounded-xl transition-all duration-300 hover:scale-105"
             style={{ color: 'var(--bm-muted)' }}
           >
             {auth.isAuthenticated && auth.user?.avatar ? (

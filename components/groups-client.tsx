@@ -62,7 +62,8 @@ function count(value: unknown): number | null {
 }
 function memberLabel(value: unknown) {
   const number = count(value)
-  return number !== null ? `${number.toLocaleString()} 成员` : '成员数暂不可用'
+  // 成员数缺失或为 0 时多半是上游没给数据，不要用假数字误导用户，调用方直接不渲染。
+  return number !== null && number > 0 ? `${number.toLocaleString()} 成员` : null
 }
 function replyLabel(value: unknown) {
   const number = count(value)
@@ -147,12 +148,16 @@ function GroupCard({ group, followed = false }: { group: Group; followed?: boole
           </div>
           <div className="min-w-0">
             <p className="font-semibold truncate">{title}</p>
-            <p className="community-group-description">
-              {text(group.description || group.summary, '暂无小组简介')}
-            </p>
-            <span className="community-group-meta">
-              {memberLabel(group.member_count ?? group.members)}
-            </span>
+            {text(group.description || group.summary) ? (
+              <p className="community-group-description">
+                {text(group.description || group.summary)}
+              </p>
+            ) : null}
+            {memberLabel(group.member_count ?? group.members) ? (
+              <span className="community-group-meta">
+                {memberLabel(group.member_count ?? group.members)}
+              </span>
+            ) : null}
           </div>
         </div>
       </div>
