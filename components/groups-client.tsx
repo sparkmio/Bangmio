@@ -198,12 +198,16 @@ export function GroupsClient({
   initialGroups,
   initialTopics,
   groupsFailed = false,
-  topicsFailed = false
+  topicsFailed = false,
+  groupsDegraded = false,
+  topicsDegraded = false
 }: {
   initialGroups: unknown
   initialTopics: unknown
   groupsFailed?: boolean
   topicsFailed?: boolean
+  groupsDegraded?: boolean
+  topicsDegraded?: boolean
 }) {
   const { user, request } = useAuth()
   const initialGroupList = useMemo(
@@ -227,12 +231,20 @@ export function GroupsClient({
   const [allGroups, setAllGroups] = useState<Group[]>(initialGroupList)
   const [allGroupsLoading, setAllGroupsLoading] = useState(false)
   const [allGroupsError, setAllGroupsError] = useState(
-    groupsFailed ? '小组列表加载失败，请点击刷新重试' : ''
+    groupsFailed
+      ? '小组列表加载失败，请点击刷新重试'
+      : groupsDegraded
+        ? '暂时显示上次可用的小组数据，内容可能不是最新。'
+        : ''
   )
   const [hotTopics, setHotTopics] = useState<Topic[]>(initialTopicList)
   const [topicsLoading, setTopicsLoading] = useState(false)
   const [topicsError, setTopicsError] = useState(
-    topicsFailed ? '热门话题加载失败，请点击刷新重试' : ''
+    topicsFailed
+      ? '热门话题加载失败，请点击刷新重试'
+      : topicsDegraded
+        ? '暂时显示上次成功获取的话题，内容可能不是最新。'
+        : ''
   )
   const currentUsername = text(user?.username)
   const isSearching = Boolean(searchQuery.trim())
@@ -303,7 +315,13 @@ export function GroupsClient({
         .map(normalizeGroup)
         .filter(Boolean) as Group[]
       setAllGroups(groups)
-      if (!groups.length) setAllGroupsError('')
+      setAllGroupsError(
+        payload?.degraded === true
+          ? groups.length
+            ? '暂时显示上次可用的小组数据，内容可能不是最新。'
+            : '小组数据暂时不可用，请点击刷新重试。'
+          : ''
+      )
     } catch (error) {
       setAllGroupsError(error instanceof Error ? error.message : '小组列表加载失败')
     } finally {
@@ -319,7 +337,13 @@ export function GroupsClient({
         .map(normalizeTopic)
         .filter(Boolean) as Topic[]
       setHotTopics(topics)
-      if (!topics.length) setTopicsError('')
+      setTopicsError(
+        payload?.degraded === true
+          ? topics.length
+            ? '暂时显示上次成功获取的话题，内容可能不是最新。'
+            : '话题数据暂时不可用，请点击刷新重试。'
+          : ''
+      )
     } catch (error) {
       setTopicsError(error instanceof Error ? error.message : '热门话题加载失败')
     } finally {

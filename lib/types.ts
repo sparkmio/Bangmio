@@ -49,4 +49,10 @@ export type User = {
   [key: string]: unknown
 }
 
-export type ApiResult<T> = { data?: T; total?: number; error?: string }
+export type ApiResult<T> = {
+  data?: T
+  total?: number
+  error?: string
+  degraded?: boolean
+  stale?: boolean
+}

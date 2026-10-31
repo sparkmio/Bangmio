@@ -1,7 +1,8 @@
 import { requiredPageData, requirePositiveId } from '@/lib/page-data'
 import { DataUnavailable } from '@/components/data-unavailable'
 import Link from 'next/link'
-import { safeApiFetch, imageUrl } from '@/lib/api'
+import { imageUrl } from '@/lib/api'
+import { safeApiFetchServer } from '@/lib/api-server'
 import { RichText } from '@/components/rich-text'
 
 export default async function PersonPage({ params }: { params: Promise<{ id: string }> }) {
@@ -9,7 +10,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   requirePositiveId(id)
   const [detail, subjects] = await Promise.all([
     requiredPageData<any>(`/anime/person/${id}`),
-    safeApiFetch<any[]>(`/anime/person/${id}/subjects`)
+    safeApiFetchServer<any[]>(`/anime/person/${id}/subjects`)
   ])
   const person = detail
   const list = Array.isArray(subjects?.data) ? subjects.data : []

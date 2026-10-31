@@ -9,6 +9,7 @@ import { AnimeGrid } from './anime-card'
 import { RichText } from './rich-text'
 import { apiFetch as requestApi, displayName, imageUrl, imageUrls } from '@/lib/api'
 import type { DetailTabKey } from '@/lib/detail-tabs'
+import { extractOtherRatingIds } from '@/lib/other-rating-ids'
 import type { ApiResult, ImageSet, Subject } from '@/lib/types'
 
 type Episode = {
@@ -37,6 +38,7 @@ type Props = {
   characters: Credit[]
   persons: Credit[]
   episodes: Episode[]
+  staleData?: boolean
   episodeTotal?: number
   episodesFailed?: boolean
   failedSections?: Array<'characters' | 'staff' | 'relations'>
@@ -63,6 +65,8 @@ type DoubanComment = {
   content?: string
 }
 type DoubanReview = DoubanComment & { title?: string }
+type ExternalRating = { id?: string; score?: number | null; votes?: number | null; url?: string }
+type OtherRatings = { mal?: ExternalRating | null; imdb?: ExternalRating | null }
 type WikipediaResult = { title?: string; description?: string; extract?: string; url?: string }
 type MusicResult = {
   id?: number | string
@@ -184,8 +188,14 @@ function StarRating({ score, size = 'text-base' }: { score?: number; size?: stri
   const value = Math.max(0, Math.min(5, Number(score || 0) / 2))
   return (
     <span className={`bm-star-rating ${size}`} role="img" aria-label={`${value.toFixed(1)} / 5 星`}>
-      <span className="bm-star-rating-base" aria-hidden="true">★★★★★</span>
-      <span className="bm-star-rating-fill" aria-hidden="true" style={{ width: `${(value / 5) * 100}%` }}>
+      <span className="bm-star-rating-base" aria-hidden="true">
+        ★★★★★
+      </span>
+      <span
+        className="bm-star-rating-fill"
+        aria-hidden="true"
+        style={{ width: `${(value / 5) * 100}%` }}
+      >
         ★★★★★
       </span>
     </span>
@@ -370,6 +380,123 @@ function CoverImage({ src, alt = '' }: { src?: string; alt?: string }) {
   const [failed, setFailed] = useState(false)
   if (!src || failed) return <span aria-hidden="true">♫</span>
   return <img src={src} alt={alt} loading="lazy" decoding="async" onError={() => setFailed(true)} />
+}
+
+function OtherRatingsPanel({ subject }: { subject: Subject }) {
+  const title = displayName(subject)
+  const { malId, imdbId } = extractOtherRatingIds(subject.infobox || [])
+  const [ratings, setRatings] = useState<OtherRatings | null>(null)
+  const [loading, setLoading] = useState(Boolean(malId || imdbId))
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    if (!malId && !imdbId) {
+      setRatings(null)
+      setLoading(false)
+      setFailed(false)
+      return
+    }
+    const query = new URLSearchParams()
+    if (malId) query.set('mal_id', malId)
+    if (imdbId) query.set('imdb_id', imdbId)
+    setLoading(true)
+    setFailed(false)
+    void requestApi<OtherRatings>(`/ratings/other?${query.toString()}`)
+      .then(payload => {
+        if (!alive) return
+        setRatings(payload.data || null)
+        setFailed(payload.degraded === true)
+      })
+      .catch(() => {
+        if (alive) setFailed(true)
+      })
+      .finally(() => {
+        if (alive) setLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [malId, imdbId])
+
+  const providers = [
+    {
+      key: 'mal',
+      name: 'MyAnimeList',
+      mark: 'MAL',
+      id: malId,
+      rating: ratings?.mal,
+      searchUrl: `https://myanimelist.net/anime.php?q=${encodeURIComponent(title)}`
+    },
+    {
+      key: 'imdb',
+      name: 'IMDb',
+      mark: 'IMDb',
+      id: imdbId,
+      rating: ratings?.imdb,
+      searchUrl: `https://www.imdb.com/find/?q=${encodeURIComponent(title)}`
+    }
+  ] as const
+
+  return (
+    <div className="space-y-7">
+      <section>
+        <SectionTitle>跨站评分</SectionTitle>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {providers.map(provider => (
+            <article
+              key={provider.key}
+              className="rounded-xl border border-base-300 bg-base-200/35 p-4"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="grid place-items-center w-10 h-10 rounded-lg bg-base-100 text-sm font-bold shrink-0">
+                    {provider.mark}
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="font-semibold truncate">{provider.name}</h3>
+                    <p className="text-xs text-base-content/50">
+                      {!provider.id
+                        ? '尚未关联条目'
+                        : loading
+                          ? '正在获取评分…'
+                          : provider.rating?.score == null
+                            ? failed
+                              ? '评分暂时不可用'
+                              : '暂无评分'
+                            : provider.rating.votes == null
+                              ? '平台用户评分'
+                              : `${provider.rating.votes.toLocaleString()} 人评分`}
+                    </p>
+                  </div>
+                </div>
+                <strong className="text-2xl font-bold tabular-nums shrink-0">
+                  {provider.rating?.score == null ? '—' : provider.rating.score.toFixed(1)}
+                </strong>
+              </div>
+              <a
+                className="btn btn-xs btn-ghost mt-3"
+                href={provider.rating?.url || provider.searchUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {provider.rating?.url ? '查看条目 ↗' : '搜索条目 ↗'}
+              </a>
+            </article>
+          ))}
+        </div>
+        {failed ? (
+          <p role="status" className="text-xs text-base-content/50 mt-3">
+            部分评分源暂时不可用，其他评分和详情页不受影响。
+          </p>
+        ) : null}
+      </section>
+      <section>
+        <SectionTitle>豆瓣资料</SectionTitle>
+        <DoubanPanel subject={subject} />
+      </section>
+    </div>
+  )
 }
 
 function DoubanPanel({ subject }: { subject: Subject }) {
@@ -853,6 +980,7 @@ export function AnimeDetail({
   characters,
   persons,
   episodes,
+  staleData = false,
   episodeTotal = episodes.length,
   episodesFailed = false,
   failedSections = [],
@@ -965,6 +1093,14 @@ export function AnimeDetail({
 
       {/* 板块栏已经移到 Dock（返回 + 各板块），这里不再重复渲染 */}
       <div className="max-w-5xl mx-auto px-4 md:px-8 py-6">
+        {staleData ? (
+          <p
+            role="status"
+            className="mb-5 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-base-content/70"
+          >
+            上游数据暂时不可用，当前显示最近一次成功加载的内容，可能不是最新。
+          </p>
+        ) : null}
         {activeTab === 'overview' ? (
           <div className="space-y-6">
             <section>
@@ -1054,9 +1190,7 @@ export function AnimeDetail({
             )}
           </section>
         ) : activeTab === 'douban' ? (
-          <section>
-            <DoubanPanel subject={subject} />
-          </section>
+          <OtherRatingsPanel subject={subject} />
         ) : activeTab === 'music' ? (
           <section>
             <SectionTitle>相关音乐</SectionTitle>

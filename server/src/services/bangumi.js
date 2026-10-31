@@ -1,4 +1,5 @@
 import { parsePositiveId } from '../utils/validation.js'
+import { logWarn } from '../utils/logger.js'
 
 const BGM_API = 'https://api.bgm.tv'
 const BGM_PROXY = 'https://api.bangumi.pro'
@@ -36,11 +37,25 @@ function apiBases(isChina) {
   return isChina ? [BGM_PROXY, BGM_API] : [BGM_API, BGM_PROXY]
 }
 
-function apiError(status, data, cause) {
+function apiError(status, data, cause, source) {
   const err = new Error(`Bangumi API ${status}`)
   err.response = { status, data }
   if (cause) err.cause = cause
+  if (source) err.upstreamSource = new URL(source).host
   return err
+}
+
+function logAttemptFailure(path, base, isChina, startedAt, error) {
+  logWarn('Bangumi 上游请求尝试失败', {
+    path,
+    source: new URL(base).host,
+    region: isChina ? 'CN' : 'global',
+    durationMs: Date.now() - startedAt,
+    upstreamStatus: error?.response?.status,
+    errorName: error?.name,
+    causeName: error?.cause?.name,
+    timedOut: error?.name === 'TimeoutError' || error?.cause?.name === 'TimeoutError'
+  })
 }
 
 /**
@@ -56,6 +71,7 @@ async function bgmRequest(
   const canRetry = method === 'GET' || (method === 'POST' && path === '/v0/search/subjects')
 
   for (const base of apiBases(isChina)) {
+    const startedAt = Date.now()
     const url = new URL(`${base}${path}`)
     if (params)
       Object.entries(params).forEach(([k, v]) => v != null && url.searchParams.set(k, String(v)))
@@ -78,19 +94,24 @@ async function bgmRequest(
         lastError = apiError(
           res.ok || res.status >= 500 ? 502 : res.status,
           { error: 'Invalid JSON response' },
-          cause
+          cause,
+          base
         )
+        logAttemptFailure(path, base, isChina, startedAt, lastError)
         if (!canRetry || res.status === 401 || res.status === 403 || (!res.ok && res.status < 500))
           throw lastError
         continue
       }
       if (res.ok) return rewriteImageUrls(data)
 
-      const error = apiError(res.status, data)
+      const error = apiError(res.status, data, undefined, base)
+      if (res.status === 429) logAttemptFailure(path, base, isChina, startedAt, error)
       if (res.status === 401 || res.status === 403 || res.status < 500) throw error
       if (!canRetry) throw error
       lastError = error
+      logAttemptFailure(path, base, isChina, startedAt, error)
     } catch (error) {
+      if (!error || typeof error !== 'object') error = new Error(String(error))
       if (
         error?.response?.status === 401 ||
         error?.response?.status === 403 ||
@@ -100,7 +121,9 @@ async function bgmRequest(
       }
       // Never replay a possibly successful write after a network failure.
       if (!canRetry) throw error
+      if (!error.upstreamSource) error.upstreamSource = new URL(base).host
       lastError = error
+      logAttemptFailure(path, base, isChina, startedAt, error)
     }
   }
 

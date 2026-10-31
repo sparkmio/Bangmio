@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { AnimeDetail } from '@/components/anime-detail'
-import { apiFetch, displayName, safeApiFetch } from '@/lib/api'
+import { displayName } from '@/lib/api'
+import { apiFetchServer, safeApiFetchServer } from '@/lib/api-server'
 import { detailTabFrom } from '@/lib/detail-tabs'
 import type { ImageSet, Subject } from '@/lib/types'
 
@@ -40,7 +41,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>
 }): Promise<Metadata> {
   const { id } = await params
-  const response = await safeApiFetch<Subject>(`/anime/${id}`)
+  const response = await safeApiFetchServer<Subject>(`/anime/${id}`)
   return {
     title: response?.data ? displayName(response.data) : '番组详情',
     description: response?.data?.summary || '查看番组资料、评分、收藏和讨论。'
@@ -58,7 +59,7 @@ export default async function AnimeDetailPage({
   const { tab } = (await searchParams) ?? {}
   const initialTab = detailTabFrom(Array.isArray(tab) ? tab[0] : tab)
   if (!/^[1-9]\d*$/.test(id) || !Number.isSafeInteger(Number(id))) notFound()
-  const detail = await apiFetch<DetailData>(`/anime/${id}`).catch(
+  const detail = await apiFetchServer<DetailData>(`/anime/${id}`).catch(
     (error: Error & { status?: number }) => {
       if (error.status === 404) notFound()
       throw error
@@ -69,15 +70,20 @@ export default async function AnimeDetailPage({
   const subject = detail.data
   const [relationsResponse, charactersResponse, personsResponse, episodesResponse] =
     await Promise.all([
-      safeApiFetch<Subject[]>(`/anime/${id}/relations`),
-      safeApiFetch<Credit[]>(`/anime/${id}/characters`),
-      safeApiFetch<Credit[]>(`/anime/${id}/persons`),
-      safeApiFetch<Episode[]>(`/anime/${id}/episodes`)
+      safeApiFetchServer<Subject[]>(`/anime/${id}/relations`),
+      safeApiFetchServer<Credit[]>(`/anime/${id}/characters`),
+      safeApiFetchServer<Credit[]>(`/anime/${id}/persons`),
+      safeApiFetchServer<Episode[]>(`/anime/${id}/episodes`)
     ])
   const relations = arrayData(relationsResponse)
   const characters = arrayData(charactersResponse)
   const persons = arrayData(personsResponse)
   const episodes = arrayData(episodesResponse)
+  const staleData =
+    detail.stale === true ||
+    [relationsResponse, charactersResponse, personsResponse, episodesResponse].some(
+      response => response?.stale === true
+    )
   const infobox = Array.isArray(subject.infobox)
     ? subject.infobox.filter(item => item?.key && displayValue(item.value))
     : []
@@ -89,6 +95,7 @@ export default async function AnimeDetailPage({
       characters={characters}
       persons={persons}
       episodes={episodes}
+      staleData={staleData}
       episodeTotal={episodesResponse?.total || episodes.length}
       episodesFailed={!episodesResponse}
       failedSections={[

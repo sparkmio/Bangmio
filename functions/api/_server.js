@@ -2630,13 +2630,13 @@ var Hono = class Hono2 {
   * app.route("/api", app2) // GET /api/user
   * ```
   */
-  route(path, app15) {
+  route(path, app16) {
     const subApp = this.basePath(path);
-    app15.routes.map((r) => {
+    app16.routes.map((r) => {
       let handler4;
-      if (app15.errorHandler === errorHandler) handler4 = r.handler;
+      if (app16.errorHandler === errorHandler) handler4 = r.handler;
       else {
-        handler4 = async (c, next) => (await compose([], app15.errorHandler)(c, () => r.handler(c, next))).res;
+        handler4 = async (c, next) => (await compose([], app16.errorHandler)(c, () => r.handler(c, next))).res;
         handler4[COMPOSED_HANDLER] = r.handler;
       }
       subApp.#addRoute(r.method, r.path, handler4, r.basePath);
@@ -4422,16 +4422,30 @@ function headers(token) {
 function apiBases(isChina7) {
   return isChina7 ? [BGM_PROXY, BGM_API] : [BGM_API, BGM_PROXY];
 }
-function apiError(status, data, cause) {
+function apiError(status, data, cause, source) {
   const err = new Error(`Bangumi API ${status}`);
   err.response = { status, data };
   if (cause) err.cause = cause;
+  if (source) err.upstreamSource = new URL(source).host;
   return err;
+}
+function logAttemptFailure(path, base, isChina7, startedAt, error) {
+  logWarn("Bangumi \u4E0A\u6E38\u8BF7\u6C42\u5C1D\u8BD5\u5931\u8D25", {
+    path,
+    source: new URL(base).host,
+    region: isChina7 ? "CN" : "global",
+    durationMs: Date.now() - startedAt,
+    upstreamStatus: error?.response?.status,
+    errorName: error?.name,
+    causeName: error?.cause?.name,
+    timedOut: error?.name === "TimeoutError" || error?.cause?.name === "TimeoutError"
+  });
 }
 async function bgmRequest(method, path, { token, body, params, isChina: isChina7 = false, timeout = 8e3 } = {}) {
   let lastError;
   const canRetry = method === "GET" || method === "POST" && path === "/v0/search/subjects";
   for (const base of apiBases(isChina7)) {
+    const startedAt = Date.now();
     const url = new URL(`${base}${path}`);
     if (params)
       Object.entries(params).forEach(([k, v]) => v != null && url.searchParams.set(k, String(v)));
@@ -4451,23 +4465,30 @@ async function bgmRequest(method, path, { token, body, params, isChina: isChina7
         lastError = apiError(
           res.ok || res.status >= 500 ? 502 : res.status,
           { error: "Invalid JSON response" },
-          cause
+          cause,
+          base
         );
+        logAttemptFailure(path, base, isChina7, startedAt, lastError);
         if (!canRetry || res.status === 401 || res.status === 403 || !res.ok && res.status < 500)
           throw lastError;
         continue;
       }
       if (res.ok) return rewriteImageUrls(data);
-      const error = apiError(res.status, data);
+      const error = apiError(res.status, data, void 0, base);
+      if (res.status === 429) logAttemptFailure(path, base, isChina7, startedAt, error);
       if (res.status === 401 || res.status === 403 || res.status < 500) throw error;
       if (!canRetry) throw error;
       lastError = error;
+      logAttemptFailure(path, base, isChina7, startedAt, error);
     } catch (error) {
+      if (!error || typeof error !== "object") error = new Error(String(error));
       if (error?.response?.status === 401 || error?.response?.status === 403 || error?.response?.status < 500) {
         throw error;
       }
       if (!canRetry) throw error;
+      if (!error.upstreamSource) error.upstreamSource = new URL(base).host;
       lastError = error;
+      logAttemptFailure(path, base, isChina7, startedAt, error);
     }
   }
   throw lastError || new Error("Bangumi API unavailable");
@@ -5891,6 +5912,17 @@ function requiredId2(c) {
 function isChina3(c) {
   return (c.env?.CF_IP_COUNTRY || "") === "CN";
 }
+function logAnimeUpstreamFailure(c, message, error) {
+  logError(message, {
+    path: c.req.path,
+    region: isChina3(c) ? "CN" : "global",
+    upstream: error?.upstreamSource,
+    upstreamStatus: error?.response?.status,
+    errorName: error?.name,
+    causeName: error?.cause?.name,
+    timedOut: error?.name === "TimeoutError" || error?.cause?.name === "TimeoutError"
+  });
+}
 async function searchAnime2(c) {
   try {
     const keyword = c.req.query("keyword");
@@ -5906,8 +5938,9 @@ async function searchAnime2(c) {
     if (tag) opts.tag = tag;
     const result = await searchAnime(keyword, opts);
     return c.json({ data: result.data, total: result.total });
-  } catch {
-    return c.json({ error: "\u641C\u7D22\u5931\u8D25" }, 500);
+  } catch (error) {
+    logAnimeUpstreamFailure(c, "\u756A\u5267\u641C\u7D22\u4E0A\u6E38\u5931\u8D25", error);
+    return c.json({ error: "\u641C\u7D22\u5931\u8D25" }, 502);
   }
 }
 async function browseAnime2(c) {
@@ -5922,14 +5955,7 @@ async function browseAnime2(c) {
     const result = await browseAnime(params);
     return c.json({ data: result.data, total: result.total });
   } catch (error) {
-    logError("\u756A\u5267\u6D4F\u89C8\u5931\u8D25", {
-      path: c.req.path,
-      errorName: error?.name,
-      message: error?.message || String(error),
-      upstreamStatus: error?.response?.status,
-      causeName: error?.cause?.name,
-      causeMessage: error?.cause?.message
-    });
+    logAnimeUpstreamFailure(c, "\u756A\u5267\u6D4F\u89C8\u4E0A\u6E38\u5931\u8D25", error);
     return c.json({ error: "\u6D4F\u89C8\u5931\u8D25" }, 502);
   }
 }
@@ -5941,6 +5967,7 @@ async function getAnimeDetail2(c) {
     return c.json({ data: detail });
   } catch (error) {
     if (error?.response?.status === 404) return c.json({ error: "\u6761\u76EE\u4E0D\u5B58\u5728" }, 404);
+    logAnimeUpstreamFailure(c, "\u756A\u5267\u8BE6\u60C5\u4E0A\u6E38\u5931\u8D25", error);
     return c.json({ error: "\u83B7\u53D6\u8BE6\u60C5\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5" }, 502);
   }
 }
@@ -5952,8 +5979,9 @@ async function getAnimeEpisodes2(c) {
   try {
     const data = await getAnimeEpisodes(id, { offset, limit, isChina: isChina3(c) });
     return c.json({ data: data.data, total: data.total });
-  } catch {
-    return c.json({ error: "\u83B7\u53D6\u7AE0\u8282\u5931\u8D25" }, 500);
+  } catch (error) {
+    logAnimeUpstreamFailure(c, "\u756A\u5267\u7AE0\u8282\u4E0A\u6E38\u5931\u8D25", error);
+    return c.json({ error: "\u83B7\u53D6\u7AE0\u8282\u5931\u8D25" }, 502);
   }
 }
 async function getAnimeCharacters2(c) {
@@ -5962,7 +5990,8 @@ async function getAnimeCharacters2(c) {
   try {
     const data = await getAnimeCharacters(id, { isChina: isChina3(c) });
     return c.json({ data });
-  } catch {
+  } catch (error) {
+    logAnimeUpstreamFailure(c, "\u756A\u5267\u89D2\u8272\u4E0A\u6E38\u5931\u8D25", error);
     return c.json({ error: "\u83B7\u53D6\u89D2\u8272\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5" }, 502);
   }
 }
@@ -5972,7 +6001,8 @@ async function getAnimePersons2(c) {
   try {
     const data = await getAnimePersons(id, { isChina: isChina3(c) });
     return c.json({ data });
-  } catch {
+  } catch (error) {
+    logAnimeUpstreamFailure(c, "\u756A\u5267\u5236\u4F5C\u4EBA\u5458\u4E0A\u6E38\u5931\u8D25", error);
     return c.json({ error: "\u83B7\u53D6\u5236\u4F5C\u4EBA\u5458\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5" }, 502);
   }
 }
@@ -5982,7 +6012,8 @@ async function getAnimeRelations2(c) {
   try {
     const data = await getAnimeRelations(id, { isChina: isChina3(c) });
     return c.json({ data });
-  } catch {
+  } catch (error) {
+    logAnimeUpstreamFailure(c, "\u756A\u5267\u5173\u8054\u6761\u76EE\u4E0A\u6E38\u5931\u8D25", error);
     return c.json({ error: "\u83B7\u53D6\u5173\u8054\u6761\u76EE\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5" }, 502);
   }
 }
@@ -5990,8 +6021,9 @@ async function getAnimeCalendar2(c) {
   try {
     const data = await getAnimeCalendar({ isChina: isChina3(c) });
     return c.json({ data });
-  } catch {
-    return c.json({ error: "\u83B7\u53D6\u65F6\u95F4\u8868\u5931\u8D25" }, 500);
+  } catch (error) {
+    logAnimeUpstreamFailure(c, "\u756A\u5267\u65F6\u95F4\u8868\u4E0A\u6E38\u5931\u8D25", error);
+    return c.json({ error: "\u83B7\u53D6\u65F6\u95F4\u8868\u5931\u8D25" }, 502);
   }
 }
 async function getAnimeTags2(c) {
@@ -18682,6 +18714,8 @@ var HOSTS = {
   mirror2: "https://bangumi.one"
 };
 var cache6 = createCache(CACHE_TTL_GROUPS);
+var lastSuccessGroupListStore = createCache(30 * 60 * 1e3, 2);
+var lastSuccessDiscoverStore = createCache(30 * 60 * 1e3, 2);
 var lastSuccessStore = createCache(30 * 60 * 1e3, 500);
 var lastSuccessTopicStore = createCache(30 * 60 * 1e3, 500);
 async function invalidateGroupPages(paths) {
@@ -19294,12 +19328,19 @@ app10.get("/", async (c) => {
       try {
         groups = parseGroupListHTML(html, baseUrl);
       } catch {
+        logError("\u5C0F\u7EC4\u5217\u8868\u89E3\u6790\u5931\u8D25", { path: c.req.path, source: new URL(url).host });
         groups = [];
       }
     } catch {
+      logError("\u5C0F\u7EC4\u5217\u8868\u4E0A\u6E38\u8BF7\u6C42\u5931\u8D25", { path: c.req.path, region: isChina7 ? "CN" : "global" });
+      const lastSuccess = lastSuccessGroupListStore.get(cacheKey2);
+      if (lastSuccess) return c.json({ data: lastSuccess, degraded: true });
       groups = [];
     }
+    if (groups.length >= 10) lastSuccessGroupListStore.set(cacheKey2, groups);
     if (groups.length < 10) {
+      const lastSuccess = lastSuccessGroupListStore.get(cacheKey2);
+      if (lastSuccess) return c.json({ data: lastSuccess, degraded: true });
       const fallback = FALLBACK_GROUPS.map((g) => ({ ...g, url: `${baseUrl}/group/${g.id}` }));
       const seen = new Set(groups.map((g) => g.id));
       for (const g of fallback) {
@@ -19347,9 +19388,9 @@ app10.get("/topic/:id", async (c) => {
   }
 });
 app10.get("/discover", async (c) => {
+  const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
+  const cacheKey2 = `groups_discover_${isChina7 ? "cn" : "global"}`;
   try {
-    const isChina7 = (c.env?.CF_IP_COUNTRY || "") === "CN";
-    const cacheKey2 = `groups_discover_${isChina7 ? "cn" : "global"}`;
     const cached = cache6.get(cacheKey2);
     if (cached) return c.json({ data: cached.data, degraded: cached.degraded === true });
     const bases = getBaseUrls(isChina7);
@@ -19357,10 +19398,25 @@ app10.get("/discover", async (c) => {
     const { html, url } = await fetchGroupHTMLCached(urls);
     const baseUrl = url.replace(/\/group\/discover\/?$/, "") || bases[0];
     const topics = parseGroupDiscoverHTML(html, baseUrl);
-    const degraded = topics.length === 0;
-    cache6.set(cacheKey2, { data: topics, degraded });
-    return c.json({ data: topics, degraded });
-  } catch {
+    if (!topics.length) {
+      logError("\u5C0F\u7EC4\u53D1\u73B0\u9875\u672A\u89E3\u6790\u51FA\u8BDD\u9898", { path: c.req.path, source: new URL(url).host });
+      const lastSuccess = lastSuccessDiscoverStore.get(cacheKey2);
+      if (lastSuccess) return c.json({ data: lastSuccess, degraded: true });
+      return c.json({ data: [], degraded: true });
+    }
+    lastSuccessDiscoverStore.set(cacheKey2, topics);
+    cache6.set(cacheKey2, { data: topics, degraded: false });
+    return c.json({ data: topics, degraded: false });
+  } catch (error) {
+    logError("\u5C0F\u7EC4\u53D1\u73B0\u9875\u4E0A\u6E38\u8BF7\u6C42\u5931\u8D25", {
+      path: c.req.path,
+      region: isChina7 ? "CN" : "global",
+      errorName: error?.name,
+      causeName: error?.cause?.name,
+      message: error?.message || String(error)
+    });
+    const lastSuccess = lastSuccessDiscoverStore.get(cacheKey2);
+    if (lastSuccess) return c.json({ data: lastSuccess, degraded: true });
     return c.json({ data: [], degraded: true });
   }
 });
@@ -19793,8 +19849,147 @@ app13.get(
 );
 var geo_default = app13;
 
-// server/src/app.js
+// server/src/services/otherRatings.js
+var FRESH_TTL = 6 * 60 * 60 * 1e3;
+var STALE_TTL = 7 * 24 * 60 * 60 * 1e3;
+var freshCache = createCache(FRESH_TTL, 500);
+var staleCache = createCache(STALE_TTL, 500);
+function ratingCount(value) {
+  if (value == null || String(value).trim() === "") return null;
+  const count = Number(String(value ?? "").replace(/,/g, ""));
+  return Number.isSafeInteger(count) && count >= 0 ? count : null;
+}
+function numericScore(value) {
+  if (value == null || String(value).trim() === "") return null;
+  const score = Number(value);
+  return Number.isFinite(score) && score >= 0 && score <= 10 ? score : null;
+}
+function findAggregateRating(value) {
+  if (!value || typeof value !== "object") return null;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const result = findAggregateRating(item);
+      if (result) return result;
+    }
+    return null;
+  }
+  if (value.aggregateRating && typeof value.aggregateRating === "object")
+    return value.aggregateRating;
+  if (String(value["@type"] || "").toLowerCase() === "aggregaterating") return value;
+  for (const child of Object.values(value)) {
+    const result = findAggregateRating(child);
+    if (result) return result;
+  }
+  return null;
+}
+async function cachedRating({ source, id, url, load }) {
+  const key2 = `${source}:${id}`;
+  const fresh = freshCache.get(key2);
+  if (fresh) return { data: fresh, degraded: false };
+  const startedAt = Date.now();
+  try {
+    const data = await load();
+    freshCache.set(key2, data);
+    staleCache.set(key2, data);
+    return { data, degraded: false };
+  } catch (error) {
+    logWarn("\u5916\u90E8\u8BC4\u5206\u6E90\u8BF7\u6C42\u5931\u8D25", {
+      source,
+      upstreamStatus: error?.status,
+      errorName: error?.name,
+      causeName: error?.cause?.name,
+      durationMs: Date.now() - startedAt
+    });
+    return { data: staleCache.get(key2), degraded: true, url };
+  }
+}
+async function getMalRating(id) {
+  const url = `https://myanimelist.net/anime/${id}`;
+  return cachedRating({
+    source: "MyAnimeList",
+    id,
+    url,
+    load: async () => {
+      const response = await fetch(`https://api.jikan.moe/v4/anime/${id}`, {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(5e3)
+      });
+      if (!response.ok)
+        throw Object.assign(new Error("MAL rating request failed"), { status: response.status });
+      const payload = await response.json();
+      const score = numericScore(payload?.data?.score);
+      return {
+        id,
+        score,
+        votes: ratingCount(payload?.data?.scored_by),
+        url: payload?.data?.url || url
+      };
+    }
+  });
+}
+async function getImdbRating(id) {
+  const url = `https://www.imdb.com/title/${id}/`;
+  return cachedRating({
+    source: "IMDb",
+    id,
+    url,
+    load: async () => {
+      const response = await fetch(url, {
+        headers: {
+          Accept: "text/html,application/xhtml+xml",
+          "User-Agent": "Mozilla/5.0 (compatible; Bangmio/1.0)"
+        },
+        signal: AbortSignal.timeout(5e3)
+      });
+      if (!response.ok)
+        throw Object.assign(new Error("IMDb rating request failed"), { status: response.status });
+      const { document } = parseHTML(await response.text());
+      let aggregateRating = null;
+      for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
+        try {
+          aggregateRating = findAggregateRating(JSON.parse(script.textContent || ""));
+        } catch {
+        }
+        if (aggregateRating) break;
+      }
+      const score = numericScore(aggregateRating?.ratingValue);
+      if (score === null) throw new Error("IMDb rating missing from structured data");
+      return {
+        id,
+        score,
+        votes: ratingCount(aggregateRating?.ratingCount || aggregateRating?.reviewCount),
+        url
+      };
+    }
+  });
+}
+async function getOtherRatings({ malId = "", imdbId = "" } = {}) {
+  const [mal, imdb] = await Promise.all([
+    malId ? getMalRating(malId) : Promise.resolve({ data: null, degraded: false }),
+    imdbId ? getImdbRating(imdbId) : Promise.resolve({ data: null, degraded: false })
+  ]);
+  return {
+    data: { mal: mal.data, imdb: imdb.data },
+    degraded: mal.degraded || imdb.degraded
+  };
+}
+
+// server/src/routes/ratings.js
 var app14 = new Hono3();
+app14.get("/other", async (c) => {
+  const rawMalId = c.req.query("mal_id") || "";
+  const rawImdbId = c.req.query("imdb_id") || "";
+  const malId = /^\d{1,10}$/.test(rawMalId) && Number(rawMalId) > 0 ? rawMalId : "";
+  const imdbId = /^tt\d{5,12}$/i.test(rawImdbId) ? rawImdbId.toLowerCase() : "";
+  if (rawMalId && !malId || rawImdbId && !imdbId)
+    return c.json({ error: "\u5916\u90E8\u6761\u76EE\u7F16\u53F7\u4E0D\u5408\u6CD5" }, 400);
+  const result = await getOtherRatings({ malId, imdbId });
+  return c.json(result);
+});
+var ratings_default = app14;
+
+// server/src/app.js
+var app15 = new Hono3();
 var allowedOrigins = /* @__PURE__ */ new Set([
   "https://bangmio.site",
   "https://www.bangmio.site",
@@ -19803,7 +19998,7 @@ var allowedOrigins = /* @__PURE__ */ new Set([
   "http://localhost:3001",
   "http://127.0.0.1:3001"
 ]);
-app14.use(
+app15.use(
   "*",
   cors({
     origin: (origin) => allowedOrigins.has(origin) ? origin : "",
@@ -19812,22 +20007,22 @@ app14.use(
     maxAge: 86400
   })
 );
-app14.use("*", async (c, next) => {
+app15.use("*", async (c, next) => {
   const country = c.req.header("cf-ipcountry") || "";
   c.env = c.env || {};
   c.env.CF_IP_COUNTRY = country;
   await next();
 });
-app14.use("*", securityHeaders());
+app15.use("*", securityHeaders());
 var postLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_POST);
 var getLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_GET);
-app14.use("/api/v1/*", async (c, next) => {
+app15.use("/api/v1/*", async (c, next) => {
   const method = c.req.method.toUpperCase();
   const limiter = method === "POST" || method === "PUT" || method === "DELETE" ? postLimiter : getLimiter;
   return limiter(c, next);
 });
 var authLimiter = rateLimit(RATE_LIMIT_WINDOW, 5, { fallback: "reject" });
-app14.use("/api/v1/auth/*", async (c, next) => {
+app15.use("/api/v1/auth/*", async (c, next) => {
   const path = c.req.path;
   const method = c.req.method.toUpperCase();
   if (method === "POST" && (path === "/api/v1/auth/register" || path === "/api/v1/auth/login" || path === "/api/v1/auth/send-code" || path === "/api/v1/auth/change-password" || path === "/api/v1/auth/forgot-password" || path === "/api/v1/auth/reset-password")) {
@@ -19835,26 +20030,27 @@ app14.use("/api/v1/auth/*", async (c, next) => {
   }
   await next();
 });
-app14.route("/api/v1/auth", auth_default);
-app14.route("/api/v1/user", user_default);
-app14.route("/api/v1/anime", anime_default);
-app14.route("/api/v1/collection", collection_default);
-app14.route("/api/v1/comments", comments_default);
-app14.route("/api/v1/douban", douban_default);
-app14.route("/api/v1/bilibili", bilibili_default);
-app14.route("/api/v1/moegirl", moegirl_default);
-app14.route("/api/v1/wikipedia", wikipedia_default);
-app14.route("/api/v1/geo", geo_default);
-app14.route("/api/v1/groups", groups_default);
-app14.route("/api/v1/music", music_default);
-app14.route("/api/v1/ai", ai_default);
+app15.route("/api/v1/auth", auth_default);
+app15.route("/api/v1/user", user_default);
+app15.route("/api/v1/anime", anime_default);
+app15.route("/api/v1/collection", collection_default);
+app15.route("/api/v1/comments", comments_default);
+app15.route("/api/v1/douban", douban_default);
+app15.route("/api/v1/bilibili", bilibili_default);
+app15.route("/api/v1/moegirl", moegirl_default);
+app15.route("/api/v1/wikipedia", wikipedia_default);
+app15.route("/api/v1/geo", geo_default);
+app15.route("/api/v1/groups", groups_default);
+app15.route("/api/v1/music", music_default);
+app15.route("/api/v1/ai", ai_default);
+app15.route("/api/v1/ratings", ratings_default);
 var healthResponse = (c) => c.json({ status: "ok", country: c.env?.CF_IP_COUNTRY || "unknown" });
-app14.get("/api/health", healthResponse);
-app14.get("/api/v1/health", healthResponse);
-app14.all("*", (c) => {
+app15.get("/api/health", healthResponse);
+app15.get("/api/v1/health", healthResponse);
+app15.all("*", (c) => {
   return c.json({ data: null, error: "Not Found", code: 404 }, 404);
 });
-app14.onError((err, c) => {
+app15.onError((err, c) => {
   logError("\u672A\u6355\u83B7\u7684\u670D\u52A1\u5668\u5F02\u5E38", {
     message: err?.message || String(err),
     stack: err?.stack,
@@ -19863,7 +20059,7 @@ app14.onError((err, c) => {
   });
   return c.json({ data: null, error: "\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF", code: 500 }, 500);
 });
-var app_default = app14;
+var app_default = app15;
 export {
   app_default as default
 };

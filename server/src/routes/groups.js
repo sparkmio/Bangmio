@@ -12,6 +12,7 @@ import {
 import { CACHE_TTL_GROUPS } from '../config.js'
 import { edgeCacheDeleteUrl } from '../utils/edgeCache.js'
 import { getBangumiAccessToken } from '../utils/bangumiAuth.js'
+import { logError } from '../utils/logger.js'
 
 const app = new Hono()
 
@@ -22,6 +23,8 @@ const HOSTS = {
 }
 
 const cache = createCache(CACHE_TTL_GROUPS)
+const lastSuccessGroupListStore = createCache(30 * 60 * 1000, 2)
+const lastSuccessDiscoverStore = createCache(30 * 60 * 1000, 2)
 
 // 降级回退缓存也必须有生命周期和容量上限，避免长驻实例持续积累旧数据。
 const lastSuccessStore = createCache(30 * 60 * 1000, 500)
@@ -856,14 +859,20 @@ app.get('/', async c => {
       try {
         groups = parseGroupListHTML(html, baseUrl)
       } catch {
-        // 解析异常立即使用兜底数据
+        logError('小组列表解析失败', { path: c.req.path, source: new URL(url).host })
         groups = []
       }
     } catch {
+      logError('小组列表上游请求失败', { path: c.req.path, region: isChina ? 'CN' : 'global' })
+      const lastSuccess = lastSuccessGroupListStore.get(cacheKey)
+      if (lastSuccess) return c.json({ data: lastSuccess, degraded: true })
       groups = []
     }
 
+    if (groups.length >= 10) lastSuccessGroupListStore.set(cacheKey, groups)
     if (groups.length < 10) {
+      const lastSuccess = lastSuccessGroupListStore.get(cacheKey)
+      if (lastSuccess) return c.json({ data: lastSuccess, degraded: true })
       const fallback = FALLBACK_GROUPS.map(g => ({ ...g, url: `${baseUrl}/group/${g.id}` }))
       // 合并真实解析结果和兜底，避免重复
       const seen = new Set(groups.map(g => g.id))
@@ -916,9 +925,9 @@ app.get('/topic/:id', async c => {
 })
 // GET /groups/discover - 全站热门帖子
 app.get('/discover', async c => {
+  const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
+  const cacheKey = `groups_discover_${isChina ? 'cn' : 'global'}`
   try {
-    const isChina = (c.env?.CF_IP_COUNTRY || '') === 'CN'
-    const cacheKey = `groups_discover_${isChina ? 'cn' : 'global'}`
     const cached = cache.get(cacheKey)
     if (cached) return c.json({ data: cached.data, degraded: cached.degraded === true })
 
@@ -927,10 +936,25 @@ app.get('/discover', async c => {
     const { html, url } = await fetchGroupHTMLCached(urls)
     const baseUrl = url.replace(/\/group\/discover\/?$/, '') || bases[0]
     const topics = parseGroupDiscoverHTML(html, baseUrl)
-    const degraded = topics.length === 0
-    cache.set(cacheKey, { data: topics, degraded })
-    return c.json({ data: topics, degraded })
-  } catch {
+    if (!topics.length) {
+      logError('小组发现页未解析出话题', { path: c.req.path, source: new URL(url).host })
+      const lastSuccess = lastSuccessDiscoverStore.get(cacheKey)
+      if (lastSuccess) return c.json({ data: lastSuccess, degraded: true })
+      return c.json({ data: [], degraded: true })
+    }
+    lastSuccessDiscoverStore.set(cacheKey, topics)
+    cache.set(cacheKey, { data: topics, degraded: false })
+    return c.json({ data: topics, degraded: false })
+  } catch (error) {
+    logError('小组发现页上游请求失败', {
+      path: c.req.path,
+      region: isChina ? 'CN' : 'global',
+      errorName: error?.name,
+      causeName: error?.cause?.name,
+      message: error?.message || String(error)
+    })
+    const lastSuccess = lastSuccessDiscoverStore.get(cacheKey)
+    if (lastSuccess) return c.json({ data: lastSuccess, degraded: true })
     return c.json({ data: [], degraded: true })
   }
 })

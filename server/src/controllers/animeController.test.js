@@ -50,13 +50,13 @@ describe('anime controller regression', () => {
 
     expect(response).toEqual({ body: { error: '浏览失败' }, status: 502 })
     expect(logError).toHaveBeenCalledWith(
-      '番剧浏览失败',
+      '番剧浏览上游失败',
       expect.objectContaining({
         path: '/api/v1/anime/browse',
+        region: 'global',
         errorName: 'TypeError',
-        message: 'fetch failed',
         causeName: 'Error',
-        causeMessage: 'read ECONNRESET'
+        timedOut: false
       })
     )
   })

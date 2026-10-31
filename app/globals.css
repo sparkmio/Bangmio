@@ -2688,24 +2688,25 @@ html[data-theme='dark'] .bm-card {
   display: none;
   position: fixed;
   top: 50%;
-  left: 16px;
+  left: 12px;
   z-index: 50;
-  width: 136px;
+  width: 48px;
   transform: translateY(-50%);
 }
 .bm-dock-mobile {
   display: block;
   position: fixed;
-  right: 12px;
-  bottom: max(12px, env(safe-area-inset-bottom));
-  left: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  left: 50%;
   z-index: 50;
-  padding-bottom: env(safe-area-inset-bottom);
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  transform: translateX(-50%);
   pointer-events: none;
 }
 .bm-shell-content {
   margin-left: 0;
-  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom));
 }
 @media (min-width: 820px) and (orientation: landscape) {
   .bm-dock-desktop {
@@ -2715,16 +2716,18 @@ html[data-theme='dark'] .bm-card {
     display: none;
   }
   .bm-shell-content {
-    margin-left: 168px;
+    margin-left: 72px;
     padding-bottom: 0;
   }
 }
 .bm-dock-scroll {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
   max-height: calc(100dvh - 32px);
-  padding: 4px;
+  width: 48px;
+  padding: 2px;
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: none;
@@ -2738,9 +2741,11 @@ html[data-theme='dark'] .bm-card {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  min-width: 0;
+  width: 44px;
+  min-width: 44px;
   height: 44px;
-  padding: 0 14px;
+  padding: 0;
+  position: relative;
   color: var(--bm-muted);
   border: 1px solid var(--bm-glass-border);
   border-radius: 999px;
@@ -2773,24 +2778,20 @@ html[data-theme='dark'] .bm-card {
   font-weight: 700;
 }
 .bm-dock-desktop-action {
-  width: 136px;
-  gap: 8px;
-}
-.bm-dock-desktop-action span {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  width: 44px;
 }
 .bm-dock-desktop-detail-pill {
-  width: 136px;
+  width: 44px;
 }
 .bm-dock-mobile-track {
   display: flex;
   align-items: center;
-  justify-content: stretch;
-  gap: 6px;
-  width: 100%;
-  min-height: 68px;
-  padding: 8px;
+  justify-content: center;
+  gap: 8px;
+  width: max-content;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 0;
   overflow: hidden;
   pointer-events: none;
 }
@@ -2800,46 +2801,20 @@ html[data-theme='dark'] .bm-card {
   scrollbar-width: none;
 }
 .bm-dock-mobile-pill {
-  flex: 1 1 0;
-  width: 0;
-  min-width: 0;
-  height: 52px;
-  flex-direction: column;
-  gap: 4px;
-  padding: 0 4px;
-  font-size: 10px;
-  font-weight: 600;
+  flex: 0 0 44px;
 }
 .bm-dock-mobile-pill svg {
-  width: 22px;
-  height: 22px;
+  width: 21px;
+  height: 21px;
 }
 .bm-dock-mobile-back,
 .bm-dock-mobile-detail-pill {
-  height: 48px;
-  padding: 0 14px;
+  width: 44px;
+  height: 44px;
 }
 .bm-dock-mobile-detail-pill {
-  min-width: max-content;
+  min-width: 44px;
 }
-.bm-dock-mobile-back {
-  gap: 4px;
-}
-.bm-leading-none {
-  line-height: 1;
-}
-
-@media (max-width: 360px) {
-  .bm-dock-mobile-track {
-    gap: 4px;
-    padding: 6px;
-  }
-  .bm-dock-mobile-pill {
-    height: 50px;
-    font-size: 9px;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .bm-dock-pill {
     transition: none;

@@ -1,7 +1,7 @@
 import { DataUnavailable } from '@/components/data-unavailable'
 import { requirePositiveId } from '@/lib/page-data'
 import Link from 'next/link'
-import { safeApiFetch } from '@/lib/api'
+import { safeApiFetchServer } from '@/lib/api-server'
 import { DiscussionComposer } from '@/components/discussion-composer'
 import { RichText } from '@/components/rich-text'
 import { communityProfile } from '@/lib/community'
@@ -9,7 +9,7 @@ import { communityProfile } from '@/lib/community'
 export default async function PersonTalkboxPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   requirePositiveId(id)
-  const response = await safeApiFetch<any[]>(`/comments/person/${id}`)
+  const response = await safeApiFetchServer<any[]>(`/comments/person/${id}`)
   const comments = Array.isArray(response?.data) ? response.data : []
 
   return (

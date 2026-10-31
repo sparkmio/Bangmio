@@ -5,36 +5,37 @@ vi.mock('next/navigation', () => ({
   }
 }))
 vi.mock('@/lib/api', () => ({
-  apiFetch: vi.fn(),
-  safeApiFetch: vi.fn(),
   displayName: () => 'fixture',
   imageUrl: () => ''
 }))
+vi.mock('@/lib/api-server', () => ({ apiFetchServer: vi.fn(), safeApiFetchServer: vi.fn() }))
 vi.mock('@/components/anime-detail', () => ({ AnimeDetail: () => null }))
-import { apiFetch, safeApiFetch } from '@/lib/api'
+import { apiFetchServer, safeApiFetchServer } from '@/lib/api-server'
 import Page from './page'
 beforeEach(() => {
-  vi.mocked(safeApiFetch).mockResolvedValue({ data: [] })
+  vi.mocked(safeApiFetchServer).mockResolvedValue({ data: [] })
 })
 afterEach(() => vi.resetAllMocks())
 describe('detail failure boundaries', () => {
   it('uses not found only for upstream 404', async () => {
-    vi.mocked(apiFetch).mockRejectedValue(Object.assign(new Error('missing'), { status: 404 }))
+    vi.mocked(apiFetchServer).mockRejectedValue(
+      Object.assign(new Error('missing'), { status: 404 })
+    )
     await expect(Page({ params: Promise.resolve({ id: '42' }) })).rejects.toThrow('NEXT_NOT_FOUND')
   })
   it('propagates an upstream outage to retry boundary', async () => {
-    vi.mocked(apiFetch).mockRejectedValue(
+    vi.mocked(apiFetchServer).mockRejectedValue(
       Object.assign(new Error('upstream outage'), { status: 502 })
     )
     await expect(Page({ params: Promise.resolve({ id: '42' }) })).rejects.toThrow('upstream outage')
   })
   it('rejects malformed IDs without a request', async () => {
     await expect(Page({ params: Promise.resolve({ id: 'abc' }) })).rejects.toThrow('NEXT_NOT_FOUND')
-    expect(apiFetch).not.toHaveBeenCalled()
+    expect(apiFetchServer).not.toHaveBeenCalled()
   })
   it('keeps supplementary chapter failure explicit', async () => {
-    vi.mocked(apiFetch).mockResolvedValue({ data: { id: 42, name: 'fixture' } })
-    vi.mocked(safeApiFetch).mockResolvedValue(null)
+    vi.mocked(apiFetchServer).mockResolvedValue({ data: { id: 42, name: 'fixture' } })
+    vi.mocked(safeApiFetchServer).mockResolvedValue(null)
     const result = await Page({ params: Promise.resolve({ id: '42' }) })
     expect(result.props.episodesFailed).toBe(true)
   })

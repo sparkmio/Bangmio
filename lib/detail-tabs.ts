@@ -5,7 +5,7 @@ export const DETAIL_TABS = [
   ['characters', '角色'],
   ['staff', '制作人员'],
   ['relations', '关联'],
-  ['douban', '豆瓣'],
+  ['douban', '其他评分'],
   ['music', '音乐'],
   ['streaming', '在线观看'],
   ['wiki', 'Wiki'],

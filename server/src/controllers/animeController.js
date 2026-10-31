@@ -11,6 +11,18 @@ function isChina(c) {
   return (c.env?.CF_IP_COUNTRY || '') === 'CN'
 }
 
+function logAnimeUpstreamFailure(c, message, error) {
+  logError(message, {
+    path: c.req.path,
+    region: isChina(c) ? 'CN' : 'global',
+    upstream: error?.upstreamSource,
+    upstreamStatus: error?.response?.status,
+    errorName: error?.name,
+    causeName: error?.cause?.name,
+    timedOut: error?.name === 'TimeoutError' || error?.cause?.name === 'TimeoutError'
+  })
+}
+
 export async function searchAnime(c) {
   try {
     const keyword = c.req.query('keyword')
@@ -26,8 +38,9 @@ export async function searchAnime(c) {
     if (tag) opts.tag = tag
     const result = await bangumiService.searchAnime(keyword, opts)
     return c.json({ data: result.data, total: result.total })
-  } catch {
-    return c.json({ error: '搜索失败' }, 500)
+  } catch (error) {
+    logAnimeUpstreamFailure(c, '番剧搜索上游失败', error)
+    return c.json({ error: '搜索失败' }, 502)
   }
 }
 
@@ -43,14 +56,7 @@ export async function browseAnime(c) {
     const result = await bangumiService.browseAnime(params)
     return c.json({ data: result.data, total: result.total })
   } catch (error) {
-    logError('番剧浏览失败', {
-      path: c.req.path,
-      errorName: error?.name,
-      message: error?.message || String(error),
-      upstreamStatus: error?.response?.status,
-      causeName: error?.cause?.name,
-      causeMessage: error?.cause?.message
-    })
+    logAnimeUpstreamFailure(c, '番剧浏览上游失败', error)
     return c.json({ error: '浏览失败' }, 502)
   }
 }
@@ -63,6 +69,7 @@ export async function getAnimeDetail(c) {
     return c.json({ data: detail })
   } catch (error) {
     if (error?.response?.status === 404) return c.json({ error: '条目不存在' }, 404)
+    logAnimeUpstreamFailure(c, '番剧详情上游失败', error)
     return c.json({ error: '获取详情失败，请稍后重试' }, 502)
   }
 }
@@ -75,8 +82,9 @@ export async function getAnimeEpisodes(c) {
   try {
     const data = await bangumiService.getAnimeEpisodes(id, { offset, limit, isChina: isChina(c) })
     return c.json({ data: data.data, total: data.total })
-  } catch {
-    return c.json({ error: '获取章节失败' }, 500)
+  } catch (error) {
+    logAnimeUpstreamFailure(c, '番剧章节上游失败', error)
+    return c.json({ error: '获取章节失败' }, 502)
   }
 }
 
@@ -86,7 +94,8 @@ export async function getAnimeCharacters(c) {
   try {
     const data = await bangumiService.getAnimeCharacters(id, { isChina: isChina(c) })
     return c.json({ data })
-  } catch {
+  } catch (error) {
+    logAnimeUpstreamFailure(c, '番剧角色上游失败', error)
     return c.json({ error: '获取角色失败，请稍后重试' }, 502)
   }
 }
@@ -97,7 +106,8 @@ export async function getAnimePersons(c) {
   try {
     const data = await bangumiService.getAnimePersons(id, { isChina: isChina(c) })
     return c.json({ data })
-  } catch {
+  } catch (error) {
+    logAnimeUpstreamFailure(c, '番剧制作人员上游失败', error)
     return c.json({ error: '获取制作人员失败，请稍后重试' }, 502)
   }
 }
@@ -108,7 +118,8 @@ export async function getAnimeRelations(c) {
   try {
     const data = await bangumiService.getAnimeRelations(id, { isChina: isChina(c) })
     return c.json({ data })
-  } catch {
+  } catch (error) {
+    logAnimeUpstreamFailure(c, '番剧关联条目上游失败', error)
     return c.json({ error: '获取关联条目失败，请稍后重试' }, 502)
   }
 }
@@ -117,8 +128,9 @@ export async function getAnimeCalendar(c) {
   try {
     const data = await bangumiService.getAnimeCalendar({ isChina: isChina(c) })
     return c.json({ data })
-  } catch {
-    return c.json({ error: '获取时间表失败' }, 500)
+  } catch (error) {
+    logAnimeUpstreamFailure(c, '番剧时间表上游失败', error)
+    return c.json({ error: '获取时间表失败' }, 502)
   }
 }
 

@@ -21,6 +21,7 @@ import groupRoutes from './routes/groups.js'
 import musicRoutes from './routes/music.js'
 import aiRoutes from './routes/ai.js'
 import geoRoutes from './routes/geo.js'
+import ratingsRoutes from './routes/ratings.js'
 
 const app = new Hono()
 
@@ -97,6 +98,7 @@ app.route('/api/v1/geo', geoRoutes)
 app.route('/api/v1/groups', groupRoutes)
 app.route('/api/v1/music', musicRoutes)
 app.route('/api/v1/ai', aiRoutes)
+app.route('/api/v1/ratings', ratingsRoutes)
 
 const healthResponse = c => c.json({ status: 'ok', country: c.env?.CF_IP_COUNTRY || 'unknown' })
 app.get('/api/health', healthResponse)

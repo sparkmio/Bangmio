@@ -180,6 +180,154 @@ function UserIcon({ className }: { className?: string }) {
   )
 }
 
+function ListIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"
+      />
+    </svg>
+  )
+}
+
+function LinkIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71m2.25 6.82a5 5 0 01-7.54-.54l-3-3a5 5 0 017.07-7.07l1.72 1.71"
+      />
+    </svg>
+  )
+}
+
+function StarIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="m12 3 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.92 1.06-6.2L3 9.53l6.22-.9L12 3z"
+      />
+    </svg>
+  )
+}
+
+function MusicIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9 18V5l12-2v13M9 18c0 1.1-1.34 2-3 2s-3-.9-3-2 1.34-2 3-2 3 .9 3 2zm12-2c0 1.1-1.34 2-3 2s-3-.9-3-2 1.34-2 3-2 3 .9 3 2zM9 9l12-2"
+      />
+    </svg>
+  )
+}
+
+function PlayIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      aria-hidden="true"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="m8 5 12 7-12 7V5z" />
+    </svg>
+  )
+}
+
+function BookIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 7v14m0-14C10.5 5.67 8.5 5 5 5H3v14h3c2.5 0 4.5.67 6 2m0-14c1.5-1.33 3.5-2 7-2h2v14h-3c-2.5 0-4.5.67-6 2"
+      />
+    </svg>
+  )
+}
+
+function TalkIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M7 8h10M7 12h6m-9 8 2.2-3.3A8 8 0 1119 17H8a8 8 0 01-3.8-1z"
+      />
+    </svg>
+  )
+}
+
+function ChatIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M8 10h8m-8 4h5m-9 7 1.5-4.5A8 8 0 1119 19H8l-4 2z"
+      />
+    </svg>
+  )
+}
+
 const iconComponents = {
   home: HomeIcon,
   trending: TrendingIcon,
@@ -190,6 +338,20 @@ const iconComponents = {
   moon: MoonIcon,
   sun: SunIcon,
   user: UserIcon
+}
+
+const detailIconComponents = {
+  overview: HomeIcon,
+  episodes: ListIcon,
+  characters: GroupsIcon,
+  staff: UserIcon,
+  relations: LinkIcon,
+  douban: StarIcon,
+  music: MusicIcon,
+  streaming: PlayIcon,
+  wiki: BookIcon,
+  talkbox: TalkIcon,
+  topics: ChatIcon
 }
 
 function BackIcon({ className }: { className?: string }) {
@@ -223,15 +385,18 @@ function DesktopDetailTabPills({
     <>
       {DETAIL_TABS.map(([key, label]) => {
         const isActive = activeTab === key
+        const Icon = detailIconComponents[key]
         return (
           <Link
             key={key}
             href={`/anime/${detailId}?tab=${key}`}
             aria-current={isActive ? 'page' : undefined}
-            className={`bm-dock-pill bm-dock-desktop-detail-pill ${isActive ? 'bm-dock-pill-active' : ''}`}
+            aria-label={label}
+            title={label}
+            className={`bm-dock-pill bm-dock-icon-button bm-dock-desktop-detail-pill ${isActive ? 'bm-dock-pill-active' : ''}`}
             style={isActive ? activePillStyle : undefined}
           >
-            {label}
+            <Icon className="w-5 h-5" />
           </Link>
         )
       })}
@@ -250,15 +415,18 @@ function MobileDetailTabPills({
     <>
       {DETAIL_TABS.map(([key, label]) => {
         const isActive = activeTab === key
+        const Icon = detailIconComponents[key]
         return (
           <Link
             key={key}
             href={`/anime/${detailId}?tab=${key}`}
             aria-current={isActive ? 'page' : undefined}
-            className={`bm-dock-pill bm-dock-mobile-detail-pill ${isActive ? 'bm-dock-pill-active' : ''}`}
+            aria-label={label}
+            title={label}
+            className={`bm-dock-pill bm-dock-icon-button bm-dock-mobile-detail-pill ${isActive ? 'bm-dock-pill-active' : ''}`}
             style={isActive ? activePillStyle : undefined}
           >
-            {label}
+            <Icon className="w-5 h-5" />
           </Link>
         )
       })}
@@ -331,10 +499,10 @@ export function DockNavigation() {
                 type="button"
                 onClick={handleBack}
                 aria-label="返回上一页"
-                className="bm-dock-pill bm-dock-desktop-action"
+                title="返回上一页"
+                className="bm-dock-pill bm-dock-icon-button bm-dock-desktop-action"
               >
                 <BackIcon className="w-5 h-5 shrink-0" />
-                返回
               </button>
               <Suspense
                 fallback={
@@ -354,13 +522,12 @@ export function DockNavigation() {
                     key={item.href}
                     href={item.href}
                     aria-label={item.label}
+                    title={item.label}
                     aria-current={isActive ? 'page' : undefined}
                     className={`bm-dock-pill bm-dock-desktop-action ${isActive ? 'bm-dock-pill-active' : ''}`}
                     style={isActive ? activePillStyle : undefined}
-                    title={item.label}
                   >
                     <Icon className="w-5 h-5 shrink-0" />
-                    <span className="truncate">{item.label}</span>
                   </Link>
                 )
               })}
@@ -370,21 +537,22 @@ export function DockNavigation() {
                 type="button"
                 onClick={() => appearance.toggleTheme()}
                 aria-label={appearance.theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
-                className="bm-dock-pill bm-dock-desktop-action"
+                title={appearance.theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
+                className="bm-dock-pill bm-dock-icon-button bm-dock-desktop-action"
               >
                 {appearance.theme === 'dark' ? (
                   <SunIcon className="w-5 h-5" />
                 ) : (
                   <MoonIcon className="w-5 h-5" />
                 )}
-                <span>主题</span>
               </button>
 
               {/* 用户头像 / 登录 */}
               <Link
                 href={auth.isAuthenticated ? '/profile' : '/login'}
                 aria-label={auth.isAuthenticated ? '我的' : '登录'}
-                className="bm-dock-pill bm-dock-desktop-action"
+                title={auth.isAuthenticated ? '我的' : '登录'}
+                className="bm-dock-pill bm-dock-icon-button bm-dock-desktop-action"
               >
                 {avatarSrc ? (
                   <img
@@ -395,7 +563,6 @@ export function DockNavigation() {
                 ) : (
                   <UserIcon className="w-5 h-5" />
                 )}
-                <span>{auth.isAuthenticated ? '我的' : '登录'}</span>
               </Link>
             </>
           )}
@@ -410,10 +577,10 @@ export function DockNavigation() {
               type="button"
               onClick={handleBack}
               aria-label="返回上一页"
-              className="bm-dock-pill bm-dock-mobile-back"
+              title="返回上一页"
+              className="bm-dock-pill bm-dock-icon-button bm-dock-mobile-back"
             >
               <BackIcon className="w-5 h-5" />
-              返回
             </button>
             <Suspense
               fallback={
@@ -433,18 +600,19 @@ export function DockNavigation() {
                   key={item.href}
                   href={item.href}
                   aria-label={item.label}
+                  title={item.label}
                   aria-current={isActive ? 'page' : undefined}
                   className={`bm-dock-pill bm-dock-mobile-pill ${isActive ? 'bm-dock-pill-active' : ''}`}
                   style={isActive ? activePillStyle : undefined}
                 >
                   <Icon className="w-6 h-6" />
-                  <span className="bm-leading-none text-[10px] font-medium">{item.shortLabel}</span>
                 </Link>
               )
             })}
             <Link
               href={auth.isAuthenticated ? '/profile' : '/login'}
               aria-label={auth.isAuthenticated ? '我的' : '登录'}
+              title={auth.isAuthenticated ? '我的' : '登录'}
               aria-current={pathname === '/profile' ? 'page' : undefined}
               className={`bm-dock-pill bm-dock-mobile-pill ${pathname === '/profile' ? 'bm-dock-pill-active' : ''}`}
               style={pathname === '/profile' ? activePillStyle : undefined}
@@ -458,9 +626,6 @@ export function DockNavigation() {
               ) : (
                 <UserIcon className="w-6 h-6" />
               )}
-              <span className="bm-leading-none text-[10px] font-medium">
-                {auth.isAuthenticated ? '我的' : '登录'}
-              </span>
             </Link>
           </div>
         )}

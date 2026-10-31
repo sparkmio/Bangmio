@@ -1,7 +1,7 @@
 import { DataUnavailable } from '@/components/data-unavailable'
 import { requirePositiveId } from '@/lib/page-data'
 import Link from 'next/link'
-import { safeApiFetch } from '@/lib/api'
+import { safeApiFetchServer } from '@/lib/api-server'
 import { DiscussionComposer } from '@/components/discussion-composer'
 import { communityProfile } from '@/lib/community'
 
@@ -58,7 +58,7 @@ function topicId(topic: any) {
 export default async function SubjectTopicsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   requirePositiveId(id)
-  const response = await safeApiFetch<any[]>(`/comments/subject/${id}/topics`)
+  const response = await safeApiFetchServer<any[]>(`/comments/subject/${id}/topics`)
   const topics = Array.isArray(response?.data) ? response.data : []
 
   return (

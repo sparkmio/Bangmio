@@ -2,7 +2,8 @@ import { requiredPageData, requirePositiveId } from '@/lib/page-data'
 import { DataUnavailable } from '@/components/data-unavailable'
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { safeApiFetch, imageUrl } from '@/lib/api'
+import { imageUrl } from '@/lib/api'
+import { safeApiFetchServer } from '@/lib/api-server'
 import { RichText } from '@/components/rich-text'
 export async function generateMetadata({
   params
@@ -10,7 +11,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>
 }): Promise<Metadata> {
   const { id } = await params
-  const response = await safeApiFetch<any>(`/anime/character/${id}`)
+  const response = await safeApiFetchServer<any>(`/anime/character/${id}`)
   return { title: response?.data?.name || '角色详情' }
 }
 export default async function CharacterPage({ params }: { params: Promise<{ id: string }> }) {
@@ -18,7 +19,7 @@ export default async function CharacterPage({ params }: { params: Promise<{ id: 
   requirePositiveId(id)
   const [detail, subjects] = await Promise.all([
     requiredPageData<any>(`/anime/character/${id}`),
-    safeApiFetch<any[]>(`/anime/character/${id}/subjects`)
+    safeApiFetchServer<any[]>(`/anime/character/${id}/subjects`)
   ])
   const character = detail
   const list = Array.isArray(subjects?.data) ? subjects.data : []
