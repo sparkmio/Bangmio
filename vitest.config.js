@@ -35,6 +35,7 @@ export default defineConfig({
             '.next/**',
             '.open-next/**',
             'client/src/components/**/*.test.js',
+            'vue-reference/src/components/**/*.test.js',
             'lib/ai-context.test.ts'
           ]
         }
@@ -46,6 +47,7 @@ export default defineConfig({
           environment: 'jsdom',
           include: [
             'client/src/components/**/*.test.js',
+            'vue-reference/src/components/**/*.test.js',
             'components/**/*.test.tsx',
             'app/**/*.test.tsx',
             'lib/ai-context.test.ts'
