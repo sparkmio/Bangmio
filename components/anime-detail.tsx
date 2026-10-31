@@ -9,7 +9,7 @@ import { AnimeGrid } from './anime-card'
 import { RichText } from './rich-text'
 import { apiFetch as requestApi, displayName, imageUrl, imageUrls } from '@/lib/api'
 import type { DetailTabKey } from '@/lib/detail-tabs'
-import { extractOtherRatingIds } from '@/lib/other-rating-ids'
+import { extractOtherRatingIds, externalSearchTitle } from '@/lib/other-rating-ids'
 import type { ApiResult, ImageSet, Subject } from '@/lib/types'
 
 type Episode = {
@@ -383,7 +383,7 @@ function CoverImage({ src, alt = '' }: { src?: string; alt?: string }) {
 }
 
 function OtherRatingsPanel({ subject }: { subject: Subject }) {
-  const title = displayName(subject)
+  const searchTitle = externalSearchTitle(subject)
   const { malId, imdbId } = extractOtherRatingIds(subject.infobox || [])
   const [ratings, setRatings] = useState<OtherRatings | null>(null)
   const [loading, setLoading] = useState(Boolean(malId || imdbId))
@@ -426,7 +426,10 @@ function OtherRatingsPanel({ subject }: { subject: Subject }) {
       mark: 'MAL',
       id: malId,
       rating: ratings?.mal,
-      searchUrl: `https://myanimelist.net/anime.php?q=${encodeURIComponent(title)}`
+      entryUrl: malId ? `https://myanimelist.net/anime/${malId}` : '',
+      searchUrl: searchTitle
+        ? `https://myanimelist.net/anime.php?q=${encodeURIComponent(searchTitle)}`
+        : 'https://myanimelist.net/anime.php'
     },
     {
       key: 'imdb',
@@ -434,7 +437,10 @@ function OtherRatingsPanel({ subject }: { subject: Subject }) {
       mark: 'IMDb',
       id: imdbId,
       rating: ratings?.imdb,
-      searchUrl: `https://www.imdb.com/find/?q=${encodeURIComponent(title)}`
+      entryUrl: imdbId ? `https://www.imdb.com/title/${imdbId}/` : '',
+      searchUrl: searchTitle
+        ? `https://www.imdb.com/find/?q=${encodeURIComponent(searchTitle)}`
+        : 'https://www.imdb.com/search/title/'
     }
   ] as const
 
@@ -476,11 +482,11 @@ function OtherRatingsPanel({ subject }: { subject: Subject }) {
               </div>
               <a
                 className="btn btn-xs btn-ghost mt-3"
-                href={provider.rating?.url || provider.searchUrl}
+                href={provider.rating?.url || provider.entryUrl || provider.searchUrl}
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                {provider.rating?.url ? '查看条目 ↗' : '搜索条目 ↗'}
+                {provider.rating?.url || provider.entryUrl ? '查看条目 ↗' : '搜索条目 ↗'}
               </a>
             </article>
           ))}

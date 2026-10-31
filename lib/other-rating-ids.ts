@@ -17,6 +17,34 @@ function numericId(values: string[]) {
   return ''
 }
 
+function textValues(value: unknown): string[] {
+  return flattenValue(value)
+    .map(item => item.trim())
+    .filter(Boolean)
+}
+
+export function externalSearchTitle(subject: {
+  name?: string
+  infobox?: InfoboxEntry[]
+  [key: string]: unknown
+}) {
+  const explicitAlternates = [
+    subject.name_en,
+    subject.nameEn,
+    subject.english_title,
+    subject.name_romanized,
+    subject.name_romaji,
+    subject.name_original,
+    subject.name_jp
+  ].flatMap(textValues)
+  const infoboxAlternates = (subject.infobox || [])
+    .filter(item => /english|英文|romaji|roman|罗马音|罗马字/i.test(String(item?.key || '')))
+    .flatMap(item => textValues(item?.value))
+
+  // `name` is Bangumi's canonical/original title; deliberately never use `name_cn` here.
+  return [...explicitAlternates, ...infoboxAlternates, ...textValues(subject.name)][0] || ''
+}
+
 export function extractOtherRatingIds(infobox: InfoboxEntry[] = []) {
   let malId = ''
   let imdbId = ''

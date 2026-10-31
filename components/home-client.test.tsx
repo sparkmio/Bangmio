@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-const auth = vi.hoisted(() => ({ request: vi.fn() }))
+const auth = vi.hoisted(() => ({ request: vi.fn(), isAuthenticated: true }))
 vi.mock('./auth-provider', () => ({
-  useAuth: () => ({ isAuthenticated: true, request: auth.request })
+  useAuth: () => ({ isAuthenticated: auth.isAuthenticated, request: auth.request })
 }))
 vi.mock('next/link', () => ({
   default: ({ children, href, ...props }: any) => (
@@ -26,6 +26,7 @@ beforeEach(() => {
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
+  auth.isAuthenticated = true
   auth.request.mockReset()
   auth.request.mockImplementation(async (url: string) =>
     url.includes('/collection/list')
@@ -62,5 +63,16 @@ describe('home watching contracts', () => {
     expect(container.textContent).toContain('在读')
     expect(container.textContent).toContain('23:45')
     expect(container.textContent).not.toContain('23:45:00')
+  })
+
+  it('shows useful discovery links and a compact welcome for signed-out visitors', async () => {
+    auth.isAuthenticated = false
+    await act(async () => root.render(<HomeClient initialHot={[]} />))
+
+    expect(container.querySelector('h1')?.textContent).toBe('Bangmio')
+    expect(container.querySelector('[aria-label="快速入口"]')?.textContent).toContain('浏览番剧')
+    expect(container.querySelector('[aria-label="快速入口"]')?.textContent).toContain('新番时间表')
+    expect(container.querySelector('[aria-label="快速入口"]')?.textContent).toContain('小组讨论')
+    expect(container.querySelector('a[href="/login"]')?.textContent).toContain('使用 Bangumi 登录')
   })
 })

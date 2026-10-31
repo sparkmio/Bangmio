@@ -6,8 +6,8 @@ export function AnimeCard({ subject }: { subject: Subject }) {
   const image = imageUrl(subject.images)
   const score = Number(subject.rating?.score || 0)
   return (
-    <Link href={`/anime/${subject.id}`} className="group block animate-card-in">
-      <div className="relative overflow-hidden rounded-2xl transition-all duration-300 group-hover:-translate-y-1 border border-[var(--bm-line)] bg-[var(--bm-surface)] group-hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
+    <Link href={`/anime/${subject.id}`} className="group bm-anime-card block animate-card-in">
+      <div className="bm-anime-card-surface relative overflow-hidden rounded-2xl border border-[var(--bm-line)] bg-[var(--bm-surface)]">
         <div className="aspect-[2/3] relative bg-[var(--bm-soft)]">
           {image ? (
             <img

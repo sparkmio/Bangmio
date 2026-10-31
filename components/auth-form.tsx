@@ -261,11 +261,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
       <div className="bm-auth-layout">
         <section className="bm-auth-intro" aria-label="Bangmio 功能介绍">
           <span className="bm-auth-eyebrow">YOUR ANIME COMPANION</span>
-          <h1>
-            把喜欢的番剧，
-            <br />
-            整理成自己的世界。
-          </h1>
+          <h1>把喜欢的番剧， 整理成自己的世界。</h1>
           <p>聚合 Bangumi 条目资料、收藏进度与社区讨论。界面更轻，信息更清楚。</p>
           <div className="bm-auth-points">
             <span>

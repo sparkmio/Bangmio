@@ -368,9 +368,8 @@ function BackIcon({ className }: { className?: string }) {
   )
 }
 
-const ACTIVE_BG = 'rgba(232, 144, 156, 0.18)'
 const activePillStyle = {
-  background: ACTIVE_BG,
+  background: 'color-mix(in srgb, var(--bm-accent) 22%, var(--bm-surface) 78%)',
   color: 'var(--bm-accent)'
 } as const
 
@@ -397,6 +396,7 @@ function DesktopDetailTabPills({
             style={isActive ? activePillStyle : undefined}
           >
             <Icon className="w-5 h-5" />
+            <span className="bm-dock-label">{label}</span>
           </Link>
         )
       })}
@@ -503,6 +503,7 @@ export function DockNavigation() {
                 className="bm-dock-pill bm-dock-icon-button bm-dock-desktop-action"
               >
                 <BackIcon className="w-5 h-5 shrink-0" />
+                <span className="bm-dock-label">返回</span>
               </button>
               <Suspense
                 fallback={
@@ -528,6 +529,7 @@ export function DockNavigation() {
                     style={isActive ? activePillStyle : undefined}
                   >
                     <Icon className="w-5 h-5 shrink-0" />
+                    <span className="bm-dock-label">{item.label}</span>
                   </Link>
                 )
               })}
@@ -545,6 +547,7 @@ export function DockNavigation() {
                 ) : (
                   <MoonIcon className="w-5 h-5" />
                 )}
+                <span className="bm-dock-label">主题</span>
               </button>
 
               {/* 用户头像 / 登录 */}
@@ -563,6 +566,7 @@ export function DockNavigation() {
                 ) : (
                   <UserIcon className="w-5 h-5" />
                 )}
+                <span className="bm-dock-label">{auth.isAuthenticated ? '我的' : '登录'}</span>
               </Link>
             </>
           )}

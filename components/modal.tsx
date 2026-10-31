@@ -6,11 +6,13 @@ import { useEffect, useRef, type ReactNode } from 'react'
 export function Modal({
   title,
   onClose,
-  children
+  children,
+  className
 }: {
   title: string
   onClose: () => void
   children: ReactNode
+  className?: string
 }) {
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => {
@@ -23,7 +25,12 @@ export function Modal({
     }
   }, [])
   return (
-    <dialog ref={ref} className="bm-modal" aria-label={title} onCancel={onClose}>
+    <dialog
+      ref={ref}
+      className={className ? `bm-modal ${className}` : 'bm-modal'}
+      aria-label={title}
+      onCancel={onClose}
+    >
       {children}
     </dialog>
   )

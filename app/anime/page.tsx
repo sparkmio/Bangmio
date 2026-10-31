@@ -179,6 +179,7 @@ export default function AnimeBrowsePage() {
       <VueLoadingState
         loading={loading}
         error={error}
+        loadingMessage={query.keyword ? `正在搜索“${query.keyword}”…` : '正在加载番剧列表…'}
         onRetry={() => setRetry(value => value + 1)}
       />
       {!loading && !error ? (

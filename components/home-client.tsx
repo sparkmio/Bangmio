@@ -192,21 +192,39 @@ export function HomeClient({ initialHot }: { initialHot: Subject[] }) {
 
   return (
     <div>
-      {!isAuthenticated ? (
-        <section className="mb-10">
-          <div className="rounded-2xl bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 border border-primary/20 p-8 sm:p-12 text-center">
-            <h1 className="text-3xl sm:text-4xl font-black text-primary mb-3">Bangmio</h1>
-            <p className="text-base-content/60 text-sm sm:text-base mb-6 max-w-md mx-auto">
-              愿你活的热烈，活的盛大，活的恣意，活的义无反顾
-            </p>
-            <div className="flex items-center justify-center">
-              <Link href="/login" className="btn btn-primary rounded-full px-6">
-                使用 Bangumi 登录
-              </Link>
-            </div>
-          </div>
-        </section>
-      ) : null}
+      <section className="bm-home-welcome mb-8">
+        <div className="bm-home-welcome-copy">
+          <p className="bm-home-kicker">YOUR ANIME LIBRARY</p>
+          <h1>Bangmio</h1>
+          <p className="bm-home-motto">愿你活的热烈，活的盛大，活的恣意，活的义无反顾</p>
+          <p className="bm-home-description">发现作品、记录进度，也和喜欢同一部番剧的人聊聊。</p>
+          {!isAuthenticated ? (
+            <Link href="/login" className="btn btn-primary bm-home-login">
+              使用 Bangumi 登录
+            </Link>
+          ) : null}
+        </div>
+        <nav className="bm-home-shortcuts" aria-label="快速入口">
+          <Link href="/anime" className="bm-home-shortcut">
+            <span>01</span>
+            <strong>浏览番剧</strong>
+            <small>按类型与标签发现作品</small>
+            <b aria-hidden="true">↗</b>
+          </Link>
+          <Link href="/trending" className="bm-home-shortcut">
+            <span>02</span>
+            <strong>新番时间表</strong>
+            <small>查看本周放送安排</small>
+            <b aria-hidden="true">↗</b>
+          </Link>
+          <Link href="/groups" className="bm-home-shortcut">
+            <span>03</span>
+            <strong>小组讨论</strong>
+            <small>加入作品与兴趣交流</small>
+            <b aria-hidden="true">↗</b>
+          </Link>
+        </nav>
+      </section>
 
       {isAuthenticated ? (
         <section className="mb-10">
