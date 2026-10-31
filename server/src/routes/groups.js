@@ -885,7 +885,7 @@ app.get('/', async c => {
       degraded = true
     }
 
-    cache.set(cacheKey, { data: groups, degraded })
+    if (!degraded) cache.set(cacheKey, { data: groups, degraded: false })
     return c.json({ data: groups, degraded })
   } catch {
     return c.json({

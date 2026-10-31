@@ -10,6 +10,7 @@ import { RichText } from './rich-text'
 import { apiFetch as requestApi, displayName, imageUrl, imageUrls } from '@/lib/api'
 import type { DetailTabKey } from '@/lib/detail-tabs'
 import { extractOtherRatingIds, externalSearchTitle } from '@/lib/other-rating-ids'
+import { animeDetailRetryKey } from '@/lib/anime-detail-recovery'
 import type { ApiResult, ImageSet, Subject } from '@/lib/types'
 
 type Episode = {
@@ -995,6 +996,13 @@ export function AnimeDetail({
 }: Props) {
   // 板块切换已经移到 Dock，Dock 通过 URL ?tab= 导航，服务端把解析结果从 initialTab 传进来。
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab)
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem(animeDetailRetryKey(subject.id))
+    } catch {
+      // Ignore disabled session storage; the detail page itself has loaded successfully.
+    }
+  }, [subject.id])
   useEffect(() => setActiveTab(initialTab), [initialTab])
   // 详情页封面按尺寸从大到小依次回退，全部失败后才显示占位，
   // 避免大图单点失败时列表能看、详情页却只剩“封面暂时无法加载”。

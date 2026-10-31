@@ -42,8 +42,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params
   const response = await safeApiFetchServer<Subject>(`/anime/${id}`)
+  const subjectTitle = response?.data ? displayName(response.data) : `番剧 ${id}`
   return {
-    title: response?.data ? displayName(response.data) : '番组详情',
+    title: { absolute: `${subjectTitle} · Bangmio` },
     description: response?.data?.summary || '查看番组资料、评分、收藏和讨论。'
   }
 }

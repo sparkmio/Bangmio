@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import {
   ANNOUNCEMENT_DISMISSED_KEY,
-  ANNOUNCEMENT_URL,
+  ANNOUNCEMENT_SESSION_KEY,
   AnnouncementPopup
 } from './announcement-popup'
 
@@ -30,14 +30,47 @@ afterEach(async () => {
   vi.useRealTimers()
 })
 
-it('opens on a new visit and displays the live announcement inline', async () => {
+it('opens with readable site-hosted announcement text and no external embed', async () => {
   await act(async () => root.render(<AnnouncementPopup />))
 
   expect(container.querySelector('dialog')?.open).toBe(true)
-  const frame = container.querySelector('iframe')
-  expect(frame?.getAttribute('src')).toBe(ANNOUNCEMENT_URL)
-  expect(frame?.getAttribute('title')).toBe('Bangmio 实时公告')
+  expect(container.textContent).toContain('Bangmio 正在持续维护与改进')
+  expect(container.querySelector('iframe')).toBeNull()
   expect(container.querySelector('a')).toBeNull()
+  expect(localStorage.getItem(ANNOUNCEMENT_SESSION_KEY)).not.toBeNull()
+})
+
+it('does not reopen during the same browsing session after being closed', async () => {
+  vi.useFakeTimers()
+  vi.setSystemTime(new Date(2026, 9, 31, 0))
+  await act(async () => root.render(<AnnouncementPopup />))
+  await act(async () =>
+    container.querySelector<HTMLButtonElement>('[aria-label="关闭公告"]')?.click()
+  )
+
+  vi.advanceTimersByTime(13 * 60 * 60 * 1000)
+
+  await act(async () => root.unmount())
+  root = createRoot(container)
+  await act(async () => root.render(<AnnouncementPopup />))
+
+  expect(container.querySelector('dialog')).toBeNull()
+})
+
+it('shows again on the next local day unless the user snoozed it', async () => {
+  vi.useFakeTimers()
+  vi.setSystemTime(new Date(2026, 9, 31, 23, 59))
+  await act(async () => root.render(<AnnouncementPopup />))
+  await act(async () =>
+    container.querySelector<HTMLButtonElement>('[aria-label="关闭公告"]')?.click()
+  )
+
+  vi.setSystemTime(new Date(2026, 10, 1, 0, 1))
+  await act(async () => root.unmount())
+  root = createRoot(container)
+  await act(async () => root.render(<AnnouncementPopup />))
+
+  expect(container.querySelector('dialog')?.open).toBe(true)
 })
 
 it('suppresses the announcement only for the current local date', async () => {
@@ -65,5 +98,23 @@ it('stores today when the user chooses not to be reminded again', async () => {
   await act(async () => button?.click())
 
   expect(localStorage.getItem(ANNOUNCEMENT_DISMISSED_KEY)).toBe('2026-10-31')
+  expect(localStorage.getItem(ANNOUNCEMENT_SESSION_KEY)).toBe('2026-10-31')
+  expect(container.querySelector('dialog')).toBeNull()
+})
+
+it('closes when another same-origin tab disables reminders for today', async () => {
+  vi.useFakeTimers()
+  vi.setSystemTime(new Date(2026, 9, 31, 12))
+  await act(async () => root.render(<AnnouncementPopup />))
+
+  await act(async () => {
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: ANNOUNCEMENT_DISMISSED_KEY,
+        newValue: '2026-10-31'
+      })
+    )
+  })
+
   expect(container.querySelector('dialog')).toBeNull()
 })

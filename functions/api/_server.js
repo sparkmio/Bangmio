@@ -19351,7 +19351,7 @@ app10.get("/", async (c) => {
       }
       degraded = true;
     }
-    cache6.set(cacheKey2, { data: groups, degraded });
+    if (!degraded) cache6.set(cacheKey2, { data: groups, degraded: false });
     return c.json({ data: groups, degraded });
   } catch {
     return c.json({

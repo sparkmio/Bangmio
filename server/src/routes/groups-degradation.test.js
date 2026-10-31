@@ -35,4 +35,21 @@ describe('group discovery fallback', () => {
     })
     expect(upstream.mock.calls.length).toBeGreaterThan(3)
   })
+
+  it('does not cache a degraded group list as a successful result', async () => {
+    vi.stubGlobal('caches', undefined)
+    const upstream = vi.fn().mockResolvedValue(
+      new Response(`<html><body><h1>暂时不可用</h1><div>${'x'.repeat(600)}</div></body></html>`)
+    )
+    vi.stubGlobal('fetch', upstream)
+
+    const first = await app.request('/', {}, { CF_IP_COUNTRY: 'CN' })
+    const firstCallCount = upstream.mock.calls.length
+    expect(first.status).toBe(200)
+    await expect(first.json()).resolves.toMatchObject({ degraded: true })
+
+    const second = await app.request('/', {}, { CF_IP_COUNTRY: 'CN' })
+    expect(second.status).toBe(200)
+    expect(upstream.mock.calls.length).toBeGreaterThan(firstCallCount)
+  })
 })

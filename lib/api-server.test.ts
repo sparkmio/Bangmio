@@ -51,6 +51,36 @@ describe('server-side API dispatch', () => {
     expect(dispatch).toHaveBeenCalledOnce()
   })
 
+  it('deduplicates concurrent requests for the same public resource', async () => {
+    let release!: (response: Response) => void
+    dispatch.mockImplementation(
+      () => new Promise(resolve => (release = resolve)) as ReturnType<typeof app.fetch>
+    )
+    const path = `/anime/620010?single-flight=${Math.random()}`
+    const first = apiFetchServer(path)
+    const second = apiFetchServer(path)
+
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(dispatch).toHaveBeenCalledOnce()
+    release(new Response('{"data":{"id":620010}}'))
+
+    await expect(Promise.all([first, second])).resolves.toMatchObject([
+      { data: { id: 620010 } },
+      { data: { id: 620010 } }
+    ])
+  })
+
+  it('retries a transient upstream failure once', async () => {
+    dispatch
+      .mockResolvedValueOnce(new Response('{"error":"upstream unavailable"}', { status: 502 }))
+      .mockResolvedValueOnce(new Response('{"data":{"id":620011}}'))
+
+    await expect(apiFetchServer(`/anime/620011?retry=${Math.random()}`)).resolves.toMatchObject({
+      data: { id: 620011 }
+    })
+    expect(dispatch).toHaveBeenCalledTimes(2)
+  })
+
   it('returns a marked last-known anime response during an upstream failure for up to 30 minutes', async () => {
     let now = Date.now()
     vi.spyOn(Date, 'now').mockImplementation(() => now)
@@ -59,7 +89,9 @@ describe('server-side API dispatch', () => {
 
     await apiFetchServer(path)
     now += 121_000
-    dispatch.mockRejectedValueOnce(new Error('upstream unavailable'))
+    dispatch
+      .mockRejectedValueOnce(new Error('upstream unavailable'))
+      .mockRejectedValueOnce(new Error('upstream unavailable'))
 
     await expect(apiFetchServer<{ id: number }>(path)).resolves.toMatchObject({
       data: { id: 620001 },
@@ -67,7 +99,9 @@ describe('server-side API dispatch', () => {
     })
 
     now += 30 * 60_000
-    dispatch.mockRejectedValueOnce(new Error('upstream unavailable'))
+    dispatch
+      .mockRejectedValueOnce(new Error('upstream unavailable'))
+      .mockRejectedValueOnce(new Error('upstream unavailable'))
     await expect(apiFetchServer(path)).rejects.toThrow('upstream unavailable')
   })
 
@@ -79,7 +113,9 @@ describe('server-side API dispatch', () => {
 
     await apiFetchServer(path)
     now += 121_000
-    dispatch.mockRejectedValueOnce(new Error('upstream unavailable'))
+    dispatch
+      .mockRejectedValueOnce(new Error('upstream unavailable'))
+      .mockRejectedValueOnce(new Error('upstream unavailable'))
 
     await expect(apiFetchServer(path)).rejects.toThrow('upstream unavailable')
   })

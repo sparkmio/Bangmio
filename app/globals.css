@@ -3014,11 +3014,22 @@ html[data-theme='dark'] .bm-dock-pill {
     box-shadow 180ms ease;
 }
 
-.bm-anime-card:hover .bm-anime-card-surface,
 .bm-anime-card:focus-visible .bm-anime-card-surface {
-  transform: translateY(-4px);
-  border-color: color-mix(in srgb, var(--bm-accent-strong) 42%, var(--bm-line));
-  box-shadow: 0 12px 26px rgba(29, 17, 21, 0.16);
+  transform: translateY(-3px);
+  border-color: var(--bm-accent-strong);
+  outline: 1px solid color-mix(in srgb, var(--bm-accent-strong) 65%, transparent);
+  outline-offset: 1px;
+  box-shadow: 0 14px 30px rgba(29, 17, 21, 0.2);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .bm-anime-card:hover .bm-anime-card-surface {
+    transform: translateY(-3px);
+    border-color: var(--bm-accent-strong);
+    outline: 1px solid color-mix(in srgb, var(--bm-accent-strong) 65%, transparent);
+    outline-offset: 1px;
+    box-shadow: 0 14px 30px rgba(29, 17, 21, 0.2);
+  }
 }
 
 .bm-announcement-modal {
@@ -3084,22 +3095,25 @@ html[data-theme='dark'] .bm-dock-pill {
 }
 
 .bm-announcement-content {
-  min-height: 0;
-  height: min(62dvh, 620px);
+  min-height: 140px;
   margin-top: 14px;
-  overflow: auto;
+  padding: 16px;
   border: 1px solid var(--bm-line);
   border-radius: 10px;
   background: var(--bm-surface);
 }
 
-.bm-announcement-frame {
-  display: block;
-  width: 100%;
-  height: 100%;
-  min-height: 260px;
-  border: 0;
-  background: var(--bm-surface);
+.bm-announcement-content p {
+  margin: 0;
+  color: var(--bm-text);
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.bm-announcement-content p + p {
+  margin-top: 10px;
+  color: var(--bm-muted);
+  font-size: 12px;
 }
 
 .bm-announcement-actions {
@@ -3203,24 +3217,10 @@ html[data-theme='dark'] .bm-dock-pill {
     padding: 14px;
   }
 
-  .bm-announcement-content {
-    height: min(60dvh, 620px);
-  }
-
   .bm-announcement-actions {
     align-items: center;
     justify-content: flex-end;
     gap: 6px;
-  }
-}
-
-@media (max-height: 520px) {
-  .bm-announcement-content {
-    height: 38dvh;
-  }
-
-  .bm-announcement-frame {
-    min-height: 150px;
   }
 }
 

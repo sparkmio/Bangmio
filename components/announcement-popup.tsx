@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react'
 import { Modal } from './modal'
 
 export const ANNOUNCEMENT_DISMISSED_KEY = 'bangmio:announcement-dismissed-date'
-export const ANNOUNCEMENT_URL =
-  'https://app.notion.com/p/40a0fe6c7f2f80c39299ecb6b5c7bb9b?source=copy_link'
+export const ANNOUNCEMENT_SESSION_KEY = 'bangmio:announcement-session-seen'
 
 function localDateKey(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -18,15 +17,32 @@ export function AnnouncementPopup() {
 
   useEffect(() => {
     try {
-      setOpen(localStorage.getItem(ANNOUNCEMENT_DISMISSED_KEY) !== localDateKey(new Date()))
+      const today = localDateKey(new Date())
+      if (localStorage.getItem(ANNOUNCEMENT_DISMISSED_KEY) === today) return
+      if (localStorage.getItem(ANNOUNCEMENT_SESSION_KEY) === today) return
+
+      localStorage.setItem(ANNOUNCEMENT_SESSION_KEY, today)
+      setOpen(true)
     } catch {
       setOpen(true)
     }
   }, [])
 
+  useEffect(() => {
+    const syncDismissal = (event: StorageEvent) => {
+      if (event.key === ANNOUNCEMENT_DISMISSED_KEY && event.newValue === localDateKey(new Date())) {
+        setOpen(false)
+      }
+      if (event.key === ANNOUNCEMENT_SESSION_KEY && event.newValue) setOpen(false)
+    }
+    window.addEventListener('storage', syncDismissal)
+    return () => window.removeEventListener('storage', syncDismissal)
+  }, [])
+
   const dismissForToday = () => {
     try {
       localStorage.setItem(ANNOUNCEMENT_DISMISSED_KEY, localDateKey(new Date()))
+      localStorage.setItem(ANNOUNCEMENT_SESSION_KEY, localDateKey(new Date()))
     } catch {
       // The dialog should still close when browser storage is unavailable.
     }
@@ -56,12 +72,11 @@ export function AnnouncementPopup() {
           </button>
         </header>
         <div className="bm-announcement-content">
-          <iframe
-            className="bm-announcement-frame"
-            src={ANNOUNCEMENT_URL}
-            title="Bangmio 实时公告"
-            loading="eager"
-          />
+          <p>
+            Bangmio 正在持续维护与改进。番剧、评分、收藏及讨论数据主要来自
+            Bangumi；上游服务波动时，部分内容可能延迟或暂时不可用。
+          </p>
+          <p>感谢理解。网站公告会直接在这里更新。</p>
         </div>
         <footer className="bm-announcement-actions">
           <button className="bm-announcement-snooze" type="button" onClick={dismissForToday}>

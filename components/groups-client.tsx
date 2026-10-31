@@ -116,10 +116,57 @@ function arrayFrom(value: unknown, key?: string) {
   return Array.isArray(source) ? source : []
 }
 
+function isRetryableReadError(error: unknown) {
+  const status = (error as { status?: number } | null)?.status
+  return status === undefined || status === 408 || status === 429 || status >= 500
+}
+
+async function fetchGroupData(path: string, signal: AbortSignal) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const payload = await apiFetch<unknown>(path, { signal })
+      if (payload?.degraded !== true || attempt === 1) return payload
+    } catch (error) {
+      if (signal.aborted || attempt === 1 || !isRetryableReadError(error)) throw error
+    }
+
+    await new Promise(resolve => window.setTimeout(resolve, 150))
+  }
+  throw new Error('小组数据暂时不可用')
+}
+
+function GroupAvatar({ title, source }: { title: string; source: string }) {
+  const image = source.startsWith('//') ? `https:${source}` : source
+  const [failedImage, setFailedImage] = useState('')
+  const [loadedImage, setLoadedImage] = useState('')
+  const canLoadImage = /^https?:\/\//i.test(image) && failedImage !== image
+
+  return (
+    <div
+      className="community-group-avatar relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-base-200"
+      aria-hidden="true"
+    >
+      <span className="absolute inset-0 flex items-center justify-center text-base-content/60">
+        {title.slice(0, 1)}
+      </span>
+      {canLoadImage ? (
+        <img
+          src={image}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onLoad={() => setLoadedImage(image)}
+          onError={() => setFailedImage(image)}
+          className={`absolute inset-0 h-full w-full object-cover ${loadedImage === image ? 'opacity-100' : 'opacity-0'}`}
+        />
+      ) : null}
+    </div>
+  )
+}
+
 function GroupCard({ group, followed = false }: { group: Group; followed?: boolean }) {
   const title = groupTitle(group)
   const image = text(group.avatar || group.icon)
-  const [failedImage, setFailedImage] = useState('')
   return (
     <Link
       href={`/group/${encodeURIComponent(String(group.id))}`}
@@ -127,25 +174,7 @@ function GroupCard({ group, followed = false }: { group: Group; followed?: boole
     >
       <div className="card-body p-4">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-full overflow-hidden bg-base-200 shrink-0">
-            {image && failedImage !== image && /^https?:\/\//i.test(image) ? (
-              <img
-                src={image}
-                alt=""
-                ref={element => {
-                  if (element?.complete && !element.naturalWidth) setFailedImage(image)
-                }}
-                onError={() => setFailedImage(image)}
-                className="w-full h-full object-cover"
-                loading="lazy"
-                decoding="async"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-base-content/40">
-                {title.slice(0, 1)}
-              </div>
-            )}
-          </div>
+          <GroupAvatar title={title} source={image} />
           <div className="min-w-0">
             <p className="font-semibold truncate">{title}</p>
             {text(group.description || group.summary) ? (
@@ -227,6 +256,11 @@ export function GroupsClient({
   const searchGeneration = useRef(0)
   const searchController = useRef<AbortController | null>(null)
   const followedGeneration = useRef(0)
+  const groupsGeneration = useRef(0)
+  const topicsGeneration = useRef(0)
+  const groupsController = useRef<AbortController | null>(null)
+  const topicsController = useRef<AbortController | null>(null)
+  const initialRecoveryStarted = useRef(false)
   const [followedLoading, setFollowedLoading] = useState(false)
   const [allGroups, setAllGroups] = useState<Group[]>(initialGroupList)
   const [allGroupsLoading, setAllGroupsLoading] = useState(false)
@@ -307,10 +341,15 @@ export function GroupsClient({
     }
   }, [searchQuery])
   const loadAllGroups = useCallback(async () => {
+    groupsController.current?.abort()
+    const controller = new AbortController()
+    groupsController.current = controller
+    const generation = ++groupsGeneration.current
     setAllGroupsLoading(true)
     setAllGroupsError('')
     try {
-      const payload = await apiFetch<unknown>('/groups')
+      const payload = await fetchGroupData('/groups', controller.signal)
+      if (generation !== groupsGeneration.current) return
       const groups = arrayFrom(payload?.data, 'groups')
         .map(normalizeGroup)
         .filter(Boolean) as Group[]
@@ -318,21 +357,27 @@ export function GroupsClient({
       setAllGroupsError(
         payload?.degraded === true
           ? groups.length
-            ? '暂时显示上次可用的小组数据，内容可能不是最新。'
+            ? '暂时显示可用的小组数据，内容可能不是最新。'
             : '小组数据暂时不可用，请点击刷新重试。'
           : ''
       )
     } catch (error) {
-      setAllGroupsError(error instanceof Error ? error.message : '小组列表加载失败')
+      if (generation === groupsGeneration.current && !controller.signal.aborted)
+        setAllGroupsError(error instanceof Error ? error.message : '小组列表加载失败')
     } finally {
-      setAllGroupsLoading(false)
+      if (generation === groupsGeneration.current) setAllGroupsLoading(false)
     }
   }, [])
   const loadHotTopics = useCallback(async () => {
+    topicsController.current?.abort()
+    const controller = new AbortController()
+    topicsController.current = controller
+    const generation = ++topicsGeneration.current
     setTopicsLoading(true)
     setTopicsError('')
     try {
-      const payload = await apiFetch<unknown>('/groups/discover')
+      const payload = await fetchGroupData('/groups/discover', controller.signal)
+      if (generation !== topicsGeneration.current) return
       const topics = arrayFrom(payload?.data, 'topics')
         .map(normalizeTopic)
         .filter(Boolean) as Topic[]
@@ -340,14 +385,15 @@ export function GroupsClient({
       setTopicsError(
         payload?.degraded === true
           ? topics.length
-            ? '暂时显示上次成功获取的话题，内容可能不是最新。'
+            ? '暂时显示可用的话题，内容可能不是最新。'
             : '话题数据暂时不可用，请点击刷新重试。'
           : ''
       )
     } catch (error) {
-      setTopicsError(error instanceof Error ? error.message : '热门话题加载失败')
+      if (generation === topicsGeneration.current && !controller.signal.aborted)
+        setTopicsError(error instanceof Error ? error.message : '热门话题加载失败')
     } finally {
-      setTopicsLoading(false)
+      if (generation === topicsGeneration.current) setTopicsLoading(false)
     }
   }, [])
   useEffect(() => {
@@ -371,6 +417,21 @@ export function GroupsClient({
       searchController.current?.abort()
     }
   }, [searchQuery, searchGroups])
+  useEffect(() => {
+    if (initialRecoveryStarted.current) return
+    initialRecoveryStarted.current = true
+    if (groupsFailed || groupsDegraded) void loadAllGroups()
+    if (topicsFailed || topicsDegraded) void loadHotTopics()
+  }, [groupsDegraded, groupsFailed, loadAllGroups, loadHotTopics, topicsDegraded, topicsFailed])
+  useEffect(
+    () => () => {
+      groupsGeneration.current += 1
+      topicsGeneration.current += 1
+      groupsController.current?.abort()
+      topicsController.current?.abort()
+    },
+    []
+  )
 
   return (
     <div className="community-home">

@@ -1,171 +1,127 @@
 'use client'
 
-import Link from 'next/link'
-
-const originalFeatures = [
-  ['OAuth 登录', '一键登录或手动粘贴 Access Token'],
-  ['收藏管理', '想看/在看/看过/搁置/弃番，支持评分和短评'],
-  ['番剧/游戏/书籍/音乐详情', '评分分布、收藏统计、制作人员、角色、相关条目'],
-  ['吐槽箱', '角色页嵌入式展示，番剧/人物页独立子页面'],
-  ['讨论版', '番剧讨论帖列表 + 帖子详情'],
-  ['人物/角色详情', '完整信息展示、参与作品、声优/关联人物、吐槽箱']
-]
-const specialFeatures = [
-  ['豆瓣评分', '一站式查看多平台信息，不用多头跑'],
-  ['相关音乐', '一键跳转该番剧/游戏有关的音乐，不用到处找'],
-  ['萌娘百科', '链接萌娘百科，查看更全的番剧简介'],
-  ['在线观看', '链接第三方番剧在线观看网站，一键跳转在线观看']
+const sections = [
+  {
+    id: 'data-sources',
+    title: '数据来源',
+    content: (
+      <p>
+        Bangmio 是 Bangumi（bgm.tv）的非官方第三方客户端。番剧、人物、角色、小组及讨论等内容主要来自{' '}
+        <a href="https://bgm.tv" target="_blank" rel="noreferrer" className="link link-primary">
+          Bangumi
+        </a>{' '}
+        API 或公开页面；部分扩展信息由相应第三方提供。数据版权及其准确性归原来源所有。
+      </p>
+    )
+  },
+  {
+    id: 'privacy',
+    title: '隐私说明',
+    content: (
+      <>
+        <p>
+          注册 Bangmio 账号时会处理邮箱、密码哈希和账号资料；绑定 Bangumi 后，Bangumi 用户 ID
+          与加密后的授权凭证保存在服务端数据库中。Bangumi OAuth 会话通过 HttpOnly Cookie
+          传递，Bangmio 账号会话令牌及账号资料保存在当前浏览器的 localStorage。
+        </p>
+        <p>
+          主题、动效等界面偏好、AI 对话记录和讨论草稿会保存在当前浏览器的
+          localStorage；清除浏览器站点数据可删除这些本地记录。
+          你主动提交的收藏、评分、评论或讨论会发送到 Bangumi。
+        </p>
+        <p>
+          Bangumi 请求由 Cloudflare Workers 代理和托管。使用 AI 助手时，你发送的问题会提交给智谱
+          AI；只有启用“附带当前公开条目内容”后，才会同时发送相应的公开页面上下文，不会自动发送收藏盒。
+        </p>
+        <p>
+          完整说明见{' '}
+          <a href="/privacy" className="link link-primary">
+            隐私说明
+          </a>
+          。
+        </p>
+      </>
+    )
+  },
+  {
+    id: 'contact',
+    title: '联系方式',
+    content: (
+      <p>
+        暂无独立联系方式（待补充）。目前可通过下方 GitHub 项目或作者 Bangumi
+        主页了解项目与反馈问题。
+      </p>
+    )
+  }
 ]
 
 export default function AboutContent() {
   return (
-    <div className="max-w-2xl mx-auto">
-      <h1 className="text-3xl font-bold mb-2 text-base-content">Bangmio</h1>
-      <p className="text-sm text-base-content/50 mb-2">
-        Bangumi (bgm.tv) 第三方客户端。支持 OAuth
-        登录、动画浏览与搜索、收藏管理、吐槽箱与讨论版查看。
-      </p>
-      <a
-        href="https://bangmio.site"
-        target="_blank"
-        rel="noreferrer"
-        className="text-sm text-primary hover:underline mb-8 block"
-      >
-        在线体验：https://bangmio.site
-      </a>
-      <div className="space-y-6 text-sm leading-relaxed text-base-content/80">
-        <section>
-          <h2 className="text-lg font-semibold mb-3 text-base-content flex items-center gap-2">
-            <span className="w-1 h-4 rounded-full bg-primary" />
-            关于
-          </h2>
-          <p className="mb-2">
-            <em>半个作者的碎碎念(还有半个是AI)</em>
-          </p>
-          <p className="mb-3">
-            <strong>这是一个高中生好玩做的 VibeCoding 项目</strong>，主要是用 DeepSeek V4 Pro 和
-            MiMo-V2.5-Pro 做的，用了快 2亿 tokens，要不是 <strong>DeepSeek</strong>{' '}
-            便宜根本负担不起......
-          </p>
-          <p>
-            本项目使用了{' '}
-            <a href="https://bgm.tv" target="_blank" rel="noreferrer" className="link link-primary">
-              Bangumi
-            </a>{' '}
-            的 API，前端使用 Next.js App Router 复刻原 Vue 3 + Vite 版本，后端继续通过 Cloudflare
-            边缘节点代理 Bangumi 数据。
-          </p>
-        </section>
-        <div className="border-t border-base-300/30" />
-        <section>
-          <h2 className="text-lg font-semibold mb-3 text-base-content flex items-center gap-2">
-            <span className="w-1 h-4 rounded-full bg-secondary" />
-            原版功能（均为 Bangumi 原版提供）
-          </h2>
-          <ul className="space-y-1.5 ml-1">
-            {originalFeatures.map(([title, text]) => (
-              <li className="flex items-start gap-2" key={title}>
-                <span className="text-primary mt-0.5">•</span>
-                <span>
-                  <strong>{title}</strong> — {text}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-xs text-base-content/50">
-            提醒：手动粘贴 Access Token 登录只建议在自己的设备上使用，Token
-            等同于账号凭证，不要分享给他人，也不要在公共设备上保存。
-          </p>
-        </section>
-        <div className="border-t border-base-300/30" />
-        <section>
-          <h2 className="text-lg font-semibold mb-3 text-base-content flex items-center gap-2">
-            <span className="w-1 h-4 rounded-full bg-accent" />
-            特色功能（自己做的新功能）
-          </h2>
-          <ul className="space-y-1.5 ml-1">
-            {specialFeatures.map(([title, text]) => (
-              <li className="flex items-start gap-2" key={title}>
-                <span className="text-primary mt-0.5">•</span>
-                <span>
-                  <strong>{title}</strong> — {text}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-        <div className="border-t border-base-300/30" />
-        <section>
-          <h2 className="text-lg font-semibold mb-3 text-base-content flex items-center gap-2">
-            <span className="w-1 h-4 rounded-full bg-info" />
-            技术栈
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="table table-sm">
-              <thead>
-                <tr>
-                  <th className="text-base-content/50">层</th>
-                  <th className="text-base-content/50">技术</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>前端</td>
-                  <td>Next.js + React + TailwindCSS + DaisyUI</td>
-                </tr>
-                <tr>
-                  <td>后端</td>
-                  <td>Hono（Cloudflare Workers）</td>
-                </tr>
-                <tr>
-                  <td>API</td>
-                  <td>代理 Bangumi API v0 + 网页抓取</td>
-                </tr>
-                <tr>
-                  <td>部署</td>
-                  <td>Cloudflare Workers / OpenNext</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-        <div className="border-t border-base-300/30" />
-        <section>
-          <h2 className="text-lg font-semibold mb-3 text-base-content flex items-center gap-2">
-            <span className="w-1 h-4 rounded-full bg-warning" />
-            相关链接
-          </h2>
-          <div className="space-y-2">
-            <a
-              href="https://bangmio.site"
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-2 text-primary hover:underline"
+    <main className="mx-auto max-w-3xl pb-8" aria-labelledby="about-title">
+      <header className="pb-6">
+        <p className="mb-2 text-xs font-semibold uppercase text-primary">BANGMIO</p>
+        <h1 id="about-title" className="mb-3 text-3xl font-bold text-base-content">
+          关于 Bangmio
+        </h1>
+        <p className="max-w-2xl text-sm leading-7 text-base-content/70">
+          Bangmio 是一个用于发现、浏览和记录番剧的 Bangumi 第三方客户端，基于 Next.js、React 与 Hono
+          构建，部署在 Cloudflare Workers。
+        </p>
+        <a
+          href="https://bangmio.site"
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 inline-block text-sm text-primary hover:underline"
+        >
+          在线体验：bangmio.site
+        </a>
+      </header>
+
+      <div className="divide-y divide-base-300/50 border-y border-base-300/50">
+        {sections.map(section => (
+          <section key={section.id} className="py-5" aria-labelledby={`${section.id}-heading`}>
+            <h2
+              id={`${section.id}-heading`}
+              className="mb-3 text-lg font-semibold text-base-content"
             >
-              <span>🌐</span>网站：https://bangmio.site
-            </a>
+              {section.title}
+            </h2>
+            <div className="space-y-3 text-sm leading-7 text-base-content/75">
+              {section.content}
+            </div>
+          </section>
+        ))}
+      </div>
+
+      <section className="py-5" aria-labelledby="about-links-heading">
+        <h2 id="about-links-heading" className="mb-3 text-lg font-semibold text-base-content">
+          项目与作者
+        </h2>
+        <ul className="space-y-2 text-sm">
+          <li>
+            GitHub：{' '}
             <a
               href="https://github.com/sparkmio/Bangmio"
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-2 text-primary hover:underline"
+              className="link link-primary"
             >
-              <span>⌘</span>GitHub：sparkmio/Bangmio
+              sparkmio/Bangmio
             </a>
+          </li>
+          <li>
+            作者 Bangumi 主页：{' '}
             <a
               href="https://bgm.tv/user/acgpzh"
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-2 text-primary hover:underline"
+              className="link link-primary"
             >
-              <span>◎</span>作者 Bangumi 主页：acgpzh
+              acgpzh
             </a>
-          </div>
-        </section>
-      </div>
-      <Link href="/" className="inline-block mt-8 text-sm text-primary hover-underline-wipe">
-        ← 返回首页
-      </Link>
-    </div>
+          </li>
+        </ul>
+      </section>
+    </main>
   )
 }

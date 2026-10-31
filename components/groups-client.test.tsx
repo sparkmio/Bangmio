@@ -101,3 +101,33 @@ it('discards followed data after logout', async () => {
   expect(container.textContent).not.toContain('旧账号的小组')
   expect(container.textContent).toContain('登录后查看')
 })
+
+it('automatically retries the initial degraded groups response once', async () => {
+  mocks.api
+    .mockResolvedValueOnce({ data: [], degraded: true })
+    .mockResolvedValueOnce({ data: [{ id: 'recover', name: '恢复后的小组' }], degraded: false })
+
+  await act(async () =>
+    root.render(<GroupsClient initialGroups={[]} initialTopics={[]} groupsDegraded />)
+  )
+  await act(async () => vi.advanceTimersByTimeAsync(151))
+
+  expect(mocks.api).toHaveBeenCalledTimes(2)
+  expect(container.textContent).toContain('恢复后的小组')
+  expect(container.querySelector('.community-group-avatar')?.textContent).toContain('恢')
+})
+
+it('automatically retries initial topic failures and renders the recovered topics', async () => {
+  mocks.api.mockRejectedValueOnce(new Error('upstream unavailable')).mockResolvedValueOnce({
+    data: [{ id: '321', title: '恢复后的话题', group_name: '测试组' }],
+    degraded: false
+  })
+
+  await act(async () =>
+    root.render(<GroupsClient initialGroups={[]} initialTopics={[]} topicsFailed />)
+  )
+  await act(async () => vi.advanceTimersByTimeAsync(151))
+
+  expect(mocks.api).toHaveBeenCalledTimes(2)
+  expect(container.textContent).toContain('恢复后的话题')
+})

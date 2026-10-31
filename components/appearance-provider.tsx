@@ -46,21 +46,34 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   const [glass, setGlassState] = useState(true)
 
   useEffect(() => {
-    let savedTheme: Theme = 'light'
-    try {
-      savedTheme = window.localStorage.getItem('theme') === 'dark' ? 'dark' : 'light'
-    } catch {
-      // Private browsing/storage-disabled environments use the defaults.
+    const syncAppearance = () => {
+      let savedTheme: Theme = 'light'
+      try {
+        savedTheme = window.localStorage.getItem('theme') === 'dark' ? 'dark' : 'light'
+      } catch {
+        // Private browsing/storage-disabled environments use the defaults.
+      }
+      const savedMotion = readBoolean(
+        'appearance-motion',
+        !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      )
+      const savedGlass = readBoolean('appearance-glass', true)
+      setTheme(savedTheme)
+      setMotionState(savedMotion)
+      setGlassState(savedGlass)
+      applyAppearance(savedTheme, savedMotion, savedGlass)
     }
-    const savedMotion = readBoolean(
-      'appearance-motion',
-      !window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    )
-    const savedGlass = readBoolean('appearance-glass', true)
-    setTheme(savedTheme)
-    setMotionState(savedMotion)
-    setGlassState(savedGlass)
-    applyAppearance(savedTheme, savedMotion, savedGlass)
+    const syncOtherTab = (event: StorageEvent) => {
+      if (
+        event.key === null ||
+        ['theme', 'appearance-motion', 'appearance-glass'].includes(event.key)
+      )
+        syncAppearance()
+    }
+
+    syncAppearance()
+    window.addEventListener('storage', syncOtherTab)
+    return () => window.removeEventListener('storage', syncOtherTab)
   }, [])
 
   const toggleTheme = useCallback(() => {
