@@ -54,5 +54,6 @@ export type ApiResult<T> = {
   total?: number
   error?: string
   degraded?: boolean
+  degradedSources?: Record<string, boolean>
   stale?: boolean
 }

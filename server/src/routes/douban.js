@@ -3,6 +3,7 @@ import { parseHTML } from 'linkedom'
 import * as bangumiService from '../services/bangumi.js'
 import {
   searchDouban,
+  findDoubanCandidate,
   getDoubanAbstract,
   getDoubanComments,
   getDoubanReviews,
@@ -129,48 +130,69 @@ function makeDoubanBid() {
 }
 
 async function findDoubanMatch(detail) {
-  const names = [...new Set([detail.name, detail.name_cn].filter(Boolean))]
+  const infoboxNames = (detail.infobox || [])
+    .filter(item => /english|英文|romaji|roman|罗马音|罗马字/i.test(String(item?.key || '')))
+    .flatMap(item => {
+      const value = item?.value
+      if (typeof value === 'string') return [value]
+      if (Array.isArray(value)) return value.filter(item => typeof item === 'string')
+      if (value && typeof value === 'object')
+        return Object.values(value).filter(item => typeof item === 'string')
+      return []
+    })
+  const names = [
+    ...new Set([detail.name_cn, detail.name, detail.name_en, ...infoboxNames].filter(Boolean))
+  ]
   if (!names.length) return null
 
+  const suggestions = new Map()
   for (const name of names) {
-    const suggestions = await searchDouban(name)
-    if (!suggestions.length) continue
-    const match =
-      suggestions.find(
-        s => s.title === name || s.title === detail.name_cn || s.title === detail.name
-      ) || suggestions[0]
-    if (match) return match
+    for (const candidate of await searchDouban(name)) suggestions.set(candidate.id, candidate)
   }
-  return null
+  const year = String(detail.date || detail.air_date || '').match(/(?:19|20)\d{2}/)?.[0] || ''
+  return findDoubanCandidate([...suggestions.values()], names, year) || null
+}
+
+async function buildDoubanResult(match) {
+  if (!match) return null
+  const abstract = await getDoubanAbstract(match.id)
+  return {
+    id: match.id,
+    title: abstract?.title || match.title,
+    rate: abstract?.rate || match.rate || '0',
+    star: abstract?.star ?? match.star ?? 0,
+    episodes_count: abstract?.episodes_count || 0,
+    release_year: abstract?.release_year || match.year || '',
+    types: abstract?.types || [],
+    short_comment: abstract?.short_comment || null,
+    url: abstract?.url || `https://movie.douban.com/subject/${match.id}/`
+  }
 }
 
 app.get('/by-name', async c => {
   try {
-    const name = c.req.query('name')
-    if (!name) return c.json({ data: null })
-    const cacheKey = `douban_name_${name}`
+    const names = [
+      ...new Set((c.req.queries('name') || []).map(name => name.trim()).filter(Boolean))
+    ]
+      .filter(name => name.length <= 120)
+      .slice(0, 6)
+    const year = c.req.query('year') || ''
+    if (year && !/^\d{4}$/.test(year)) return c.json({ error: '年份不合法' }, 400)
+    if (!names.length) return c.json({ data: null })
+    const cacheKey = `douban_name_${JSON.stringify(names)}_${year}`
     const cached = cache.get(cacheKey)
-    if (cached) return c.json({ data: cached })
+    if (cached) return c.json({ data: cached.notFound ? null : cached })
 
-    // 直接用番名搜豆瓣，不依赖 Bangumi API（避免镜像/被墙影响）
-    const suggestions = await searchDouban(name)
-    const match = suggestions?.[0]
+    const suggestions = new Map()
+    for (const name of names.slice(0, 4)) {
+      for (const candidate of await searchDouban(name)) suggestions.set(candidate.id, candidate)
+    }
+    const match = findDoubanCandidate([...suggestions.values()], names, year)
     if (!match) {
-      cache.set(cacheKey, null)
+      cache.set(cacheKey, { notFound: true })
       return c.json({ data: null })
     }
-    const abstract = await getDoubanAbstract(match.id)
-    const data = {
-      id: match.id,
-      title: abstract?.title || match.title,
-      rate: abstract?.rate || '0',
-      star: abstract?.star || 0,
-      episodes_count: abstract?.episodes_count || 0,
-      release_year: abstract?.release_year || '',
-      types: abstract?.types || [],
-      short_comment: abstract?.short_comment || null,
-      url: `https://movie.douban.com/subject/${match.id}`
-    }
+    const data = await buildDoubanResult(match)
     cache.set(cacheKey, data)
     return c.json({ data })
   } catch {
@@ -186,21 +208,7 @@ app.get('/:id', async c => {
     const detail = await bangumiService.getAnimeDetail(subjectId, { isChina: cn })
     if (!detail) return c.json({ data: null })
     const match = await findDoubanMatch(detail)
-    if (!match) return c.json({ data: null })
-    const abstract = await getDoubanAbstract(match.id)
-    return c.json({
-      data: {
-        id: match.id,
-        title: abstract?.title || match.title,
-        rate: abstract?.rate || '0',
-        star: abstract?.star || 0,
-        episodes_count: abstract?.episodes_count || 0,
-        release_year: abstract?.release_year || '',
-        types: abstract?.types || [],
-        short_comment: abstract?.short_comment || null,
-        url: `https://movie.douban.com/subject/${match.id}`
-      }
-    })
+    return c.json({ data: await buildDoubanResult(match) })
   } catch {
     return c.json({ data: null })
   }

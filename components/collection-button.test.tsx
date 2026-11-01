@@ -32,6 +32,11 @@ describe('collection editor long-series regression', () => {
     expect(container.querySelectorAll('.bm-watch-progress-episodes button')).toHaveLength(100)
     expect(container.textContent).toContain('在读')
     expect(container.querySelector('[aria-label="标记看到第 101 集"]')).toBeTruthy()
+    expect(
+      container
+        .querySelector('.bm-collection-toolbar')
+        ?.contains(container.querySelector('.bm-watch-progress-card'))
+    ).toBe(true)
     const select = container.querySelector('[aria-label="进度页"]') as HTMLSelectElement
     await act(async () => {
       select.value = '11'

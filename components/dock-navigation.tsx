@@ -368,11 +368,6 @@ function BackIcon({ className }: { className?: string }) {
   )
 }
 
-const activePillStyle = {
-  background: 'color-mix(in srgb, var(--bm-accent) 22%, var(--bm-surface) 78%)',
-  color: 'var(--bm-accent)'
-} as const
-
 function DesktopDetailTabPills({
   detailId,
   activeTab
@@ -392,7 +387,6 @@ function DesktopDetailTabPills({
             aria-current={isActive ? 'page' : undefined}
             aria-label={label}
             className={`bm-dock-pill bm-dock-icon-button bm-dock-desktop-detail-pill ${isActive ? 'bm-dock-pill-active' : ''}`}
-            style={isActive ? activePillStyle : undefined}
           >
             <Icon className="w-5 h-5" />
             <span className="bm-dock-label">{label}</span>
@@ -423,7 +417,6 @@ function MobileDetailTabPills({
             aria-label={label}
             title={label}
             className={`bm-dock-pill bm-dock-icon-button bm-dock-mobile-detail-pill ${isActive ? 'bm-dock-pill-active' : ''}`}
-            style={isActive ? activePillStyle : undefined}
           >
             <Icon className="w-5 h-5" />
           </Link>
@@ -523,7 +516,6 @@ export function DockNavigation() {
                     aria-label={item.label}
                     aria-current={isActive ? 'page' : undefined}
                     className={`bm-dock-pill bm-dock-desktop-action ${isActive ? 'bm-dock-pill-active' : ''}`}
-                    style={isActive ? activePillStyle : undefined}
                   >
                     <Icon className="w-5 h-5 shrink-0" />
                     <span className="bm-dock-label">{item.label}</span>
@@ -602,7 +594,6 @@ export function DockNavigation() {
                   title={item.label}
                   aria-current={isActive ? 'page' : undefined}
                   className={`bm-dock-pill bm-dock-mobile-pill ${isActive ? 'bm-dock-pill-active' : ''}`}
-                  style={isActive ? activePillStyle : undefined}
                 >
                   <Icon className="w-6 h-6" />
                 </Link>
@@ -614,7 +605,6 @@ export function DockNavigation() {
               title={auth.isAuthenticated ? '我的' : '登录'}
               aria-current={pathname === '/profile' ? 'page' : undefined}
               className={`bm-dock-pill bm-dock-mobile-pill ${pathname === '/profile' ? 'bm-dock-pill-active' : ''}`}
-              style={pathname === '/profile' ? activePillStyle : undefined}
             >
               {avatarSrc ? (
                 <img

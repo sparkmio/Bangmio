@@ -17575,6 +17575,7 @@ function parseMobileSearch(json) {
     return {
       id: String(target.id),
       title: target.title || "",
+      original_title: target.original_title || "",
       year: target.year || "",
       rate: getRating(target),
       star: getStar(target),
@@ -17582,6 +17583,26 @@ function parseMobileSearch(json) {
       type: item.target_type
     };
   });
+}
+function normalizeTitle(value) {
+  return String(value || "").normalize("NFKC").toLocaleLowerCase().replace(/[\p{P}\p{S}\s]/gu, "");
+}
+function candidateYear(item) {
+  return Number(String(item?.year || item?.release_year || "").match(/(?:19|20)\d{2}/)?.[0]) || 0;
+}
+function findDoubanCandidate(items, names, year = "") {
+  const normalizedNames = names.map(normalizeTitle).filter(Boolean);
+  const targetYear = Number(year) || 0;
+  return (Array.isArray(items) ? items : []).map((item) => {
+    const itemTitles = [item?.title, item?.original_title].map(normalizeTitle).filter(Boolean);
+    const titleIndex = normalizedNames.findIndex((name) => itemTitles.includes(name));
+    const itemYear = candidateYear(item);
+    return titleIndex < 0 ? null : {
+      item,
+      titleIndex,
+      yearDistance: targetYear && itemYear ? Math.abs(targetYear - itemYear) : targetYear ? 1e3 : 0
+    };
+  }).filter(Boolean).filter((match2) => !targetYear || !candidateYear(match2.item) || match2.yearDistance <= 3).sort((a, b) => a.yearDistance - b.yearDistance || a.titleIndex - b.titleIndex)[0]?.item;
 }
 async function searchDouban(name) {
   if (!name) return [];
@@ -17877,43 +17898,61 @@ function makeDoubanBid() {
   ).join("");
 }
 async function findDoubanMatch(detail) {
-  const names = [...new Set([detail.name, detail.name_cn].filter(Boolean))];
+  const infoboxNames = (detail.infobox || []).filter((item) => /english|英文|romaji|roman|罗马音|罗马字/i.test(String(item?.key || ""))).flatMap((item) => {
+    const value = item?.value;
+    if (typeof value === "string") return [value];
+    if (Array.isArray(value)) return value.filter((item2) => typeof item2 === "string");
+    if (value && typeof value === "object")
+      return Object.values(value).filter((item2) => typeof item2 === "string");
+    return [];
+  });
+  const names = [
+    ...new Set([detail.name_cn, detail.name, detail.name_en, ...infoboxNames].filter(Boolean))
+  ];
   if (!names.length) return null;
+  const suggestions = /* @__PURE__ */ new Map();
   for (const name of names) {
-    const suggestions = await searchDouban(name);
-    if (!suggestions.length) continue;
-    const match2 = suggestions.find(
-      (s) => s.title === name || s.title === detail.name_cn || s.title === detail.name
-    ) || suggestions[0];
-    if (match2) return match2;
+    for (const candidate of await searchDouban(name)) suggestions.set(candidate.id, candidate);
   }
-  return null;
+  const year = String(detail.date || detail.air_date || "").match(/(?:19|20)\d{2}/)?.[0] || "";
+  return findDoubanCandidate([...suggestions.values()], names, year) || null;
+}
+async function buildDoubanResult(match2) {
+  if (!match2) return null;
+  const abstract = await getDoubanAbstract(match2.id);
+  return {
+    id: match2.id,
+    title: abstract?.title || match2.title,
+    rate: abstract?.rate || match2.rate || "0",
+    star: abstract?.star ?? match2.star ?? 0,
+    episodes_count: abstract?.episodes_count || 0,
+    release_year: abstract?.release_year || match2.year || "",
+    types: abstract?.types || [],
+    short_comment: abstract?.short_comment || null,
+    url: abstract?.url || `https://movie.douban.com/subject/${match2.id}/`
+  };
 }
 app6.get("/by-name", async (c) => {
   try {
-    const name = c.req.query("name");
-    if (!name) return c.json({ data: null });
-    const cacheKey2 = `douban_name_${name}`;
+    const names = [
+      ...new Set((c.req.queries("name") || []).map((name) => name.trim()).filter(Boolean))
+    ].filter((name) => name.length <= 120).slice(0, 6);
+    const year = c.req.query("year") || "";
+    if (year && !/^\d{4}$/.test(year)) return c.json({ error: "\u5E74\u4EFD\u4E0D\u5408\u6CD5" }, 400);
+    if (!names.length) return c.json({ data: null });
+    const cacheKey2 = `douban_name_${JSON.stringify(names)}_${year}`;
     const cached = cache2.get(cacheKey2);
-    if (cached) return c.json({ data: cached });
-    const suggestions = await searchDouban(name);
-    const match2 = suggestions?.[0];
+    if (cached) return c.json({ data: cached.notFound ? null : cached });
+    const suggestions = /* @__PURE__ */ new Map();
+    for (const name of names.slice(0, 4)) {
+      for (const candidate of await searchDouban(name)) suggestions.set(candidate.id, candidate);
+    }
+    const match2 = findDoubanCandidate([...suggestions.values()], names, year);
     if (!match2) {
-      cache2.set(cacheKey2, null);
+      cache2.set(cacheKey2, { notFound: true });
       return c.json({ data: null });
     }
-    const abstract = await getDoubanAbstract(match2.id);
-    const data = {
-      id: match2.id,
-      title: abstract?.title || match2.title,
-      rate: abstract?.rate || "0",
-      star: abstract?.star || 0,
-      episodes_count: abstract?.episodes_count || 0,
-      release_year: abstract?.release_year || "",
-      types: abstract?.types || [],
-      short_comment: abstract?.short_comment || null,
-      url: `https://movie.douban.com/subject/${match2.id}`
-    };
+    const data = await buildDoubanResult(match2);
     cache2.set(cacheKey2, data);
     return c.json({ data });
   } catch {
@@ -17928,21 +17967,7 @@ app6.get("/:id", async (c) => {
     const detail = await getAnimeDetail(subjectId, { isChina: cn });
     if (!detail) return c.json({ data: null });
     const match2 = await findDoubanMatch(detail);
-    if (!match2) return c.json({ data: null });
-    const abstract = await getDoubanAbstract(match2.id);
-    return c.json({
-      data: {
-        id: match2.id,
-        title: abstract?.title || match2.title,
-        rate: abstract?.rate || "0",
-        star: abstract?.star || 0,
-        episodes_count: abstract?.episodes_count || 0,
-        release_year: abstract?.release_year || "",
-        types: abstract?.types || [],
-        short_comment: abstract?.short_comment || null,
-        url: `https://movie.douban.com/subject/${match2.id}`
-      }
-    });
+    return c.json({ data: await buildDoubanResult(match2) });
   } catch {
     return c.json({ data: null });
   }
@@ -19854,6 +19879,7 @@ var FRESH_TTL = 6 * 60 * 60 * 1e3;
 var STALE_TTL = 7 * 24 * 60 * 60 * 1e3;
 var freshCache = createCache(FRESH_TTL, 500);
 var staleCache = createCache(STALE_TTL, 500);
+var searchCache = createCache(FRESH_TTL, 500);
 function ratingCount(value) {
   if (value == null || String(value).trim() === "") return null;
   const count = Number(String(value ?? "").replace(/,/g, ""));
@@ -19881,6 +19907,37 @@ function findAggregateRating(value) {
     if (result) return result;
   }
   return null;
+}
+function normalizeTitle2(value) {
+  return String(value || "").normalize("NFKC").toLocaleLowerCase().replace(/[\p{P}\p{S}\s]/gu, "");
+}
+function candidateTitles(item) {
+  return [
+    item?.title,
+    item?.title_english,
+    item?.title_japanese,
+    ...Array.isArray(item?.title_synonyms) ? item.title_synonyms : [],
+    ...Array.isArray(item?.titles) ? item.titles.map((title) => title?.title) : []
+  ].map(normalizeTitle2).filter(Boolean);
+}
+function candidateYear2(item) {
+  const value = String(item?.year || item?.aired?.from || item?.release_year || "");
+  return Number(value.match(/(?:19|20)\d{2}/)?.[0]) || 0;
+}
+function exactTitleMatch(item, titles, year) {
+  const knownTitles = candidateTitles(item);
+  const titleIndex = titles.findIndex((title) => knownTitles.includes(normalizeTitle2(title)));
+  if (titleIndex < 0) return null;
+  const candidateYearValue = candidateYear2(item);
+  const targetYear = Number(year) || 0;
+  const yearDistance = targetYear && candidateYearValue ? Math.abs(targetYear - candidateYearValue) : targetYear ? 1e3 : 0;
+  return { item, titleIndex, yearDistance };
+}
+function chooseExactTitleMatch(items, titles, year) {
+  return (Array.isArray(items) ? items : []).map((item) => exactTitleMatch(item, titles, year)).filter(Boolean).filter((match2) => !Number(year) || !candidateYear2(match2.item) || match2.yearDistance <= 3).sort((a, b) => a.yearDistance - b.yearDistance || a.titleIndex - b.titleIndex)[0]?.item;
+}
+function searchKey(provider, titles, year) {
+  return `${provider}:${Number(year) || ""}:${titles.map(normalizeTitle2).join("|")}`;
 }
 async function cachedRating({ source, id, url, load }) {
   const key2 = `${source}:${id}`;
@@ -19927,6 +19984,55 @@ async function getMalRating(id) {
     }
   });
 }
+async function getMalRatingByTitle(titles, year) {
+  if (!titles.length) return { data: null, degraded: false };
+  const key2 = searchKey("mal", titles, year);
+  const cached = searchCache.get(key2);
+  if (cached) return cached.notFound ? { data: null, degraded: false } : cached;
+  const startedAt = Date.now();
+  try {
+    for (const title of titles.slice(0, 3)) {
+      const params = new URLSearchParams({ q: title, limit: "10", sfw: "true" });
+      const response = await fetch(`https://api.jikan.moe/v4/anime?${params}`, {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(5e3)
+      });
+      if (!response.ok)
+        throw Object.assign(new Error("MAL title search failed"), { status: response.status });
+      const payload = await response.json();
+      const match2 = chooseExactTitleMatch(payload?.data, titles, year);
+      if (!match2) continue;
+      const id = String(match2.mal_id || "");
+      const result = {
+        data: id ? {
+          id,
+          score: numericScore(match2.score),
+          votes: ratingCount(match2.scored_by),
+          url: match2.url || `https://myanimelist.net/anime/${id}`
+        } : null,
+        degraded: false
+      };
+      if (result.data) {
+        freshCache.set(`MyAnimeList:${id}`, result.data);
+        staleCache.set(`MyAnimeList:${id}`, result.data);
+        staleCache.set(`MyAnimeList:search:${key2}`, result.data);
+      }
+      searchCache.set(key2, result.data ? result : { notFound: true });
+      return result;
+    }
+    searchCache.set(key2, { notFound: true });
+    return { data: null, degraded: false };
+  } catch (error) {
+    logWarn("\u5916\u90E8\u8BC4\u5206\u6E90\u6807\u9898\u68C0\u7D22\u5931\u8D25", {
+      source: "MyAnimeList",
+      upstreamStatus: error?.status,
+      errorName: error?.name,
+      causeName: error?.cause?.name,
+      durationMs: Date.now() - startedAt
+    });
+    return { data: staleCache.get(`MyAnimeList:search:${key2}`), degraded: true };
+  }
+}
 async function getImdbRating(id) {
   const url = `https://www.imdb.com/title/${id}/`;
   return cachedRating({
@@ -19963,14 +20069,84 @@ async function getImdbRating(id) {
     }
   });
 }
-async function getOtherRatings({ malId = "", imdbId = "" } = {}) {
+function imdbSearchCandidates(html) {
+  const { document } = parseHTML(html);
+  const candidates = [];
+  for (const anchor of document.querySelectorAll("a[href]")) {
+    const href = anchor.getAttribute("href") || "";
+    const id = href.match(/(?:imdb\.com)?\/title\/(tt\d{5,12})(?:\/|\?|$)/i)?.[1];
+    const title = (anchor.textContent || "").trim().replace(/\s*\((?:19|20)\d{2}(?:[–-](?:19|20)?\d{2})?\)\s*$/, "");
+    if (!id || !title) continue;
+    const containerText = anchor.parentElement?.textContent || anchor.textContent || "";
+    candidates.push({
+      id: id.toLowerCase(),
+      title,
+      year: Number(containerText.match(/(?:19|20)\d{2}/)?.[0]) || 0
+    });
+  }
+  return candidates;
+}
+async function getImdbIdByTitle(titles, year) {
+  if (!titles.length) return "";
+  const key2 = searchKey("imdb", titles, year);
+  const cached = searchCache.get(key2);
+  if (cached) return cached.id || "";
+  for (const title of titles.slice(0, 3)) {
+    const params = new URLSearchParams({ q: title, s: "tt", exact: "true" });
+    const response = await fetch(`https://www.imdb.com/find/?${params}`, {
+      headers: {
+        Accept: "text/html,application/xhtml+xml",
+        "User-Agent": "Mozilla/5.0 (compatible; Bangmio/1.0)"
+      },
+      signal: AbortSignal.timeout(5e3)
+    });
+    if (!response.ok)
+      throw Object.assign(new Error("IMDb title search failed"), { status: response.status });
+    const match2 = chooseExactTitleMatch(imdbSearchCandidates(await response.text()), titles, year);
+    if (!match2) continue;
+    searchCache.set(key2, { id: match2.id });
+    return match2.id;
+  }
+  searchCache.set(key2, { notFound: true });
+  return "";
+}
+async function getImdbRatingByTitle(titles, year) {
+  const startedAt = Date.now();
+  try {
+    const id = await getImdbIdByTitle(titles, year);
+    if (!id) return { data: null, degraded: false };
+    return getImdbRating(id);
+  } catch (error) {
+    logWarn("\u5916\u90E8\u8BC4\u5206\u6E90\u6807\u9898\u68C0\u7D22\u5931\u8D25", {
+      source: "IMDb",
+      upstreamStatus: error?.status,
+      errorName: error?.name,
+      causeName: error?.cause?.name,
+      durationMs: Date.now() - startedAt
+    });
+    return { data: null, degraded: true };
+  }
+}
+async function getRatingWithTitleFallback(id, titles, year, loadById, loadByTitle) {
+  if (!id) return loadByTitle(titles, year);
+  const linked = await loadById(id);
+  if (linked.data || !titles.length) return linked;
+  const searched = await loadByTitle(titles, year);
+  return {
+    data: searched.data || linked.data || null,
+    degraded: searched.degraded || !searched.data && linked.degraded
+  };
+}
+async function getOtherRatings({ malId = "", imdbId = "", titles = [], year = "" } = {}) {
+  const searchTitles = [...new Set(titles.map((title) => String(title || "").trim()).filter(Boolean))];
   const [mal, imdb] = await Promise.all([
-    malId ? getMalRating(malId) : Promise.resolve({ data: null, degraded: false }),
-    imdbId ? getImdbRating(imdbId) : Promise.resolve({ data: null, degraded: false })
+    getRatingWithTitleFallback(malId, searchTitles, year, getMalRating, getMalRatingByTitle),
+    getRatingWithTitleFallback(imdbId, searchTitles, year, getImdbRating, getImdbRatingByTitle)
   ]);
   return {
     data: { mal: mal.data, imdb: imdb.data },
-    degraded: mal.degraded || imdb.degraded
+    degraded: mal.degraded || imdb.degraded,
+    degradedSources: { mal: mal.degraded, imdb: imdb.degraded }
   };
 }
 
@@ -19979,11 +20155,16 @@ var app14 = new Hono3();
 app14.get("/other", async (c) => {
   const rawMalId = c.req.query("mal_id") || "";
   const rawImdbId = c.req.query("imdb_id") || "";
+  const titles = [
+    ...new Set((c.req.queries("title") || []).map((title) => title.trim()).filter(Boolean))
+  ].filter((title) => title.length <= 120).slice(0, 5);
+  const year = c.req.query("year") || "";
   const malId = /^\d{1,10}$/.test(rawMalId) && Number(rawMalId) > 0 ? rawMalId : "";
   const imdbId = /^tt\d{5,12}$/i.test(rawImdbId) ? rawImdbId.toLowerCase() : "";
   if (rawMalId && !malId || rawImdbId && !imdbId)
     return c.json({ error: "\u5916\u90E8\u6761\u76EE\u7F16\u53F7\u4E0D\u5408\u6CD5" }, 400);
-  const result = await getOtherRatings({ malId, imdbId });
+  if (year && !/^\d{4}$/.test(year)) return c.json({ error: "\u5E74\u4EFD\u4E0D\u5408\u6CD5" }, 400);
+  const result = await getOtherRatings({ malId, imdbId, titles, year });
   return c.json(result);
 });
 var ratings_default = app14;

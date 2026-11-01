@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { extractOtherRatingIds, externalSearchTitle } from './other-rating-ids'
+import {
+  doubanSearchTitles,
+  extractOtherRatingIds,
+  externalSearchTitle,
+  externalSearchTitles
+} from './other-rating-ids'
 
 describe('external rating ID extraction', () => {
   it('extracts only explicit MAL and IMDb IDs from infobox links', () => {
@@ -46,6 +51,40 @@ describe('external rating search titles', () => {
         infobox: [{ key: '英文名', value: 'Fullmetal Alchemist' }]
       })
     ).toBe('Fullmetal Alchemist')
+  })
+
+  it('keeps multiple non-Chinese aliases for provider search', () => {
+    expect(
+      externalSearchTitles({
+        name: '鋼の錬金術師',
+        name_cn: '钢之炼金术师',
+        name_en: 'Fullmetal Alchemist',
+        infobox: [{ key: '罗马音', value: 'Hagane no Renkinjutsushi' }]
+      })
+    ).toEqual(['Fullmetal Alchemist', 'Hagane no Renkinjutsushi', '鋼の錬金術師'])
+  })
+
+  it('does not treat infobox URLs as searchable titles', () => {
+    expect(
+      externalSearchTitles({
+        infobox: [
+          {
+            key: '英文名',
+            value: { v: 'Fullmetal Alchemist', link: 'https://example.com/anime/1' }
+          }
+        ]
+      })
+    ).toEqual(['Fullmetal Alchemist'])
+  })
+
+  it('prioritizes the Chinese display name for Douban while retaining alternate titles', () => {
+    expect(
+      doubanSearchTitles({
+        name: '鋼の錬金術師',
+        name_cn: '钢之炼金术师',
+        name_en: 'Fullmetal Alchemist'
+      })
+    ).toEqual(['钢之炼金术师', '鋼の錬金術師', 'Fullmetal Alchemist'])
   })
 
   it('does not fall back to the Chinese translation when no original title exists', () => {

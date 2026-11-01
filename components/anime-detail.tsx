@@ -9,7 +9,12 @@ import { AnimeGrid } from './anime-card'
 import { RichText } from './rich-text'
 import { apiFetch as requestApi, displayName, imageUrl, imageUrls } from '@/lib/api'
 import type { DetailTabKey } from '@/lib/detail-tabs'
-import { extractOtherRatingIds, externalSearchTitle } from '@/lib/other-rating-ids'
+import {
+  doubanSearchTitles,
+  extractOtherRatingIds,
+  externalSearchTitle,
+  externalSearchTitles
+} from '@/lib/other-rating-ids'
 import { animeDetailRetryKey } from '@/lib/anime-detail-recovery'
 import type { ApiResult, ImageSet, Subject } from '@/lib/types'
 
@@ -67,7 +72,10 @@ type DoubanComment = {
 }
 type DoubanReview = DoubanComment & { title?: string }
 type ExternalRating = { id?: string; score?: number | null; votes?: number | null; url?: string }
-type OtherRatings = { mal?: ExternalRating | null; imdb?: ExternalRating | null }
+type OtherRatings = {
+  mal?: ExternalRating | null
+  imdb?: ExternalRating | null
+}
 type WikipediaResult = { title?: string; description?: string; extract?: string; url?: string }
 type MusicResult = {
   id?: number | string
@@ -385,32 +393,39 @@ function CoverImage({ src, alt = '' }: { src?: string; alt?: string }) {
 
 function OtherRatingsPanel({ subject }: { subject: Subject }) {
   const searchTitle = externalSearchTitle(subject)
+  const searchTitles = useMemo(() => externalSearchTitles(subject), [subject])
+  const year = String(subject.air_date || subject.date || '').match(/(?:19|20)\d{2}/)?.[0] || ''
   const { malId, imdbId } = extractOtherRatingIds(subject.infobox || [])
   const [ratings, setRatings] = useState<OtherRatings | null>(null)
-  const [loading, setLoading] = useState(Boolean(malId || imdbId))
-  const [failed, setFailed] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [failedSources, setFailedSources] = useState({ mal: false, imdb: false })
 
   useEffect(() => {
     let alive = true
-    if (!malId && !imdbId) {
+    if (!malId && !imdbId && !searchTitles.length) {
       setRatings(null)
       setLoading(false)
-      setFailed(false)
+      setFailedSources({ mal: false, imdb: false })
       return
     }
     const query = new URLSearchParams()
     if (malId) query.set('mal_id', malId)
     if (imdbId) query.set('imdb_id', imdbId)
+    for (const title of searchTitles) query.append('title', title)
+    if (year) query.set('year', year)
     setLoading(true)
-    setFailed(false)
+    setFailedSources({ mal: false, imdb: false })
     void requestApi<OtherRatings>(`/ratings/other?${query.toString()}`)
       .then(payload => {
         if (!alive) return
         setRatings(payload.data || null)
-        setFailed(payload.degraded === true)
+        setFailedSources({
+          mal: payload.degradedSources?.mal ?? payload.degraded === true,
+          imdb: payload.degradedSources?.imdb ?? payload.degraded === true
+        })
       })
       .catch(() => {
-        if (alive) setFailed(true)
+        if (alive) setFailedSources({ mal: true, imdb: true })
       })
       .finally(() => {
         if (alive) setLoading(false)
@@ -418,14 +433,14 @@ function OtherRatingsPanel({ subject }: { subject: Subject }) {
     return () => {
       alive = false
     }
-  }, [malId, imdbId])
+  }, [malId, imdbId, searchTitles, year])
 
   const providers = [
     {
       key: 'mal',
       name: 'MyAnimeList',
       mark: 'MAL',
-      id: malId,
+      id: ratings?.mal?.id || malId,
       rating: ratings?.mal,
       entryUrl: malId ? `https://myanimelist.net/anime/${malId}` : '',
       searchUrl: searchTitle
@@ -436,7 +451,7 @@ function OtherRatingsPanel({ subject }: { subject: Subject }) {
       key: 'imdb',
       name: 'IMDb',
       mark: 'IMDb',
-      id: imdbId,
+      id: ratings?.imdb?.id || imdbId,
       rating: ratings?.imdb,
       entryUrl: imdbId ? `https://www.imdb.com/title/${imdbId}/` : '',
       searchUrl: searchTitle
@@ -444,6 +459,7 @@ function OtherRatingsPanel({ subject }: { subject: Subject }) {
         : 'https://www.imdb.com/search/title/'
     }
   ] as const
+  const hasFailedSource = failedSources.mal || failedSources.imdb
 
   return (
     <div className="space-y-7">
@@ -464,11 +480,15 @@ function OtherRatingsPanel({ subject }: { subject: Subject }) {
                     <h3 className="font-semibold truncate">{provider.name}</h3>
                     <p className="text-xs text-base-content/50">
                       {!provider.id
-                        ? '尚未关联条目'
+                        ? loading
+                          ? '正在检索条目…'
+                          : failedSources[provider.key]
+                            ? '暂时无法检索'
+                            : '未找到匹配条目'
                         : loading
                           ? '正在获取评分…'
                           : provider.rating?.score == null
-                            ? failed
+                            ? failedSources[provider.key]
                               ? '评分暂时不可用'
                               : '暂无评分'
                             : provider.rating.votes == null
@@ -492,7 +512,7 @@ function OtherRatingsPanel({ subject }: { subject: Subject }) {
             </article>
           ))}
         </div>
-        {failed ? (
+        {hasFailedSource ? (
           <p role="status" className="text-xs text-base-content/50 mt-3">
             部分评分源暂时不可用，其他评分和详情页不受影响。
           </p>
@@ -508,6 +528,8 @@ function OtherRatingsPanel({ subject }: { subject: Subject }) {
 
 function DoubanPanel({ subject }: { subject: Subject }) {
   const title = displayName(subject)
+  const searchTitles = useMemo(() => doubanSearchTitles(subject), [subject])
+  const year = String(subject.air_date || subject.date || '').match(/(?:19|20)\d{2}/)?.[0] || ''
   const [loading, setLoading] = useState(true)
   const [details, setDetails] = useState<DoubanData | null>(null)
   const [summary, setSummary] = useState<{ intro?: string } | null>(null)
@@ -515,12 +537,22 @@ function DoubanPanel({ subject }: { subject: Subject }) {
   const [reviews, setReviews] = useState<DoubanReview[]>([])
   useEffect(() => {
     let alive = true
+    if (!searchTitles.length) {
+      setLoading(false)
+      setDetails(null)
+      return () => {
+        alive = false
+      }
+    }
     setLoading(true)
     setDetails(null)
     setSummary(null)
     setComments([])
     setReviews([])
-    void apiFetch<DoubanData>(`/douban/by-name?name=${encodeURIComponent(title)}`)
+    const query = new URLSearchParams()
+    for (const name of searchTitles) query.append('name', name)
+    if (year) query.set('year', year)
+    void apiFetch<DoubanData>(`/douban/by-name?${query.toString()}`)
       .then(data => {
         if (!alive) return
         setDetails(data || null)
@@ -545,7 +577,7 @@ function DoubanPanel({ subject }: { subject: Subject }) {
     return () => {
       alive = false
     }
-  }, [title])
+  }, [searchTitles, year])
   if (loading) return <Empty>正在加载豆瓣资料…</Empty>
   if (!details?.id)
     return (
@@ -1033,20 +1065,8 @@ export function AnimeDetail({
 
   return (
     <div>
-      <div className="-mx-4 md:-mx-8 -mt-6 relative overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden">
-          {image ? (
-            <img
-              src={image}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              className="w-full h-full object-cover scale-110 blur-3xl opacity-30"
-            />
-          ) : null}
-          <div className="absolute inset-0 bg-gradient-to-b from-base-100/60 via-base-100/90 to-base-100" />
-        </div>
-        <div className="relative max-w-5xl mx-auto px-4 md:px-8 py-10 md:py-16">
+      <section className="bm-detail-hero -mx-4 md:-mx-8 -mt-6">
+        <div className="bm-detail-hero-content max-w-5xl mx-auto px-4 md:px-8 py-5 md:py-6">
           <div className="bm-detail-hero-grid">
             <div className="bm-detail-left">
               <div className="bm-detail-poster">
@@ -1068,13 +1088,13 @@ export function AnimeDetail({
               </div>
             </div>
             <div className="bm-detail-info-card flex-1 min-w-0 text-center md:text-left">
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 text-base-content break-words line-clamp-2">
+              <h1 className="text-2xl sm:text-3xl font-bold mb-1 text-base-content break-words line-clamp-2">
                 {title}
               </h1>
-              {subject.name_cn && subject.name && subject.name_cn !== subject.name ? (
-                <p className="text-base text-base-content/50 mb-4">{subject.name}</p>
+              {subject.name && subject.name_cn && subject.name_cn !== subject.name ? (
+                <p className="text-sm text-base-content/50 mb-3">{subject.name}</p>
               ) : null}
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-6">
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
                 {subject.rating?.score ? (
                   <span className="badge badge-lg gap-2 font-bold border-0 bg-amber-500/15 text-amber-400">
                     <StarRating score={subject.rating.score} size="text-base" />
@@ -1096,8 +1116,18 @@ export function AnimeDetail({
               </div>
             </div>
           </div>
+          {activeTab === 'overview' ? (
+            <div className="bm-detail-collection-wrap">
+              <CollectionEditor
+                animeId={subject.id}
+                subjectType={subject.type}
+                episodes={episodes}
+                totalEpisodes={subject.eps || subject.eps_count || episodes.length}
+              />
+            </div>
+          ) : null}
         </div>
-      </div>
+      </section>
 
       {/* 板块栏已经移到 Dock（返回 + 各板块），这里不再重复渲染 */}
       <div className="max-w-5xl mx-auto px-4 md:px-8 py-6">
@@ -1124,12 +1154,6 @@ export function AnimeDetail({
                 </div>
               ) : null}
             </section>
-            <CollectionEditor
-              animeId={subject.id}
-              subjectType={subject.type}
-              episodes={episodes}
-              totalEpisodes={subject.eps || subject.eps_count || episodes.length}
-            />
             <div className="bm-detail-stats-grid">
               <RatingChart subject={subject} />
               <CollectionChart subject={subject} />

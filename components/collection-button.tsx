@@ -344,6 +344,79 @@ function CollectionEditorState({
                   }))
                 }
               />
+              {isAuthenticated && watching && episodeTotal ? (
+                <section
+                  className="bm-watch-progress-card"
+                  aria-label="观看进度管理"
+                  data-ai-private="true"
+                >
+                  <div className="bm-watch-progress-head">
+                    <div>
+                      <strong>观看进度管理</strong>
+                      <span>
+                        已看 {episode} / {episodeTotal} 集
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void updateEpisode(episodeTotal)}
+                      disabled={busy || episode === episodeTotal}
+                    >
+                      全部看过
+                    </button>
+                  </div>
+                  <div className="bm-watch-progress-track" aria-hidden="true">
+                    <span style={{ width: `${progressPercent}%` }} />
+                  </div>
+                  {episodeTotal > pageSize ? (
+                    <nav aria-label="进度分页" className="bm-progress-pagination">
+                      <button
+                        type="button"
+                        disabled={currentPage === 0 || busy}
+                        onClick={() => setProgressPage(currentPage - 1)}
+                      >
+                        上一组
+                      </button>
+                      <label>
+                        跳到第{' '}
+                        <select
+                          aria-label="进度页"
+                          value={currentPage}
+                          onChange={event => setProgressPage(Number(event.target.value))}
+                        >
+                          {Array.from({ length: maxPage + 1 }, (_, i) => (
+                            <option key={i} value={i}>
+                              {i * pageSize + 1}–{Math.min(episodeTotal, (i + 1) * pageSize)} 集
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button
+                        type="button"
+                        disabled={currentPage === maxPage || busy}
+                        onClick={() => setProgressPage(currentPage + 1)}
+                      >
+                        下一组
+                      </button>
+                    </nav>
+                  ) : null}
+                  <div className="bm-watch-progress-episodes">
+                    {episodeItems.map(item => (
+                      <button
+                        key={item}
+                        type="button"
+                        className={item <= episode ? 'is-watched' : ''}
+                        aria-label={`标记看到第 ${item} 集`}
+                        aria-pressed={item <= episode}
+                        onClick={() => void updateEpisode(item)}
+                        disabled={busy}
+                      >
+                        {String(item).padStart(2, '0')}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
               <div className="bm-collection-rating">
                 <span>评分</span>
                 <div
@@ -414,79 +487,6 @@ function CollectionEditorState({
             <Link href={`/login?redirect=/anime/${animeId}`}>登录后继续 →</Link>
           </div>
         )}
-        {isAuthenticated && watching && episodeTotal ? (
-          <section
-            className="bm-watch-progress-card"
-            aria-label="观看进度管理"
-            data-ai-private="true"
-          >
-            <div className="bm-watch-progress-head">
-              <div>
-                <strong>观看进度管理</strong>
-                <span>
-                  已看 {episode} / {episodeTotal} 集
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => void updateEpisode(episodeTotal)}
-                disabled={busy || episode === episodeTotal}
-              >
-                全部看过
-              </button>
-            </div>
-            <div className="bm-watch-progress-track" aria-hidden="true">
-              <span style={{ width: `${progressPercent}%` }} />
-            </div>
-            {episodeTotal > pageSize ? (
-              <nav aria-label="进度分页" className="bm-progress-pagination">
-                <button
-                  type="button"
-                  disabled={currentPage === 0 || busy}
-                  onClick={() => setProgressPage(currentPage - 1)}
-                >
-                  上一组
-                </button>
-                <label>
-                  跳到第{' '}
-                  <select
-                    aria-label="进度页"
-                    value={currentPage}
-                    onChange={event => setProgressPage(Number(event.target.value))}
-                  >
-                    {Array.from({ length: maxPage + 1 }, (_, i) => (
-                      <option key={i} value={i}>
-                        {i * pageSize + 1}–{Math.min(episodeTotal, (i + 1) * pageSize)} 集
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  disabled={currentPage === maxPage || busy}
-                  onClick={() => setProgressPage(currentPage + 1)}
-                >
-                  下一组
-                </button>
-              </nav>
-            ) : null}
-            <div className="bm-watch-progress-episodes">
-              {episodeItems.map(item => (
-                <button
-                  key={item}
-                  type="button"
-                  className={item <= episode ? 'is-watched' : ''}
-                  aria-label={`标记看到第 ${item} 集`}
-                  aria-pressed={item <= episode}
-                  onClick={() => void updateEpisode(item)}
-                  disabled={busy}
-                >
-                  {String(item).padStart(2, '0')}
-                </button>
-              ))}
-            </div>
-          </section>
-        ) : null}
       </section>
     </>
   )

@@ -23,7 +23,18 @@ function textValues(value: unknown): string[] {
     .filter(Boolean)
 }
 
-export function externalSearchTitle(subject: {
+function uniqueTitles(values: unknown[]) {
+  return [
+    ...new Set(
+      values
+        .flatMap(textValues)
+        .map(value => value.trim())
+        .filter(value => value && !/^(?:https?:\/\/|www\.)/i.test(value))
+    )
+  ]
+}
+
+export function externalSearchTitles(subject: {
   name?: string
   infobox?: InfoboxEntry[]
   [key: string]: unknown
@@ -42,7 +53,34 @@ export function externalSearchTitle(subject: {
     .flatMap(item => textValues(item?.value))
 
   // `name` is Bangumi's canonical/original title; deliberately never use `name_cn` here.
-  return [...explicitAlternates, ...infoboxAlternates, ...textValues(subject.name)][0] || ''
+  return uniqueTitles([...explicitAlternates, ...infoboxAlternates, subject.name]).slice(0, 5)
+}
+
+export function externalSearchTitle(subject: {
+  name?: string
+  infobox?: InfoboxEntry[]
+  [key: string]: unknown
+}) {
+  return externalSearchTitles(subject)[0] || ''
+}
+
+export function doubanSearchTitles(subject: {
+  name?: string
+  name_cn?: string
+  infobox?: InfoboxEntry[]
+  [key: string]: unknown
+}) {
+  const infoboxTitles = (subject.infobox || [])
+    .filter(item =>
+      /name|名称|标题|别名|原名|译名|英文|romaji|roman|罗马/i.test(String(item?.key || ''))
+    )
+    .flatMap(item => textValues(item?.value))
+  return uniqueTitles([
+    subject.name_cn,
+    subject.name,
+    ...externalSearchTitles(subject),
+    ...infoboxTitles
+  ]).slice(0, 6)
 }
 
 export function extractOtherRatingIds(infobox: InfoboxEntry[] = []) {

@@ -77,6 +77,7 @@ function parseMobileSearch(json) {
       return {
         id: String(target.id),
         title: target.title || '',
+        original_title: target.original_title || '',
         year: target.year || '',
         rate: getRating(target),
         star: getStar(target),
@@ -84,6 +85,39 @@ function parseMobileSearch(json) {
         type: item.target_type
       }
     })
+}
+
+function normalizeTitle(value) {
+  return String(value || '')
+    .normalize('NFKC')
+    .toLocaleLowerCase()
+    .replace(/[\p{P}\p{S}\s]/gu, '')
+}
+
+function candidateYear(item) {
+  return Number(String(item?.year || item?.release_year || '').match(/(?:19|20)\d{2}/)?.[0]) || 0
+}
+
+export function findDoubanCandidate(items, names, year = '') {
+  const normalizedNames = names.map(normalizeTitle).filter(Boolean)
+  const targetYear = Number(year) || 0
+  return (Array.isArray(items) ? items : [])
+    .map(item => {
+      const itemTitles = [item?.title, item?.original_title].map(normalizeTitle).filter(Boolean)
+      const titleIndex = normalizedNames.findIndex(name => itemTitles.includes(name))
+      const itemYear = candidateYear(item)
+      return titleIndex < 0
+        ? null
+        : {
+            item,
+            titleIndex,
+            yearDistance:
+              targetYear && itemYear ? Math.abs(targetYear - itemYear) : targetYear ? 1000 : 0
+          }
+    })
+    .filter(Boolean)
+    .filter(match => !targetYear || !candidateYear(match.item) || match.yearDistance <= 3)
+    .sort((a, b) => a.yearDistance - b.yearDistance || a.titleIndex - b.titleIndex)[0]?.item
 }
 
 /**

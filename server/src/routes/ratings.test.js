@@ -28,6 +28,34 @@ describe('other ratings route', () => {
       data: { mal: { score: 8.5 }, imdb: null },
       degraded: true
     })
-    expect(getOtherRatings).toHaveBeenCalledWith({ malId: '9253', imdbId: 'tt2013206' })
+    expect(getOtherRatings).toHaveBeenCalledWith({
+      malId: '9253',
+      imdbId: 'tt2013206',
+      titles: [],
+      year: ''
+    })
+  })
+
+  it('passes bounded alternate titles and release year for automatic matching', async () => {
+    const response = await app.request(
+      '/other?title=Fullmetal%20Alchemist&title=Hagane%20no%20Renkinjutsushi&year=2003',
+      {},
+      {}
+    )
+
+    expect(response.status).toBe(200)
+    expect(getOtherRatings).toHaveBeenCalledWith({
+      malId: '',
+      imdbId: '',
+      titles: ['Fullmetal Alchemist', 'Hagane no Renkinjutsushi'],
+      year: '2003'
+    })
+  })
+
+  it('rejects malformed years', async () => {
+    const response = await app.request('/other?year=2003-01-01', {}, {})
+
+    expect(response.status).toBe(400)
+    expect(getOtherRatings).not.toHaveBeenCalled()
   })
 })

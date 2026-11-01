@@ -577,23 +577,23 @@ html[data-theme='dark'] .bm-auth-page {
   overflow-wrap: anywhere;
 }
 
+.bm-detail-hero {
+  border-bottom: 1px solid var(--bm-line);
+  background: color-mix(in srgb, var(--bm-soft) 52%, var(--bm-surface));
+}
+
 .bm-detail-hero-grid {
   display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  grid-template-columns: 140px minmax(0, 1fr);
   grid-template-areas: 'poster info';
-  grid-template-rows: auto;
-  align-items: start;
-  column-gap: 28px;
-  row-gap: 20px;
+  align-items: center;
+  gap: 24px;
 }
 
 .bm-detail-left {
   grid-area: poster;
-  display: grid;
   width: 100%;
   min-width: 0;
-  align-content: start;
-  gap: 14px;
 }
 
 .bm-detail-poster {
@@ -605,12 +605,19 @@ html[data-theme='dark'] .bm-auth-page {
 .bm-detail-poster > div {
   display: block;
   width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: 10px;
 }
 
 .bm-detail-info-card {
   grid-area: info;
   min-width: 0;
   text-align: left;
+}
+
+.bm-detail-collection-wrap {
+  margin-top: 16px;
 }
 
 @media (max-width: 620px) {
@@ -812,10 +819,10 @@ html[data-theme='dark'] .bm-auth-page {
 
 .bm-collection-toolbar {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(92px, auto) minmax(0, 1fr) minmax(225px, auto);
   align-items: center;
-  gap: 12px;
-  margin-top: 12px;
+  gap: 16px;
+  margin-top: 10px;
 }
 
 .bm-collection-status {
@@ -1504,10 +1511,10 @@ html[data-theme='dark'] .bm-auth-page {
 .bm-watch-progress-card {
   display: grid;
   gap: 10px;
-  margin-top: 14px;
-  padding: 12px 0 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
   border: 0;
-  border-top: 1px solid var(--bm-line);
   border-radius: 0;
   background: transparent;
 }
@@ -1815,23 +1822,18 @@ html[data-theme='dark'] .bm-auth-page {
 }
 @media (max-width: 960px) {
   .bm-detail-hero-grid {
-    grid-template-areas: 'poster' 'info';
-    grid-template-rows: auto;
-    grid-template-columns: 1fr;
-    gap: 22px;
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: 18px;
   }
   .bm-detail-left {
-    width: min(100%, 280px);
-    justify-self: center;
+    width: 100%;
   }
   .bm-detail-info-card {
-    text-align: center;
-  }
-  .bm-detail-info-card .bm-collection-toolbar {
-    justify-content: center;
+    text-align: left;
   }
   .bm-collection-toolbar {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(88px, auto) minmax(0, 1fr) minmax(205px, auto);
+    gap: 12px;
   }
   .bm-credit-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1839,15 +1841,32 @@ html[data-theme='dark'] .bm-auth-page {
 }
 
 @media (max-width: 720px) {
+  .bm-detail-hero-content {
+    padding-top: 14px;
+    padding-bottom: 16px;
+  }
   .bm-detail-hero-grid {
-    gap: 18px;
+    grid-template-columns: 78px minmax(0, 1fr);
+    gap: 12px;
   }
-  .bm-detail-left {
-    width: min(100%, 280px);
+  .bm-detail-info-card h1 {
+    font-size: 20px;
+    line-height: 1.3;
   }
-  .bm-detail-poster {
-    width: 100%;
-    justify-self: center;
+  .bm-detail-info-card > p {
+    margin-bottom: 8px;
+    font-size: 12px;
+  }
+  .bm-detail-collection-wrap {
+    margin-top: 12px;
+  }
+  .bm-collection-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .bm-watch-progress-card {
+    padding-top: 10px;
+    border-top: 1px solid var(--bm-line);
   }
   .bm-collection-rating {
     justify-content: center;
@@ -2694,15 +2713,13 @@ html[data-theme='dark'] .bm-card {
   height: 44px;
   padding: 0;
   position: relative;
-  color: var(--bm-muted);
-  border: 0;
+  color: #494149;
+  border: 1px solid #e4e1e4;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--bm-surface) 90%, transparent);
-  box-shadow:
-    0 7px 20px rgba(20, 12, 15, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(20px) saturate(135%);
-  -webkit-backdrop-filter: blur(20px) saturate(135%);
+  background: #fff;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   font-size: 13px;
   font-weight: 600;
   line-height: 1;
@@ -2716,9 +2733,9 @@ html[data-theme='dark'] .bm-card {
   pointer-events: auto;
 }
 .bm-dock-pill:hover {
-  box-shadow:
-    0 9px 24px rgba(20, 12, 15, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.58);
+  border-color: #d9aab0;
+  background: #fff;
+  box-shadow: none;
   transform: translateY(-1px) scale(1.025);
 }
 .bm-dock-pill:focus-visible {
@@ -2726,10 +2743,10 @@ html[data-theme='dark'] .bm-card {
   outline-offset: 2px;
 }
 .bm-dock-pill-active {
-  box-shadow:
-    0 7px 20px rgba(20, 12, 15, 0.14),
-    0 0 0 2px color-mix(in srgb, var(--bm-accent) 40%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  color: var(--bm-accent);
+  border-color: color-mix(in srgb, var(--bm-accent) 48%, #fff);
+  background: #fff;
+  box-shadow: none;
   font-weight: 700;
 }
 .bm-dock-desktop-action {
@@ -2748,7 +2765,7 @@ html[data-theme='dark'] .bm-card {
   z-index: 2;
   max-width: 150px;
   padding: 8px 10px;
-  color: var(--bm-text);
+  color: #373137;
   font-size: 13px;
   font-weight: 600;
   line-height: 1;
@@ -2756,11 +2773,11 @@ html[data-theme='dark'] .bm-card {
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  border: 0;
+  border: 1px solid #e4e1e4;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--bm-surface) 95%, transparent);
-  box-shadow: 0 4px 14px rgba(20, 12, 15, 0.16);
-  backdrop-filter: blur(16px);
+  background: #fff;
+  box-shadow: none;
+  backdrop-filter: none;
   transform: translateX(-3px);
   transition:
     opacity 140ms ease,
@@ -2822,13 +2839,19 @@ html[data-theme='dark'] .bm-card {
 }
 
 html[data-theme='dark'] .bm-dock-pill {
-  box-shadow:
-    0 8px 22px rgba(0, 0, 0, 0.36),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  color: #494149;
+  border-color: #e4e1e4;
+  background: #fff;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .bm-dock-mobile .bm-dock-pill {
-  background: color-mix(in srgb, var(--bm-surface) 94%, transparent);
+  background: #fff;
+}
+
+html[data-theme='dark'] .bm-dock-mobile .bm-dock-pill {
+  background: #fff;
 }
 
 .bm-dock-mobile .bm-dock-pill:active {

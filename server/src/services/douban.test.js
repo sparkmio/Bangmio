@@ -4,6 +4,7 @@ import {
   getDoubanComments,
   getDoubanReviews,
   getDoubanSummary,
+  findDoubanCandidate,
   searchDouban
 } from './douban.js'
 
@@ -42,6 +43,7 @@ describe('豆瓣移动端公开数据服务', () => {
       {
         id: '36093351',
         title: '葬送的芙莉莲',
+        original_title: '',
         year: '2023',
         rate: '9.4',
         star: 9,
@@ -53,6 +55,29 @@ describe('豆瓣移动端公开数据服务', () => {
       expect.stringContaining('/search?q=%E8%91%AC%E9%80%81%E7%9A%84%E8%8A%99%E8%8E%89%E8%8E%B2'),
       expect.objectContaining({ redirect: 'follow' })
     )
+  })
+
+  it('按精确标题和年份匹配豆瓣候选，不会取搜索结果第一项', () => {
+    const candidates = [
+      { id: 'wrong', title: '钢之炼金术师 BROTHERHOOD', year: '2009' },
+      { id: 'right', title: '钢之炼金术师', original_title: 'Fullmetal Alchemist', year: '2003' },
+      { id: 'old', title: '钢之炼金术师', year: '2003' }
+    ]
+
+    expect(findDoubanCandidate(candidates, ['钢之炼金术师', 'Fullmetal Alchemist'], '2003')).toBe(
+      candidates[1]
+    )
+    expect(
+      findDoubanCandidate(
+        [
+          { id: 'unknown-year', title: '钢之炼金术师' },
+          { id: 'known-year', title: '钢之炼金术师', year: '2003' }
+        ],
+        ['钢之炼金术师'],
+        '2003'
+      )?.id
+    ).toBe('known-year')
+    expect(findDoubanCandidate([candidates[0]], ['钢之炼金术师'], '2003')).toBeUndefined()
   })
 
   it('详情与摘要从 movie/tv 接口构建兼容字段', async () => {

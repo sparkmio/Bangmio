@@ -11,17 +11,21 @@ vi.mock('../utils/http.js', () => ({
   })
 }))
 
-vi.mock('../services/douban.js', () => ({
-  searchDouban: vi.fn(),
-  getDoubanAbstract: vi.fn(),
-  getDoubanComments: vi.fn(),
-  getDoubanReviews: vi.fn(),
-  getDoubanSummary: vi.fn()
-}))
+vi.mock('../services/douban.js', async importOriginal => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    searchDouban: vi.fn(),
+    getDoubanAbstract: vi.fn(),
+    getDoubanComments: vi.fn(),
+    getDoubanReviews: vi.fn(),
+    getDoubanSummary: vi.fn()
+  }
+})
 
 import app, { cleanDoubanPage } from './douban.js'
 import { fetchHTML } from '../utils/http.js'
-import { getDoubanSummary } from '../services/douban.js'
+import { getDoubanAbstract, getDoubanSummary, searchDouban } from '../services/douban.js'
 
 /**
  * 模拟豆瓣条目页 HTML 片段。
@@ -286,5 +290,55 @@ describe('GET /:id/summary', () => {
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.data).toBeNull()
+  })
+})
+
+describe('GET /by-name', () => {
+  beforeEach(() => {
+    searchDouban.mockReset()
+    getDoubanAbstract.mockReset()
+  })
+
+  it('searches alternate titles and uses the exact title/year match instead of the first result', async () => {
+    searchDouban.mockResolvedValue([
+      { id: 'wrong', title: '钢之炼金术师 BROTHERHOOD', year: '2009', rate: '9.1' },
+      {
+        id: 'right',
+        title: '钢之炼金术师',
+        original_title: 'Fullmetal Alchemist',
+        year: '2003',
+        rate: '8.8',
+        star: 4.4
+      }
+    ])
+    getDoubanAbstract.mockResolvedValue(null)
+
+    const response = await app.request(
+      '/by-name?name=钢之炼金术师&name=Fullmetal%20Alchemist&year=2003'
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        id: 'right',
+        title: '钢之炼金术师',
+        rate: '8.8',
+        release_year: '2003',
+        url: 'https://movie.douban.com/subject/right/'
+      }
+    })
+    expect(searchDouban).toHaveBeenCalledTimes(2)
+    expect(getDoubanAbstract).toHaveBeenCalledWith('right')
+  })
+
+  it('does not associate a merely similar title', async () => {
+    searchDouban.mockResolvedValue([
+      { id: 'wrong', title: '钢之炼金术师 BROTHERHOOD', year: '2009', rate: '9.1' }
+    ])
+
+    const response = await app.request('/by-name?name=钢之炼金术师&year=2003')
+
+    await expect(response.json()).resolves.toEqual({ data: null })
+    expect(getDoubanAbstract).not.toHaveBeenCalled()
   })
 })
