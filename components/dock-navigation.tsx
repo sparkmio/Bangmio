@@ -391,7 +391,6 @@ function DesktopDetailTabPills({
             href={`/anime/${detailId}?tab=${key}`}
             aria-current={isActive ? 'page' : undefined}
             aria-label={label}
-            title={label}
             className={`bm-dock-pill bm-dock-icon-button bm-dock-desktop-detail-pill ${isActive ? 'bm-dock-pill-active' : ''}`}
             style={isActive ? activePillStyle : undefined}
           >
@@ -499,7 +498,6 @@ export function DockNavigation() {
                 type="button"
                 onClick={handleBack}
                 aria-label="返回上一页"
-                title="返回上一页"
                 className="bm-dock-pill bm-dock-icon-button bm-dock-desktop-action"
               >
                 <BackIcon className="w-5 h-5 shrink-0" />
@@ -523,7 +521,6 @@ export function DockNavigation() {
                     key={item.href}
                     href={item.href}
                     aria-label={item.label}
-                    title={item.label}
                     aria-current={isActive ? 'page' : undefined}
                     className={`bm-dock-pill bm-dock-desktop-action ${isActive ? 'bm-dock-pill-active' : ''}`}
                     style={isActive ? activePillStyle : undefined}
@@ -539,7 +536,6 @@ export function DockNavigation() {
                 type="button"
                 onClick={() => appearance.toggleTheme()}
                 aria-label={appearance.theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
-                title={appearance.theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
                 className="bm-dock-pill bm-dock-icon-button bm-dock-desktop-action"
               >
                 {appearance.theme === 'dark' ? (
@@ -554,7 +550,6 @@ export function DockNavigation() {
               <Link
                 href={auth.isAuthenticated ? '/profile' : '/login'}
                 aria-label={auth.isAuthenticated ? '我的' : '登录'}
-                title={auth.isAuthenticated ? '我的' : '登录'}
                 className="bm-dock-pill bm-dock-icon-button bm-dock-desktop-action"
               >
                 {avatarSrc ? (

@@ -1095,12 +1095,6 @@ export function AnimeDetail({
                 ) : null}
               </div>
             </div>
-            <CollectionEditor
-              animeId={subject.id}
-              subjectType={subject.type}
-              episodes={episodes}
-              totalEpisodes={subject.eps || subject.eps_count || episodes.length}
-            />
           </div>
         </div>
       </div>
@@ -1130,6 +1124,12 @@ export function AnimeDetail({
                 </div>
               ) : null}
             </section>
+            <CollectionEditor
+              animeId={subject.id}
+              subjectType={subject.type}
+              episodes={episodes}
+              totalEpisodes={subject.eps || subject.eps_count || episodes.length}
+            />
             <div className="bm-detail-stats-grid">
               <RatingChart subject={subject} />
               <CollectionChart subject={subject} />
