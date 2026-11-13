@@ -31,7 +31,7 @@
     "check": "npm run lint && npm test && npm run next:build"
   },
   "devDependencies": {
-    "@hono/node-server": "^1.17.0",
+    "@hono/node-server": "^2.1.6",
     "@opennextjs/cloudflare": "^1.20.2",
     "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
