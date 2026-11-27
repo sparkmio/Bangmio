@@ -539,22 +539,32 @@ export function DockNavigation() {
               </button>
 
               {/* 用户头像 / 登录 */}
-              <Link
-                href={auth.isAuthenticated ? '/profile' : '/login'}
-                aria-label={auth.isAuthenticated ? '我的' : '登录'}
-                className="bm-dock-pill bm-dock-icon-button bm-dock-desktop-action"
-              >
-                {avatarSrc ? (
-                  <img
-                    src={avatarSrc}
-                    alt={auth.user?.nickname || auth.user?.username || ''}
-                    className="w-6 h-6 rounded-full object-cover shrink-0"
-                  />
-                ) : (
+              {auth.ready ? (
+                <Link
+                  href={auth.isAuthenticated ? '/profile' : '/login'}
+                  aria-label={auth.isAuthenticated ? '我的' : '登录'}
+                  className="bm-dock-pill bm-dock-icon-button bm-dock-desktop-action"
+                >
+                  {avatarSrc ? (
+                    <img
+                      src={avatarSrc}
+                      alt={auth.user?.nickname || auth.user?.username || ''}
+                      className="w-6 h-6 rounded-full object-cover shrink-0"
+                    />
+                  ) : (
+                    <UserIcon className="w-5 h-5" />
+                  )}
+                  <span className="bm-dock-label">{auth.isAuthenticated ? '我的' : '登录'}</span>
+                </Link>
+              ) : (
+                <span
+                  aria-hidden="true"
+                  className="bm-dock-pill bm-dock-icon-button bm-dock-desktop-action opacity-0"
+                >
                   <UserIcon className="w-5 h-5" />
-                )}
-                <span className="bm-dock-label">{auth.isAuthenticated ? '我的' : '登录'}</span>
-              </Link>
+                  <span className="bm-dock-label">登录</span>
+                </span>
+              )}
             </>
           )}
         </nav>
@@ -599,23 +609,29 @@ export function DockNavigation() {
                 </Link>
               )
             })}
-            <Link
-              href={auth.isAuthenticated ? '/profile' : '/login'}
-              aria-label={auth.isAuthenticated ? '我的' : '登录'}
-              title={auth.isAuthenticated ? '我的' : '登录'}
-              aria-current={pathname === '/profile' ? 'page' : undefined}
-              className={`bm-dock-pill bm-dock-mobile-pill ${pathname === '/profile' ? 'bm-dock-pill-active' : ''}`}
-            >
-              {avatarSrc ? (
-                <img
-                  src={avatarSrc}
-                  alt={auth.user?.nickname || auth.user?.username || ''}
-                  className="w-6 h-6 rounded-full object-cover"
-                />
-              ) : (
+            {auth.ready ? (
+              <Link
+                href={auth.isAuthenticated ? '/profile' : '/login'}
+                aria-label={auth.isAuthenticated ? '我的' : '登录'}
+                title={auth.isAuthenticated ? '我的' : '登录'}
+                aria-current={pathname === '/profile' ? 'page' : undefined}
+                className={`bm-dock-pill bm-dock-mobile-pill ${pathname === '/profile' ? 'bm-dock-pill-active' : ''}`}
+              >
+                {avatarSrc ? (
+                  <img
+                    src={avatarSrc}
+                    alt={auth.user?.nickname || auth.user?.username || ''}
+                    className="w-6 h-6 rounded-full object-cover"
+                  />
+                ) : (
+                  <UserIcon className="w-6 h-6" />
+                )}
+              </Link>
+            ) : (
+              <span aria-hidden="true" className="bm-dock-pill bm-dock-mobile-pill opacity-0">
                 <UserIcon className="w-6 h-6" />
-              )}
-            </Link>
+              </span>
+            )}
           </div>
         )}
       </nav>

@@ -3573,6 +3573,8 @@ var CACHE_TTL_MOEGIRL = 30 * 60 * 1e3;
 var RATE_LIMIT_WINDOW = 60 * 1e3;
 var RATE_LIMIT_MAX_POST = 10;
 var RATE_LIMIT_MAX_GET = 60;
+var RATE_LIMIT_AI_WINDOW = 60 * 60 * 1e3;
+var RATE_LIMIT_MAX_AI = 30;
 var MAX_CONTENT_LENGTH = 5e3;
 var MAX_TITLE_LENGTH = 200;
 
@@ -20197,8 +20199,10 @@ app15.use("*", async (c, next) => {
 app15.use("*", securityHeaders());
 var postLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_POST);
 var getLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_GET);
+var aiLimiter = rateLimit(RATE_LIMIT_AI_WINDOW, RATE_LIMIT_MAX_AI, { fallback: "reject" });
 app15.use("/api/v1/*", async (c, next) => {
   const method = c.req.method.toUpperCase();
+  if (method === "POST" && c.req.path.startsWith("/api/v1/ai/")) return aiLimiter(c, next);
   const limiter = method === "POST" || method === "PUT" || method === "DELETE" ? postLimiter : getLimiter;
   return limiter(c, next);
 });

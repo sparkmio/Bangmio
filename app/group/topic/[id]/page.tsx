@@ -1,6 +1,9 @@
+import type { Metadata } from 'next'
 import { requiredPageData, requirePositiveId } from '@/lib/page-data'
 import { groupTopicView } from '@/lib/community'
 import { TopicThread } from '@/components/topic-thread'
+
+export const metadata: Metadata = { title: '小组话题' }
 
 export default async function GroupTopicPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

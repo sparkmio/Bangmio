@@ -47,7 +47,7 @@ function collectionSubject(collection: CollectionRecord): WatchingSubject | null
 }
 
 export function HomeClient({ initialHot }: { initialHot: Subject[] }) {
-  const { isAuthenticated, request } = useAuth()
+  const { ready, isAuthenticated, request } = useAuth()
   const [watchingType, setWatchingType] = useState(0)
   const [watchingList, setWatchingList] = useState<WatchingSubject[]>([])
   const [selectedId, setSelectedId] = useState(0)
@@ -198,7 +198,7 @@ export function HomeClient({ initialHot }: { initialHot: Subject[] }) {
           <h1>Bangmio</h1>
           <p className="bm-home-motto">愿你活的热烈，活的盛大，活的恣意，活的义无反顾</p>
           <p className="bm-home-description">发现作品、记录进度，也和喜欢同一部番剧的人聊聊。</p>
-          {!isAuthenticated ? (
+          {ready && !isAuthenticated ? (
             <Link href="/login" className="btn btn-primary bm-home-login">
               使用 Bangumi 登录
             </Link>
@@ -226,7 +226,7 @@ export function HomeClient({ initialHot }: { initialHot: Subject[] }) {
         </nav>
       </section>
 
-      {isAuthenticated ? (
+      {ready && isAuthenticated ? (
         <section className="mb-10">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-base-content">在追</h2>
@@ -397,7 +397,7 @@ export function HomeClient({ initialHot }: { initialHot: Subject[] }) {
         ) : null}
       </section>
 
-      {!isAuthenticated ? (
+      {ready && !isAuthenticated ? (
         <section className="mb-10">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Link

@@ -7,7 +7,13 @@ import { cors } from 'hono/cors'
 import { logError } from './utils/logger.js'
 import { rateLimit } from './utils/rateLimit.js'
 import { securityHeaders } from './middleware/security.js'
-import { RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_POST, RATE_LIMIT_MAX_GET } from './config.js'
+import {
+  RATE_LIMIT_WINDOW,
+  RATE_LIMIT_MAX_POST,
+  RATE_LIMIT_MAX_GET,
+  RATE_LIMIT_AI_WINDOW,
+  RATE_LIMIT_MAX_AI
+} from './config.js'
 import authRoutes from './routes/auth.js'
 import userRoutes from './routes/user.js'
 import animeRoutes from './routes/anime.js'
@@ -58,8 +64,10 @@ app.use('*', securityHeaders())
 // 注意：limiter 实例必须在模块级创建一次，确保 store(Map) 在请求间累积计数
 const postLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_POST)
 const getLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_GET)
+const aiLimiter = rateLimit(RATE_LIMIT_AI_WINDOW, RATE_LIMIT_MAX_AI, { fallback: 'reject' })
 app.use('/api/v1/*', async (c, next) => {
   const method = c.req.method.toUpperCase()
+  if (method === 'POST' && c.req.path.startsWith('/api/v1/ai/')) return aiLimiter(c, next)
   const limiter =
     method === 'POST' || method === 'PUT' || method === 'DELETE' ? postLimiter : getLimiter
   return limiter(c, next)

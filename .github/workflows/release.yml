@@ -25,11 +25,10 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: |
             package-lock.json
-            client/package-lock.json
             tooling/eslint/package-lock.json
 
       - name: Install root dependencies
@@ -47,11 +46,8 @@ jobs:
             exit 1
           fi
 
-      - name: Lint
-        run: npm run lint
-
-      - name: Test
-        run: npm test
+      - name: Quality checks
+        run: npm run check
 
       - name: Build
         run: npm run build

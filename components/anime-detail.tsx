@@ -95,19 +95,15 @@ type BilibiliData = {
   episodes?: number
 }
 
-function valueText(value: unknown) {
-  if (Array.isArray(value))
-    return value
-      .map(item =>
-        typeof item === 'string'
-          ? item
-          : typeof item === 'object' && item
-            ? JSON.stringify(item)
-            : String(item)
-      )
-      .join(' / ')
+export function valueText(value: unknown): string {
+  if (Array.isArray(value)) return value.map(valueText).filter(Boolean).join(' / ')
   if (typeof value === 'string' || typeof value === 'number') return String(value)
-  return value ? JSON.stringify(value) : ''
+  if (!value || typeof value !== 'object') return ''
+  const record = value as Record<string, unknown>
+  const preferred =
+    record.v ?? record.value ?? record.name ?? record.title ?? record.text ?? record.content
+  if (preferred !== undefined) return valueText(preferred)
+  return Object.values(record).map(valueText).filter(Boolean).join(' / ')
 }
 
 function importantInfobox(infobox: InfoboxItem[]) {
@@ -399,6 +395,7 @@ function OtherRatingsPanel({ subject }: { subject: Subject }) {
   const [ratings, setRatings] = useState<OtherRatings | null>(null)
   const [loading, setLoading] = useState(true)
   const [failedSources, setFailedSources] = useState({ mal: false, imdb: false })
+  const [retryAttempt, setRetryAttempt] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -433,7 +430,7 @@ function OtherRatingsPanel({ subject }: { subject: Subject }) {
     return () => {
       alive = false
     }
-  }, [malId, imdbId, searchTitles, year])
+  }, [malId, imdbId, searchTitles, year, retryAttempt])
 
   const providers = [
     {
@@ -513,9 +510,19 @@ function OtherRatingsPanel({ subject }: { subject: Subject }) {
           ))}
         </div>
         {hasFailedSource ? (
-          <p role="status" className="text-xs text-base-content/50 mt-3">
-            部分评分源暂时不可用，其他评分和详情页不受影响。
-          </p>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <p role="status" className="text-xs text-base-content/50">
+              部分评分源暂时不可用，其他评分和详情页不受影响。
+            </p>
+            <button
+              className="btn btn-xs btn-ghost"
+              type="button"
+              disabled={loading}
+              onClick={() => setRetryAttempt(value => value + 1)}
+            >
+              {loading ? '重试中…' : '重试评分源'}
+            </button>
+          </div>
         ) : null}
       </section>
       <section>

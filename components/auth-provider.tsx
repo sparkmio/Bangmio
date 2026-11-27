@@ -303,6 +303,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await fetchBgmToken()
         await fetchBgmUserProfile()
       })()
+      setReady(true)
+      return
     } else if (storedBangumiToken) {
       void fetch(apiPath('/user/auth'), {
         method: 'POST',
@@ -316,6 +318,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (payload?.data?.user) setAuth('', payload.data.user, 'bangumi')
           else localStorage.removeItem(KEYS.bangumiUser)
         })
+        .catch(() => {})
+        .finally(() => setReady(true))
+      return
     } else {
       void fetch(apiPath('/user/me'), { credentials: 'include' })
         .then(response => (response.ok ? response.json() : null))
@@ -327,8 +332,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(payload.data)
           }
         })
+        .catch(() => null)
+        .finally(() => setReady(true))
     }
-    setReady(true)
   }, [fetchBgmToken, fetchBgmUserProfile, setAuth])
 
   const value = useMemo<AuthContextValue>(

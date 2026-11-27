@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-const auth = vi.hoisted(() => ({ request: vi.fn(), isAuthenticated: true }))
+const auth = vi.hoisted(() => ({ request: vi.fn(), isAuthenticated: true, ready: true }))
 vi.mock('./auth-provider', () => ({
-  useAuth: () => ({ isAuthenticated: auth.isAuthenticated, request: auth.request })
+  useAuth: () => ({
+    ready: auth.ready,
+    isAuthenticated: auth.isAuthenticated,
+    request: auth.request
+  })
 }))
 vi.mock('next/link', () => ({
   default: ({ children, href, ...props }: any) => (
@@ -27,6 +31,7 @@ beforeEach(() => {
   document.body.append(container)
   root = createRoot(container)
   auth.isAuthenticated = true
+  auth.ready = true
   auth.request.mockReset()
   auth.request.mockImplementation(async (url: string) =>
     url.includes('/collection/list')
@@ -67,6 +72,7 @@ describe('home watching contracts', () => {
 
   it('shows useful discovery links and a compact welcome for signed-out visitors', async () => {
     auth.isAuthenticated = false
+    auth.ready = true
     await act(async () => root.render(<HomeClient initialHot={[]} />))
 
     expect(container.querySelector('h1')?.textContent).toBe('Bangmio')
@@ -74,5 +80,14 @@ describe('home watching contracts', () => {
     expect(container.querySelector('[aria-label="快速入口"]')?.textContent).toContain('新番时间表')
     expect(container.querySelector('[aria-label="快速入口"]')?.textContent).toContain('小组讨论')
     expect(container.querySelector('a[href="/login"]')?.textContent).toContain('使用 Bangumi 登录')
+  })
+
+  it('does not render a logged-out call to action while authentication is restoring', async () => {
+    auth.isAuthenticated = false
+    auth.ready = false
+    await act(async () => root.render(<HomeClient initialHot={[]} />))
+
+    expect(container.querySelector('a[href="/login"]')).toBeNull()
+    expect(container.textContent).not.toContain('还没有在追的内容')
   })
 })

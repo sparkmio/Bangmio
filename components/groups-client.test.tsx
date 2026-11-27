@@ -4,10 +4,11 @@ import { createRoot, type Root } from 'react-dom/client'
 const mocks = vi.hoisted(() => ({
   request: vi.fn(),
   api: vi.fn(),
-  user: null as null | { username: string }
+  user: null as null | { username: string },
+  ready: true
 }))
 vi.mock('./auth-provider', () => ({
-  useAuth: () => ({ user: mocks.user, request: mocks.request })
+  useAuth: () => ({ ready: mocks.ready, user: mocks.user, request: mocks.request })
 }))
 vi.mock('@/lib/api', () => ({ apiFetch: mocks.api }))
 vi.mock('next/link', () => ({
@@ -23,6 +24,7 @@ beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.useFakeTimers()
   mocks.user = null
+  mocks.ready = true
   mocks.request.mockReset()
   mocks.api.mockReset()
   container = document.createElement('div')
@@ -79,12 +81,27 @@ it('uses one followed-list read without N+1 detail requests', async () => {
   expect(mocks.request).toHaveBeenCalledTimes(1)
   expect(container.textContent).toContain('我的小组')
 })
+it('waits for auth restoration before deciding that the user has no groups', async () => {
+  mocks.ready = false
+  mocks.user = { username: 'fixture' }
+  mocks.request.mockResolvedValue({ data: [{ id: 'one', name: '我的小组' }] })
+  await render()
+
+  expect(mocks.request).not.toHaveBeenCalled()
+  expect(container.textContent).not.toContain('还没有参加小组')
+  expect(container.querySelectorAll('.skeleton')).toHaveLength(3)
+
+  mocks.ready = true
+  await render()
+  expect(mocks.request).toHaveBeenCalledTimes(1)
+  expect(container.textContent).toContain('我的小组')
+})
 it('does not misrepresent a failed followed read as an empty membership list', async () => {
   mocks.user = { username: 'fixture' }
   mocks.request.mockRejectedValue(new Error('offline'))
   await render()
   expect(container.querySelector('[role="alert"]')?.textContent).toContain('读取失败')
-  expect(container.textContent).not.toContain('还没有关注的小组')
+  expect(container.textContent).not.toContain('还没有参加小组')
 })
 it('discards followed data after logout', async () => {
   let resolve!: (value: unknown) => void

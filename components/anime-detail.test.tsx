@@ -17,7 +17,7 @@ vi.mock('./collection-button', () => ({
 vi.mock('./anime-card', () => ({ AnimeGrid: () => null }))
 vi.mock('./rich-text', () => ({ RichText: () => <div>Summary fixture</div> }))
 
-import { AnimeDetail } from './anime-detail'
+import { AnimeDetail, valueText } from './anime-detail'
 
 let container: HTMLDivElement
 let root: Root
@@ -41,6 +41,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount())
   container.remove()
+  vi.unstubAllGlobals()
 })
 
 describe('anime detail collection placement', () => {
@@ -58,5 +59,41 @@ describe('anime detail collection placement', () => {
 
     expect(container.querySelector('.test-collection-editor')).toBeNull()
     expect(container.textContent).toContain('Episodes fixture')
+  })
+})
+
+describe('Bangumi infobox values', () => {
+  it('renders structured aliases as readable text instead of JSON', () => {
+    expect(valueText([{ v: 'K-On!' }, { v: ['轻音少女', { value: 'けいおん!' }] }])).toBe(
+      'K-On! / 轻音少女 / けいおん!'
+    )
+  })
+})
+
+describe('external rating recovery', () => {
+  it('retries degraded sources on request', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      return {
+        ok: true,
+        json: async () =>
+          url.includes('/ratings/other')
+            ? { data: null, degraded: true, degradedSources: { mal: true, imdb: false } }
+            : { data: {} }
+      }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await act(async () => root.render(<AnimeDetail {...props} initialTab="douban" />))
+    const retry = [...container.querySelectorAll('button')].find(
+      button => button.textContent === '重试评分源'
+    )!
+    expect(retry).toBeTruthy()
+
+    await act(async () => retry.click())
+
+    expect(
+      fetchMock.mock.calls.filter(([input]) => String(input).includes('/ratings/other'))
+    ).toHaveLength(2)
   })
 })

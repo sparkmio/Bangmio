@@ -12,34 +12,24 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
           cache-dependency-path: |
             package-lock.json
-            client/package-lock.json
             tooling/eslint/package-lock.json
 
       - name: Install root dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
+      - name: Quality checks
+        run: npm run check
 
-      - name: Test
-        run: npm test
-
-      - name: Build legacy Vue client
-        run: npm run build:vue
-
-      - name: Build
-        env:
-          VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAD6gcShUkr9NZuAJ' }}
-          VITE_REQUIRE_EMAIL_CODE: 'true'
+      - name: Build Cloudflare Worker
         run: npm run build
 
       - name: Upload build artifacts

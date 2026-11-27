@@ -47,6 +47,10 @@ export const RATE_LIMIT_MAX_POST = 10
 /** GET 路由速率限制（次/窗口） */
 export const RATE_LIMIT_MAX_GET = 60
 
+/** AI 共享成本配额：每个 IP 每小时最多 30 次 chat/suggestions 请求 */
+export const RATE_LIMIT_AI_WINDOW = 60 * 60 * 1000
+export const RATE_LIMIT_MAX_AI = 30
+
 /** 评论内容最大长度 */
 export const MAX_CONTENT_LENGTH = 5000
 

@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { DataUnavailable } from '@/components/data-unavailable'
 import { requirePositiveId } from '@/lib/page-data'
 import Link from 'next/link'
@@ -5,6 +6,8 @@ import { safeApiFetchServer } from '@/lib/api-server'
 import { DiscussionComposer } from '@/components/discussion-composer'
 import { RichText } from '@/components/rich-text'
 import { communityProfile } from '@/lib/community'
+
+export const metadata: Metadata = { title: '吐槽箱' }
 
 function commentDate(comment: any, index: number) {
   const value = comment.created_at || comment.date

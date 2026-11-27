@@ -238,7 +238,7 @@ export function GroupsClient({
   groupsDegraded?: boolean
   topicsDegraded?: boolean
 }) {
-  const { user, request } = useAuth()
+  const { ready, user, request } = useAuth()
   const initialGroupList = useMemo(
     () => arrayFrom(initialGroups).map(normalizeGroup).filter(Boolean) as Group[],
     [initialGroups]
@@ -261,7 +261,7 @@ export function GroupsClient({
   const groupsController = useRef<AbortController | null>(null)
   const topicsController = useRef<AbortController | null>(null)
   const initialRecoveryStarted = useRef(false)
-  const [followedLoading, setFollowedLoading] = useState(false)
+  const [followedLoading, setFollowedLoading] = useState(true)
   const [allGroups, setAllGroups] = useState<Group[]>(initialGroupList)
   const [allGroupsLoading, setAllGroupsLoading] = useState(false)
   const [allGroupsError, setAllGroupsError] = useState(
@@ -285,6 +285,10 @@ export function GroupsClient({
 
   const loadFollowedGroups = useCallback(async () => {
     const generation = ++followedGeneration.current
+    if (!ready) {
+      setFollowedLoading(true)
+      return
+    }
     if (!currentUsername) {
       setFollowedGroups([])
       setFollowedLoading(false)
@@ -303,11 +307,11 @@ export function GroupsClient({
       if (generation === followedGeneration.current) setFollowedGroups(groups)
     } catch {
       if (generation === followedGeneration.current)
-        setFollowedError('关注的小组读取失败，请重试。')
+        setFollowedError('参加的小组读取失败，请重试。')
     } finally {
       if (generation === followedGeneration.current) setFollowedLoading(false)
     }
-  }, [currentUsername, request])
+  }, [currentUsername, ready, request])
 
   const searchGroups = useCallback(async () => {
     const generation = ++searchGeneration.current
@@ -397,12 +401,13 @@ export function GroupsClient({
     }
   }, [])
   useEffect(() => {
+    if (!ready) return
     setFollowedGroups([])
     void loadFollowedGroups()
     return () => {
       followedGeneration.current += 1
     }
-  }, [loadFollowedGroups])
+  }, [loadFollowedGroups, ready])
   useEffect(() => {
     searchGeneration.current += 1
     searchController.current?.abort()
@@ -440,7 +445,7 @@ export function GroupsClient({
           <div className="eyebrow">BANGMIO / COMMUNITY</div>
           <h1>小组与讨论</h1>
           <p className="text-sm text-base-content/50 mt-1">
-            查看关注的小组，参与讨论，发现新的兴趣。
+            查看参加的小组，参与讨论，发现新的兴趣。
           </p>
         </div>
         <div className="community-search">
@@ -507,7 +512,7 @@ export function GroupsClient({
           <section className="community-followed">
             <div className="flex items-center justify-between gap-3 mb-4">
               <div>
-                <h2 className="text-lg font-bold">我关注的小组</h2>
+                <h2 className="text-lg font-bold">我参加的小组</h2>
                 {currentUsername ? (
                   <p className="text-xs text-base-content/50 mt-1">{currentUsername} 参加的小组</p>
                 ) : null}
@@ -534,7 +539,7 @@ export function GroupsClient({
               </div>
             ) : followedError && !followedGroups.length ? (
               <div className="panel empty-state">
-                <h3>暂时无法读取小组</h3>
+                <h3>暂时无法读取参加的小组</h3>
                 <p>这不代表你没有关注的小组，请点击上方刷新重试。</p>
               </div>
             ) : followedGroups.length ? (
@@ -545,7 +550,7 @@ export function GroupsClient({
               </div>
             ) : (
               <div className="panel empty-state compact-empty">
-                <h3>{currentUsername ? '还没有关注的小组' : '登录后查看关注的小组'}</h3>
+                <h3>{currentUsername ? '还没有参加小组' : '登录后查看参加的小组'}</h3>
                 <p>
                   {currentUsername
                     ? '去下方发现感兴趣的小组。'

@@ -1,9 +1,12 @@
+import type { Metadata } from 'next'
 import { DataUnavailable } from '@/components/data-unavailable'
 import { requirePositiveId } from '@/lib/page-data'
 import Link from 'next/link'
 import { safeApiFetchServer } from '@/lib/api-server'
 import { DiscussionComposer } from '@/components/discussion-composer'
 import { communityProfile } from '@/lib/community'
+
+export const metadata: Metadata = { title: '条目话题' }
 
 function safeText(value: unknown, fallback = ''): string {
   if (typeof value === 'string' || typeof value === 'number') return String(value)

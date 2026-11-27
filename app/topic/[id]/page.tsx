@@ -1,5 +1,8 @@
+import type { Metadata } from 'next'
 import { requiredPageData, requirePositiveId } from '@/lib/page-data'
 import { TopicThread } from '@/components/topic-thread'
+
+export const metadata: Metadata = { title: '讨论帖' }
 
 export default async function TopicPage({
   params,

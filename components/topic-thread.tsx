@@ -39,6 +39,19 @@ function dateLabel(value: unknown) {
   return '时间未知'
 }
 
+function replyCount(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return value
+  if (typeof value === 'string' && /^\s*\d[\d,]*\s*$/.test(value)) {
+    const parsed = Number(value.replaceAll(',', '').trim())
+    return Number.isSafeInteger(parsed) ? parsed : null
+  }
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    return replyCount(record.count ?? record.total ?? record.length)
+  }
+  return null
+}
+
 export function TopicThread({
   topic,
   replies,
@@ -48,6 +61,15 @@ export function TopicThread({
   composerMode
 }: TopicThreadProps) {
   const authorProfile = communityProfile(topic)
+  const totalReplies = replyCount(topic.reply_count ?? topic.replyCount)
+  const replySummary =
+    totalReplies === null
+      ? replies.length
+        ? `已加载 ${replies.length} 条`
+        : ''
+      : totalReplies === replies.length
+        ? `共 ${totalReplies} 条`
+        : `共 ${totalReplies} 条，已加载 ${replies.length} 条`
   return (
     <div className="discussion-page">
       <Link className="text-link" href={backHref}>
@@ -83,7 +105,7 @@ export function TopicThread({
       </article>
 
       <section className="discussion-replies" aria-labelledby="reply-heading">
-        <h2 id="reply-heading">回复 {replies.length ? `（已加载 ${replies.length} 条）` : ''}</h2>
+        <h2 id="reply-heading">回复{replySummary ? `（${replySummary}）` : ''}</h2>
         {replies.length ? (
           replies.map((reply: any, index) => {
             const profile = communityProfile(reply)
