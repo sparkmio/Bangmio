@@ -22,9 +22,13 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             tooling/eslint/package-lock.json
+            vue-reference/package-lock.json
 
       - name: Install root dependencies
         run: npm ci
+
+      - name: Install Vue reference dependencies
+        run: npm ci --prefix vue-reference
 
       - name: Quality checks
         run: npm run check
