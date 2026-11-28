@@ -70,15 +70,15 @@ describe('server-side API dispatch', () => {
     ])
   })
 
-  it('retries a transient upstream failure once', async () => {
+  it('does not replay detail reads after the upstream fallback is exhausted', async () => {
     dispatch
       .mockResolvedValueOnce(new Response('{"error":"upstream unavailable"}', { status: 502 }))
       .mockResolvedValueOnce(new Response('{"data":{"id":620011}}'))
 
-    await expect(apiFetchServer(`/anime/620011?retry=${Math.random()}`)).resolves.toMatchObject({
-      data: { id: 620011 }
+    await expect(apiFetchServer(`/anime/620011?retry=${Math.random()}`)).rejects.toMatchObject({
+      status: 502
     })
-    expect(dispatch).toHaveBeenCalledTimes(2)
+    expect(dispatch).toHaveBeenCalledOnce()
   })
 
   it('returns a marked last-known anime response during an upstream failure for up to 30 minutes', async () => {

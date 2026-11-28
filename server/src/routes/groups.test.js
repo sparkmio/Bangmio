@@ -58,7 +58,7 @@ describe('parseGroupListHTML', () => {
       id: 'acg',
       name: 'ACG 综合讨论',
       member_count: 5600,
-      avatar: 'https://lain.bgm.tv/icon/acg.png'
+      avatar: 'https://lain.bgm.lat/icon/acg.png'
     })
 
     const anime = groups.find(g => g.id === 'anime')

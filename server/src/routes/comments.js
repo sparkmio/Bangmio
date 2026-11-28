@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { parseHTML } from 'linkedom'
 import { createCache } from '../utils/cache.js'
-import { fetchHTML, fetchWithTimeout } from '../utils/http.js'
+import { fetchBangumiHTML, fetchHTML, fetchWithTimeout, fixUrl } from '../utils/http.js'
 import { CACHE_TTL_COMMENTS, MAX_CONTENT_LENGTH, MAX_TITLE_LENGTH } from '../config.js'
 import { parsePositiveId } from '../utils/validation.js'
 import { getBangumiAccessToken } from '../utils/bangumiAuth.js'
@@ -11,7 +11,7 @@ const app = new Hono()
 const cache = createCache(CACHE_TTL_COMMENTS)
 
 const BGM_TV = 'https://bgm.tv'
-const BGM_PROXY = 'https://bangumi.pro'
+const BGM_PROXY = 'https://bgm.lat'
 
 function getBase(isChina) {
   return isChina ? BGM_PROXY : BGM_TV
@@ -24,8 +24,7 @@ function invalidateCacheFor(prefix, id) {
 function absoluteAvatar(raw) {
   const value = String(raw || '').trim()
   if (!value) return ''
-  const normalized = value.startsWith('//') ? `https:${value}` : value
-  return normalized.replace('lain.bgm.tv', 'lain.bangumi.pro')
+  return fixUrl(value, BGM_PROXY)
 }
 
 function contentText(element) {
@@ -99,7 +98,7 @@ function parseSubReplies($doc, el) {
     const content = contentText(contentEl)
     if (user.username && content) {
       replies.push({
-        id: subEl.id?.replace('post_', '') || String(j),
+        id: subEl.id?.replace('post_', '') || (el.id || 'post') + '-sub-' + j,
         floor,
         user,
         content,
@@ -207,7 +206,7 @@ function parseTopicPage(html) {
       : '',
     title: (
       document.querySelector('h1.nameSingle a, .headerNeueInner h1, title') || { textContent: '' }
-    ).textContent.trim()
+    ).textContent.trim().replace(/\s*\(讨论[:：][^)]*\)$/, '')
   }
 
   const replies = []
@@ -220,6 +219,7 @@ function parseTopicPage(html) {
     const user = parseUserLink(el)
     const contentEl = el.querySelector('.message')
     const content = contentText(contentEl)
+    const children = parseSubReplies(document, el)
     if (user.username && content) {
       replies.push({
         id: el.id?.replace('post_', '') || String(i),
@@ -227,8 +227,10 @@ function parseTopicPage(html) {
         user,
         content,
         timestamp,
-        replies: parseSubReplies(document, el)
+        replies: children
       })
+    } else {
+      replies.push(...children)
     }
   })
 
@@ -247,7 +249,7 @@ app.get('/character/:id', async c => {
     const key = `char_${id}_${isChina}`
     const cached = cache.get(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`${getBase(isChina)}/character/${id}`)
+    const { html } = await fetchBangumiHTML(isChina ? [BGM_PROXY, BGM_TV] : [BGM_TV, BGM_PROXY], `/character/${id}`)
     const comments = parseTalkbox(html)
     cache.set(key, comments)
     return c.json({ data: comments })
@@ -264,7 +266,7 @@ app.get('/subject/:id', async c => {
     const key = `subj_${id}_${isChina}`
     const cached = cache.get(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`${getBase(isChina)}/subject/${id}`)
+    const { html } = await fetchBangumiHTML(isChina ? [BGM_PROXY, BGM_TV] : [BGM_TV, BGM_PROXY], `/subject/${id}`)
     const comments = parseSubjectTalkbox(html)
     cache.set(key, comments)
     return c.json({ data: comments })
@@ -281,7 +283,7 @@ app.get('/subject/:id/topics', async c => {
     const key = `topics_${id}_${isChina}`
     const cached = cache.get(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`${getBase(isChina)}/subject/${id}/board`)
+    const { html } = await fetchBangumiHTML(isChina ? [BGM_PROXY, BGM_TV] : [BGM_TV, BGM_PROXY], `/subject/${id}/board`)
     const topics = parseTopics(html).map(topic => ({ ...topic, subject_id: id }))
     cache.set(key, topics)
     return c.json({ data: topics })
@@ -298,7 +300,7 @@ app.get('/topic/:topicId', async c => {
     const key = `topic_${topicId}_${isChina}`
     const cached = cache.get(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`${getBase(isChina)}/subject/topic/${topicId}`)
+    const { html } = await fetchBangumiHTML(isChina ? [BGM_PROXY, BGM_TV] : [BGM_TV, BGM_PROXY], `/subject/topic/${topicId}`)
     const topic = parseTopicPage(html)
     cache.set(key, topic)
     return c.json({ data: topic })
@@ -315,7 +317,7 @@ app.get('/person/:id', async c => {
     const key = `person_${id}_${isChina}`
     const cached = cache.get(key)
     if (cached) return c.json({ data: cached })
-    const html = await fetchHTML(`${getBase(isChina)}/person/${id}`)
+    const { html } = await fetchBangumiHTML(isChina ? [BGM_PROXY, BGM_TV] : [BGM_TV, BGM_PROXY], `/person/${id}`)
     const comments = parseTalkbox(html)
     cache.set(key, comments)
     return c.json({ data: comments })

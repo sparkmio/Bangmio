@@ -1,5 +1,6 @@
 'use client'
 
+import { BangumiImage } from '@/components/bangumi-image'
 import Link from 'next/link'
 import { EpisodeList } from './episode-list'
 import { DataUnavailable } from './data-unavailable'
@@ -162,7 +163,7 @@ function Credits({ items, kind }: { items: Credit[]; kind: 'character' | 'person
             >
               <div className="bm-credit-photo">
                 {image ? (
-                  <img src={image} alt={name} loading="lazy" decoding="async" />
+                  <BangumiImage src={image} alt={name} loading="lazy" decoding="async" />
                 ) : (
                   <span>{name.slice(0, 1)}</span>
                 )}
@@ -384,7 +385,15 @@ function EmbedFrame({
 function CoverImage({ src, alt = '' }: { src?: string; alt?: string }) {
   const [failed, setFailed] = useState(false)
   if (!src || failed) return <span aria-hidden="true">♫</span>
-  return <img src={src} alt={alt} loading="lazy" decoding="async" onError={() => setFailed(true)} />
+  return (
+    <BangumiImage
+      src={src}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+    />
+  )
 }
 
 function OtherRatingsPanel({ subject }: { subject: Subject }) {
@@ -1078,7 +1087,7 @@ export function AnimeDetail({
             <div className="bm-detail-left">
               <div className="bm-detail-poster">
                 {image ? (
-                  <img
+                  <BangumiImage
                     key={image}
                     src={image}
                     alt={title}

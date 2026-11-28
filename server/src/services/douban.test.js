@@ -167,7 +167,7 @@ describe('豆瓣移动端公开数据服务', () => {
     expect(reviews[0].content).toHaveLength(longAbstract.length)
   })
 
-  it('上游返回验证页、非 JSON 或请求异常时静默降级', async () => {
+  it('搜索显式报告上游验证和网络异常，其他资料保持降级', async () => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(new Response('<html>安全验证</html>', { status: 403 }))
@@ -180,7 +180,7 @@ describe('豆瓣移动端公开数据服务', () => {
       .mockRejectedValueOnce(new Error('network error'))
     vi.stubGlobal('fetch', fetch)
 
-    await expect(searchDouban('测试')).resolves.toEqual([])
+    await expect(searchDouban('测试')).rejects.toThrow()
     await expect(getDoubanComments('1')).resolves.toEqual([])
     await expect(getDoubanReviews('1')).resolves.toEqual([])
   })

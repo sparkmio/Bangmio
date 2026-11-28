@@ -86,7 +86,7 @@ async function fetchServerPayload<T>(target: string, country: string, cacheKey: 
       }
       return payload
     } catch (error) {
-      if (attempt === 0 && shouldRetry(error)) {
+      if (attempt === 0 && !canUseStaleCache && shouldRetry(error)) {
         await waitBeforeRetry()
         continue
       }

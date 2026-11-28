@@ -153,9 +153,9 @@ async function findDoubanMatch(detail) {
   return findDoubanCandidate([...suggestions.values()], names, year) || null
 }
 
-async function buildDoubanResult(match) {
+async function buildDoubanResult(match, signal) {
   if (!match) return null
-  const abstract = await getDoubanAbstract(match.id)
+  const abstract = signal?.aborted ? null : await getDoubanAbstract(match.id, signal)
   return {
     id: match.id,
     title: abstract?.title || match.title,
@@ -183,20 +183,21 @@ app.get('/by-name', async c => {
     const cached = cache.get(cacheKey)
     if (cached) return c.json({ data: cached.notFound ? null : cached })
 
-    const suggestions = new Map()
+    const signal = AbortSignal.timeout(4200)
+    let match
     for (const name of names.slice(0, 4)) {
-      for (const candidate of await searchDouban(name)) suggestions.set(candidate.id, candidate)
+      match = findDoubanCandidate(await searchDouban(name, signal), names, year)
+      if (match) break
     }
-    const match = findDoubanCandidate([...suggestions.values()], names, year)
     if (!match) {
       cache.set(cacheKey, { notFound: true })
       return c.json({ data: null })
     }
-    const data = await buildDoubanResult(match)
+    const data = await buildDoubanResult(match, signal)
     cache.set(cacheKey, data)
     return c.json({ data })
   } catch {
-    return c.json({ data: null })
+    return c.json({ error: '豆瓣评分源暂时不可用', degraded: true }, 502)
   }
 })
 

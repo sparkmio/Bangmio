@@ -6,7 +6,16 @@ import { safeApiFetchServer } from '@/lib/api-server'
 import { DiscussionComposer } from '@/components/discussion-composer'
 import { communityProfile } from '@/lib/community'
 
-export const metadata: Metadata = { title: '条目话题' }
+export async function generateMetadata({
+  params
+}: {
+  params: Promise<{ id: string }>
+}): Promise<Metadata> {
+  const id = requirePositiveId((await params).id)
+  const response = await safeApiFetchServer<{ name?: string; name_cn?: string }>('/anime/' + id)
+  const name = response?.data?.name_cn || response?.data?.name
+  return { title: name ? name + ' · 条目话题' : '条目话题' }
+}
 
 function safeText(value: unknown, fallback = ''): string {
   if (typeof value === 'string' || typeof value === 'number') return String(value)

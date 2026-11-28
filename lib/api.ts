@@ -1,3 +1,4 @@
+import { bangumiImage, bangumiImageFallback } from './bangumi-image'
 import type { ApiResult } from './types'
 
 const DEFAULT_ORIGIN = 'http://localhost:3001'
@@ -85,8 +86,10 @@ export function imageUrls(images?: {
   if (!images) return []
   // Bangumi 的不同尺寸封面走同一图床但并非总能一起加载成功，
   // 保留全部候选，调用方可以在大图失败时依次回退到更小的尺寸。
-  return [...new Set([images.large, images.medium, images.common, images.grid].filter(Boolean))]
+  const candidates = [images.large, images.medium, images.common, images.grid]
     .filter((url): url is string => typeof url === 'string' && url.length > 0)
+    .map(bangumiImage)
+  return [...new Set([...candidates, ...candidates.map(bangumiImageFallback)])]
 }
 
 export function imageUrl(images?: {
@@ -105,6 +108,6 @@ export function displayName(subject?: { name?: string; name_cn?: string }) {
 export function avatarUrl(user?: {
   avatar?: { large?: string; medium?: string; small?: string } | string
 }) {
-  if (typeof user?.avatar === 'string') return user.avatar
-  return user?.avatar?.large || user?.avatar?.medium || user?.avatar?.small || ''
+  if (typeof user?.avatar === 'string') return bangumiImage(user.avatar)
+  return bangumiImage(user?.avatar?.medium || user?.avatar?.large || user?.avatar?.small)
 }

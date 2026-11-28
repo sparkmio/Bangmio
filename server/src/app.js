@@ -52,25 +52,25 @@ app.use(
 
 app.use('*', async (c, next) => {
   const country = c.req.header('cf-ipcountry') || ''
-  c.env = c.env || {}
-  c.env.CF_IP_COUNTRY = country
+  c.env = { ...c.env, CF_IP_COUNTRY: country }
   await next()
 })
 
 // 安全响应头：为所有响应添加安全相关 HTTP 头
 app.use('*', securityHeaders())
 
-// 速率限制：POST/PUT/DELETE 路由 10 次/分钟，GET 路由 60 次/分钟
-// 注意：limiter 实例必须在模块级创建一次，确保 store(Map) 在请求间累积计数
+// 写操作 10 次/分钟，账号及收藏读取 60 次/分钟。公开页面数据跳过共享计数。
+// 本地开发的内存兜底需要复用同一个 limiter 实例。
 const postLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_POST)
 const getLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_GET)
 const aiLimiter = rateLimit(RATE_LIMIT_AI_WINDOW, RATE_LIMIT_MAX_AI, { fallback: 'reject' })
 app.use('/api/v1/*', async (c, next) => {
   const method = c.req.method.toUpperCase()
   if (method === 'POST' && c.req.path.startsWith('/api/v1/ai/')) return aiLimiter(c, next)
-  const limiter =
-    method === 'POST' || method === 'PUT' || method === 'DELETE' ? postLimiter : getLimiter
-  return limiter(c, next)
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return postLimiter(c, next)
+  if (method === 'GET' && /^\/api\/v1\/(auth|user|collection)(\/|$)/.test(c.req.path))
+    return getLimiter(c, next)
+  await next()
 })
 
 // 认证路由速率限制：register/login/send-code/change-password/forgot-password/reset-password 5 次/分钟

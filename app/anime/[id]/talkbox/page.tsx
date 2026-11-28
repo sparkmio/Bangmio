@@ -7,7 +7,16 @@ import { DiscussionComposer } from '@/components/discussion-composer'
 import { RichText } from '@/components/rich-text'
 import { communityProfile } from '@/lib/community'
 
-export const metadata: Metadata = { title: '吐槽箱' }
+export async function generateMetadata({
+  params
+}: {
+  params: Promise<{ id: string }>
+}): Promise<Metadata> {
+  const id = requirePositiveId((await params).id)
+  const response = await safeApiFetchServer<{ name?: string; name_cn?: string }>('/anime/' + id)
+  const name = response?.data?.name_cn || response?.data?.name
+  return { title: name ? name + ' · 吐槽箱' : '吐槽箱' }
+}
 
 function commentDate(comment: any, index: number) {
   const value = comment.created_at || comment.date

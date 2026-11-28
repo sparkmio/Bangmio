@@ -3,7 +3,7 @@ import { parseHTML } from 'linkedom'
 import { createCache } from '../utils/cache.js'
 import {
   fetchHTML,
-  fetchHTMLMulti,
+  fetchBangumiHTML,
   fetchWithTimeout,
   parseNumber,
   fixUrl,
@@ -18,8 +18,7 @@ const app = new Hono()
 
 const HOSTS = {
   main: 'https://bgm.tv',
-  mirror1: 'https://bangumi.pro',
-  mirror2: 'https://bangumi.one'
+  mirror1: 'https://bgm.lat'
 }
 
 const cache = createCache(CACHE_TTL_GROUPS)
@@ -40,9 +39,9 @@ async function invalidateGroupPages(paths) {
 function getBaseUrls(isChina) {
   // 国内节点优先走代理镜像，海外节点优先走官方
   if (isChina) {
-    return [HOSTS.mirror1, HOSTS.mirror2, HOSTS.main]
+    return [HOSTS.mirror1, HOSTS.main]
   }
-  return [HOSTS.main, HOSTS.mirror1, HOSTS.mirror2]
+  return [HOSTS.main, HOSTS.mirror1]
 }
 
 /** 上游 WAF 拦截页特征（命中则不写入边缘缓存，避免缓存降级内容） */
@@ -79,7 +78,8 @@ async function fetchGroupHTMLCached(urls) {
     }
   }
 
-  const { html, url } = await fetchHTMLMulti(urls)
+  const first = new URL(urls[0])
+  const { html, url } = await fetchBangumiHTML(urls.map(url => new URL(url).origin), first.pathname + first.search)
 
   if (cache && html && html.length >= 500 && !looksBlocked(html)) {
     try {
@@ -548,7 +548,6 @@ function parseMemberCount(document) {
       el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent || ''
     )
   }
-  candidates.push(document.body?.textContent || '')
   for (const el of document.querySelectorAll('[class]')) {
     const className = el.getAttribute('class') || ''
     if (/(?:group[_-]?member|member[_-]?count|subscribers?|members?)/i.test(className)) {
@@ -561,7 +560,7 @@ function parseMemberCount(document) {
   for (const text of candidates) {
     const normalized = collapseText(text)
     const match =
-      normalized.match(/([0-9][0-9,]*)\s*(?:位?成员|人|members?|subscribers?)/i) ||
+      normalized.match(/([0-9][0-9,]*)\s*(?:位?成员|members?|subscribers?)/i) ||
       normalized.match(/(?:成员(?:数|人数)?|members?|subscribers?)\s*[:：]?\s*([0-9][0-9,]*)/i)
     if (match) {
       const count = parseNumber(match[1])
@@ -699,9 +698,7 @@ function parseGroupTopicHTML(html, id, base) {
     appendRow(container, rows.length + 1)
     for (const subReply of container.querySelectorAll('.topic_sub_reply > .sub_reply_bg')) {
       appendRow(subReply, rows.length + 1)
-      if (rows.length >= 50) break
     }
-    if (rows.length >= 50) break
   }
 
   if (!rows.length) {

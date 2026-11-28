@@ -1,8 +1,10 @@
 import { parsePositiveId } from '../utils/validation.js'
 import { logWarn } from '../utils/logger.js'
+import { withUpstreamCircuit } from '../utils/upstreamCircuit.js'
+import { BGM_API_HOST, BGM_MIRROR_HOST } from '../config.js'
 
-const BGM_API = 'https://api.bgm.tv'
-const BGM_PROXY = 'https://api.bangumi.pro'
+const BGM_API = 'https://' + BGM_API_HOST
+const BGM_PROXY = 'https://' + BGM_MIRROR_HOST
 
 function requiredId(value) {
   const id = parsePositiveId(value)
@@ -12,17 +14,11 @@ function requiredId(value) {
 
 function rewriteImageUrls(data) {
   if (typeof data === 'string') {
-    return data
-      .replace(/^\/\/lain\.bgm\.tv/i, 'https://lain.bangumi.pro')
-      .replace(/^http:\/\/lain\.bgm\.tv/i, 'https://lain.bangumi.pro')
-      .replace(/^http:\/\/lain\.bangumi\.pro/i, 'https://lain.bangumi.pro')
-      .replace(/lain\.bgm\.tv/g, 'lain.bangumi.pro')
+    return data.replace(/^(?:https?:)?\/\/(?:lain\.bgm\.tv|lain\.bgm\.lat|lain\.bangumi\.pro)(?=[/:?#]|$)/i, 'https://lain.bgm.lat')
   }
   if (Array.isArray(data)) return data.map(rewriteImageUrls)
   if (data && typeof data === 'object') {
-    const out = {}
-    for (const [k, v] of Object.entries(data)) out[k] = rewriteImageUrls(v)
-    return out
+    return Object.fromEntries(Object.entries(data).map(([k, v]) => [k, rewriteImageUrls(v)]))
   }
   return data
 }
@@ -68,65 +64,43 @@ async function bgmRequest(
   { token, body, params, isChina = false, timeout = 8000 } = {}
 ) {
   let lastError
-  const canRetry = method === 'GET' || (method === 'POST' && path === '/v0/search/subjects')
-
-  for (const base of apiBases(isChina)) {
+  const canRetry = !token && (method === 'GET' || (method === 'POST' && path === '/v0/search/subjects'))
+  for (const base of canRetry ? apiBases(isChina) : [BGM_API]) {
     const startedAt = Date.now()
-    const url = new URL(`${base}${path}`)
-    if (params)
-      Object.entries(params).forEach(([k, v]) => v != null && url.searchParams.set(k, String(v)))
+    const url = new URL(base + path)
+    for (const [key, value] of Object.entries(params || {})) {
+      if (value != null) url.searchParams.set(key, String(value))
+    }
     try {
-      const requestHeaders =
-        method === 'POST'
-          ? { ...headers(token), 'Content-Type': 'application/json' }
-          : headers(token)
-      const res = await fetch(url.toString(), {
-        ...(method === 'GET' ? {} : { method }),
-        headers: requestHeaders,
-        signal: AbortSignal.timeout(timeout),
-        ...(body === undefined ? {} : { body: JSON.stringify(body) })
+      return await withUpstreamCircuit(url, async () => {
+        const requestHeaders = headers(token)
+        if (body !== undefined) requestHeaders['Content-Type'] = 'application/json'
+        const res = await fetch(url.toString(), {
+          ...(method === 'GET' ? {} : { method }),
+          headers: requestHeaders,
+          redirect: 'manual',
+          signal: AbortSignal.timeout(Math.min(timeout, 4000)),
+          ...(body === undefined ? {} : { body: JSON.stringify(body) })
+        })
+        if (res.status >= 300 && res.status < 400) {
+          throw apiError(502, { error: 'Unexpected upstream redirect' }, undefined, base)
+        }
+        const text = await res.text()
+        let data
+        try {
+          data = text ? JSON.parse(text) : {}
+        } catch (cause) {
+          throw apiError(res.ok || res.status >= 500 ? 502 : res.status, { error: 'Invalid JSON response' }, cause, base)
+        }
+        if (!res.ok) throw apiError(res.status, data, undefined, base)
+        return rewriteImageUrls(data)
       })
-      const text = await res.text()
-      let data = {}
-      try {
-        data = text ? JSON.parse(text) : {}
-      } catch (cause) {
-        lastError = apiError(
-          res.ok || res.status >= 500 ? 502 : res.status,
-          { error: 'Invalid JSON response' },
-          cause,
-          base
-        )
-        logAttemptFailure(path, base, isChina, startedAt, lastError)
-        if (!canRetry || res.status === 401 || res.status === 403 || (!res.ok && res.status < 500))
-          throw lastError
-        continue
-      }
-      if (res.ok) return rewriteImageUrls(data)
-
-      const error = apiError(res.status, data, undefined, base)
-      if (res.status === 429) logAttemptFailure(path, base, isChina, startedAt, error)
-      if (res.status === 401 || res.status === 403 || res.status < 500) throw error
-      if (!canRetry) throw error
-      lastError = error
-      logAttemptFailure(path, base, isChina, startedAt, error)
     } catch (error) {
-      if (!error || typeof error !== 'object') error = new Error(String(error))
-      if (
-        error?.response?.status === 401 ||
-        error?.response?.status === 403 ||
-        error?.response?.status < 500
-      ) {
-        throw error
-      }
-      // Never replay a possibly successful write after a network failure.
-      if (!canRetry) throw error
-      if (!error.upstreamSource) error.upstreamSource = new URL(base).host
+      if (!canRetry || (error?.response?.status < 500 && error?.response?.status !== 429)) throw error
       lastError = error
-      logAttemptFailure(path, base, isChina, startedAt, error)
+      if (error?.name !== 'CircuitOpenError') logAttemptFailure(path, base, isChina, startedAt, error)
     }
   }
-
   throw lastError || new Error('Bangumi API unavailable')
 }
 
@@ -176,7 +150,22 @@ export function getIsChina(c) {
  * @returns {Promise<{ data: Array<Object>, total: number }>} 搜索结果列表及总数。
  */
 export async function searchAnime(keyword, opts = {}) {
-  const { body, limit, offset } = buildSearchBody(keyword, opts)
+  const normalized = keyword.normalize('NFKC').toLowerCase()
+  const exactTerms = /\p{Script=Han}/u.test(normalized)
+    ? normalized.match(/[a-z][a-z0-9]{2,}/g) || []
+    : []
+  const { body, limit, offset } = buildSearchBody(keyword, { sort: 'match', ...opts })
+  if (exactTerms.length) {
+    // Bangumi tokenizes mixed-script input as OR. Require the latin terms in
+    // the returned title or alias and paginate the bounded relevance window.
+    const { data } = await bgmPost('/v0/search/subjects', body, null, { limit: 100, offset: 0 }, opts.isChina)
+    const matches = (data || []).filter(subject => {
+      const aliases = subject.infobox?.filter(field => /别名|別名|alias/i.test(field.key)) || []
+      const names = [subject.name, subject.name_cn, JSON.stringify(aliases)].join(' ').normalize('NFKC').toLowerCase()
+      return exactTerms.every(term => new RegExp('(?:^|[^a-z0-9])' + term + '(?:$|[^a-z0-9])').test(names))
+    })
+    return { data: matches.slice(offset, offset + limit), total: matches.length }
+  }
   const d = await bgmPost('/v0/search/subjects', body, null, { limit, offset }, opts.isChina)
   return { data: d.data || [], total: d.total || 0 }
 }

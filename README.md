@@ -10,7 +10,7 @@ Bangumi (bgm.tv) 第三方客户端。支持 OAuth 登录、动画浏览与搜�
 
 **这是一个高中生好玩做的 VibeCoding 项目**，主要是用 DeepSeek V4 Pro 和 MiMo-V2.5-Pro 做的（二遍：改用glm5.2和kimi2.7code了），用了快 2亿 tokens（二遍：早就用了十亿tokens了），要不是 Deepseek 便宜根本负担不起......
 
-本项目使用了 [Bangumi](https://bgm.tv) 的 API，前端使用 Next.js，后端由 Hono 提供 API。当前通过 OpenNext 部署到 Cloudflare Workers。因为国内已经访问不了bangumi的域名了，所以替换了部分接口改为桜色大佬做的镜像站bangumi.pro(详见https://bgm.tv/group/topic/462456)
+本项目使用了 [Bangumi](https://bgm.tv) 的 API，前端使用 Next.js，后端由 Hono 提供 API。当前通过 OpenNext 部署到 Cloudflare Workers。因为国内已经访问不了bangumi的域名了，所以替换了部分接口改为桜色大佬做的镜像站bgm.lat(详见https://bgm.tv/group/topic/462456)
 
 这是一个几乎不懂 CSS 的人用 AI 做的网站，各位可以提出批评，但也别骂的太狠。也感谢 Bangumi 现在还活着，给我提供了一个这么全的数据库，只让我做了点前端工作。**这个项目虽然没啥人关注，但我会尽我所能持续进行维护和更新。**
 
@@ -70,6 +70,14 @@ npm run next:deploy
 ```
 
 Cloudflare 的 Git 构建项目应使用 **Workers Builds**，部署命令填写 `npm run next:deploy`；不要再把项目配置为 Cloudflare Pages 的 `client/dist` 输出目录。
+
+### 条目缓存与 Sitemap
+
+匿名且无查询参数的条目 HTML 在同一 Cloudflare 数据中心缓存 5 分钟，确认不存在的页面缓存 60 秒。登录 Cookie、鉴权头、RSC 和有查询参数的请求直接渲染。修改缓存格式或规则时递增缓存键中的 `html-v1`。
+
+写入及账户相关限流计数已迁至 `RATE_LIMITS` Durable Object。回滚代码时保留 Wrangler 已执行的 `rate-limits-v1` 迁移及对应类导出，再部署回滚版本。
+
+站点地图使用 Bangumi Archive 的公开条目快照。下载归档后执行 `node scripts/update-sitemap-catalog.mjs <归档 ZIP 路径> <YYYY-MM-DD>` 更新 ID，无需在部署时访问上游。`robots.txt` 声明 `https://bangmio.site/sitemap.xml`。
 
 ## 自动发布 Release
 

@@ -1,3 +1,4 @@
+import { BangumiImage } from '@/components/bangumi-image'
 import Link from 'next/link'
 import { DiscussionComposer } from './discussion-composer'
 import { RichText } from './rich-text'
@@ -11,6 +12,8 @@ type TopicThreadProps = {
   backLabel: string
   composerTopicId?: number
   composerMode?: 'reply' | 'group-reply'
+  page?: string | string[]
+  pagePath?: string
 }
 
 function safeText(value: unknown, fallback = ''): string {
@@ -58,18 +61,39 @@ export function TopicThread({
   backHref,
   backLabel,
   composerTopicId,
-  composerMode
+  composerMode,
+  page,
+  pagePath
 }: TopicThreadProps) {
   const authorProfile = communityProfile(topic)
+  const allReplies = replies.flatMap(reply => [
+    reply,
+    ...(Array.isArray(reply.replies) ? reply.replies : [])
+  ])
+  const loaded = allReplies.length
+  const pageSize = 30
+  const pageCount = Math.max(1, Math.ceil(loaded / pageSize))
+  const requestedPage = Number(Array.isArray(page) ? page[0] : page)
+  const currentPage =
+    pagePath && Number.isSafeInteger(requestedPage)
+      ? Math.max(1, Math.min(pageCount, requestedPage))
+      : 1
+  const offset = (currentPage - 1) * pageSize
+  const visible = pagePath ? allReplies.slice(offset, offset + pageSize) : allReplies
+  const hrefFor = (target: number) => {
+    const url = new URL(pagePath || backHref, 'https://bangmio.site')
+    url.searchParams.set('page', String(target))
+    return url.pathname + url.search + '#reply-heading'
+  }
   const totalReplies = replyCount(topic.reply_count ?? topic.replyCount)
   const replySummary =
     totalReplies === null
-      ? replies.length
-        ? `已加载 ${replies.length} 条`
+      ? loaded
+        ? `已加载 ${loaded} 条`
         : ''
-      : totalReplies === replies.length
+      : totalReplies === loaded
         ? `共 ${totalReplies} 条`
-        : `共 ${totalReplies} 条，已加载 ${replies.length} 条`
+        : `共 ${totalReplies} 条，已加载 ${loaded} 条`
   return (
     <div className="discussion-page">
       <Link className="text-link" href={backHref}>
@@ -93,7 +117,7 @@ export function TopicThread({
         <div className="discussion-author">
           <div className="avatar">
             {authorProfile.avatar ? (
-              <img src={authorProfile.avatar} alt="" loading="lazy" />
+              <BangumiImage src={authorProfile.avatar} alt="" loading="lazy" />
             ) : (
               authorProfile.name.slice(0, 1)
             )}
@@ -106,8 +130,8 @@ export function TopicThread({
 
       <section className="discussion-replies" aria-labelledby="reply-heading">
         <h2 id="reply-heading">回复{replySummary ? `（${replySummary}）` : ''}</h2>
-        {replies.length ? (
-          replies.map((reply: any, index) => {
+        {visible.length ? (
+          visible.map((reply: any, index) => {
             const profile = communityProfile(reply)
             const name = profile.name
             return (
@@ -118,7 +142,7 @@ export function TopicThread({
               >
                 <div className="avatar">
                   {profile.avatar ? (
-                    <img src={profile.avatar} alt="" loading="lazy" />
+                    <BangumiImage src={profile.avatar} alt="" loading="lazy" />
                   ) : (
                     name.slice(0, 1)
                   )}
@@ -127,11 +151,14 @@ export function TopicThread({
                   <div className="reply-meta">
                     <h3>{name}</h3>
                     <span className="reply-meta-side">
-                      <small>#{safeText(reply.floor, String(index + 1))}</small>
+                      <small>#{safeText(reply.floor, String(offset + index + 1))}</small>
                       {dateLabel(reply.timestamp || reply.created_at) !== '时间未知' ? (
                         <time>{dateLabel(reply.timestamp || reply.created_at)}</time>
                       ) : null}
-                      <ReplyAction author={name} floor={safeText(reply.floor, String(index + 1))} />
+                      <ReplyAction
+                        author={name}
+                        floor={safeText(reply.floor, String(offset + index + 1))}
+                      />
                     </span>
                   </div>
                   <RichText value={reply.content ?? reply.body} fallback="暂无回复内容。" />
@@ -145,6 +172,23 @@ export function TopicThread({
             <p>成为第一个参与讨论的人吧。</p>
           </div>
         )}
+        {pagePath && pageCount > 1 ? (
+          <nav aria-label="回复分页" className="discussion-header-actions">
+            {currentPage > 1 ? (
+              <Link className="button" href={hrefFor(currentPage - 1)}>
+                上一页
+              </Link>
+            ) : null}
+            <span>
+              第 {currentPage} / {pageCount} 页
+            </span>
+            {currentPage < pageCount ? (
+              <Link className="button" href={hrefFor(currentPage + 1)}>
+                下一页
+              </Link>
+            ) : null}
+          </nav>
+        ) : null}
       </section>
 
       {composerTopicId ? (

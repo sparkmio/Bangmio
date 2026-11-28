@@ -41,6 +41,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>
 }): Promise<Metadata> {
   const { id } = await params
+  if (!/^[1-9]\d*$/.test(id) || !Number.isSafeInteger(Number(id))) notFound()
   const response = await safeApiFetchServer<Subject>(`/anime/${id}`)
   const subjectTitle = response?.data ? displayName(response.data) : `番剧 ${id}`
   return {
@@ -90,22 +91,33 @@ export default async function AnimeDetailPage({
     : []
 
   return (
-    <AnimeDetail
-      subject={subject}
-      relations={relations}
-      characters={characters}
-      persons={persons}
-      episodes={episodes}
-      staleData={staleData}
-      episodeTotal={episodesResponse?.total || episodes.length}
-      episodesFailed={!episodesResponse}
-      failedSections={[
-        ...(!charactersResponse ? ['characters' as const] : []),
-        ...(!personsResponse ? ['staff' as const] : []),
-        ...(!relationsResponse ? ['relations' as const] : [])
-      ]}
-      infobox={infobox}
-      initialTab={initialTab}
-    />
+    <div
+      data-bangmio-cache="public"
+      data-bangmio-degraded={
+        staleData ||
+        !relationsResponse ||
+        !charactersResponse ||
+        !personsResponse ||
+        !episodesResponse
+      }
+    >
+      <AnimeDetail
+        subject={subject}
+        relations={relations}
+        characters={characters}
+        persons={persons}
+        episodes={episodes}
+        staleData={staleData}
+        episodeTotal={episodesResponse?.total || episodes.length}
+        episodesFailed={!episodesResponse}
+        failedSections={[
+          ...(!charactersResponse ? ['characters' as const] : []),
+          ...(!personsResponse ? ['staff' as const] : []),
+          ...(!relationsResponse ? ['relations' as const] : [])
+        ]}
+        infobox={infobox}
+        initialTab={initialTab}
+      />
+    </div>
   )
 }

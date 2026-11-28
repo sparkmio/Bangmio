@@ -33,7 +33,7 @@ describe('group discovery fallback', () => {
       data: [expect.objectContaining({ id: '321', title: '可用话题' })],
       degraded: true
     })
-    expect(upstream.mock.calls.length).toBeGreaterThan(3)
+    expect(upstream.mock.calls.length).toBe(3)
   })
 
   it('does not cache a degraded group list as a successful result', async () => {

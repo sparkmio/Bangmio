@@ -48,3 +48,28 @@ describe('topic reply counts', () => {
     )
   })
 })
+
+it('includes nested replies on the last page and preserves the return query', async () => {
+  const replies = Array.from({ length: 30 }, (_, index) => ({ id: index + 1, content: 'reply' }))
+  await act(async () =>
+    root.render(
+      <TopicThread
+        topic={{ title: 'Fixture topic', reply_count: 31 }}
+        replies={[
+          ...replies.slice(0, 29),
+          { ...replies[29], replies: [{ id: 31, content: 'nested' }] }
+        ]}
+        backHref="/groups"
+        backLabel="返回小组"
+        page="2"
+        pagePath="/topic/42?from=group"
+      />
+    )
+  )
+  expect(
+    [...container.querySelectorAll('.discussion-replies article small')].map(el => el.textContent)
+  ).toContain('#31')
+  expect(container.querySelector('nav[aria-label="回复分页"] a')?.getAttribute('href')).toBe(
+    '/topic/42?from=group&page=1#reply-heading'
+  )
+})

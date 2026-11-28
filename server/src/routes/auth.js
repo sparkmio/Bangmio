@@ -1,3 +1,4 @@
+import { BGM_OFFICIAL_OAUTH_BASE } from '../services/oauth.js'
 /**
  * 认证路由（Cloudflare Pages / Hono 后端）。
  *
@@ -43,21 +44,12 @@ import {
 const app = new Hono()
 
 /**
- * 判断请求是否来自国内节点（决定走 bgm.tv 还是 bangumi.pro 镜像）。
+ * 判断请求是否来自国内节点（决定走 bgm.tv 还是 bgm.lat 镜像）。
  * @param {import('hono').Context} c
  * @returns {boolean}
  */
 function isChina(c) {
   return (c.env?.CF_IP_COUNTRY || '') === 'CN'
-}
-
-/**
- * 获取 OAuth 基础 URL（国内走镜像，海外走官方）。
- * @param {import('hono').Context} c
- * @returns {string}
- */
-function oauthBase(c) {
-  return isChina(c) ? 'https://bangumi.pro' : 'https://bgm.tv'
 }
 
 /**
@@ -348,7 +340,7 @@ app.get('/oauth-bind-url', jwtAuth(), async c => {
     const currentUser = c.get('user')
     const state = await createOAuthBindState(c.env, currentUser.userId)
     const { appId } = getOAuthCredentials(c.env, '/auth/oauth-bind-url')
-    const url = `${oauthBase(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}&state=${encodeURIComponent(state)}`
+    const url = `${BGM_OFFICIAL_OAUTH_BASE}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}&state=${encodeURIComponent(state)}`
     return c.json({ data: { url }, code: 200 })
   } catch (err) {
     return errorResponse(err)
@@ -387,7 +379,6 @@ app.post('/oauth-bind-callback', jwtAuth(), async c => {
     const result = await bindBangumiByOAuth(c.env.DB, c.env, {
       code,
       state,
-      oauthBase: oauthBase(c),
       appId,
       appSecret,
       redirectUri: redirectUri(c),

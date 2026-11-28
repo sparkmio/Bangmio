@@ -1,5 +1,6 @@
 'use client'
 
+import { BangumiImage } from '@/components/bangumi-image'
 import Link from 'next/link'
 import { Modal } from './modal'
 import { collectionOptions, formatEpisodeDuration } from '@/lib/collection-options'
@@ -51,7 +52,7 @@ export function HomeClient({ initialHot }: { initialHot: Subject[] }) {
   const [watchingType, setWatchingType] = useState(0)
   const [watchingList, setWatchingList] = useState<WatchingSubject[]>([])
   const [selectedId, setSelectedId] = useState(0)
-  const [watchingLoading, setWatchingLoading] = useState(false)
+  const [watchingLoading, setWatchingLoading] = useState(true)
   const [watchingError, setWatchingError] = useState('')
   const [trendingList, setTrendingList] = useState<Subject[]>(initialHot)
   const [trendingLoading, setTrendingLoading] = useState(!initialHot.length)
@@ -99,14 +100,16 @@ export function HomeClient({ initialHot }: { initialHot: Subject[] }) {
     try {
       const filter = watchingType ? `&subject_type=${watchingType}` : ''
       const payload = await request<CollectionRecord[]>(
-        `/collection/list?offset=0&limit=30&type=3${filter}`
+        `/collection/list?offset=0&limit=100&type=3${filter}`
       )
-      const next = (Array.isArray(payload.data) ? payload.data : [])
+      if (!Array.isArray(payload.data)) throw new Error('收藏列表数据不完整')
+      const next = payload.data
         .filter(
           collection => Number(collection.subject?.type || collection.subject_type || 0) !== 4
         )
         .map(collectionSubject)
         .filter((item): item is WatchingSubject => Boolean(item))
+        .slice(0, 30)
       if (requestId !== watchingRequest.current) return
       setWatchingList(next)
       setSelectedId(next[0]?.id || 0)
@@ -144,15 +147,17 @@ export function HomeClient({ initialHot }: { initialHot: Subject[] }) {
     ++episodeRequest.current
   }, [])
   useEffect(() => {
+    if (!ready) return
     if (isAuthenticated) void fetchWatching()
     else {
+      setWatchingLoading(true)
       setWatchingList([])
       setSelectedId(0)
       setEpisodes([])
       setEpisodePopup(null)
     }
     return invalidateRequests
-  }, [isAuthenticated, fetchWatching, invalidateRequests])
+  }, [ready, isAuthenticated, fetchWatching, invalidateRequests])
 
   const selectWatching = (item: WatchingSubject) => {
     setSelectedId(item.id)
@@ -266,7 +271,7 @@ export function HomeClient({ initialHot }: { initialHot: Subject[] }) {
                       onClick={() => selectWatching(item)}
                     >
                       {imageUrl(item.images) ? (
-                        <img
+                        <BangumiImage
                           src={imageUrl(item.images)}
                           alt={displayName(item)}
                           className="w-10 h-14 sm:w-11 sm:h-[60px] rounded object-cover flex-shrink-0"
@@ -291,7 +296,7 @@ export function HomeClient({ initialHot }: { initialHot: Subject[] }) {
                   <div className="rounded-xl bg-base-200/40 p-5">
                     <div className="flex gap-5 mb-4">
                       {imageUrl(selectedWatching.images) ? (
-                        <img
+                        <BangumiImage
                           src={imageUrl(selectedWatching.images)}
                           alt={displayName(selectedWatching)}
                           className="w-24 h-32 sm:w-28 sm:h-40 rounded-lg object-cover shadow-md flex-shrink-0"

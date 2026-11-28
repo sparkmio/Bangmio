@@ -12,6 +12,7 @@
  * - 过期未使用的记录由后台清理（这里只提供查询与插入，不做自动清理）
  */
 
+import { consumeRateLimit } from '../utils/rateLimit.js'
 import { normalizeEmail } from '../utils/emailAddress.js'
 
 /** 验证码有效期（毫秒）：10 分钟 */
@@ -81,40 +82,18 @@ export async function getLatestCode(db, email, purpose) {
 
 /**
  * 原子占用邮箱验证码发送窗口，避免并发请求在“查询→发送→写入”之间重复发信。
- * D1 未提供时回退到旧查询逻辑，仅用于本地开发兼容。
+ * 共享对象原子占用发送窗口，本地无绑定时读取最近验证码。
  * @returns {Promise<{ allowed: boolean, cooldownSeconds: number }}>
  */
-export async function reserveCodeSendSlot(db, email, purpose) {
+export async function reserveCodeSendSlot(db, email, purpose, binding) {
   const normalizedEmail = normalizeEmail(email)
-  const now = Date.now()
-  const key = 'email-code:' + purpose + ':' + normalizedEmail
-  try {
-    const row = await db
-      .prepare(
-        'INSERT INTO rate_limits (key, count, reset_at) ' +
-          'VALUES (?, 1, ?) ' +
-          'ON CONFLICT(key) DO UPDATE SET ' +
-          'count = CASE WHEN rate_limits.reset_at <= ? THEN 1 ELSE rate_limits.count + 1 END, ' +
-          'reset_at = CASE WHEN rate_limits.reset_at <= ? THEN ? ELSE rate_limits.reset_at END ' +
-          'RETURNING count, reset_at'
-      )
-      .bind(key, now + CODE_RESEND_INTERVAL_MS, now, now, now + CODE_RESEND_INTERVAL_MS)
-      .first()
-    const count = Number(row?.count)
-    const resetAt = Number(row?.reset_at)
-    if (!Number.isFinite(count) || !Number.isFinite(resetAt))
-      throw new Error('invalid send slot row')
-    return {
-      allowed: count === 1,
-      cooldownSeconds: count === 1 ? 0 : Math.max(1, Math.ceil((resetAt - now) / 1000))
-    }
-  } catch {
+  if (!binding) {
     const latest = await getLatestCode(db, normalizedEmail, purpose)
-    return {
-      allowed: canResend(latest),
-      cooldownSeconds: canResend(latest) ? 0 : resendCooldownSeconds(latest)
-    }
+    return { allowed: canResend(latest), cooldownSeconds: resendCooldownSeconds(latest) }
   }
+  const key = 'email-code:' + purpose + ':' + await hashCode(normalizedEmail)
+  const { allowed, resetTime } = await consumeRateLimit(binding, key, CODE_RESEND_INTERVAL_MS, 1)
+  return { allowed, cooldownSeconds: allowed ? 0 : Math.max(1, Math.ceil((resetTime - Date.now()) / 1000)) }
 }
 
 /**

@@ -22,8 +22,7 @@ describe('exchangeBangumiOAuthCode', () => {
         code: 'authorization-code',
         appId: 'app-id',
         appSecret: 'app-secret',
-        redirectUri: 'https://bangmio.site/login/callback',
-        preferredBase: 'https://bangumi.pro'
+        redirectUri: 'https://bangmio.site/login/callback'
       })
     ).resolves.toEqual({ accessToken: 'access-token', refreshToken: 'refresh-token' })
 
@@ -31,28 +30,20 @@ describe('exchangeBangumiOAuthCode', () => {
     expect(fetchMock.mock.calls[0][0]).toBe(`${BGM_OFFICIAL_OAUTH_BASE}/oauth/access_token`)
   })
 
-  it('官方端点网络失败时回退到国内镜像端点', async () => {
-    const fetchMock = vi
-      .spyOn(globalThis, 'fetch')
-      .mockRejectedValueOnce(new Error('network down'))
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ access_token: 'mirror-token' }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        })
-      )
-
+  it('官方端点失败时不会将客户端密钥或授权码交给镜像', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network down'))
     await expect(
       exchangeBangumiOAuthCode({
         code: 'authorization-code',
         appId: 'app-id',
         appSecret: 'app-secret',
-        redirectUri: 'https://bangmio.site/login/callback',
-        preferredBase: 'https://bangumi.pro'
+        redirectUri: 'https://bangmio.site/login/callback'
       })
-    ).resolves.toMatchObject({ accessToken: 'mirror-token' })
-
-    expect(fetchMock.mock.calls[1][0]).toBe('https://bangumi.pro/oauth/access_token')
+    ).rejects.toMatchObject({ code: 'network_error' })
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+      `${BGM_OFFICIAL_OAUTH_BASE}/oauth/access_token`,
+      expect.objectContaining({ redirect: 'manual' })
+    )
   })
 
   it('保留上游 invalid_client 错误类型供路由给出明确提示', async () => {

@@ -1,3 +1,6 @@
+import { fetchWithTimeout } from '../utils/http.js'
+import { withUpstreamCircuit } from '../utils/upstreamCircuit.js'
+
 const DOUBAN_API = 'https://movie.douban.com'
 const MOBILE_API = 'https://m.douban.com/rexxar/api/v2'
 const MOBILE_UA =
@@ -5,23 +8,6 @@ const MOBILE_UA =
 
 function collapseSpace(s) {
   return (s || '').replace(/\s+/g, ' ').trim()
-}
-
-/**
- * 带超时的 fetch。豆瓣上游偶发连接挂起；必须给每次请求明确预算，
- * 以便页面能稳定降级而不是无限等待。
- * @param {string} url
- * @param {Record<string, string>} headers
- * @returns {Promise<Response>}
- */
-async function fetchWithTimeout(url, headers = {}) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 8000)
-  try {
-    return await fetch(url, { headers, signal: controller.signal, redirect: 'follow' })
-  } finally {
-    clearTimeout(timer)
-  }
 }
 
 /** 豆瓣移动端公开 JSON 端点的公共请求头。 */
@@ -32,23 +18,26 @@ const MOBILE_HEADERS = {
   'Accept-Language': 'zh-CN,zh;q=0.9'
 }
 
-/**
- * 调用豆瓣移动端 rexxar 接口并保证非 JSON/异常响应不会泄漏到路由层。
- * 豆瓣会将 movie/{id} 自动跳转到 tv/{id}；fetch 的 redirect: follow
- * 使电影与动画都可用同一个入口。
- */
-async function fetchMobileJson(path) {
+async function fetchMobileJson(path, { strict = false, signal } = {}) {
+  const separator = path.includes('?') ? '&' : '?'
+  const url = `${MOBILE_API}/${path}${separator}for_mobile=1`
   try {
-    const separator = path.includes('?') ? '&' : '?'
-    const res = await fetchWithTimeout(
-      `${MOBILE_API}/${path}${separator}for_mobile=1`,
-      MOBILE_HEADERS
-    )
-    if (!res.ok) return null
-    const contentType = res.headers.get('content-type') || ''
-    if (!contentType.includes('json')) return null
-    return await res.json()
-  } catch {
+    return await withUpstreamCircuit(url, async () => {
+      signal?.throwIfAborted()
+      const res = await fetchWithTimeout(url, { headers: MOBILE_HEADERS, signal, redirect: 'follow' }, 2500)
+      if ((!strict || !path.startsWith('search?')) && res.status === 404) return null
+      if (!res.ok || !(res.headers.get('content-type') || '').includes('json')) {
+        const status = res.status === 429 ? 429 : 503
+        throw Object.assign(new Error('Douban source unavailable'), { status })
+      }
+      const data = await res.json()
+      if (path.startsWith('search?') && !Array.isArray(data?.subjects?.items)) {
+        throw new Error('Invalid Douban search payload')
+      }
+      return data
+    })
+  } catch (error) {
+    if (strict) throw error
     return null
   }
 }
@@ -123,11 +112,11 @@ export function findDoubanCandidate(items, names, year = '') {
 /**
  * 在豆瓣搜索条目（番剧→豆瓣关联匹配）。
  * 桌面 suggest 和网页抓取会频繁进入 sec.douban.com 验证；移动端搜索实际返回
- * 结构化结果，因此将其作为唯一主路径。失败时返回空数组，路由可正常降级。
+ * 结构化结果，因此将其作为唯一主路径。网络异常交给路由标记为来源不可用。
  */
-export async function searchDouban(name) {
+export async function searchDouban(name, signal) {
   if (!name) return []
-  const data = await fetchMobileJson(`search?q=${encodeURIComponent(name)}&start=0&count=10`)
+  const data = await fetchMobileJson(`search?q=${encodeURIComponent(name)}&start=0&count=10`, { strict: true, signal })
   return parseMobileSearch(data)
 }
 
@@ -136,9 +125,9 @@ export async function searchDouban(name) {
  * @param {string|number} subjectId - 豆瓣条目 ID。
  * @returns {Promise<Object|null>} 与旧 subject_abstract 兼容的字段集合。
  */
-export async function getDoubanAbstract(subjectId) {
+export async function getDoubanAbstract(subjectId, signal) {
   if (!subjectId) return null
-  const data = await fetchMobileJson(`movie/${encodeURIComponent(subjectId)}`)
+  const data = await fetchMobileJson(`movie/${encodeURIComponent(subjectId)}`, { signal })
   if (!data?.id) return null
 
   return {

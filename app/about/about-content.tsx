@@ -48,8 +48,25 @@ const sections = [
     title: '联系方式',
     content: (
       <p>
-        暂无独立联系方式（待补充）。目前可通过下方 GitHub 项目或作者 Bangumi
-        主页了解项目与反馈问题。
+        站点故障与功能建议可提交到{' '}
+        <a
+          href="https://github.com/sparkmio/Bangmio/issues"
+          target="_blank"
+          rel="noreferrer"
+          className="link link-primary"
+        >
+          GitHub Issues
+        </a>
+        。账号或隐私相关问题请通过{' '}
+        <a
+          href="https://bgm.tv/pm/compose?to=acgpzh"
+          target="_blank"
+          rel="noreferrer"
+          className="link link-primary"
+        >
+          Bangumi 站内信
+        </a>{' '}
+        联系维护者，请勿在公开反馈中附上账号凭据。
       </p>
     )
   }

@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation'
-import { apiFetch } from './api'
+import { apiFetchServer } from './api-server'
 
 /** Required page data: only a confirmed upstream 404 means a missing page. */
 export async function requiredPageData<T>(path: string) {
-  const response = await apiFetch<T>(path).catch((error: Error & { status?: number }) => {
+  const response = await apiFetchServer<T>(path).catch((error: Error & { status?: number }) => {
     if (error.status === 404) notFound()
     throw error
   })

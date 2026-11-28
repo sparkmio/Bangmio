@@ -5,6 +5,7 @@ vi.mock('../services/bangumi.js', () => ({
 }))
 
 vi.mock('../services/oauth.js', () => ({
+  BGM_OFFICIAL_OAUTH_BASE: 'https://bgm.tv',
   exchangeBangumiOAuthCode: vi.fn()
 }))
 
@@ -189,6 +190,10 @@ describe('user group member count parsing', () => {
                 <strong><a href="/group/fillgrids" class="avatar"><img src="//lain.bgm.tv/pic/icon/m/1.jpg" />补旧番</a></strong>
                 <small>16,397 位成员</small>
               </li>
+              <li>
+                <a href="/group/dev"><img src="//lain.bgm.tv/pic/icon/m/2.jpg" />番组开发</a>
+                <small>1,788 位成员</small>
+              </li>
             </ul>
           `,
           { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
@@ -203,8 +208,14 @@ describe('user group member count parsing', () => {
         {
           id: 'fillgrids',
           name: '补旧番',
-          avatar: 'https://lain.bgm.tv/pic/icon/m/1.jpg',
+          avatar: 'https://lain.bgm.lat/pic/icon/m/1.jpg',
           member_count: 16397
+        },
+        {
+          id: 'dev',
+          name: '番组开发',
+          avatar: 'https://lain.bgm.lat/pic/icon/m/2.jpg',
+          member_count: 1788
         }
       ]
     })

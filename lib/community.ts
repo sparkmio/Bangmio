@@ -1,3 +1,5 @@
+import { bangumiImage } from './bangumi-image'
+
 export type CommunityProfile = { name: string; username: string; avatar: string; url: string }
 
 const GENERIC_PROFILE_NAMES = new Set([
@@ -70,7 +72,7 @@ export function communityProfile(value: any): CommunityProfile {
     : !isGenericProfileName(username)
       ? username
       : '社区成员'
-  const avatar = sourceData.avatar || fallback.avatar
+  const avatar = bangumiImage(sourceData.avatar || fallback.avatar)
   const url = sourceData.url || fallback.url
   return { name, username, avatar, url }
 }

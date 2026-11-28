@@ -327,8 +327,8 @@ describe('GET /by-name', () => {
         url: 'https://movie.douban.com/subject/right/'
       }
     })
-    expect(searchDouban).toHaveBeenCalledTimes(2)
-    expect(getDoubanAbstract).toHaveBeenCalledWith('right')
+    expect(searchDouban).toHaveBeenCalledTimes(1)
+    expect(getDoubanAbstract).toHaveBeenCalledWith('right', expect.any(AbortSignal))
   })
 
   it('does not associate a merely similar title', async () => {

@@ -94,7 +94,7 @@ function httpError(status, message) {
  */
 export async function sendVerificationCode(db, env, { email, purpose = 'register' }) {
   const normalizedEmail = normalizeEmail(email)
-  const slot = await reserveCodeSendSlot(db, normalizedEmail, purpose)
+  const slot = await reserveCodeSendSlot(db, normalizedEmail, purpose, env?.RATE_LIMITS)
   if (!slot.allowed) {
     return { sent: false, cooldownSeconds: slot.cooldownSeconds }
   }
@@ -386,7 +386,7 @@ export async function verifyOAuthBindState(env, state) {
  *
  * @param {D1Database} db - D1 binding。
  * @param {object} env - 环境变量。
- * @param {{ code: string, state: string, oauthBase: string, appId: string, appSecret: string, redirectUri: string, isChina?: boolean }} input
+ * @param {{ code: string, state: string, appId: string, appSecret: string, redirectUri: string, isChina?: boolean }} input
  *   OAuth 参数。
  * @returns {Promise<{ token: string, user: object }>}
  *   新 JWT 与用户信息。
@@ -395,7 +395,7 @@ export async function verifyOAuthBindState(env, state) {
 export async function bindBangumiByOAuth(
   db,
   env,
-  { code, state, oauthBase, appId, appSecret, redirectUri, isChina = false }
+  { code, state, appId, appSecret, redirectUri, isChina = false }
 ) {
   const stateResult = await verifyOAuthBindState(env, state)
   if (!stateResult.valid || !stateResult.userId) {
@@ -410,8 +410,7 @@ export async function bindBangumiByOAuth(
       code,
       appId,
       appSecret,
-      redirectUri,
-      preferredBase: oauthBase
+      redirectUri
     })
     accessToken = token.accessToken
   } catch (err) {

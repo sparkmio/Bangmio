@@ -13,6 +13,7 @@
  */
 
 import { logError } from './logger.js'
+import { withUpstreamCircuit } from './upstreamCircuit.js'
 
 /**
  * 使用 AbortController 为任意上游请求提供统一超时。
@@ -24,14 +25,9 @@ import { logError } from './logger.js'
  * @returns {Promise<Response>}
  */
 export async function fetchWithTimeout(url, init = {}, timeoutMs = 12000) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  const signal = init.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal
-  try {
-    return await fetch(url, { ...init, signal })
-  } finally {
-    clearTimeout(timer)
-  }
+  const deadline = AbortSignal.timeout(timeoutMs)
+  const signal = init.signal ? AbortSignal.any([init.signal, deadline]) : deadline
+  return fetch(url, { ...init, signal })
 }
 
 /**
@@ -194,7 +190,7 @@ export async function fetchHTML(
       },
       timeout
     )
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    if (!res.ok) throw Object.assign(new Error('HTTP ' + res.status), { status: res.status })
     return await decodeResponseBody(res)
   } catch (e) {
     if (!quiet && !signal?.aborted) logError('fetchHTML failed', { url, error: String(e) })
@@ -338,9 +334,33 @@ export function fixUrl(url, base = '') {
   if (!url) return ''
   const value = String(url).trim()
   if (!value) return ''
-  if (value.startsWith('//')) return `https:${value}`
+  if (/^(?:https?:)?\/\/lain\.(?:bangumi\.pro|bgm\.lat|bgm\.tv)(?=[/:?#]|$)/i.test(value)) {
+    return value.replace(/^(?:https?:)?\/\/[^/:?#]+/i, 'https://lain.bgm.lat')
+  }
+  if (value.startsWith('//')) return 'https:' + value
   if (value.startsWith('/')) return `${base}${value}`
   // 公共页面可能仍返回 HTTP 图片；生产站点为 HTTPS 时升级协议，避免混合内容被浏览器拦截。
   if (/^http:\/\//i.test(value)) return value.replace(/^http:\/\//i, 'https://')
   return value
+}
+
+/** Public HTML mirrors are tried in order, with one short attempt per host. */
+export async function fetchBangumiHTML(bases, path) {
+  let failure
+  for (const base of bases) {
+    const url = base + path
+    try {
+      const html = await withUpstreamCircuit(url, async () => {
+        const content = await fetchHTML(url, { timeout: 3000, quiet: true })
+        if (!content || /Just a moment|Attention Required|正在确认你是不是机器人|Access denied/i.test(content.slice(0, 2000)))
+          throw Object.assign(new Error('Bangumi HTML challenge'), { status: 503 })
+        return content
+      })
+      return { html, url }
+    } catch (error) {
+      if (error?.status === 404 && base === 'https://bgm.tv') throw error
+      failure = error
+    }
+  }
+  throw failure || new Error('Bangumi HTML unavailable')
 }

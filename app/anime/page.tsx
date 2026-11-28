@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   browseEndpoint,
@@ -24,6 +24,14 @@ const typeOptions = [
 const limit = 20
 
 export default function AnimeBrowsePage() {
+  return (
+    <Suspense fallback={<VueLoadingState loading loadingMessage="正在加载番剧列表…" />}>
+      <AnimeBrowseContent />
+    </Suspense>
+  )
+}
+
+function AnimeBrowseContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   // The URL is the committed query; the input remains a separate, unsent draft.

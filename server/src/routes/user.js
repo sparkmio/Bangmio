@@ -1,8 +1,9 @@
+import { parseHTML } from 'linkedom'
 import { Hono } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { getClient } from '../services/bangumi.js'
-import { exchangeBangumiOAuthCode } from '../services/oauth.js'
-import { fetchHTML, stripTags, unescapeHtml, parseNumber, fixUrl } from '../utils/http.js'
+import { BGM_OFFICIAL_OAUTH_BASE, exchangeBangumiOAuthCode } from '../services/oauth.js'
+import { fetchBangumiHTML, stripTags, unescapeHtml, parseNumber, fixUrl } from '../utils/http.js'
 import { getOAuthCredentials } from '../utils/oauthConfig.js'
 import { logError } from '../utils/logger.js'
 import {
@@ -27,8 +28,9 @@ function redirectUri(c) {
   return c.env?.OAUTH_REDIRECT_URI || 'http://localhost:3001/login/callback'
 }
 
-function oauthBase(c) {
-  return isChina(c) ? 'https://bangumi.pro' : 'https://bgm.tv'
+function fetchPublicProfile(c, username, suffix = '') {
+  const bases = isChina(c) ? ['https://bgm.lat', 'https://bgm.tv'] : ['https://bgm.tv', 'https://bgm.lat']
+  return fetchBangumiHTML(bases, `/user/${userPathSegment(username)}${suffix}`)
 }
 
 /**
@@ -108,7 +110,7 @@ app.get('/oauth-url', c => {
   const { appId } = getOAuthCredentials(c.env, '/user/oauth-url')
   const state = crypto.randomUUID()
   setCookie(c, OAUTH_STATE_COOKIE, state, oauthCookieOptions(c))
-  const url = `${oauthBase(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}&state=${encodeURIComponent(state)}`
+  const url = `${BGM_OFFICIAL_OAUTH_BASE}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}&state=${encodeURIComponent(state)}`
   return c.json({ data: url })
 })
 
@@ -126,8 +128,7 @@ app.post('/oauth-callback', async c => {
       code,
       appId,
       appSecret,
-      redirectUri: redirectUri(c),
-      preferredBase: oauthBase(c)
+      redirectUri: redirectUri(c)
     })
     const client = getClient(accessToken, isChina(c))
     const user = await client.get('/v0/me')
@@ -178,7 +179,6 @@ app.post('/refresh-token', async c => {
       appId,
       appSecret,
       redirectUri: redirectUri(c),
-      preferredBase: oauthBase(c),
       grantType: 'refresh_token'
     })
     const newRefreshToken = returnedRefreshToken || refreshToken
@@ -280,8 +280,7 @@ app.get('/:username/friends', async c => {
   try {
     const username = c.req.param('username')
     if (!username) return c.json({ data: [] })
-    const base = oauthBase(c)
-    const html = await fetchHTML(`${base}/user/${userPathSegment(username)}/friends`)
+    const { html, url } = await fetchPublicProfile(c, username, '/friends')
     if (!html) return c.json({ data: [] })
 
     const friends = []
@@ -302,7 +301,7 @@ app.get('/:username/friends', async c => {
 
       // 头像
       const avatarMatch = chunk.match(/<img[^>]*src="([^"]+)"/i)
-      const avatar = avatarMatch ? fixUrl(avatarMatch[1], base) : ''
+      const avatar = avatarMatch ? fixUrl(avatarMatch[1], new URL(url).origin) : ''
 
       // 签名
       const signMatch =
@@ -324,50 +323,31 @@ app.get('/:username/groups', async c => {
   try {
     const username = c.req.param('username')
     if (!username) return c.json({ data: [] })
-    const base = oauthBase(c)
-    // Bangumi 当前页面路径是 /groups；保留 /group 作为旧镜像兼容回退。
-    let html = await fetchHTML(`${base}/user/${userPathSegment(username)}/groups`)
-    if (!html) html = await fetchHTML(`${base}/user/${userPathSegment(username)}/group`)
-    if (!html) return c.json({ data: [] })
-
-    // 优先从 #group 或 .groups 区块提取，避免全页导航链接受污染
-    let scope = html
-    const blockMatch =
-      html.match(/<ul[^>]*id="memberGroupList"[^>]*>[\s\S]*?<\/ul>/i) ||
-      html.match(/id="group"[\s\S]*?<ul[\s\S]*?<\/ul>/i) ||
-      html.match(/class="[^"]*groups[^"]*"[\s\S]*?<ul[\s\S]*?<\/ul>/i) ||
-      html.match(/<h2[^>]*>小组[\s\S]*?<ul[\s\S]*?<\/ul>/i)
-    if (blockMatch) scope = blockMatch[0]
-
-    const groups = []
-    const seen = new Set()
-    const linkRegex = /<a href="\/group\/([^"/]+)"[^>]*>([\s\S]*?)<\/a>/gi
-    let m
-    while ((m = linkRegex.exec(scope)) !== null) {
-      const id = m[1]
-      if (id === 'all' || id === 'discover' || id === 'topic' || seen.has(id)) continue
-      const name = unescapeHtml(stripTags(m[2])).trim()
-      if (!name || /^\d+$/.test(name)) continue
-      seen.add(id)
-
-      const idx = m.index
-      const context = scope.slice(Math.max(0, idx - 250), Math.min(scope.length, idx + 500))
-
-      const memberMatch =
-        context.match(/([0-9][0-9,]*)\s*位?\s*成员/i) ||
-        context.match(/<span class="group_member">([0-9][0-9,]*).*?<\/span>/i) ||
-        context.match(/<span class="l">([0-9][0-9,]*).*?<\/span>/i) ||
-        context.match(/<strong>([0-9][0-9,]*)<\/strong>/i)
-      const member_count = memberMatch ? parseNumber(memberMatch[1]) : null
-
-      const avatarMatch = context.match(/<img[^>]*src="([^"]+)"[^>]*>/i)
-      const avatar = avatarMatch ? fixUrl(avatarMatch[1], base) : ''
-
-      groups.push({ id, name, avatar, member_count })
-      if (groups.length >= 30) break
+    let profile
+    try {
+      profile = await fetchPublicProfile(c, username, '/groups')
+    } catch (error) {
+      if (error?.status !== 404) throw error
+      profile = await fetchPublicProfile(c, username, '/group')
     }
-
-    return c.json({ data: groups })
+    const { document } = parseHTML(profile.html)
+    const list = document.querySelector('#memberGroupList, #group ul, .groups ul')
+    const groups = new Map()
+    for (const card of list?.querySelectorAll('li') || []) {
+      const groupLinks = [...card.querySelectorAll('a[href^="/group/"]')]
+        .map(anchor => ({ anchor, id: /^\/group\/([^/?#]+)\/?$/.exec(anchor.getAttribute('href'))?.[1] }))
+        .filter(({ id }) => id && !['all', 'discover', 'topic'].includes(id))
+      if (new Set(groupLinks.map(({ id }) => id)).size !== 1) continue
+      const entry = groupLinks.find(({ anchor }) => anchor.textContent.trim() && !/^\d+$/.test(anchor.textContent.trim()))
+      if (!entry || groups.has(entry.id)) continue
+      const name = entry.anchor.textContent.trim()
+      const countText = card.querySelector('.group_member, .l, strong')?.textContent || ''
+      const count = /([0-9][0-9,]*)\s*位?\s*成员/.exec(card.textContent) || /^\s*([0-9][0-9,]*)/.exec(countText)
+      const avatar = fixUrl(card.querySelector('img[src]')?.getAttribute('src'), new URL(profile.url).origin)
+      groups.set(entry.id, { id: entry.id, name, avatar, member_count: count ? parseNumber(count[1]) : null })
+      if (groups.size === 30) break
+    }
+    return c.json({ data: [...groups.values()] })
   } catch {
     return c.json({ data: [] })
   }
@@ -377,8 +357,7 @@ app.get('/:username/timeline', async c => {
   try {
     const username = c.req.param('username')
     if (!username) return c.json({ data: [] })
-    const base = oauthBase(c)
-    const html = await fetchHTML(`${base}/user/${userPathSegment(username)}/timeline`)
+    const { html } = await fetchPublicProfile(c, username, '/timeline')
     if (!html) return c.json({ data: [] })
 
     const items = []
@@ -432,8 +411,7 @@ app.get('/:username/stats-yearly', async c => {
   try {
     const username = c.req.param('username')
     if (!username) return c.json({ data: [] })
-    const base = oauthBase(c)
-    const html = await fetchHTML(`${base}/user/${userPathSegment(username)}`)
+    const { html } = await fetchPublicProfile(c, username)
     if (!html) return c.json({ data: [] })
 
     const stats = []

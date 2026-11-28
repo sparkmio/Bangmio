@@ -123,7 +123,7 @@ export function useAppearance() {
 }
 
 export function AppearanceSettings() {
-  const { motion, glass, setMotion, setGlass } = useAppearance()
+  const { theme, toggleTheme, motion, glass, setMotion, setGlass } = useAppearance()
   return (
     <section className="bm-settings-panel" aria-labelledby="appearance-heading">
       <div>
@@ -133,6 +133,17 @@ export function AppearanceSettings() {
           保留克制的层次感，也可以按设备性能或个人偏好关闭效果。
         </p>
       </div>
+      <label className="bm-setting-row">
+        <span>
+          <strong>深色主题</strong>
+        </span>
+        <input
+          aria-label="深色主题"
+          type="checkbox"
+          checked={theme === 'dark'}
+          onChange={toggleTheme}
+        />
+      </label>
       <label className="bm-setting-row">
         <span>
           <strong>页面过渡动画</strong>

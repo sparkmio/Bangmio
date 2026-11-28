@@ -299,10 +299,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAccount(storedAccount)
       setBgmToken('')
       setUser(readJson<User>(localStorage.getItem(KEYS.bgmProfile)) || storedAccount)
-      void (async () => {
-        await fetchBgmToken()
-        await fetchBgmUserProfile()
-      })()
+      void fetchBgmUserProfile().catch(() => null)
       setReady(true)
       return
     } else if (storedBangumiToken) {
@@ -322,10 +319,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .finally(() => setReady(true))
       return
     } else {
-      void fetch(apiPath('/user/me'), { credentials: 'include' })
+      const recovery = new AbortController()
+      void fetch(apiPath('/user/me'), {
+        credentials: 'include',
+        cache: 'no-store',
+        signal: AbortSignal.any([recovery.signal, AbortSignal.timeout(8000)])
+      })
         .then(response => (response.ok ? response.json() : null))
         .then(payload => {
-          if (payload?.data) {
+          if (!recovery.signal.aborted && payload?.data?.username) {
             setKind('bangumi')
             setToken(COOKIE_AUTH)
             setBgmToken('')
@@ -333,7 +335,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         })
         .catch(() => null)
-        .finally(() => setReady(true))
+        .finally(() => {
+          if (!recovery.signal.aborted) setReady(true)
+        })
+      return () => recovery.abort()
     }
   }, [fetchBgmToken, fetchBgmUserProfile, setAuth])
 

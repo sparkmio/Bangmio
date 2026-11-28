@@ -1,7 +1,7 @@
 name = "bangmio-next"
 compatibility_date = "2026-08-18"
 compatibility_flags = ["nodejs_compat"]
-main = ".open-next/worker.js"
+main = "worker.js"
 
 [[routes]]
 pattern = "bangmio.site/*"
@@ -29,3 +29,11 @@ binding = "DB"
 database_name = "bangmio-users"
 database_id = "3ef95a1c-a66a-4572-9522-39ed1961dbb8"
 migrations_dir = "server/db/migrations"
+
+[[durable_objects.bindings]]
+name = "RATE_LIMITS"
+class_name = "RateLimitCounter"
+
+[[migrations]]
+tag = "rate-limits-v1"
+new_sqlite_classes = ["RateLimitCounter"]

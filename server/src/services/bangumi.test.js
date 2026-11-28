@@ -1,3 +1,14 @@
+import { createUpstreamCircuit, withUpstreamCircuit } from '../utils/upstreamCircuit.js'
+
+vi.mock('../utils/upstreamCircuit.js', async importOriginal => {
+  const original = await importOriginal()
+  return { ...original, withUpstreamCircuit: vi.fn() }
+})
+
+beforeEach(() => {
+  vi.mocked(withUpstreamCircuit).mockImplementation(createUpstreamCircuit())
+})
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   getIsChina,
@@ -108,7 +119,7 @@ describe('searchAnime', () => {
 
     const body = JSON.parse(opts.body)
     expect(body.keyword).toBe('keyword')
-    expect(body.sort).toBe('rank')
+    expect(body.sort).toBe('match')
     expect(body.filter).toEqual({})
   })
 
@@ -128,7 +139,7 @@ describe('searchAnime', () => {
 
     await expect(searchAnime('x')).resolves.toEqual({ data: [{ id: 1 }], total: 1 })
     expect(global.fetch.mock.calls[0][0]).toContain('https://api.bgm.tv/')
-    expect(global.fetch.mock.calls[1][0]).toContain('https://api.bangumi.pro/')
+    expect(global.fetch.mock.calls[1][0]).toContain('https://api.bgm.lat/')
   })
 
   it('401 不切换源，直接保留 Token 无效错误', async () => {
@@ -167,7 +178,7 @@ describe('searchAnime', () => {
     await searchAnime('kw', { isChina: true })
 
     const [url] = global.fetch.mock.calls[0]
-    expect(url).toContain('https://api.bangumi.pro/v0/search/subjects')
+    expect(url).toContain('https://api.bgm.lat/v0/search/subjects')
   })
 })
 
@@ -224,10 +235,10 @@ describe('getAnimeDetail', () => {
     await getAnimeDetail(1, { isChina: true })
 
     const [url] = global.fetch.mock.calls[0]
-    expect(url).toContain('https://api.bangumi.pro/v0/subjects/1')
+    expect(url).toContain('https://api.bgm.lat/v0/subjects/1')
   })
 
-  it('将响应中的 lain.bgm.tv 图片地址重写为 lain.bangumi.pro', async () => {
+  it('将响应中的 lain.bgm.tv 图片地址重写为 lain.bgm.lat', async () => {
     const mockData = {
       id: 1,
       images: { large: 'http://lain.bgm.tv/pic/large.jpg' },
@@ -237,7 +248,7 @@ describe('getAnimeDetail', () => {
 
     const result = await getAnimeDetail(1)
 
-    expect(result.images.large).toBe('https://lain.bangumi.pro/pic/large.jpg')
+    expect(result.images.large).toBe('https://lain.bgm.lat/pic/large.jpg')
     expect(result.images.large).not.toContain('lain.bgm.tv')
   })
 })
@@ -363,14 +374,14 @@ describe('getClient', () => {
     expect(opts.method).toBe('DELETE')
   })
 
-  it('isChina=true 时 client 使用代理域名', async () => {
+  it('携带授权信息时仅请求官方接口', async () => {
     global.fetch = vi.fn().mockResolvedValue(okResponse({}))
 
     const client = getClient('t', true)
     await client.get('/v0/me')
 
     const [url] = global.fetch.mock.calls[0]
-    expect(url).toContain('https://api.bangumi.pro/v0/me')
+    expect(url).toContain('https://api.bgm.tv/v0/me')
   })
 })
 

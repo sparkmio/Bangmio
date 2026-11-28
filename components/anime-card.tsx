@@ -1,3 +1,4 @@
+import { BangumiImage } from '@/components/bangumi-image'
 import Link from 'next/link'
 import type { Subject } from '@/lib/types'
 import { displayName, imageUrl } from '@/lib/api'
@@ -10,7 +11,7 @@ export function AnimeCard({ subject }: { subject: Subject }) {
       <div className="bm-anime-card-surface relative overflow-hidden rounded-2xl border border-[var(--bm-line)] bg-[var(--bm-surface)]">
         <div className="aspect-[2/3] relative bg-[var(--bm-soft)]">
           {image ? (
-            <img
+            <BangumiImage
               src={image}
               alt={displayName(subject)}
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"

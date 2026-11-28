@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { avatarUrl } from '@/lib/api'
+import { bangumiImageFallback } from '@/lib/bangumi-image'
 import { Suspense } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/components/auth-provider'
@@ -473,12 +475,7 @@ export function DockNavigation() {
   const detailId = detailMatch?.[1]
   const detailSub = detailMatch?.[2] as DetailTabKey | undefined
 
-  const avatarSrc =
-    auth.isAuthenticated && auth.user?.avatar
-      ? typeof auth.user.avatar === 'string'
-        ? auth.user.avatar
-        : auth.user.avatar.medium || ''
-      : ''
+  const avatarSrc = auth.isAuthenticated && auth.user ? avatarUrl(auth.user) : ''
 
   return (
     <>
@@ -548,6 +545,11 @@ export function DockNavigation() {
                   {avatarSrc ? (
                     <img
                       src={avatarSrc}
+                      onError={event => {
+                        const fallback = bangumiImageFallback(avatarSrc)
+                        if (event.currentTarget.src !== fallback) event.currentTarget.src = fallback
+                        else event.currentTarget.style.visibility = 'hidden'
+                      }}
                       alt={auth.user?.nickname || auth.user?.username || ''}
                       className="w-6 h-6 rounded-full object-cover shrink-0"
                     />
@@ -559,10 +561,9 @@ export function DockNavigation() {
               ) : (
                 <span
                   aria-hidden="true"
-                  className="bm-dock-pill bm-dock-icon-button bm-dock-desktop-action opacity-0"
+                  className="bm-dock-pill bm-dock-icon-button bm-dock-desktop-action animate-pulse"
                 >
-                  <UserIcon className="w-5 h-5" />
-                  <span className="bm-dock-label">登录</span>
+                  <span className="skeleton w-5 h-5 rounded-full" />
                 </span>
               )}
             </>
@@ -620,6 +621,11 @@ export function DockNavigation() {
                 {avatarSrc ? (
                   <img
                     src={avatarSrc}
+                    onError={event => {
+                      const fallback = bangumiImageFallback(avatarSrc)
+                      if (event.currentTarget.src !== fallback) event.currentTarget.src = fallback
+                      else event.currentTarget.style.visibility = 'hidden'
+                    }}
                     alt={auth.user?.nickname || auth.user?.username || ''}
                     className="w-6 h-6 rounded-full object-cover"
                   />
@@ -628,8 +634,8 @@ export function DockNavigation() {
                 )}
               </Link>
             ) : (
-              <span aria-hidden="true" className="bm-dock-pill bm-dock-mobile-pill opacity-0">
-                <UserIcon className="w-6 h-6" />
+              <span aria-hidden="true" className="bm-dock-pill bm-dock-mobile-pill animate-pulse">
+                <span className="skeleton w-6 h-6 rounded-full" />
               </span>
             )}
           </div>

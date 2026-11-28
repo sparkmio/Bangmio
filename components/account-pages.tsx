@@ -1,5 +1,6 @@
 'use client'
 
+import { BangumiImage } from '@/components/bangumi-image'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { Collection, Subject, User } from '@/lib/types'
@@ -97,7 +98,7 @@ function CollectionStrip({ items }: { items: Collection[] }) {
           >
             <div className="w-16 h-[90px] sm:w-[72px] sm:h-[100px] rounded-md overflow-hidden bg-base-200 shadow-sm relative">
               {cover ? (
-                <img
+                <BangumiImage
                   src={cover}
                   alt={displayName(subject)}
                   className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
@@ -325,7 +326,11 @@ export function ProfilePage({ username }: { username?: string }) {
                 <div className="avatar shrink-0">
                   <div className="w-16 h-16 rounded-xl ring-4 ring-base-100 shadow-lg overflow-hidden bg-primary text-primary-content flex items-center justify-center text-2xl font-bold">
                     {avatar ? (
-                      <img src={avatar} alt={profileName} className="w-full h-full object-cover" />
+                      <BangumiImage
+                        src={avatar}
+                        alt={profileName}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       profileName.slice(0, 1)
                     )}
@@ -549,7 +554,7 @@ export function WatchingPage() {
                       type="button"
                     >
                       {cover ? (
-                        <img
+                        <BangumiImage
                           src={cover}
                           alt={displayName(itemSubject)}
                           className="w-10 h-14 sm:w-11 sm:h-[60px] rounded object-cover flex-shrink-0"
@@ -573,7 +578,7 @@ export function WatchingPage() {
               <article className="lg:col-span-9 rounded-xl bg-base-200/40 p-5">
                 <div className="flex gap-5 mb-4">
                   {imageUrl(subject.images) ? (
-                    <img
+                    <BangumiImage
                       className="w-24 h-32 sm:w-28 sm:h-40 rounded-lg object-cover shadow-md flex-shrink-0"
                       src={imageUrl(subject.images)}
                       alt={displayName(subject)}
@@ -678,12 +683,11 @@ export function SettingsPage() {
       </div>
       <RequireAuth>
         <div className="max-w-2xl">
-          <h1 className="text-xl font-bold mb-4">设置</h1>
           <div className="card bg-base-100 border border-base-300">
             <div className="card-body p-5">
               <h2 className="font-bold">{account?.email || '当前账号'}</h2>
               <p className="text-sm text-base-content/60">
-                {isBangmioUser ? '当前使用 Bangmio 账号。' : '当前使用 Bangumi Access Token 直登。'}
+                {isBangmioUser ? '当前使用 Bangmio 账号。' : '当前使用 Bangumi 账号。'}
               </p>
               {isBangmioUser ? (
                 <>

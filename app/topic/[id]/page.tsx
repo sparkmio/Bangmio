@@ -1,15 +1,24 @@
 import type { Metadata } from 'next'
 import { requiredPageData, requirePositiveId } from '@/lib/page-data'
 import { TopicThread } from '@/components/topic-thread'
+import { safeApiFetchServer } from '@/lib/api-server'
 
-export const metadata: Metadata = { title: '讨论帖' }
+export async function generateMetadata({
+  params
+}: {
+  params: Promise<{ id: string }>
+}): Promise<Metadata> {
+  const id = requirePositiveId((await params).id)
+  const response = await safeApiFetchServer<{ op?: { title?: string } }>('/comments/topic/' + id)
+  return { title: response?.data?.op?.title || '讨论帖' }
+}
 
 export default async function TopicPage({
   params,
   searchParams
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ from?: string; subject?: string | string[] }>
+  searchParams: Promise<{ from?: string; subject?: string | string[]; page?: string | string[] }>
 }) {
   const { id } = await params
   const query = await searchParams
@@ -32,6 +41,8 @@ export default async function TopicPage({
       backHref={backToSubject ? `/anime/${subject}/topics` : '/groups'}
       backLabel={backToSubject ? '返回条目讨论' : '返回小组'}
       composerTopicId={Number(id)}
+      page={query.page}
+      pagePath={`/topic/${id}${backToSubject ? `?from=subject&subject=${subject}` : ''}`}
     />
   )
 }

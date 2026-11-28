@@ -2,10 +2,25 @@ import type { Metadata } from 'next'
 import { requiredPageData, requirePositiveId } from '@/lib/page-data'
 import { groupTopicView } from '@/lib/community'
 import { TopicThread } from '@/components/topic-thread'
+import { safeApiFetchServer } from '@/lib/api-server'
 
-export const metadata: Metadata = { title: '小组话题' }
+export async function generateMetadata({
+  params
+}: {
+  params: Promise<{ id: string }>
+}): Promise<Metadata> {
+  const id = requirePositiveId((await params).id)
+  const response = await safeApiFetchServer<{ title?: string }>('/groups/topic/' + id)
+  return { title: response?.data?.title || '小组话题' }
+}
 
-export default async function GroupTopicPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function GroupTopicPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ page?: string | string[] }>
+}) {
   const { id } = await params
   requirePositiveId(id)
   const response = await requiredPageData<any>(`/groups/topic/${encodeURIComponent(id)}`)
@@ -18,6 +33,8 @@ export default async function GroupTopicPage({ params }: { params: Promise<{ id:
       backHref={topic.group_id ? `/group/${encodeURIComponent(String(topic.group_id))}` : '/groups'}
       backLabel="返回小组"
       composerTopicId={composerTopicId}
+      page={(await searchParams).page}
+      pagePath={`/group/topic/${id}`}
       composerMode="group-reply"
     />
   )

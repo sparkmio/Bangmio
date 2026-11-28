@@ -1,5 +1,6 @@
 'use client'
 
+import { BangumiImage } from '@/components/bangumi-image'
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from './auth-provider'
@@ -150,7 +151,7 @@ function GroupAvatar({ title, source }: { title: string; source: string }) {
         {title.slice(0, 1)}
       </span>
       {canLoadImage ? (
-        <img
+        <BangumiImage
           src={image}
           alt=""
           loading="lazy"

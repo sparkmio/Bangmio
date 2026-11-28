@@ -3450,93 +3450,42 @@ function logWarn(msg, meta = {}) {
 }
 
 // server/src/utils/rateLimit.js
-var d1WarningState = /* @__PURE__ */ new WeakMap();
-var nonObjectWarningState = /* @__PURE__ */ new Set();
-function rateLimit(windowMs, max, { fallback = "memory", keyFn } = {}) {
-  const localStore = /* @__PURE__ */ new Map();
-  const keyPrefix = `rate:${windowMs}:${max}`;
+function consumeRateLimit(binding, key2, windowMs, max) {
+  return binding.getByName(key2).consume(windowMs, max);
+}
+function rateLimit(windowMs, max, { fallback = "memory" } = {}) {
+  const local = /* @__PURE__ */ new Map();
+  let cleanupAt = 0;
   return async (c, next) => {
-    const ip = c.req.header("cf-connecting-ip") || c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-    const key2 = String(await keyFn?.(c) || ip);
+    const ip = c.req.header("cf-connecting-ip") || !c.env?.RATE_LIMITS && c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
     const now = Date.now();
-    const d1 = c.env?.DB;
-    let count;
-    let resetTime;
-    if (d1?.prepare) {
-      try {
-        const row = await d1.prepare(
-          `INSERT INTO rate_limits (key, count, reset_at)
-             VALUES (?, 1, ?)
-             ON CONFLICT(key) DO UPDATE SET
-               count = CASE WHEN rate_limits.reset_at <= ? THEN 1 ELSE rate_limits.count + 1 END,
-               reset_at = CASE WHEN rate_limits.reset_at <= ? THEN ? ELSE rate_limits.reset_at END
-             RETURNING count, reset_at`
-        ).bind(`${keyPrefix}:${key2}`, now + windowMs, now, now, now + windowMs).first();
-        count = Number(row?.count);
-        resetTime = Number(row?.reset_at);
-        if (!Number.isFinite(count) || !Number.isFinite(resetTime))
-          throw new Error("D1 returned invalid rate-limit row");
-      } catch (err) {
-        if (fallback === "reject") {
-          logWarn("D1 \u901F\u7387\u9650\u5236\u4E0D\u53EF\u7528\uFF0C\u4E25\u683C\u9650\u6D41\u63A5\u53E3\u5DF2\u62D2\u7EDD\u8BF7\u6C42", {
-            error: String(err),
-            path: c.req.path
-          });
-          return c.json({ data: null, error: "\u670D\u52A1\u6682\u65F6\u4E0D\u53EF\u7528\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5", code: 503 }, 503);
-        }
-        localStoreCleanup(localStore, now);
-        const entry = localStore.get(key2);
-        if (!entry || now > entry.resetTime) {
-          localStore.set(key2, { count: 1, resetTime: now + windowMs });
-        } else {
-          entry.count += 1;
-        }
-        const fallbackEntry = localStore.get(key2);
-        count = fallbackEntry.count;
-        resetTime = fallbackEntry.resetTime;
-        if (err?.message && !String(err.message).includes("invalid rate-limit row")) {
-          const errorText = String(err);
-          if (d1 && typeof d1 === "object") {
-            if (d1WarningState.get(d1) !== errorText) {
-              d1WarningState.set(d1, errorText);
-              logWarn("D1 \u901F\u7387\u9650\u5236\u4E0D\u53EF\u7528\uFF0C\u5DF2\u56DE\u9000\u5185\u5B58\u8BA1\u6570", { error: errorText });
-            }
-          } else if (!nonObjectWarningState.has(errorText)) {
-            nonObjectWarningState.add(errorText);
-            logWarn("D1 \u901F\u7387\u9650\u5236\u4E0D\u53EF\u7528\uFF0C\u5DF2\u56DE\u9000\u5185\u5B58\u8BA1\u6570", { error: errorText });
-          }
-        }
-      }
-    } else {
+    let result;
+    try {
+      if (!c.env?.RATE_LIMITS) throw new Error("RATE_LIMITS binding unavailable");
+      result = await consumeRateLimit(c.env.RATE_LIMITS, "ip:" + windowMs + ":" + max + ":" + ip, windowMs, max);
+      if (typeof result?.allowed !== "boolean" || !Number.isFinite(result.resetTime))
+        throw new Error("Invalid rate-limit result");
+    } catch {
       if (fallback === "reject") {
-        logWarn("\u4E25\u683C\u9650\u6D41\u63A5\u53E3\u7F3A\u5C11 D1\uFF0C\u5DF2\u62D2\u7EDD\u8BF7\u6C42", { path: c.req.path });
+        logWarn("Shared rate limiter unavailable", { path: c.req.path });
         return c.json({ data: null, error: "\u670D\u52A1\u6682\u65F6\u4E0D\u53EF\u7528\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5", code: 503 }, 503);
       }
-      localStoreCleanup(localStore, now);
-      const entry = localStore.get(key2);
-      if (!entry || now > entry.resetTime) {
-        localStore.set(key2, { count: 1, resetTime: now + windowMs });
-      } else {
-        entry.count += 1;
+      if (now >= cleanupAt || local.size >= 1e4) {
+        for (const [key2, state2] of local) if (state2.resetTime <= now) local.delete(key2);
+        if (local.size >= 1e4) local.delete(local.keys().next().value);
+        cleanupAt = now + windowMs;
       }
-      const fallbackEntry = localStore.get(key2);
-      count = fallbackEntry.count;
-      resetTime = fallbackEntry.resetTime;
+      const previous = local.get(ip);
+      const state = previous?.resetTime > now ? previous : { count: 0, resetTime: now + windowMs };
+      result = { allowed: state.count < max, resetTime: state.resetTime };
+      if (result.allowed) local.set(ip, { ...state, count: state.count + 1 });
     }
-    if (count > max) {
-      const retryAfter = Math.max(1, Math.ceil((resetTime - now) / 1e3));
-      logWarn("\u901F\u7387\u9650\u5236\u89E6\u53D1", { ip, count, max, path: c.req.path });
-      c.header("Retry-After", String(retryAfter));
+    if (!result.allowed) {
+      c.header("Retry-After", String(Math.max(1, Math.ceil((result.resetTime - now) / 1e3))));
       return c.json({ data: null, error: "\u8BF7\u6C42\u8FC7\u4E8E\u9891\u7E41", code: 429 }, 429);
     }
     await next();
   };
-}
-function localStoreCleanup(store, now) {
-  if (store.size <= 1e4) return;
-  for (const [key2, entry] of store) {
-    if (now > entry.resetTime) store.delete(key2);
-  }
 }
 
 // server/src/middleware/security.js
@@ -3570,6 +3519,8 @@ var CACHE_TTL_DOUBAN = 10 * 60 * 1e3;
 var CACHE_TTL_BILIBILI = 10 * 60 * 1e3;
 var CACHE_TTL_COMMENTS = 5 * 60 * 1e3;
 var CACHE_TTL_MOEGIRL = 30 * 60 * 1e3;
+var BGM_API_HOST = "api.bgm.tv";
+var BGM_MIRROR_HOST = "api.bgm.lat";
 var RATE_LIMIT_WINDOW = 60 * 1e3;
 var RATE_LIMIT_MAX_POST = 10;
 var RATE_LIMIT_MAX_GET = 60;
@@ -3577,6 +3528,304 @@ var RATE_LIMIT_AI_WINDOW = 60 * 60 * 1e3;
 var RATE_LIMIT_MAX_AI = 30;
 var MAX_CONTENT_LENGTH = 5e3;
 var MAX_TITLE_LENGTH = 200;
+
+// server/src/utils/upstreamCircuit.js
+var COOLDOWN_MS = 3e4;
+function createUpstreamCircuit() {
+  const origins = /* @__PURE__ */ new Map();
+  return async function withUpstreamCircuit2(url, attempt) {
+    const key2 = new URL(url).origin;
+    let state = origins.get(key2);
+    if (!state) {
+      state = { failures: 0, until: 0, probing: false };
+      if (origins.size === 32) origins.delete(origins.keys().next().value);
+      origins.set(key2, state);
+    }
+    const now = Date.now();
+    if (state.until > now || state.probing) {
+      throw Object.assign(new Error("Upstream temporarily unavailable"), { name: "CircuitOpenError" });
+    }
+    const probing = Boolean(state.until);
+    if (probing) state.probing = true;
+    try {
+      const result = await attempt();
+      state.failures = 0;
+      state.until = 0;
+      return result;
+    } catch (error) {
+      const status = error?.status ?? error?.response?.status;
+      if (status === 429 || status >= 500 || status == null && error?.name !== "AbortError") {
+        if (probing || ++state.failures >= 3) state.until = Date.now() + COOLDOWN_MS;
+      } else if (status != null) {
+        state.failures = 0;
+        state.until = 0;
+      }
+      throw error;
+    } finally {
+      if (probing) state.probing = false;
+    }
+  };
+}
+var withUpstreamCircuit = createUpstreamCircuit();
+
+// server/src/utils/http.js
+async function fetchWithTimeout(url, init = {}, timeoutMs = 12e3) {
+  const deadline = AbortSignal.timeout(timeoutMs);
+  const signal = init.signal ? AbortSignal.any([init.signal, deadline]) : deadline;
+  return fetch(url, { ...init, signal });
+}
+var SCRAPE_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+var ENCODING_SUPPORT = (() => {
+  const support = {};
+  for (const label of ["gb18030", "gbk", "big5"]) {
+    try {
+      const decoder = new TextDecoder(label);
+      decoder.decode(new Uint8Array(0));
+      support[label] = true;
+    } catch {
+      support[label] = false;
+      logError("TextDecoder \u4E0D\u652F\u6301\u7F16\u7801 label", { label });
+    }
+  }
+  return support;
+})();
+var WINDOWS_1252_BYTES = /* @__PURE__ */ new Map([
+  [8364, 128],
+  [8218, 130],
+  [402, 131],
+  [8222, 132],
+  [8230, 133],
+  [8224, 134],
+  [8225, 135],
+  [710, 136],
+  [8240, 137],
+  [352, 138],
+  [8249, 139],
+  [338, 140],
+  [381, 142],
+  [8216, 145],
+  [8217, 146],
+  [8220, 147],
+  [8221, 148],
+  [8226, 149],
+  [8211, 150],
+  [8212, 151],
+  [732, 152],
+  [8482, 153],
+  [353, 154],
+  [8250, 155],
+  [339, 156],
+  [382, 158],
+  [376, 159]
+]);
+function mojibakeMarkerCount(text) {
+  return (text.match(/[ÃÂâ]|(?:[à-ï][\u0080-\u00bf])/g) || []).length;
+}
+function repairMojibake(text) {
+  if (!text || !/[ÃÂâ]|[à-ï][\u0080-\u00bf]/.test(text)) return text;
+  const bytes = [];
+  for (const char of text) {
+    const code = char.codePointAt(0);
+    if (code <= 255) bytes.push(code);
+    else if (WINDOWS_1252_BYTES.has(code)) bytes.push(WINDOWS_1252_BYTES.get(code));
+    else return text;
+  }
+  try {
+    const repaired = new TextDecoder("utf-8", { fatal: true }).decode(new Uint8Array(bytes));
+    const beforeMarkers = mojibakeMarkerCount(text);
+    const afterMarkers = mojibakeMarkerCount(repaired);
+    const beforeCjk = (text.match(/[\u3400-\u9fff]/g) || []).length;
+    const afterCjk = (repaired.match(/[\u3400-\u9fff]/g) || []).length;
+    return afterMarkers < beforeMarkers || afterCjk > beforeCjk ? repaired : text;
+  } catch {
+    return text;
+  }
+}
+async function decodeResponseBody(res) {
+  const buffer = await res.arrayBuffer();
+  let text = "";
+  try {
+    text = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
+    if (!text.includes("\uFFFD")) return repairMojibake(text);
+  } catch {
+  }
+  for (const label of ["gb18030", "gbk"]) {
+    if (!ENCODING_SUPPORT[label]) {
+      logError("\u89E3\u7801\u56DE\u9000\u8DF3\u8FC7\u4E0D\u652F\u6301\u7684\u7F16\u7801", { label });
+      continue;
+    }
+    try {
+      const decoder = new TextDecoder(label, { fatal: true });
+      return repairMojibake(decoder.decode(buffer));
+    } catch {
+    }
+  }
+  return repairMojibake(new TextDecoder("utf-8").decode(buffer));
+}
+async function fetchHTML(url, { timeout = 12e3, headers: headers2 = {}, signal, quiet = false } = {}) {
+  try {
+    const res = await fetchWithTimeout(
+      url,
+      {
+        signal,
+        headers: {
+          "User-Agent": SCRAPE_UA,
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+          "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+          ...headers2
+        }
+      },
+      timeout
+    );
+    if (!res.ok) throw Object.assign(new Error("HTTP " + res.status), { status: res.status });
+    return await decodeResponseBody(res);
+  } catch (e) {
+    if (!quiet && !signal?.aborted) logError("fetchHTML failed", { url, error: String(e) });
+    throw e;
+  }
+}
+async function fetchHTMLMulti(urls, { timeout = 8e3, overallTimeout = 18e3, retries = 1, headers: headers2 = {} } = {}) {
+  if (!urls || urls.length === 0) {
+    throw new Error("All sources failed");
+  }
+  const controller = new AbortController();
+  const failures = [];
+  let timer;
+  const fetchOneWithRetry = async (url) => {
+    for (let i = 0; i <= retries; i++) {
+      controller.signal.throwIfAborted();
+      try {
+        const html = await fetchHTML(url, {
+          timeout,
+          headers: headers2,
+          signal: controller.signal,
+          quiet: true
+        });
+        if (html) return { html, url };
+        throw new Error("Empty HTML response");
+      } catch (error) {
+        if (controller.signal.aborted) throw error;
+        if (i === retries) {
+          failures.push({ url, error });
+          throw error;
+        }
+      }
+    }
+  };
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error("Overall timeout " + overallTimeout + "ms");
+      controller.abort(error);
+      reject(error);
+    }, overallTimeout);
+  });
+  try {
+    return await Promise.race([Promise.any(urls.map(fetchOneWithRetry)), deadline]);
+  } catch (error) {
+    const finalError = error instanceof AggregateError && failures.length ? failures[failures.length - 1].error : error;
+    logError("HTML \u6240\u6709\u5019\u9009\u6E90\u5931\u8D25", {
+      failures: failures.map((item) => ({ url: item.url, error: String(item.error) })),
+      error: String(finalError)
+    });
+    throw finalError;
+  } finally {
+    clearTimeout(timer);
+    controller.abort();
+  }
+}
+function stripTags(str) {
+  return (str || "").replace(/<[^>]+>/g, "").trim();
+}
+function unescapeHtml(str) {
+  return (str || "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+}
+function parseNumber(str) {
+  if (str == null) return 0;
+  const m = String(str).replace(/[^0-9]/g, "");
+  const n = parseInt(m);
+  return isNaN(n) ? 0 : n;
+}
+function fixUrl(url, base = "") {
+  if (!url) return "";
+  const value = String(url).trim();
+  if (!value) return "";
+  if (/^(?:https?:)?\/\/lain\.(?:bangumi\.pro|bgm\.lat|bgm\.tv)(?=[/:?#]|$)/i.test(value)) {
+    return value.replace(/^(?:https?:)?\/\/[^/:?#]+/i, "https://lain.bgm.lat");
+  }
+  if (value.startsWith("//")) return "https:" + value;
+  if (value.startsWith("/")) return `${base}${value}`;
+  if (/^http:\/\//i.test(value)) return value.replace(/^http:\/\//i, "https://");
+  return value;
+}
+async function fetchBangumiHTML(bases, path) {
+  let failure;
+  for (const base of bases) {
+    const url = base + path;
+    try {
+      const html = await withUpstreamCircuit(url, async () => {
+        const content = await fetchHTML(url, { timeout: 3e3, quiet: true });
+        if (!content || /Just a moment|Attention Required|正在确认你是不是机器人|Access denied/i.test(content.slice(0, 2e3)))
+          throw Object.assign(new Error("Bangumi HTML challenge"), { status: 503 });
+        return content;
+      });
+      return { html, url };
+    } catch (error) {
+      if (error?.status === 404 && base === "https://bgm.tv") throw error;
+      failure = error;
+    }
+  }
+  throw failure || new Error("Bangumi HTML unavailable");
+}
+
+// server/src/services/oauth.js
+var BGM_OFFICIAL_OAUTH_BASE = "https://bgm.tv";
+async function exchangeBangumiOAuthCode({
+  code,
+  appId,
+  appSecret,
+  redirectUri: redirectUri3,
+  grantType = "authorization_code"
+}) {
+  const params = new URLSearchParams({
+    grant_type: grantType,
+    client_id: appId,
+    client_secret: appSecret,
+    redirect_uri: redirectUri3
+  });
+  if (grantType === "authorization_code") {
+    params.set("code", code);
+  } else {
+    params.set("refresh_token", code);
+  }
+  try {
+    const response = await fetchWithTimeout(`${BGM_OFFICIAL_OAUTH_BASE}/oauth/access_token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json"
+      },
+      body: params.toString(),
+      redirect: "manual"
+    }, 5e3);
+    const data = await response.json().catch(() => ({}));
+    const accessToken = data?.access_token;
+    if (response.ok && accessToken) {
+      return {
+        accessToken,
+        refreshToken: data?.refresh_token || ""
+      };
+    }
+    const error = new Error(data?.error_description || data?.error || `HTTP ${response.status}`);
+    error.code = "provider_error";
+    error.providerStatus = response.status;
+    error.providerError = data?.error || "";
+    throw error;
+  } catch (err) {
+    if (err?.code === "provider_error") throw err;
+    logError("Bangumi OAuth endpoint request failed", { error: err?.name });
+    throw Object.assign(new Error("Bangumi OAuth endpoint unavailable"), { code: "network_error" });
+  }
+}
 
 // server/src/utils/jwt.js
 var DEFAULT_EXPIRES_IN = 7 * 24 * 3600;
@@ -3983,29 +4232,15 @@ async function getLatestCode(db, email, purpose) {
     return null;
   }
 }
-async function reserveCodeSendSlot(db, email, purpose) {
+async function reserveCodeSendSlot(db, email, purpose, binding) {
   const normalizedEmail = normalizeEmail(email);
-  const now = Date.now();
-  const key2 = "email-code:" + purpose + ":" + normalizedEmail;
-  try {
-    const row = await db.prepare(
-      "INSERT INTO rate_limits (key, count, reset_at) VALUES (?, 1, ?) ON CONFLICT(key) DO UPDATE SET count = CASE WHEN rate_limits.reset_at <= ? THEN 1 ELSE rate_limits.count + 1 END, reset_at = CASE WHEN rate_limits.reset_at <= ? THEN ? ELSE rate_limits.reset_at END RETURNING count, reset_at"
-    ).bind(key2, now + CODE_RESEND_INTERVAL_MS, now, now, now + CODE_RESEND_INTERVAL_MS).first();
-    const count = Number(row?.count);
-    const resetAt = Number(row?.reset_at);
-    if (!Number.isFinite(count) || !Number.isFinite(resetAt))
-      throw new Error("invalid send slot row");
-    return {
-      allowed: count === 1,
-      cooldownSeconds: count === 1 ? 0 : Math.max(1, Math.ceil((resetAt - now) / 1e3))
-    };
-  } catch {
+  if (!binding) {
     const latest = await getLatestCode(db, normalizedEmail, purpose);
-    return {
-      allowed: canResend(latest),
-      cooldownSeconds: canResend(latest) ? 0 : resendCooldownSeconds(latest)
-    };
+    return { allowed: canResend(latest), cooldownSeconds: resendCooldownSeconds(latest) };
   }
+  const key2 = "email-code:" + purpose + ":" + await hashCode(normalizedEmail);
+  const { allowed, resetTime } = await consumeRateLimit(binding, key2, CODE_RESEND_INTERVAL_MS, 1);
+  return { allowed, cooldownSeconds: allowed ? 0 : Math.max(1, Math.ceil((resetTime - Date.now()) / 1e3)) };
 }
 async function createCode(db, { email, code, purpose }) {
   const normalizedEmail = normalizeEmail(email);
@@ -4067,198 +4302,6 @@ function resendCooldownSeconds(latest) {
   return Math.ceil((CODE_RESEND_INTERVAL_MS - elapsed) / 1e3);
 }
 
-// server/src/utils/http.js
-async function fetchWithTimeout(url, init = {}, timeoutMs = 12e3) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  const signal = init.signal ? AbortSignal.any([init.signal, controller.signal]) : controller.signal;
-  try {
-    return await fetch(url, { ...init, signal });
-  } finally {
-    clearTimeout(timer);
-  }
-}
-var SCRAPE_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
-var ENCODING_SUPPORT = (() => {
-  const support = {};
-  for (const label of ["gb18030", "gbk", "big5"]) {
-    try {
-      const decoder = new TextDecoder(label);
-      decoder.decode(new Uint8Array(0));
-      support[label] = true;
-    } catch {
-      support[label] = false;
-      logError("TextDecoder \u4E0D\u652F\u6301\u7F16\u7801 label", { label });
-    }
-  }
-  return support;
-})();
-var WINDOWS_1252_BYTES = /* @__PURE__ */ new Map([
-  [8364, 128],
-  [8218, 130],
-  [402, 131],
-  [8222, 132],
-  [8230, 133],
-  [8224, 134],
-  [8225, 135],
-  [710, 136],
-  [8240, 137],
-  [352, 138],
-  [8249, 139],
-  [338, 140],
-  [381, 142],
-  [8216, 145],
-  [8217, 146],
-  [8220, 147],
-  [8221, 148],
-  [8226, 149],
-  [8211, 150],
-  [8212, 151],
-  [732, 152],
-  [8482, 153],
-  [353, 154],
-  [8250, 155],
-  [339, 156],
-  [382, 158],
-  [376, 159]
-]);
-function mojibakeMarkerCount(text) {
-  return (text.match(/[ÃÂâ]|(?:[à-ï][\u0080-\u00bf])/g) || []).length;
-}
-function repairMojibake(text) {
-  if (!text || !/[ÃÂâ]|[à-ï][\u0080-\u00bf]/.test(text)) return text;
-  const bytes = [];
-  for (const char of text) {
-    const code = char.codePointAt(0);
-    if (code <= 255) bytes.push(code);
-    else if (WINDOWS_1252_BYTES.has(code)) bytes.push(WINDOWS_1252_BYTES.get(code));
-    else return text;
-  }
-  try {
-    const repaired = new TextDecoder("utf-8", { fatal: true }).decode(new Uint8Array(bytes));
-    const beforeMarkers = mojibakeMarkerCount(text);
-    const afterMarkers = mojibakeMarkerCount(repaired);
-    const beforeCjk = (text.match(/[\u3400-\u9fff]/g) || []).length;
-    const afterCjk = (repaired.match(/[\u3400-\u9fff]/g) || []).length;
-    return afterMarkers < beforeMarkers || afterCjk > beforeCjk ? repaired : text;
-  } catch {
-    return text;
-  }
-}
-async function decodeResponseBody(res) {
-  const buffer = await res.arrayBuffer();
-  let text = "";
-  try {
-    text = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
-    if (!text.includes("\uFFFD")) return repairMojibake(text);
-  } catch {
-  }
-  for (const label of ["gb18030", "gbk"]) {
-    if (!ENCODING_SUPPORT[label]) {
-      logError("\u89E3\u7801\u56DE\u9000\u8DF3\u8FC7\u4E0D\u652F\u6301\u7684\u7F16\u7801", { label });
-      continue;
-    }
-    try {
-      const decoder = new TextDecoder(label, { fatal: true });
-      return repairMojibake(decoder.decode(buffer));
-    } catch {
-    }
-  }
-  return repairMojibake(new TextDecoder("utf-8").decode(buffer));
-}
-async function fetchHTML(url, { timeout = 12e3, headers: headers2 = {}, signal, quiet = false } = {}) {
-  try {
-    const res = await fetchWithTimeout(
-      url,
-      {
-        signal,
-        headers: {
-          "User-Agent": SCRAPE_UA,
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-          "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-          ...headers2
-        }
-      },
-      timeout
-    );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await decodeResponseBody(res);
-  } catch (e) {
-    if (!quiet && !signal?.aborted) logError("fetchHTML failed", { url, error: String(e) });
-    throw e;
-  }
-}
-async function fetchHTMLMulti(urls, { timeout = 8e3, overallTimeout = 18e3, retries = 1, headers: headers2 = {} } = {}) {
-  if (!urls || urls.length === 0) {
-    throw new Error("All sources failed");
-  }
-  const controller = new AbortController();
-  const failures = [];
-  let timer;
-  const fetchOneWithRetry = async (url) => {
-    for (let i = 0; i <= retries; i++) {
-      controller.signal.throwIfAborted();
-      try {
-        const html = await fetchHTML(url, {
-          timeout,
-          headers: headers2,
-          signal: controller.signal,
-          quiet: true
-        });
-        if (html) return { html, url };
-        throw new Error("Empty HTML response");
-      } catch (error) {
-        if (controller.signal.aborted) throw error;
-        if (i === retries) {
-          failures.push({ url, error });
-          throw error;
-        }
-      }
-    }
-  };
-  const deadline = new Promise((_, reject) => {
-    timer = setTimeout(() => {
-      const error = new Error("Overall timeout " + overallTimeout + "ms");
-      controller.abort(error);
-      reject(error);
-    }, overallTimeout);
-  });
-  try {
-    return await Promise.race([Promise.any(urls.map(fetchOneWithRetry)), deadline]);
-  } catch (error) {
-    const finalError = error instanceof AggregateError && failures.length ? failures[failures.length - 1].error : error;
-    logError("HTML \u6240\u6709\u5019\u9009\u6E90\u5931\u8D25", {
-      failures: failures.map((item) => ({ url: item.url, error: String(item.error) })),
-      error: String(finalError)
-    });
-    throw finalError;
-  } finally {
-    clearTimeout(timer);
-    controller.abort();
-  }
-}
-function stripTags(str) {
-  return (str || "").replace(/<[^>]+>/g, "").trim();
-}
-function unescapeHtml(str) {
-  return (str || "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
-}
-function parseNumber(str) {
-  if (str == null) return 0;
-  const m = String(str).replace(/[^0-9]/g, "");
-  const n = parseInt(m);
-  return isNaN(n) ? 0 : n;
-}
-function fixUrl(url, base = "") {
-  if (!url) return "";
-  const value = String(url).trim();
-  if (!value) return "";
-  if (value.startsWith("//")) return `https:${value}`;
-  if (value.startsWith("/")) return `${base}${value}`;
-  if (/^http:\/\//i.test(value)) return value.replace(/^http:\/\//i, "https://");
-  return value;
-}
-
 // server/src/utils/email.js
 var RESEND_API = "https://api.resend.com/emails";
 var DEFAULT_FROM = "Bangmio <signup@bangmio.site>";
@@ -4318,71 +4361,6 @@ function buildVerificationEmailHTML(code) {
 </html>`;
 }
 
-// server/src/services/oauth.js
-var BGM_OFFICIAL_OAUTH_BASE = "https://bgm.tv";
-async function exchangeBangumiOAuthCode({
-  code,
-  appId,
-  appSecret,
-  redirectUri: redirectUri3,
-  preferredBase,
-  grantType = "authorization_code"
-}) {
-  const bases = [BGM_OFFICIAL_OAUTH_BASE, preferredBase].filter(
-    (base, index, list) => base && list.indexOf(base) === index
-  );
-  let lastError;
-  for (const base of bases) {
-    const params = new URLSearchParams({
-      grant_type: grantType,
-      client_id: appId,
-      client_secret: appSecret,
-      redirect_uri: redirectUri3
-    });
-    if (grantType === "authorization_code") {
-      params.set("code", code);
-    } else {
-      params.set("refresh_token", code);
-    }
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12e3);
-    try {
-      const response = await fetch(`${base}/oauth/access_token`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Accept: "application/json"
-        },
-        body: params.toString(),
-        signal: controller.signal
-      });
-      const data = await response.json().catch(() => ({}));
-      const accessToken = data?.access_token;
-      if (response.ok && accessToken) {
-        return {
-          accessToken,
-          refreshToken: data?.refresh_token || ""
-        };
-      }
-      const error = new Error(data?.error_description || data?.error || `HTTP ${response.status}`);
-      error.code = "provider_error";
-      error.providerStatus = response.status;
-      error.providerError = data?.error || "";
-      lastError = error;
-      if (response.status < 500) break;
-    } catch (err) {
-      const error = new Error("Bangumi OAuth endpoint unavailable");
-      error.code = "network_error";
-      error.providerError = err?.name === "AbortError" ? "timeout" : String(err);
-      lastError = error;
-      logError("Bangumi OAuth endpoint request failed", { base, error: error.providerError });
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-  throw lastError || Object.assign(new Error("Bangumi OAuth endpoint unavailable"), { code: "network_error" });
-}
-
 // server/src/utils/validation.js
 function parsePositiveId(value) {
   const text = String(value ?? "").trim();
@@ -4399,8 +4377,8 @@ function parseBoundedInteger(value, { min, max, fallback }) {
 }
 
 // server/src/services/bangumi.js
-var BGM_API = "https://api.bgm.tv";
-var BGM_PROXY = "https://api.bangumi.pro";
+var BGM_API = "https://" + BGM_API_HOST;
+var BGM_PROXY = "https://" + BGM_MIRROR_HOST;
 function requiredId(value) {
   const id = parsePositiveId(value);
   if (id === null) throw new TypeError("ID must be a positive integer");
@@ -4408,13 +4386,11 @@ function requiredId(value) {
 }
 function rewriteImageUrls(data) {
   if (typeof data === "string") {
-    return data.replace(/^\/\/lain\.bgm\.tv/i, "https://lain.bangumi.pro").replace(/^http:\/\/lain\.bgm\.tv/i, "https://lain.bangumi.pro").replace(/^http:\/\/lain\.bangumi\.pro/i, "https://lain.bangumi.pro").replace(/lain\.bgm\.tv/g, "lain.bangumi.pro");
+    return data.replace(/^(?:https?:)?\/\/(?:lain\.bgm\.tv|lain\.bgm\.lat|lain\.bangumi\.pro)(?=[/:?#]|$)/i, "https://lain.bgm.lat");
   }
   if (Array.isArray(data)) return data.map(rewriteImageUrls);
   if (data && typeof data === "object") {
-    const out = {};
-    for (const [k, v] of Object.entries(data)) out[k] = rewriteImageUrls(v);
-    return out;
+    return Object.fromEntries(Object.entries(data).map(([k, v]) => [k, rewriteImageUrls(v)]));
   }
   return data;
 }
@@ -4445,52 +4421,41 @@ function logAttemptFailure(path, base, isChina7, startedAt, error) {
 }
 async function bgmRequest(method, path, { token, body, params, isChina: isChina7 = false, timeout = 8e3 } = {}) {
   let lastError;
-  const canRetry = method === "GET" || method === "POST" && path === "/v0/search/subjects";
-  for (const base of apiBases(isChina7)) {
+  const canRetry = !token && (method === "GET" || method === "POST" && path === "/v0/search/subjects");
+  for (const base of canRetry ? apiBases(isChina7) : [BGM_API]) {
     const startedAt = Date.now();
-    const url = new URL(`${base}${path}`);
-    if (params)
-      Object.entries(params).forEach(([k, v]) => v != null && url.searchParams.set(k, String(v)));
+    const url = new URL(base + path);
+    for (const [key2, value] of Object.entries(params || {})) {
+      if (value != null) url.searchParams.set(key2, String(value));
+    }
     try {
-      const requestHeaders = method === "POST" ? { ...headers(token), "Content-Type": "application/json" } : headers(token);
-      const res = await fetch(url.toString(), {
-        ...method === "GET" ? {} : { method },
-        headers: requestHeaders,
-        signal: AbortSignal.timeout(timeout),
-        ...body === void 0 ? {} : { body: JSON.stringify(body) }
+      return await withUpstreamCircuit(url, async () => {
+        const requestHeaders = headers(token);
+        if (body !== void 0) requestHeaders["Content-Type"] = "application/json";
+        const res = await fetch(url.toString(), {
+          ...method === "GET" ? {} : { method },
+          headers: requestHeaders,
+          redirect: "manual",
+          signal: AbortSignal.timeout(Math.min(timeout, 4e3)),
+          ...body === void 0 ? {} : { body: JSON.stringify(body) }
+        });
+        if (res.status >= 300 && res.status < 400) {
+          throw apiError(502, { error: "Unexpected upstream redirect" }, void 0, base);
+        }
+        const text = await res.text();
+        let data;
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch (cause) {
+          throw apiError(res.ok || res.status >= 500 ? 502 : res.status, { error: "Invalid JSON response" }, cause, base);
+        }
+        if (!res.ok) throw apiError(res.status, data, void 0, base);
+        return rewriteImageUrls(data);
       });
-      const text = await res.text();
-      let data = {};
-      try {
-        data = text ? JSON.parse(text) : {};
-      } catch (cause) {
-        lastError = apiError(
-          res.ok || res.status >= 500 ? 502 : res.status,
-          { error: "Invalid JSON response" },
-          cause,
-          base
-        );
-        logAttemptFailure(path, base, isChina7, startedAt, lastError);
-        if (!canRetry || res.status === 401 || res.status === 403 || !res.ok && res.status < 500)
-          throw lastError;
-        continue;
-      }
-      if (res.ok) return rewriteImageUrls(data);
-      const error = apiError(res.status, data, void 0, base);
-      if (res.status === 429) logAttemptFailure(path, base, isChina7, startedAt, error);
-      if (res.status === 401 || res.status === 403 || res.status < 500) throw error;
-      if (!canRetry) throw error;
-      lastError = error;
-      logAttemptFailure(path, base, isChina7, startedAt, error);
     } catch (error) {
-      if (!error || typeof error !== "object") error = new Error(String(error));
-      if (error?.response?.status === 401 || error?.response?.status === 403 || error?.response?.status < 500) {
-        throw error;
-      }
-      if (!canRetry) throw error;
-      if (!error.upstreamSource) error.upstreamSource = new URL(base).host;
+      if (!canRetry || error?.response?.status < 500 && error?.response?.status !== 429) throw error;
       lastError = error;
-      logAttemptFailure(path, base, isChina7, startedAt, error);
+      if (error?.name !== "CircuitOpenError") logAttemptFailure(path, base, isChina7, startedAt, error);
     }
   }
   throw lastError || new Error("Bangumi API unavailable");
@@ -4516,7 +4481,18 @@ function buildSearchBody(keyword, params = {}) {
   return { body, limit, offset: (page - 1) * limit };
 }
 async function searchAnime(keyword, opts = {}) {
-  const { body, limit, offset } = buildSearchBody(keyword, opts);
+  const normalized = keyword.normalize("NFKC").toLowerCase();
+  const exactTerms = /\p{Script=Han}/u.test(normalized) ? normalized.match(/[a-z][a-z0-9]{2,}/g) || [] : [];
+  const { body, limit, offset } = buildSearchBody(keyword, { sort: "match", ...opts });
+  if (exactTerms.length) {
+    const { data } = await bgmPost("/v0/search/subjects", body, null, { limit: 100, offset: 0 }, opts.isChina);
+    const matches2 = (data || []).filter((subject) => {
+      const aliases2 = subject.infobox?.filter((field) => /别名|別名|alias/i.test(field.key)) || [];
+      const names = [subject.name, subject.name_cn, JSON.stringify(aliases2)].join(" ").normalize("NFKC").toLowerCase();
+      return exactTerms.every((term) => new RegExp("(?:^|[^a-z0-9])" + term + "(?:$|[^a-z0-9])").test(names));
+    });
+    return { data: matches2.slice(offset, offset + limit), total: matches2.length };
+  }
   const d = await bgmPost("/v0/search/subjects", body, null, { limit, offset }, opts.isChina);
   return { data: d.data || [], total: d.total || 0 };
 }
@@ -4643,7 +4619,7 @@ function httpError(status, message) {
 }
 async function sendVerificationCode(db, env, { email, purpose = "register" }) {
   const normalizedEmail = normalizeEmail(email);
-  const slot = await reserveCodeSendSlot(db, normalizedEmail, purpose);
+  const slot = await reserveCodeSendSlot(db, normalizedEmail, purpose, env?.RATE_LIMITS);
   if (!slot.allowed) {
     return { sent: false, cooldownSeconds: slot.cooldownSeconds };
   }
@@ -4799,7 +4775,7 @@ async function verifyOAuthBindState(env, state) {
   }
   return { valid: true, userId: payload.userId };
 }
-async function bindBangumiByOAuth(db, env, { code, state, oauthBase: oauthBase3, appId, appSecret, redirectUri: redirectUri3, isChina: isChina7 = false }) {
+async function bindBangumiByOAuth(db, env, { code, state, appId, appSecret, redirectUri: redirectUri3, isChina: isChina7 = false }) {
   const stateResult = await verifyOAuthBindState(env, state);
   if (!stateResult.valid || !stateResult.userId) {
     throw httpError(400, "\u6388\u6743\u72B6\u6001\u65E0\u6548\u6216\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u53D1\u8D77\u7ED1\u5B9A");
@@ -4811,8 +4787,7 @@ async function bindBangumiByOAuth(db, env, { code, state, oauthBase: oauthBase3,
       code,
       appId,
       appSecret,
-      redirectUri: redirectUri3,
-      preferredBase: oauthBase3
+      redirectUri: redirectUri3
     });
     accessToken = token2.accessToken;
   } catch (err) {
@@ -5150,9 +5125,6 @@ var app = new Hono3();
 function isChina(c) {
   return (c.env?.CF_IP_COUNTRY || "") === "CN";
 }
-function oauthBase(c) {
-  return isChina(c) ? "https://bangumi.pro" : "https://bgm.tv";
-}
 function redirectUri(c) {
   return c.env?.OAUTH_REDIRECT_URI || "http://localhost:3001/login/callback";
 }
@@ -5341,7 +5313,7 @@ app.get("/oauth-bind-url", jwtAuth(), async (c) => {
     const currentUser = c.get("user");
     const state = await createOAuthBindState(c.env, currentUser.userId);
     const { appId } = getOAuthCredentials(c.env, "/auth/oauth-bind-url");
-    const url = `${oauthBase(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}&state=${encodeURIComponent(state)}`;
+    const url = `${BGM_OFFICIAL_OAUTH_BASE}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri(c))}&state=${encodeURIComponent(state)}`;
     return c.json({ data: { url }, code: 200 });
   } catch (err) {
     return errorResponse(err);
@@ -5370,7 +5342,6 @@ app.post("/oauth-bind-callback", jwtAuth(), async (c) => {
     const result = await bindBangumiByOAuth(c.env.DB, c.env, {
       code,
       state,
-      oauthBase: oauthBase(c),
       appId,
       appSecret,
       redirectUri: redirectUri(c),
@@ -5450,941 +5421,6 @@ app.post("/reset-password", async (c) => {
   }
 });
 var auth_default = app;
-
-// server/src/routes/user.js
-var app2 = new Hono3();
-var OAUTH_STATE_COOKIE = "bangmio_oauth_state";
-function isChina2(c) {
-  return (c.env?.CF_IP_COUNTRY || "") === "CN";
-}
-function redirectUri2(c) {
-  return c.env?.OAUTH_REDIRECT_URI || "http://localhost:3001/login/callback";
-}
-function oauthBase2(c) {
-  return isChina2(c) ? "https://bangumi.pro" : "https://bgm.tv";
-}
-function oauthCookieOptions(c, overrides = {}) {
-  const callbackUrl = redirectUri2(c);
-  let domain;
-  try {
-    const hostname = new URL(callbackUrl).hostname;
-    if (hostname === "bangmio.site" || hostname.endsWith(".bangmio.site")) {
-      domain = ".bangmio.site";
-    }
-  } catch {
-  }
-  return {
-    httpOnly: true,
-    secure: callbackUrl.startsWith("https://"),
-    sameSite: "Lax",
-    maxAge: 10 * 60,
-    // The callback is initiated from /login/callback and then posts to the
-    // API. Keep the cookie available regardless of Pages' function rewrite.
-    path: "/",
-    ...domain ? { domain } : {},
-    ...overrides
-  };
-}
-function escapeRegex(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-function userPathSegment(username) {
-  return encodeURIComponent(String(username || ""));
-}
-var TIMELINE_TYPE_MAP = {
-  collection: "\u6536\u85CF",
-  wish: "\u60F3\u770B",
-  do: "\u5728\u770B",
-  doing: "\u5728\u770B",
-  on_hold: "\u6401\u7F6E",
-  dropped: "\u629B\u5F03",
-  progress: "\u8FDB\u5EA6",
-  comment: "\u8BC4\u8BBA",
-  create: "\u521B\u5EFA",
-  blog: "\u65E5\u5FD7",
-  group_topic: "\u5C0F\u7EC4\u8BDD\u9898",
-  status: "\u7B7E\u540D",
-  mono: "\u4EBA\u7269",
-  subject: "\u6761\u76EE",
-  index: "\u76EE\u5F55"
-};
-app2.post("/auth", async (c) => {
-  try {
-    const token = String((await c.req.json()).token || "").trim();
-    if (!token) return c.json({ data: null, error: "\u8BF7\u8F93\u5165 Access Token", code: 400 }, 400);
-    const client = getClient(token, isChina2(c));
-    const user = await client.get("/v0/me");
-    setBangumiAccessCookie(c, token);
-    return c.json({ data: { user, authenticated: true }, code: 200 });
-  } catch (err) {
-    if (err.response?.status === 401 || err.response?.status === 403) {
-      return c.json({ data: null, error: "Token \u65E0\u6548\uFF0C\u8BF7\u68C0\u67E5", code: 401 }, 401);
-    }
-    return c.json({ data: null, error: "\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5", code: 502 }, 502);
-  }
-});
-app2.get("/oauth-url", (c) => {
-  const { appId } = getOAuthCredentials(c.env, "/user/oauth-url");
-  const state = crypto.randomUUID();
-  setCookie(c, OAUTH_STATE_COOKIE, state, oauthCookieOptions(c));
-  const url = `${oauthBase2(c)}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri2(c))}&state=${encodeURIComponent(state)}`;
-  return c.json({ data: url });
-});
-app2.post("/oauth-callback", async (c) => {
-  try {
-    const { code, state } = await c.req.json();
-    if (!code || !state) return c.json({ error: "\u7F3A\u5C11\u6388\u6743\u7801\u6216 state" }, 400);
-    const expectedState = getCookie(c, OAUTH_STATE_COOKIE);
-    deleteCookie(c, OAUTH_STATE_COOKIE, oauthCookieOptions(c, { maxAge: 0 }));
-    if (!expectedState || state !== expectedState) {
-      return c.json({ error: "\u6388\u6743\u72B6\u6001\u65E0\u6548\u6216\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55" }, 400);
-    }
-    const { appId, appSecret } = getOAuthCredentials(c.env, "/user/oauth-callback");
-    const { accessToken, refreshToken } = await exchangeBangumiOAuthCode({
-      code,
-      appId,
-      appSecret,
-      redirectUri: redirectUri2(c),
-      preferredBase: oauthBase2(c)
-    });
-    const client = getClient(accessToken, isChina2(c));
-    const user = await client.get("/v0/me");
-    setBangumiAccessCookie(c, accessToken);
-    setBangumiRefreshCookie(c, refreshToken);
-    return c.json({ data: { user, authenticated: true } });
-  } catch (err) {
-    if (err?.code === "provider_error") {
-      logError("Bangumi OAuth token exchange failed", {
-        status: err.providerStatus,
-        error: err.providerError
-      });
-      if (err.providerError === "invalid_client") {
-        return c.json(
-          { error: "Bangumi OAuth \u914D\u7F6E\u65E0\u6548\uFF0C\u8BF7\u786E\u8BA4 BGM_APP_ID\u3001BGM_APP_SECRET \u5C5E\u4E8E\u540C\u4E00\u4E2A\u5E94\u7528" },
-          502
-        );
-      }
-      if (err.providerError === "invalid_grant") {
-        return c.json({ error: "Bangumi \u6388\u6743\u7801\u65E0\u6548\u6216\u56DE\u8C03\u5730\u5740\u4E0D\u5339\u914D\uFF0C\u8BF7\u91CD\u65B0\u53D1\u8D77\u767B\u5F55" }, 400);
-      }
-      return c.json(
-        { error: "Bangumi OAuth \u6388\u6743\u7801\u4EA4\u6362\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5 App ID\u3001App Secret \u548C\u56DE\u8C03\u5730\u5740\u914D\u7F6E" },
-        502
-      );
-    }
-    if (err?.code === "network_error") {
-      return c.json({ error: "Bangumi OAuth \u670D\u52A1\u6682\u65F6\u4E0D\u53EF\u7528\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5" }, 502);
-    }
-    if (err?.message === "OAuth \u670D\u52A1\u672A\u914D\u7F6E") {
-      return c.json(
-        { error: "\u670D\u52A1\u5668\u672A\u914D\u7F6E BGM_APP_SECRET\uFF0C\u8BF7\u5728 Cloudflare Worker \u73AF\u5883\u53D8\u91CF\u4E2D\u6DFB\u52A0" },
-        503
-      );
-    }
-    return c.json({ error: "\u6388\u6743\u5931\u8D25\uFF0C\u8BF7\u786E\u4FDD\u56DE\u8C03\u5730\u5740\u5DF2\u5728 bgm.tv/dev/app \u8BBE\u7F6E" }, 500);
-  }
-});
-app2.post("/refresh-token", async (c) => {
-  try {
-    const body = await c.req.json().catch(() => ({}));
-    const refreshToken = String(body?.refreshToken || getBangumiRefreshToken(c) || "").trim();
-    if (!refreshToken) return c.json({ error: "\u7F3A\u5C11 refresh token" }, 400);
-    const { appId, appSecret } = getOAuthCredentials(c.env, "/user/refresh-token");
-    const { accessToken, refreshToken: returnedRefreshToken } = await exchangeBangumiOAuthCode({
-      code: refreshToken,
-      appId,
-      appSecret,
-      redirectUri: redirectUri2(c),
-      preferredBase: oauthBase2(c),
-      grantType: "refresh_token"
-    });
-    const newRefreshToken = returnedRefreshToken || refreshToken;
-    if (!accessToken) return c.json({ error: "\u5237\u65B0 Token \u5931\u8D25" }, 400);
-    const client = getClient(accessToken, isChina2(c));
-    const user = await client.get("/v0/me");
-    setBangumiAccessCookie(c, accessToken);
-    setBangumiRefreshCookie(c, newRefreshToken);
-    return c.json({ data: { user, authenticated: true } });
-  } catch (err) {
-    return c.json({ error: "\u5237\u65B0\u5931\u8D25\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55" }, 500);
-  }
-});
-app2.get("/me", async (c) => {
-  try {
-    const token = getBangumiAccessToken(c);
-    if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
-    const client = getClient(token, isChina2(c));
-    const user = await client.get("/v0/me");
-    return c.json({ data: user });
-  } catch (err) {
-    return c.json({ error: "\u767B\u5F55\u8FC7\u671F" }, 401);
-  }
-});
-app2.post("/logout", (c) => {
-  clearBangumiAccessCookie(c);
-  clearBangumiRefreshCookie(c);
-  return c.json({ data: { success: true }, code: 200 });
-});
-app2.get("/:username/collections", async (c) => {
-  try {
-    const username = c.req.param("username");
-    if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
-    const offset = parseBoundedInteger(c.req.query("offset"), {
-      min: 0,
-      max: 1e7,
-      fallback: 0
-    });
-    const limit = parseBoundedInteger(c.req.query("limit"), { min: 1, max: 100, fallback: 30 });
-    if (offset === null || limit === null) return c.json({ error: "\u6536\u85CF\u5217\u8868\u53C2\u6570\u4E0D\u5408\u6CD5" }, 400);
-    const client = getClient("", isChina2(c));
-    const data = await client.get("/v0/users/" + userPathSegment(username) + "/collections", {
-      offset,
-      limit
-    });
-    return c.json({ data: data.data || [], total: data.total || 0 });
-  } catch (err) {
-    const r = upstreamError(err.response?.status, err.response?.data, "\u83B7\u53D6\u7528\u6237\u6536\u85CF\u5931\u8D25");
-    return c.json({ error: r.error }, r.code);
-  }
-});
-app2.get("/:username/characters", async (c) => {
-  try {
-    const username = c.req.param("username");
-    if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
-    const token = getBangumiAccessToken(c);
-    const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
-    const data = await client.get(`/v0/users/${userPathSegment(username)}/characters`, {
-      limit: 10
-    });
-    return c.json({ data: data.data || [] });
-  } catch {
-    return c.json({ data: [] });
-  }
-});
-app2.get("/:username/persons", async (c) => {
-  try {
-    const username = c.req.param("username");
-    if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
-    const token = getBangumiAccessToken(c);
-    const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
-    const data = await client.get(`/v0/users/${userPathSegment(username)}/persons`, { limit: 10 });
-    return c.json({ data: data.data || [] });
-  } catch {
-    return c.json({ data: [] });
-  }
-});
-app2.get("/:username/indexes", async (c) => {
-  try {
-    const username = c.req.param("username");
-    if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
-    const token = getBangumiAccessToken(c);
-    const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
-    const data = await client.get(`/v0/users/${userPathSegment(username)}/indexes`);
-    return c.json({ data: data.data || [] });
-  } catch {
-    return c.json({ data: [] });
-  }
-});
-app2.get("/:username/friends", async (c) => {
-  try {
-    const username = c.req.param("username");
-    if (!username) return c.json({ data: [] });
-    const base = oauthBase2(c);
-    const html = await fetchHTML(`${base}/user/${userPathSegment(username)}/friends`);
-    if (!html) return c.json({ data: [] });
-    const friends = [];
-    const seen = /* @__PURE__ */ new Set();
-    const chunks = html.split(/<li\b/i);
-    for (const chunk of chunks) {
-      const linkMatch = chunk.match(/href="\/user\/([^"/?#]+)"/i);
-      if (!linkMatch) continue;
-      const uname = linkMatch[1];
-      if (uname === username || seen.has(uname)) continue;
-      seen.add(uname);
-      const nameRe = new RegExp(`href="/user/${escapeRegex(uname)}"[^>]*>([\\s\\S]*?)<\\/a>`, "i");
-      const nameMatch = chunk.match(nameRe);
-      const nickname = nameMatch ? unescapeHtml(stripTags(nameMatch[1])) : uname;
-      const avatarMatch = chunk.match(/<img[^>]*src="([^"]+)"/i);
-      const avatar = avatarMatch ? fixUrl(avatarMatch[1], base) : "";
-      const signMatch = chunk.match(/<p[^>]*class="[^"]*sign[^"]*"[^>]*>([\s\S]*?)<\/p>/i) || chunk.match(/class="sign"[^>]*>([\s\S]*?)<\//i);
-      const sign = signMatch ? unescapeHtml(stripTags(signMatch[1])) : "";
-      friends.push({ username: uname, nickname, avatar, sign });
-      if (friends.length >= 30) break;
-    }
-    return c.json({ data: friends });
-  } catch {
-    return c.json({ data: [] });
-  }
-});
-app2.get("/:username/groups", async (c) => {
-  try {
-    const username = c.req.param("username");
-    if (!username) return c.json({ data: [] });
-    const base = oauthBase2(c);
-    let html = await fetchHTML(`${base}/user/${userPathSegment(username)}/groups`);
-    if (!html) html = await fetchHTML(`${base}/user/${userPathSegment(username)}/group`);
-    if (!html) return c.json({ data: [] });
-    let scope = html;
-    const blockMatch = html.match(/<ul[^>]*id="memberGroupList"[^>]*>[\s\S]*?<\/ul>/i) || html.match(/id="group"[\s\S]*?<ul[\s\S]*?<\/ul>/i) || html.match(/class="[^"]*groups[^"]*"[\s\S]*?<ul[\s\S]*?<\/ul>/i) || html.match(/<h2[^>]*>小组[\s\S]*?<ul[\s\S]*?<\/ul>/i);
-    if (blockMatch) scope = blockMatch[0];
-    const groups = [];
-    const seen = /* @__PURE__ */ new Set();
-    const linkRegex = /<a href="\/group\/([^"/]+)"[^>]*>([\s\S]*?)<\/a>/gi;
-    let m;
-    while ((m = linkRegex.exec(scope)) !== null) {
-      const id = m[1];
-      if (id === "all" || id === "discover" || id === "topic" || seen.has(id)) continue;
-      const name = unescapeHtml(stripTags(m[2])).trim();
-      if (!name || /^\d+$/.test(name)) continue;
-      seen.add(id);
-      const idx = m.index;
-      const context = scope.slice(Math.max(0, idx - 250), Math.min(scope.length, idx + 500));
-      const memberMatch = context.match(/([0-9][0-9,]*)\s*位?\s*成员/i) || context.match(/<span class="group_member">([0-9][0-9,]*).*?<\/span>/i) || context.match(/<span class="l">([0-9][0-9,]*).*?<\/span>/i) || context.match(/<strong>([0-9][0-9,]*)<\/strong>/i);
-      const member_count = memberMatch ? parseNumber(memberMatch[1]) : null;
-      const avatarMatch = context.match(/<img[^>]*src="([^"]+)"[^>]*>/i);
-      const avatar = avatarMatch ? fixUrl(avatarMatch[1], base) : "";
-      groups.push({ id, name, avatar, member_count });
-      if (groups.length >= 30) break;
-    }
-    return c.json({ data: groups });
-  } catch {
-    return c.json({ data: [] });
-  }
-});
-app2.get("/:username/timeline", async (c) => {
-  try {
-    const username = c.req.param("username");
-    if (!username) return c.json({ data: [] });
-    const base = oauthBase2(c);
-    const html = await fetchHTML(`${base}/user/${userPathSegment(username)}/timeline`);
-    if (!html) return c.json({ data: [] });
-    const items = [];
-    const chunks = html.split(/(?=<li[^>]*class="[^"]*tml-item)|(?=<div[^>]*class="[^"]*tml-item)/i);
-    for (const chunk of chunks) {
-      if (!/tml-item/i.test(chunk)) continue;
-      const typeMatch = chunk.match(/class="[^"]*tml-item\s+tml-(\w+)/i) || chunk.match(/class="[^"]*tml-(\w+)/i);
-      const rawType = typeMatch ? typeMatch[1] : "unknown";
-      const type = TIMELINE_TYPE_MAP[rawType] || rawType;
-      const subMatch = chunk.match(/href="\/subject\/(\d+)"[^>]*>([^<]+)<\/a>/i);
-      const subject_id = subMatch ? subMatch[1] : "";
-      const subject_name = subMatch ? unescapeHtml(subMatch[2].trim()) : "";
-      const contentMatch = chunk.match(/<div[^>]*class="[^"]*tml-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i) || chunk.match(/<p[^>]*class="[^"]*tml-content[^"]*"[^>]*>([\s\S]*?)<\/p>/i) || chunk.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
-      let action = "";
-      if (contentMatch) {
-        action = contentMatch[1].replace(/<a[^>]*>[\s\S]*?<\/a>/gi, "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
-      }
-      const timeMatch = chunk.match(/class="[^"]*tml-time[^"]*"[^>]*>([^<]+)<\//i) || chunk.match(/class="[^"]*time[^"]*"[^>]*>([^<]+)<\//i);
-      const time = timeMatch ? unescapeHtml(stripTags(timeMatch[1])) : "";
-      items.push({ type, subject_id, subject_name, action, time });
-      if (items.length >= 20) break;
-    }
-    return c.json({ data: items });
-  } catch {
-    return c.json({ data: [] });
-  }
-});
-app2.get("/:username/stats-yearly", async (c) => {
-  try {
-    const username = c.req.param("username");
-    if (!username) return c.json({ data: [] });
-    const base = oauthBase2(c);
-    const html = await fetchHTML(`${base}/user/${userPathSegment(username)}`);
-    if (!html) return c.json({ data: [] });
-    const stats = [];
-    const seenYears = /* @__PURE__ */ new Set();
-    const scriptChartMatch = html.match(/(?:yearlyChart|charts|chartData)\s*=\s*(\[[\s\S]*?\]);/i);
-    if (scriptChartMatch) {
-      try {
-        const data = JSON.parse(scriptChartMatch[1]);
-        for (const item of data) {
-          if (item && item.year && !seenYears.has(item.year)) {
-            seenYears.add(item.year);
-            stats.push({
-              year: parseInt(item.year),
-              want: item.want || item.wish || 0,
-              collect: item.collect || 0,
-              doing: item.do || item.doing || 0,
-              on_hold: item.on_hold || item.onhold || 0,
-              dropped: item.dropped || item.drop || 0
-            });
-          }
-        }
-      } catch {
-      }
-    }
-    if (!stats.length) {
-      const dataYearRegex = /data-year="(\d{4})"[^>]*\sdata-(?:want|wish)="(\d*)"[^>]*\sdata-collect="(\d*)"[^>]*\sdata-doing="(\d*)"[^>]*\sdata-on_hold="(\d*)"[^>]*\sdata-dropped="(\d*)"/gi;
-      let dym;
-      while ((dym = dataYearRegex.exec(html)) !== null) {
-        const year = parseInt(dym[1]);
-        if (!seenYears.has(year)) {
-          seenYears.add(year);
-          stats.push({
-            year,
-            want: parseNumber(dym[2]),
-            collect: parseNumber(dym[3]),
-            doing: parseNumber(dym[4]),
-            on_hold: parseNumber(dym[5]),
-            dropped: parseNumber(dym[6])
-          });
-        }
-      }
-    }
-    if (!stats.length) {
-      const yearRegex = /href="\/user\/[^"]+\/(?:list|anime-list)\/(\d{4})[^"]*"[^>]*>([\s\S]{0,300}?)<\/a>/gi;
-      let ym;
-      while ((ym = yearRegex.exec(html)) !== null) {
-        const year = parseInt(ym[1]);
-        if (seenYears.has(year)) continue;
-        const content = ym[2];
-        const nums = content.match(/(\d+)/g) || [];
-        if (nums.length > 0) {
-          seenYears.add(year);
-          stats.push({
-            year,
-            want: parseInt(nums[0]) || 0,
-            collect: parseInt(nums[1]) || 0,
-            doing: parseInt(nums[2]) || 0,
-            on_hold: parseInt(nums[3]) || 0,
-            dropped: parseInt(nums[4]) || 0
-          });
-        }
-      }
-    }
-    if (!stats.length) {
-      const chartRegex = /class="[^"]*year[^"]*"[^>]*>\s*(\d{4})\s*<[\s\S]{0,200}?class="[^"]*(?:num|count|rate)[^"]*"[^>]*>\s*(\d+)/gi;
-      let cm;
-      while ((cm = chartRegex.exec(html)) !== null) {
-        const year = parseInt(cm[1]);
-        if (year >= 2e3 && year <= 2030 && !seenYears.has(year)) {
-          seenYears.add(year);
-          stats.push({
-            year,
-            want: 0,
-            collect: parseInt(cm[2]) || 0,
-            doing: 0,
-            on_hold: 0,
-            dropped: 0
-          });
-        }
-      }
-    }
-    if (!stats.length) {
-      const yearStatRegex = /(\d{4})\s*年[\s\S]{0,80}?(\d+)\s*(?:部|个|条)/gi;
-      let ysm;
-      while ((ysm = yearStatRegex.exec(html)) !== null) {
-        const year = parseInt(ysm[1]);
-        if (year >= 2e3 && year <= 2030 && !seenYears.has(year)) {
-          seenYears.add(year);
-          stats.push({
-            year,
-            want: 0,
-            collect: parseInt(ysm[2]) || 0,
-            doing: 0,
-            on_hold: 0,
-            dropped: 0
-          });
-        }
-      }
-    }
-    return c.json({ data: stats });
-  } catch {
-    return c.json({ data: [] });
-  }
-});
-app2.get("/:username", async (c) => {
-  try {
-    const username = c.req.param("username");
-    if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
-    const token = getBangumiAccessToken(c);
-    const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
-    const user = await client.get(`/v0/users/${userPathSegment(username)}`);
-    return c.json({ data: user });
-  } catch {
-    return c.json({ data: null });
-  }
-});
-var user_default = app2;
-
-// server/src/controllers/animeController.js
-function requiredId2(c) {
-  const id = parsePositiveId(c.req.param("id"));
-  return id;
-}
-function isChina3(c) {
-  return (c.env?.CF_IP_COUNTRY || "") === "CN";
-}
-function logAnimeUpstreamFailure(c, message, error) {
-  logError(message, {
-    path: c.req.path,
-    region: isChina3(c) ? "CN" : "global",
-    upstream: error?.upstreamSource,
-    upstreamStatus: error?.response?.status,
-    errorName: error?.name,
-    causeName: error?.cause?.name,
-    timedOut: error?.name === "TimeoutError" || error?.cause?.name === "TimeoutError"
-  });
-}
-async function searchAnime2(c) {
-  try {
-    const keyword = c.req.query("keyword");
-    if (!keyword) return c.json({ error: "\u8BF7\u8F93\u5165\u641C\u7D22\u5173\u952E\u8BCD" }, 400);
-    const typeNum = Number(c.req.query("type")) || 0;
-    const opts = {
-      page: Number(c.req.query("page")) || 1,
-      limit: Number(c.req.query("limit") || "20"),
-      isChina: isChina3(c)
-    };
-    if (typeNum > 0) opts.type = typeNum;
-    const tag = c.req.query("tag");
-    if (tag) opts.tag = tag;
-    const result = await searchAnime(keyword, opts);
-    return c.json({ data: result.data, total: result.total });
-  } catch (error) {
-    logAnimeUpstreamFailure(c, "\u756A\u5267\u641C\u7D22\u4E0A\u6E38\u5931\u8D25", error);
-    return c.json({ error: "\u641C\u7D22\u5931\u8D25" }, 502);
-  }
-}
-async function browseAnime2(c) {
-  try {
-    const q = c.req.query();
-    const params = { isChina: isChina3(c) };
-    if (q.sort) params.sort = q.sort;
-    if (q.type && Number(q.type) > 0) params.type = q.type;
-    if (q.page) params.page = q.page;
-    if (q.limit) params.limit = q.limit;
-    if (q.tag) params.tag = q.tag;
-    const result = await browseAnime(params);
-    return c.json({ data: result.data, total: result.total });
-  } catch (error) {
-    logAnimeUpstreamFailure(c, "\u756A\u5267\u6D4F\u89C8\u4E0A\u6E38\u5931\u8D25", error);
-    return c.json({ error: "\u6D4F\u89C8\u5931\u8D25" }, 502);
-  }
-}
-async function getAnimeDetail2(c) {
-  const id = requiredId2(c);
-  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
-  try {
-    const detail = await getAnimeDetail(id, { isChina: isChina3(c) });
-    return c.json({ data: detail });
-  } catch (error) {
-    if (error?.response?.status === 404) return c.json({ error: "\u6761\u76EE\u4E0D\u5B58\u5728" }, 404);
-    logAnimeUpstreamFailure(c, "\u756A\u5267\u8BE6\u60C5\u4E0A\u6E38\u5931\u8D25", error);
-    return c.json({ error: "\u83B7\u53D6\u8BE6\u60C5\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5" }, 502);
-  }
-}
-async function getAnimeEpisodes2(c) {
-  const id = requiredId2(c);
-  const offset = parseBoundedInteger(c.req.query("offset"), { min: 0, max: 1e6, fallback: 0 });
-  const limit = parseBoundedInteger(c.req.query("limit"), { min: 1, max: 100, fallback: 100 });
-  if (id === null || offset === null || limit === null) return c.json({ error: "\u53C2\u6570\u4E0D\u5408\u6CD5" }, 400);
-  try {
-    const data = await getAnimeEpisodes(id, { offset, limit, isChina: isChina3(c) });
-    return c.json({ data: data.data, total: data.total });
-  } catch (error) {
-    logAnimeUpstreamFailure(c, "\u756A\u5267\u7AE0\u8282\u4E0A\u6E38\u5931\u8D25", error);
-    return c.json({ error: "\u83B7\u53D6\u7AE0\u8282\u5931\u8D25" }, 502);
-  }
-}
-async function getAnimeCharacters2(c) {
-  const id = requiredId2(c);
-  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
-  try {
-    const data = await getAnimeCharacters(id, { isChina: isChina3(c) });
-    return c.json({ data });
-  } catch (error) {
-    logAnimeUpstreamFailure(c, "\u756A\u5267\u89D2\u8272\u4E0A\u6E38\u5931\u8D25", error);
-    return c.json({ error: "\u83B7\u53D6\u89D2\u8272\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5" }, 502);
-  }
-}
-async function getAnimePersons2(c) {
-  const id = requiredId2(c);
-  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
-  try {
-    const data = await getAnimePersons(id, { isChina: isChina3(c) });
-    return c.json({ data });
-  } catch (error) {
-    logAnimeUpstreamFailure(c, "\u756A\u5267\u5236\u4F5C\u4EBA\u5458\u4E0A\u6E38\u5931\u8D25", error);
-    return c.json({ error: "\u83B7\u53D6\u5236\u4F5C\u4EBA\u5458\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5" }, 502);
-  }
-}
-async function getAnimeRelations2(c) {
-  const id = requiredId2(c);
-  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
-  try {
-    const data = await getAnimeRelations(id, { isChina: isChina3(c) });
-    return c.json({ data });
-  } catch (error) {
-    logAnimeUpstreamFailure(c, "\u756A\u5267\u5173\u8054\u6761\u76EE\u4E0A\u6E38\u5931\u8D25", error);
-    return c.json({ error: "\u83B7\u53D6\u5173\u8054\u6761\u76EE\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5" }, 502);
-  }
-}
-async function getAnimeCalendar2(c) {
-  try {
-    const data = await getAnimeCalendar({ isChina: isChina3(c) });
-    return c.json({ data });
-  } catch (error) {
-    logAnimeUpstreamFailure(c, "\u756A\u5267\u65F6\u95F4\u8868\u4E0A\u6E38\u5931\u8D25", error);
-    return c.json({ error: "\u83B7\u53D6\u65F6\u95F4\u8868\u5931\u8D25" }, 502);
-  }
-}
-async function getAnimeTags2(c) {
-  try {
-    const data = await getAnimeTags();
-    return c.json({ data });
-  } catch {
-    return c.json({ error: "\u83B7\u53D6\u6807\u7B7E\u5931\u8D25" }, 500);
-  }
-}
-async function getCharacterDetail2(c) {
-  const id = requiredId2(c);
-  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
-  try {
-    const data = await getCharacterDetail(id, { isChina: isChina3(c) });
-    return c.json({ data });
-  } catch {
-    return c.json({ error: "\u83B7\u53D6\u89D2\u8272\u8BE6\u60C5\u5931\u8D25" }, 500);
-  }
-}
-async function getCharacterSubjects2(c) {
-  const id = requiredId2(c);
-  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
-  try {
-    const data = await getCharacterSubjects(id, {
-      isChina: isChina3(c)
-    });
-    return c.json({ data });
-  } catch {
-    return c.json({ error: "\u83B7\u53D6\u89D2\u8272\u4F5C\u54C1\u5931\u8D25" }, 500);
-  }
-}
-async function getCharacterPersons2(c) {
-  const id = requiredId2(c);
-  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
-  try {
-    const data = await getCharacterPersons(id, {
-      isChina: isChina3(c)
-    });
-    return c.json({ data });
-  } catch {
-    return c.json({ error: "\u83B7\u53D6\u89D2\u8272\u5173\u8054\u4EBA\u7269\u5931\u8D25" }, 500);
-  }
-}
-async function getPersonDetail2(c) {
-  const id = requiredId2(c);
-  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
-  try {
-    const data = await getPersonDetail(id, { isChina: isChina3(c) });
-    return c.json({ data });
-  } catch {
-    return c.json({ error: "\u83B7\u53D6\u4EBA\u7269\u8BE6\u60C5\u5931\u8D25" }, 500);
-  }
-}
-async function getPersonSubjects2(c) {
-  const id = requiredId2(c);
-  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
-  try {
-    const data = await getPersonSubjects(id, { isChina: isChina3(c) });
-    return c.json({ data });
-  } catch {
-    return c.json({ error: "\u83B7\u53D6\u4EBA\u7269\u4F5C\u54C1\u5931\u8D25" }, 500);
-  }
-}
-
-// server/src/routes/anime.js
-var app3 = new Hono3();
-app3.get("/search", searchAnime2);
-app3.get("/browse", browseAnime2);
-app3.get("/calendar", getAnimeCalendar2);
-app3.get("/tags", getAnimeTags2);
-app3.get("/character/:id", getCharacterDetail2);
-app3.get("/character/:id/subjects", getCharacterSubjects2);
-app3.get("/character/:id/persons", getCharacterPersons2);
-app3.get("/person/:id", getPersonDetail2);
-app3.get("/person/:id/subjects", getPersonSubjects2);
-app3.get("/:id", getAnimeDetail2);
-app3.get("/:id/episodes", getAnimeEpisodes2);
-app3.get("/:id/characters", getAnimeCharacters2);
-app3.get("/:id/persons", getAnimePersons2);
-app3.get("/:id/relations", getAnimeRelations2);
-var anime_default = app3;
-
-// server/src/services/userVerify.js
-var verifiedStore = /* @__PURE__ */ new Map();
-async function cacheKey(token, username, isChina7) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
-  return [bufferToHex(digest), username, isChina7 ? "CN" : "global"].join(":");
-}
-var USERNAME_VERIFY_TTL = 10 * 60 * 1e3;
-async function verifyBangumiUsername(token, username, isChina7 = false) {
-  if (!token || !username) return false;
-  const now = Date.now();
-  const key2 = await cacheKey(token, username, isChina7);
-  const expiresAt = verifiedStore.get(key2);
-  if (expiresAt && expiresAt > now) return true;
-  try {
-    const client = getClient(token, isChina7);
-    const me = await client.get("/v0/me");
-    const match2 = me && (me.username === username || me.nickname === username || String(me.id) === username);
-    if (match2) {
-      verifiedStore.set(key2, now + USERNAME_VERIFY_TTL);
-      return true;
-    }
-    logError("Bangumi \u76F4\u767B username \u4E0E token \u4E0D\u5339\u914D", { username });
-    return false;
-  } catch (error) {
-    logError("Bangumi \u76F4\u767B\u8EAB\u4EFD\u9A8C\u8BC1\u5931\u8D25", {
-      username,
-      reason: error instanceof Error ? error.message : "unknown"
-    });
-    return false;
-  }
-}
-
-// server/src/routes/collection.js
-var app4 = new Hono3();
-function isChina4(c) {
-  return (c.env?.CF_IP_COUNTRY || "") === "CN";
-}
-function extractToken(c) {
-  return getBangumiAccessToken(c);
-}
-function extractUsername(c) {
-  return c.req.header("X-Bangumi-Username") || "";
-}
-var COLLECTION_STATUS = /* @__PURE__ */ new Set([1, 2, 3, 4, 5]);
-function userPathSegment2(username) {
-  return encodeURIComponent(String(username || ""));
-}
-function parseBoundedInteger2(value, { min, max, fallback = null }) {
-  if (value === void 0 || value === null || value === "") return fallback;
-  const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed) || parsed < min || max !== void 0 && parsed > max)
-    return null;
-  return parsed;
-}
-function parseAnimeId(value) {
-  return parseBoundedInteger2(value, { min: 1, max: Number.MAX_SAFE_INTEGER });
-}
-async function guardUsername(c, token, username) {
-  const ok = await verifyBangumiUsername(token, username, isChina4(c));
-  if (!ok) return c.json({ error: "\u7528\u6237\u540D\u4E0E\u4EE4\u724C\u4E0D\u5339\u914D" }, 403);
-  return null;
-}
-app4.get("/list", async (c) => {
-  try {
-    const token = extractToken(c);
-    const username = extractUsername(c);
-    if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
-    if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
-    const guard = await guardUsername(c, token, username);
-    if (guard) return guard;
-    const client = getClient(token, isChina4(c));
-    const offset = parseBoundedInteger2(c.req.query("offset"), {
-      min: 0,
-      max: 1e7,
-      fallback: 0
-    });
-    const limit = parseBoundedInteger2(c.req.query("limit"), { min: 1, max: 100, fallback: 30 });
-    const subjectTypeRaw = c.req.query("subject_type");
-    const typeRaw = c.req.query("type");
-    const subjectType = subjectTypeRaw === void 0 ? void 0 : parseBoundedInteger2(subjectTypeRaw, { min: 1, max: 7 });
-    const type = typeRaw === void 0 ? void 0 : parseBoundedInteger2(typeRaw, { min: 1, max: 5 });
-    if (offset === null || limit === null || subjectType === null || type === null) {
-      return c.json({ error: "\u6536\u85CF\u5217\u8868\u53C2\u6570\u4E0D\u5408\u6CD5" }, 400);
-    }
-    const params = { offset, limit };
-    if (subjectType !== void 0) params.subject_type = subjectType;
-    if (type !== void 0) params.type = type;
-    const data = await client.get(`/v0/users/${userPathSegment2(username)}/collections`, params);
-    return c.json({ data: data.data || [], total: data.total || 0 });
-  } catch (err) {
-    const r = upstreamError(err.response?.status, err.response?.data, "\u83B7\u53D6\u6536\u85CF\u5217\u8868\u5931\u8D25");
-    return c.json({ error: r.error }, r.code);
-  }
-});
-app4.get("/stats", async (c) => {
-  try {
-    const token = extractToken(c);
-    const username = extractUsername(c);
-    if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
-    if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
-    const guard = await guardUsername(c, token, username);
-    if (guard) return guard;
-    const client = getClient(token, isChina4(c));
-    const fetchTotal = (type) => client.get(`/v0/users/${userPathSegment2(username)}/collections`, { type, limit: 1 }).then((r) => {
-      const total2 = Number(r?.total);
-      return Number.isSafeInteger(total2) && total2 >= 0 ? total2 : null;
-    }).catch(() => null);
-    const [wish, collect, doing, on_hold, dropped] = await Promise.all([
-      fetchTotal(1),
-      fetchTotal(2),
-      fetchTotal(3),
-      fetchTotal(4),
-      fetchTotal(5)
-    ]);
-    const values = [wish, collect, doing, on_hold, dropped];
-    const total = values.every((value) => value !== null) ? values.reduce((sum, value) => sum + value, 0) : null;
-    return c.json({
-      data: { want: wish, completed: collect, watching: doing, on_hold, dropped, total }
-    });
-  } catch (err) {
-    const r = upstreamError(err.response?.status, err.response?.data, "\u83B7\u53D6\u7EDF\u8BA1\u5931\u8D25");
-    return c.json({ error: r.error }, r.code);
-  }
-});
-app4.get("/:animeId", async (c) => {
-  try {
-    const token = extractToken(c);
-    const username = extractUsername(c);
-    if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
-    if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
-    const guard = await guardUsername(c, token, username);
-    if (guard) return guard;
-    const animeId = parseAnimeId(c.req.param("animeId"));
-    if (animeId === null) return c.json({ error: "\u756A\u5267 ID \u4E0D\u5408\u6CD5" }, 400);
-    const client = getClient(token, isChina4(c));
-    const collection = await client.get(
-      `/v0/users/${userPathSegment2(username)}/collections/${animeId}`
-    );
-    return c.json({
-      data: {
-        anime_id: collection.subject_id,
-        status: collection.type,
-        rating: collection.rate || 0,
-        comment: collection.comment || "",
-        ep_status: collection.ep_status || 0,
-        episode: collection.ep_status || 0,
-        subject: collection.subject || null,
-        updated_at: collection.updated_at
-      }
-    });
-  } catch (err) {
-    const r = upstreamError(err.response?.status, err.response?.data, "\u83B7\u53D6\u6536\u85CF\u72B6\u6001\u5931\u8D25");
-    if (r.code === 404) return c.json({ data: null });
-    return c.json({ error: r.error }, r.code);
-  }
-});
-app4.post("/:animeId", async (c) => {
-  try {
-    const token = extractToken(c);
-    const username = extractUsername(c);
-    if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
-    if (username) {
-      const guard = await guardUsername(c, token, username);
-      if (guard) return guard;
-    }
-    const animeId = parseAnimeId(c.req.param("animeId"));
-    if (animeId === null) return c.json({ error: "\u756A\u5267 ID \u4E0D\u5408\u6CD5" }, 400);
-    const client = getClient(token, isChina4(c));
-    const body = await c.req.json().catch(() => ({}));
-    if (!body || typeof body !== "object" || Array.isArray(body)) {
-      return c.json({ error: "\u8BF7\u6C42\u53C2\u6570\u4E0D\u5408\u6CD5" }, 400);
-    }
-    const payload = {};
-    if (body.status !== void 0) {
-      const status = parseBoundedInteger2(body.status, { min: 1, max: 5 });
-      if (status === null || !COLLECTION_STATUS.has(status)) {
-        return c.json({ error: "\u6536\u85CF\u72B6\u6001\u4E0D\u5408\u6CD5" }, 400);
-      }
-      payload.type = status;
-    }
-    if (body.rating !== void 0) {
-      const rating = parseBoundedInteger2(body.rating, { min: 0, max: 10 });
-      if (rating === null) return c.json({ error: "\u8BC4\u5206\u5FC5\u987B\u662F 0 \u5230 10 \u7684\u6574\u6570" }, 400);
-      payload.rate = rating;
-    }
-    if (body.comment !== void 0 && body.comment !== null) {
-      const comment = String(body.comment);
-      if (comment.length > 2e3) return c.json({ error: "\u8BC4\u8BBA\u4E0D\u80FD\u8D85\u8FC7 2000 \u4E2A\u5B57\u7B26" }, 400);
-      payload.comment = comment;
-    }
-    if (body.episode !== void 0 || body.ep_status !== void 0) {
-      const episode = parseBoundedInteger2(body.episode ?? body.ep_status, { min: 0, max: 1e4 });
-      if (episode === null) return c.json({ error: "\u89C2\u770B\u8FDB\u5EA6\u4E0D\u5408\u6CD5" }, 400);
-      payload.ep_status = episode;
-    }
-    if (!payload.type) {
-      if (username) {
-        try {
-          const current = await client.get(
-            `/v0/users/${userPathSegment2(username)}/collections/${animeId}`
-          );
-          if (current?.type) {
-            payload.type = current.type;
-          } else {
-            return c.json({ error: "\u8BF7\u5148\u9009\u62E9\u6536\u85CF\u72B6\u6001" }, 400);
-          }
-        } catch (err) {
-          if (err?.response?.status === 404) {
-            return c.json({ error: "\u8BF7\u5148\u9009\u62E9\u6536\u85CF\u72B6\u6001" }, 400);
-          }
-          return c.json({ error: "\u65E0\u6CD5\u786E\u8BA4\u5F53\u524D\u6536\u85CF\u72B6\u6001\uFF0C\u8BF7\u5148\u9009\u62E9\u6536\u85CF\u72B6\u6001" }, 400);
-        }
-      } else {
-        return c.json({ error: "\u8BF7\u5148\u9009\u62E9\u6536\u85CF\u72B6\u6001" }, 400);
-      }
-    }
-    await client.post(`/v0/users/-/collections/${animeId}`, payload);
-    if (username) {
-      try {
-        const collection = await client.get(
-          `/v0/users/${userPathSegment2(username)}/collections/${animeId}`
-        );
-        return c.json({
-          data: {
-            anime_id: collection.subject_id,
-            status: collection.type,
-            rating: collection.rate || 0,
-            comment: collection.comment || "",
-            ep_status: collection.ep_status || 0,
-            episode: collection.ep_status || 0,
-            subject: collection.subject || null,
-            updated_at: collection.updated_at
-          }
-        });
-      } catch {
-        return c.json({
-          data: {
-            status: payload.type,
-            rating: payload.rate || 0,
-            comment: payload.comment || "",
-            ep_status: payload.ep_status || 0,
-            episode: payload.ep_status || 0,
-            updated: true
-          }
-        });
-      }
-    } else {
-      return c.json({
-        data: {
-          status: payload.type,
-          rating: payload.rate || 0,
-          comment: payload.comment || "",
-          updated: true
-        }
-      });
-    }
-  } catch (err) {
-    const r = upstreamError(err.response?.status, err.response?.data, "\u4FDD\u5B58\u6536\u85CF\u5931\u8D25");
-    return c.json({ error: r.error }, r.code);
-  }
-});
-app4.delete("/:animeId", async (c) => {
-  try {
-    const token = extractToken(c);
-    if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
-    const animeId = parseAnimeId(c.req.param("animeId"));
-    if (animeId === null) return c.json({ error: "\u756A\u5267 ID \u4E0D\u5408\u6CD5" }, 400);
-    const client = getClient(token, isChina4(c));
-    await client.delete(`/v0/users/-/collections/${animeId}`);
-    return c.json({ message: "\u5DF2\u5220\u9664" });
-  } catch (err) {
-    const r = upstreamError(err.response?.status, err.response?.data, "\u5220\u9664\u6536\u85CF\u5931\u8D25");
-    return c.json({ error: r.error }, r.code);
-  }
-});
-var collection_default = app4;
 
 // node_modules/linkedom/esm/shared/symbols.js
 var CHANGED = /* @__PURE__ */ Symbol("changed");
@@ -12270,7 +11306,7 @@ function prevElementSibling2(element) {
 // node_modules/linkedom/node_modules/css-select/dist/attributes.js
 var reChars = /[-[\]{}()*+?.,\\^$|#\s]/g;
 var whitespaceRe = /\s/;
-function escapeRegex2(value) {
+function escapeRegex(value) {
   return value.replace(reChars, "\\$&");
 }
 var caseInsensitiveAttributes = /* @__PURE__ */ new Set([
@@ -12361,7 +11397,7 @@ var attributeRules = {
     if (whitespaceRe.test(value)) {
       return falseFunc;
     }
-    const regex = new RegExp(`(?:^|\\s)${escapeRegex2(value)}(?:$|\\s)`, shouldIgnoreCase(data, options) ? "i" : "");
+    const regex = new RegExp(`(?:^|\\s)${escapeRegex(value)}(?:$|\\s)`, shouldIgnoreCase(data, options) ? "i" : "");
     return function element(node) {
       const attribute2 = adapter2.getAttributeValue(node, name);
       return attribute2 != null && attribute2.length >= value.length && regex.test(attribute2) && next(node);
@@ -12408,7 +11444,7 @@ var attributeRules = {
       return falseFunc;
     }
     if (shouldIgnoreCase(data, options)) {
-      const regex = new RegExp(escapeRegex2(value), "i");
+      const regex = new RegExp(escapeRegex(value), "i");
       return function anyIC(element) {
         const attribute2 = adapter2.getAttributeValue(element, name);
         return attribute2 != null && attribute2.length >= value.length && regex.test(attribute2) && next(element);
@@ -16935,6 +15971,933 @@ function Document4() {
 }
 setPrototypeOf(Document4, Document2).prototype = Document2.prototype;
 
+// server/src/routes/user.js
+var app2 = new Hono3();
+var OAUTH_STATE_COOKIE = "bangmio_oauth_state";
+function isChina2(c) {
+  return (c.env?.CF_IP_COUNTRY || "") === "CN";
+}
+function redirectUri2(c) {
+  return c.env?.OAUTH_REDIRECT_URI || "http://localhost:3001/login/callback";
+}
+function fetchPublicProfile(c, username, suffix = "") {
+  const bases = isChina2(c) ? ["https://bgm.lat", "https://bgm.tv"] : ["https://bgm.tv", "https://bgm.lat"];
+  return fetchBangumiHTML(bases, `/user/${userPathSegment(username)}${suffix}`);
+}
+function oauthCookieOptions(c, overrides = {}) {
+  const callbackUrl = redirectUri2(c);
+  let domain;
+  try {
+    const hostname = new URL(callbackUrl).hostname;
+    if (hostname === "bangmio.site" || hostname.endsWith(".bangmio.site")) {
+      domain = ".bangmio.site";
+    }
+  } catch {
+  }
+  return {
+    httpOnly: true,
+    secure: callbackUrl.startsWith("https://"),
+    sameSite: "Lax",
+    maxAge: 10 * 60,
+    // The callback is initiated from /login/callback and then posts to the
+    // API. Keep the cookie available regardless of Pages' function rewrite.
+    path: "/",
+    ...domain ? { domain } : {},
+    ...overrides
+  };
+}
+function escapeRegex2(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function userPathSegment(username) {
+  return encodeURIComponent(String(username || ""));
+}
+var TIMELINE_TYPE_MAP = {
+  collection: "\u6536\u85CF",
+  wish: "\u60F3\u770B",
+  do: "\u5728\u770B",
+  doing: "\u5728\u770B",
+  on_hold: "\u6401\u7F6E",
+  dropped: "\u629B\u5F03",
+  progress: "\u8FDB\u5EA6",
+  comment: "\u8BC4\u8BBA",
+  create: "\u521B\u5EFA",
+  blog: "\u65E5\u5FD7",
+  group_topic: "\u5C0F\u7EC4\u8BDD\u9898",
+  status: "\u7B7E\u540D",
+  mono: "\u4EBA\u7269",
+  subject: "\u6761\u76EE",
+  index: "\u76EE\u5F55"
+};
+app2.post("/auth", async (c) => {
+  try {
+    const token = String((await c.req.json()).token || "").trim();
+    if (!token) return c.json({ data: null, error: "\u8BF7\u8F93\u5165 Access Token", code: 400 }, 400);
+    const client = getClient(token, isChina2(c));
+    const user = await client.get("/v0/me");
+    setBangumiAccessCookie(c, token);
+    return c.json({ data: { user, authenticated: true }, code: 200 });
+  } catch (err) {
+    if (err.response?.status === 401 || err.response?.status === 403) {
+      return c.json({ data: null, error: "Token \u65E0\u6548\uFF0C\u8BF7\u68C0\u67E5", code: 401 }, 401);
+    }
+    return c.json({ data: null, error: "\u9A8C\u8BC1\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5", code: 502 }, 502);
+  }
+});
+app2.get("/oauth-url", (c) => {
+  const { appId } = getOAuthCredentials(c.env, "/user/oauth-url");
+  const state = crypto.randomUUID();
+  setCookie(c, OAUTH_STATE_COOKIE, state, oauthCookieOptions(c));
+  const url = `${BGM_OFFICIAL_OAUTH_BASE}/oauth/authorize?client_id=${appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri2(c))}&state=${encodeURIComponent(state)}`;
+  return c.json({ data: url });
+});
+app2.post("/oauth-callback", async (c) => {
+  try {
+    const { code, state } = await c.req.json();
+    if (!code || !state) return c.json({ error: "\u7F3A\u5C11\u6388\u6743\u7801\u6216 state" }, 400);
+    const expectedState = getCookie(c, OAUTH_STATE_COOKIE);
+    deleteCookie(c, OAUTH_STATE_COOKIE, oauthCookieOptions(c, { maxAge: 0 }));
+    if (!expectedState || state !== expectedState) {
+      return c.json({ error: "\u6388\u6743\u72B6\u6001\u65E0\u6548\u6216\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55" }, 400);
+    }
+    const { appId, appSecret } = getOAuthCredentials(c.env, "/user/oauth-callback");
+    const { accessToken, refreshToken } = await exchangeBangumiOAuthCode({
+      code,
+      appId,
+      appSecret,
+      redirectUri: redirectUri2(c)
+    });
+    const client = getClient(accessToken, isChina2(c));
+    const user = await client.get("/v0/me");
+    setBangumiAccessCookie(c, accessToken);
+    setBangumiRefreshCookie(c, refreshToken);
+    return c.json({ data: { user, authenticated: true } });
+  } catch (err) {
+    if (err?.code === "provider_error") {
+      logError("Bangumi OAuth token exchange failed", {
+        status: err.providerStatus,
+        error: err.providerError
+      });
+      if (err.providerError === "invalid_client") {
+        return c.json(
+          { error: "Bangumi OAuth \u914D\u7F6E\u65E0\u6548\uFF0C\u8BF7\u786E\u8BA4 BGM_APP_ID\u3001BGM_APP_SECRET \u5C5E\u4E8E\u540C\u4E00\u4E2A\u5E94\u7528" },
+          502
+        );
+      }
+      if (err.providerError === "invalid_grant") {
+        return c.json({ error: "Bangumi \u6388\u6743\u7801\u65E0\u6548\u6216\u56DE\u8C03\u5730\u5740\u4E0D\u5339\u914D\uFF0C\u8BF7\u91CD\u65B0\u53D1\u8D77\u767B\u5F55" }, 400);
+      }
+      return c.json(
+        { error: "Bangumi OAuth \u6388\u6743\u7801\u4EA4\u6362\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5 App ID\u3001App Secret \u548C\u56DE\u8C03\u5730\u5740\u914D\u7F6E" },
+        502
+      );
+    }
+    if (err?.code === "network_error") {
+      return c.json({ error: "Bangumi OAuth \u670D\u52A1\u6682\u65F6\u4E0D\u53EF\u7528\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5" }, 502);
+    }
+    if (err?.message === "OAuth \u670D\u52A1\u672A\u914D\u7F6E") {
+      return c.json(
+        { error: "\u670D\u52A1\u5668\u672A\u914D\u7F6E BGM_APP_SECRET\uFF0C\u8BF7\u5728 Cloudflare Worker \u73AF\u5883\u53D8\u91CF\u4E2D\u6DFB\u52A0" },
+        503
+      );
+    }
+    return c.json({ error: "\u6388\u6743\u5931\u8D25\uFF0C\u8BF7\u786E\u4FDD\u56DE\u8C03\u5730\u5740\u5DF2\u5728 bgm.tv/dev/app \u8BBE\u7F6E" }, 500);
+  }
+});
+app2.post("/refresh-token", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const refreshToken = String(body?.refreshToken || getBangumiRefreshToken(c) || "").trim();
+    if (!refreshToken) return c.json({ error: "\u7F3A\u5C11 refresh token" }, 400);
+    const { appId, appSecret } = getOAuthCredentials(c.env, "/user/refresh-token");
+    const { accessToken, refreshToken: returnedRefreshToken } = await exchangeBangumiOAuthCode({
+      code: refreshToken,
+      appId,
+      appSecret,
+      redirectUri: redirectUri2(c),
+      grantType: "refresh_token"
+    });
+    const newRefreshToken = returnedRefreshToken || refreshToken;
+    if (!accessToken) return c.json({ error: "\u5237\u65B0 Token \u5931\u8D25" }, 400);
+    const client = getClient(accessToken, isChina2(c));
+    const user = await client.get("/v0/me");
+    setBangumiAccessCookie(c, accessToken);
+    setBangumiRefreshCookie(c, newRefreshToken);
+    return c.json({ data: { user, authenticated: true } });
+  } catch (err) {
+    return c.json({ error: "\u5237\u65B0\u5931\u8D25\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55" }, 500);
+  }
+});
+app2.get("/me", async (c) => {
+  try {
+    const token = getBangumiAccessToken(c);
+    if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
+    const client = getClient(token, isChina2(c));
+    const user = await client.get("/v0/me");
+    return c.json({ data: user });
+  } catch (err) {
+    return c.json({ error: "\u767B\u5F55\u8FC7\u671F" }, 401);
+  }
+});
+app2.post("/logout", (c) => {
+  clearBangumiAccessCookie(c);
+  clearBangumiRefreshCookie(c);
+  return c.json({ data: { success: true }, code: 200 });
+});
+app2.get("/:username/collections", async (c) => {
+  try {
+    const username = c.req.param("username");
+    if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
+    const offset = parseBoundedInteger(c.req.query("offset"), {
+      min: 0,
+      max: 1e7,
+      fallback: 0
+    });
+    const limit = parseBoundedInteger(c.req.query("limit"), { min: 1, max: 100, fallback: 30 });
+    if (offset === null || limit === null) return c.json({ error: "\u6536\u85CF\u5217\u8868\u53C2\u6570\u4E0D\u5408\u6CD5" }, 400);
+    const client = getClient("", isChina2(c));
+    const data = await client.get("/v0/users/" + userPathSegment(username) + "/collections", {
+      offset,
+      limit
+    });
+    return c.json({ data: data.data || [], total: data.total || 0 });
+  } catch (err) {
+    const r = upstreamError(err.response?.status, err.response?.data, "\u83B7\u53D6\u7528\u6237\u6536\u85CF\u5931\u8D25");
+    return c.json({ error: r.error }, r.code);
+  }
+});
+app2.get("/:username/characters", async (c) => {
+  try {
+    const username = c.req.param("username");
+    if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
+    const token = getBangumiAccessToken(c);
+    const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
+    const data = await client.get(`/v0/users/${userPathSegment(username)}/characters`, {
+      limit: 10
+    });
+    return c.json({ data: data.data || [] });
+  } catch {
+    return c.json({ data: [] });
+  }
+});
+app2.get("/:username/persons", async (c) => {
+  try {
+    const username = c.req.param("username");
+    if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
+    const token = getBangumiAccessToken(c);
+    const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
+    const data = await client.get(`/v0/users/${userPathSegment(username)}/persons`, { limit: 10 });
+    return c.json({ data: data.data || [] });
+  } catch {
+    return c.json({ data: [] });
+  }
+});
+app2.get("/:username/indexes", async (c) => {
+  try {
+    const username = c.req.param("username");
+    if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
+    const token = getBangumiAccessToken(c);
+    const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
+    const data = await client.get(`/v0/users/${userPathSegment(username)}/indexes`);
+    return c.json({ data: data.data || [] });
+  } catch {
+    return c.json({ data: [] });
+  }
+});
+app2.get("/:username/friends", async (c) => {
+  try {
+    const username = c.req.param("username");
+    if (!username) return c.json({ data: [] });
+    const { html, url } = await fetchPublicProfile(c, username, "/friends");
+    if (!html) return c.json({ data: [] });
+    const friends = [];
+    const seen = /* @__PURE__ */ new Set();
+    const chunks = html.split(/<li\b/i);
+    for (const chunk of chunks) {
+      const linkMatch = chunk.match(/href="\/user\/([^"/?#]+)"/i);
+      if (!linkMatch) continue;
+      const uname = linkMatch[1];
+      if (uname === username || seen.has(uname)) continue;
+      seen.add(uname);
+      const nameRe = new RegExp(`href="/user/${escapeRegex2(uname)}"[^>]*>([\\s\\S]*?)<\\/a>`, "i");
+      const nameMatch = chunk.match(nameRe);
+      const nickname = nameMatch ? unescapeHtml(stripTags(nameMatch[1])) : uname;
+      const avatarMatch = chunk.match(/<img[^>]*src="([^"]+)"/i);
+      const avatar = avatarMatch ? fixUrl(avatarMatch[1], new URL(url).origin) : "";
+      const signMatch = chunk.match(/<p[^>]*class="[^"]*sign[^"]*"[^>]*>([\s\S]*?)<\/p>/i) || chunk.match(/class="sign"[^>]*>([\s\S]*?)<\//i);
+      const sign = signMatch ? unescapeHtml(stripTags(signMatch[1])) : "";
+      friends.push({ username: uname, nickname, avatar, sign });
+      if (friends.length >= 30) break;
+    }
+    return c.json({ data: friends });
+  } catch {
+    return c.json({ data: [] });
+  }
+});
+app2.get("/:username/groups", async (c) => {
+  try {
+    const username = c.req.param("username");
+    if (!username) return c.json({ data: [] });
+    let profile;
+    try {
+      profile = await fetchPublicProfile(c, username, "/groups");
+    } catch (error) {
+      if (error?.status !== 404) throw error;
+      profile = await fetchPublicProfile(c, username, "/group");
+    }
+    const { document } = parseHTML(profile.html);
+    const list = document.querySelector("#memberGroupList, #group ul, .groups ul");
+    const groups = /* @__PURE__ */ new Map();
+    for (const card of list?.querySelectorAll("li") || []) {
+      const groupLinks = [...card.querySelectorAll('a[href^="/group/"]')].map((anchor) => ({ anchor, id: /^\/group\/([^/?#]+)\/?$/.exec(anchor.getAttribute("href"))?.[1] })).filter(({ id }) => id && !["all", "discover", "topic"].includes(id));
+      if (new Set(groupLinks.map(({ id }) => id)).size !== 1) continue;
+      const entry = groupLinks.find(({ anchor }) => anchor.textContent.trim() && !/^\d+$/.test(anchor.textContent.trim()));
+      if (!entry || groups.has(entry.id)) continue;
+      const name = entry.anchor.textContent.trim();
+      const countText = card.querySelector(".group_member, .l, strong")?.textContent || "";
+      const count = /([0-9][0-9,]*)\s*位?\s*成员/.exec(card.textContent) || /^\s*([0-9][0-9,]*)/.exec(countText);
+      const avatar = fixUrl(card.querySelector("img[src]")?.getAttribute("src"), new URL(profile.url).origin);
+      groups.set(entry.id, { id: entry.id, name, avatar, member_count: count ? parseNumber(count[1]) : null });
+      if (groups.size === 30) break;
+    }
+    return c.json({ data: [...groups.values()] });
+  } catch {
+    return c.json({ data: [] });
+  }
+});
+app2.get("/:username/timeline", async (c) => {
+  try {
+    const username = c.req.param("username");
+    if (!username) return c.json({ data: [] });
+    const { html } = await fetchPublicProfile(c, username, "/timeline");
+    if (!html) return c.json({ data: [] });
+    const items = [];
+    const chunks = html.split(/(?=<li[^>]*class="[^"]*tml-item)|(?=<div[^>]*class="[^"]*tml-item)/i);
+    for (const chunk of chunks) {
+      if (!/tml-item/i.test(chunk)) continue;
+      const typeMatch = chunk.match(/class="[^"]*tml-item\s+tml-(\w+)/i) || chunk.match(/class="[^"]*tml-(\w+)/i);
+      const rawType = typeMatch ? typeMatch[1] : "unknown";
+      const type = TIMELINE_TYPE_MAP[rawType] || rawType;
+      const subMatch = chunk.match(/href="\/subject\/(\d+)"[^>]*>([^<]+)<\/a>/i);
+      const subject_id = subMatch ? subMatch[1] : "";
+      const subject_name = subMatch ? unescapeHtml(subMatch[2].trim()) : "";
+      const contentMatch = chunk.match(/<div[^>]*class="[^"]*tml-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i) || chunk.match(/<p[^>]*class="[^"]*tml-content[^"]*"[^>]*>([\s\S]*?)<\/p>/i) || chunk.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+      let action = "";
+      if (contentMatch) {
+        action = contentMatch[1].replace(/<a[^>]*>[\s\S]*?<\/a>/gi, "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+      }
+      const timeMatch = chunk.match(/class="[^"]*tml-time[^"]*"[^>]*>([^<]+)<\//i) || chunk.match(/class="[^"]*time[^"]*"[^>]*>([^<]+)<\//i);
+      const time = timeMatch ? unescapeHtml(stripTags(timeMatch[1])) : "";
+      items.push({ type, subject_id, subject_name, action, time });
+      if (items.length >= 20) break;
+    }
+    return c.json({ data: items });
+  } catch {
+    return c.json({ data: [] });
+  }
+});
+app2.get("/:username/stats-yearly", async (c) => {
+  try {
+    const username = c.req.param("username");
+    if (!username) return c.json({ data: [] });
+    const { html } = await fetchPublicProfile(c, username);
+    if (!html) return c.json({ data: [] });
+    const stats = [];
+    const seenYears = /* @__PURE__ */ new Set();
+    const scriptChartMatch = html.match(/(?:yearlyChart|charts|chartData)\s*=\s*(\[[\s\S]*?\]);/i);
+    if (scriptChartMatch) {
+      try {
+        const data = JSON.parse(scriptChartMatch[1]);
+        for (const item of data) {
+          if (item && item.year && !seenYears.has(item.year)) {
+            seenYears.add(item.year);
+            stats.push({
+              year: parseInt(item.year),
+              want: item.want || item.wish || 0,
+              collect: item.collect || 0,
+              doing: item.do || item.doing || 0,
+              on_hold: item.on_hold || item.onhold || 0,
+              dropped: item.dropped || item.drop || 0
+            });
+          }
+        }
+      } catch {
+      }
+    }
+    if (!stats.length) {
+      const dataYearRegex = /data-year="(\d{4})"[^>]*\sdata-(?:want|wish)="(\d*)"[^>]*\sdata-collect="(\d*)"[^>]*\sdata-doing="(\d*)"[^>]*\sdata-on_hold="(\d*)"[^>]*\sdata-dropped="(\d*)"/gi;
+      let dym;
+      while ((dym = dataYearRegex.exec(html)) !== null) {
+        const year = parseInt(dym[1]);
+        if (!seenYears.has(year)) {
+          seenYears.add(year);
+          stats.push({
+            year,
+            want: parseNumber(dym[2]),
+            collect: parseNumber(dym[3]),
+            doing: parseNumber(dym[4]),
+            on_hold: parseNumber(dym[5]),
+            dropped: parseNumber(dym[6])
+          });
+        }
+      }
+    }
+    if (!stats.length) {
+      const yearRegex = /href="\/user\/[^"]+\/(?:list|anime-list)\/(\d{4})[^"]*"[^>]*>([\s\S]{0,300}?)<\/a>/gi;
+      let ym;
+      while ((ym = yearRegex.exec(html)) !== null) {
+        const year = parseInt(ym[1]);
+        if (seenYears.has(year)) continue;
+        const content = ym[2];
+        const nums = content.match(/(\d+)/g) || [];
+        if (nums.length > 0) {
+          seenYears.add(year);
+          stats.push({
+            year,
+            want: parseInt(nums[0]) || 0,
+            collect: parseInt(nums[1]) || 0,
+            doing: parseInt(nums[2]) || 0,
+            on_hold: parseInt(nums[3]) || 0,
+            dropped: parseInt(nums[4]) || 0
+          });
+        }
+      }
+    }
+    if (!stats.length) {
+      const chartRegex = /class="[^"]*year[^"]*"[^>]*>\s*(\d{4})\s*<[\s\S]{0,200}?class="[^"]*(?:num|count|rate)[^"]*"[^>]*>\s*(\d+)/gi;
+      let cm;
+      while ((cm = chartRegex.exec(html)) !== null) {
+        const year = parseInt(cm[1]);
+        if (year >= 2e3 && year <= 2030 && !seenYears.has(year)) {
+          seenYears.add(year);
+          stats.push({
+            year,
+            want: 0,
+            collect: parseInt(cm[2]) || 0,
+            doing: 0,
+            on_hold: 0,
+            dropped: 0
+          });
+        }
+      }
+    }
+    if (!stats.length) {
+      const yearStatRegex = /(\d{4})\s*年[\s\S]{0,80}?(\d+)\s*(?:部|个|条)/gi;
+      let ysm;
+      while ((ysm = yearStatRegex.exec(html)) !== null) {
+        const year = parseInt(ysm[1]);
+        if (year >= 2e3 && year <= 2030 && !seenYears.has(year)) {
+          seenYears.add(year);
+          stats.push({
+            year,
+            want: 0,
+            collect: parseInt(ysm[2]) || 0,
+            doing: 0,
+            on_hold: 0,
+            dropped: 0
+          });
+        }
+      }
+    }
+    return c.json({ data: stats });
+  } catch {
+    return c.json({ data: [] });
+  }
+});
+app2.get("/:username", async (c) => {
+  try {
+    const username = c.req.param("username");
+    if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
+    const token = getBangumiAccessToken(c);
+    const client = token ? getClient(token, isChina2(c)) : getClient("", isChina2(c));
+    const user = await client.get(`/v0/users/${userPathSegment(username)}`);
+    return c.json({ data: user });
+  } catch {
+    return c.json({ data: null });
+  }
+});
+var user_default = app2;
+
+// server/src/controllers/animeController.js
+function requiredId2(c) {
+  const id = parsePositiveId(c.req.param("id"));
+  return id;
+}
+function isChina3(c) {
+  return (c.env?.CF_IP_COUNTRY || "") === "CN";
+}
+function logAnimeUpstreamFailure(c, message, error) {
+  logError(message, {
+    path: c.req.path,
+    region: isChina3(c) ? "CN" : "global",
+    upstream: error?.upstreamSource,
+    upstreamStatus: error?.response?.status,
+    errorName: error?.name,
+    causeName: error?.cause?.name,
+    timedOut: error?.name === "TimeoutError" || error?.cause?.name === "TimeoutError"
+  });
+}
+async function searchAnime2(c) {
+  try {
+    const keyword = c.req.query("keyword");
+    if (!keyword) return c.json({ error: "\u8BF7\u8F93\u5165\u641C\u7D22\u5173\u952E\u8BCD" }, 400);
+    const typeNum = Number(c.req.query("type")) || 0;
+    const opts = {
+      page: Number(c.req.query("page")) || 1,
+      limit: Number(c.req.query("limit") || "20"),
+      isChina: isChina3(c)
+    };
+    if (typeNum > 0) opts.type = typeNum;
+    const tag = c.req.query("tag");
+    if (tag) opts.tag = tag;
+    const result = await searchAnime(keyword, opts);
+    return c.json({ data: result.data, total: result.total });
+  } catch (error) {
+    logAnimeUpstreamFailure(c, "\u756A\u5267\u641C\u7D22\u4E0A\u6E38\u5931\u8D25", error);
+    return c.json({ error: "\u641C\u7D22\u5931\u8D25" }, 502);
+  }
+}
+async function browseAnime2(c) {
+  try {
+    const q = c.req.query();
+    const params = { isChina: isChina3(c) };
+    if (q.sort) params.sort = q.sort;
+    if (q.type && Number(q.type) > 0) params.type = q.type;
+    if (q.page) params.page = q.page;
+    if (q.limit) params.limit = q.limit;
+    if (q.tag) params.tag = q.tag;
+    const result = await browseAnime(params);
+    return c.json({ data: result.data, total: result.total });
+  } catch (error) {
+    logAnimeUpstreamFailure(c, "\u756A\u5267\u6D4F\u89C8\u4E0A\u6E38\u5931\u8D25", error);
+    return c.json({ error: "\u6D4F\u89C8\u5931\u8D25" }, 502);
+  }
+}
+async function getAnimeDetail2(c) {
+  const id = requiredId2(c);
+  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
+  try {
+    const detail = await getAnimeDetail(id, { isChina: isChina3(c) });
+    return c.json({ data: detail });
+  } catch (error) {
+    if (error?.response?.status === 404) return c.json({ error: "\u6761\u76EE\u4E0D\u5B58\u5728" }, 404);
+    logAnimeUpstreamFailure(c, "\u756A\u5267\u8BE6\u60C5\u4E0A\u6E38\u5931\u8D25", error);
+    return c.json({ error: "\u83B7\u53D6\u8BE6\u60C5\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5" }, 502);
+  }
+}
+async function getAnimeEpisodes2(c) {
+  const id = requiredId2(c);
+  const offset = parseBoundedInteger(c.req.query("offset"), { min: 0, max: 1e6, fallback: 0 });
+  const limit = parseBoundedInteger(c.req.query("limit"), { min: 1, max: 100, fallback: 100 });
+  if (id === null || offset === null || limit === null) return c.json({ error: "\u53C2\u6570\u4E0D\u5408\u6CD5" }, 400);
+  try {
+    const data = await getAnimeEpisodes(id, { offset, limit, isChina: isChina3(c) });
+    return c.json({ data: data.data, total: data.total });
+  } catch (error) {
+    logAnimeUpstreamFailure(c, "\u756A\u5267\u7AE0\u8282\u4E0A\u6E38\u5931\u8D25", error);
+    return c.json({ error: "\u83B7\u53D6\u7AE0\u8282\u5931\u8D25" }, 502);
+  }
+}
+async function getAnimeCharacters2(c) {
+  const id = requiredId2(c);
+  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
+  try {
+    const data = await getAnimeCharacters(id, { isChina: isChina3(c) });
+    return c.json({ data });
+  } catch (error) {
+    logAnimeUpstreamFailure(c, "\u756A\u5267\u89D2\u8272\u4E0A\u6E38\u5931\u8D25", error);
+    return c.json({ error: "\u83B7\u53D6\u89D2\u8272\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5" }, 502);
+  }
+}
+async function getAnimePersons2(c) {
+  const id = requiredId2(c);
+  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
+  try {
+    const data = await getAnimePersons(id, { isChina: isChina3(c) });
+    return c.json({ data });
+  } catch (error) {
+    logAnimeUpstreamFailure(c, "\u756A\u5267\u5236\u4F5C\u4EBA\u5458\u4E0A\u6E38\u5931\u8D25", error);
+    return c.json({ error: "\u83B7\u53D6\u5236\u4F5C\u4EBA\u5458\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5" }, 502);
+  }
+}
+async function getAnimeRelations2(c) {
+  const id = requiredId2(c);
+  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
+  try {
+    const data = await getAnimeRelations(id, { isChina: isChina3(c) });
+    return c.json({ data });
+  } catch (error) {
+    logAnimeUpstreamFailure(c, "\u756A\u5267\u5173\u8054\u6761\u76EE\u4E0A\u6E38\u5931\u8D25", error);
+    return c.json({ error: "\u83B7\u53D6\u5173\u8054\u6761\u76EE\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5" }, 502);
+  }
+}
+async function getAnimeCalendar2(c) {
+  try {
+    const data = await getAnimeCalendar({ isChina: isChina3(c) });
+    return c.json({ data });
+  } catch (error) {
+    logAnimeUpstreamFailure(c, "\u756A\u5267\u65F6\u95F4\u8868\u4E0A\u6E38\u5931\u8D25", error);
+    return c.json({ error: "\u83B7\u53D6\u65F6\u95F4\u8868\u5931\u8D25" }, 502);
+  }
+}
+async function getAnimeTags2(c) {
+  try {
+    const data = await getAnimeTags();
+    return c.json({ data });
+  } catch {
+    return c.json({ error: "\u83B7\u53D6\u6807\u7B7E\u5931\u8D25" }, 500);
+  }
+}
+async function getCharacterDetail2(c) {
+  const id = requiredId2(c);
+  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
+  try {
+    const data = await getCharacterDetail(id, { isChina: isChina3(c) });
+    return c.json({ data });
+  } catch {
+    return c.json({ error: "\u83B7\u53D6\u89D2\u8272\u8BE6\u60C5\u5931\u8D25" }, 500);
+  }
+}
+async function getCharacterSubjects2(c) {
+  const id = requiredId2(c);
+  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
+  try {
+    const data = await getCharacterSubjects(id, {
+      isChina: isChina3(c)
+    });
+    return c.json({ data });
+  } catch {
+    return c.json({ error: "\u83B7\u53D6\u89D2\u8272\u4F5C\u54C1\u5931\u8D25" }, 500);
+  }
+}
+async function getCharacterPersons2(c) {
+  const id = requiredId2(c);
+  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
+  try {
+    const data = await getCharacterPersons(id, {
+      isChina: isChina3(c)
+    });
+    return c.json({ data });
+  } catch {
+    return c.json({ error: "\u83B7\u53D6\u89D2\u8272\u5173\u8054\u4EBA\u7269\u5931\u8D25" }, 500);
+  }
+}
+async function getPersonDetail2(c) {
+  const id = requiredId2(c);
+  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
+  try {
+    const data = await getPersonDetail(id, { isChina: isChina3(c) });
+    return c.json({ data });
+  } catch {
+    return c.json({ error: "\u83B7\u53D6\u4EBA\u7269\u8BE6\u60C5\u5931\u8D25" }, 500);
+  }
+}
+async function getPersonSubjects2(c) {
+  const id = requiredId2(c);
+  if (id === null) return c.json({ error: "ID \u4E0D\u5408\u6CD5" }, 400);
+  try {
+    const data = await getPersonSubjects(id, { isChina: isChina3(c) });
+    return c.json({ data });
+  } catch {
+    return c.json({ error: "\u83B7\u53D6\u4EBA\u7269\u4F5C\u54C1\u5931\u8D25" }, 500);
+  }
+}
+
+// server/src/routes/anime.js
+var app3 = new Hono3();
+app3.get("/search", searchAnime2);
+app3.get("/browse", browseAnime2);
+app3.get("/calendar", getAnimeCalendar2);
+app3.get("/tags", getAnimeTags2);
+app3.get("/character/:id", getCharacterDetail2);
+app3.get("/character/:id/subjects", getCharacterSubjects2);
+app3.get("/character/:id/persons", getCharacterPersons2);
+app3.get("/person/:id", getPersonDetail2);
+app3.get("/person/:id/subjects", getPersonSubjects2);
+app3.get("/:id", getAnimeDetail2);
+app3.get("/:id/episodes", getAnimeEpisodes2);
+app3.get("/:id/characters", getAnimeCharacters2);
+app3.get("/:id/persons", getAnimePersons2);
+app3.get("/:id/relations", getAnimeRelations2);
+var anime_default = app3;
+
+// server/src/services/userVerify.js
+var verifiedStore = /* @__PURE__ */ new Map();
+async function cacheKey(token, username, isChina7) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  return [bufferToHex(digest), username, isChina7 ? "CN" : "global"].join(":");
+}
+var USERNAME_VERIFY_TTL = 10 * 60 * 1e3;
+async function verifyBangumiUsername(token, username, isChina7 = false) {
+  if (!token || !username) return false;
+  const now = Date.now();
+  const key2 = await cacheKey(token, username, isChina7);
+  const expiresAt = verifiedStore.get(key2);
+  if (expiresAt && expiresAt > now) return true;
+  try {
+    const client = getClient(token, isChina7);
+    const me = await client.get("/v0/me");
+    const match2 = me && (me.username === username || me.nickname === username || String(me.id) === username);
+    if (match2) {
+      verifiedStore.set(key2, now + USERNAME_VERIFY_TTL);
+      return true;
+    }
+    logError("Bangumi \u76F4\u767B username \u4E0E token \u4E0D\u5339\u914D", { username });
+    return false;
+  } catch (error) {
+    logError("Bangumi \u76F4\u767B\u8EAB\u4EFD\u9A8C\u8BC1\u5931\u8D25", {
+      username,
+      reason: error instanceof Error ? error.message : "unknown"
+    });
+    return false;
+  }
+}
+
+// server/src/routes/collection.js
+var app4 = new Hono3();
+function isChina4(c) {
+  return (c.env?.CF_IP_COUNTRY || "") === "CN";
+}
+function extractToken(c) {
+  return getBangumiAccessToken(c);
+}
+function extractUsername(c) {
+  return c.req.header("X-Bangumi-Username") || "";
+}
+var COLLECTION_STATUS = /* @__PURE__ */ new Set([1, 2, 3, 4, 5]);
+function userPathSegment2(username) {
+  return encodeURIComponent(String(username || ""));
+}
+function parseBoundedInteger2(value, { min, max, fallback = null }) {
+  if (value === void 0 || value === null || value === "") return fallback;
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < min || max !== void 0 && parsed > max)
+    return null;
+  return parsed;
+}
+function parseAnimeId(value) {
+  return parseBoundedInteger2(value, { min: 1, max: Number.MAX_SAFE_INTEGER });
+}
+async function guardUsername(c, token, username) {
+  const ok = await verifyBangumiUsername(token, username, isChina4(c));
+  if (!ok) return c.json({ error: "\u7528\u6237\u540D\u4E0E\u4EE4\u724C\u4E0D\u5339\u914D" }, 403);
+  return null;
+}
+app4.get("/list", async (c) => {
+  try {
+    const token = extractToken(c);
+    const username = extractUsername(c);
+    if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
+    if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
+    const guard = await guardUsername(c, token, username);
+    if (guard) return guard;
+    const client = getClient(token, isChina4(c));
+    const offset = parseBoundedInteger2(c.req.query("offset"), {
+      min: 0,
+      max: 1e7,
+      fallback: 0
+    });
+    const limit = parseBoundedInteger2(c.req.query("limit"), { min: 1, max: 100, fallback: 30 });
+    const subjectTypeRaw = c.req.query("subject_type");
+    const typeRaw = c.req.query("type");
+    const subjectType = subjectTypeRaw === void 0 ? void 0 : parseBoundedInteger2(subjectTypeRaw, { min: 1, max: 7 });
+    const type = typeRaw === void 0 ? void 0 : parseBoundedInteger2(typeRaw, { min: 1, max: 5 });
+    if (offset === null || limit === null || subjectType === null || type === null) {
+      return c.json({ error: "\u6536\u85CF\u5217\u8868\u53C2\u6570\u4E0D\u5408\u6CD5" }, 400);
+    }
+    const params = { offset, limit };
+    if (subjectType !== void 0) params.subject_type = subjectType;
+    if (type !== void 0) params.type = type;
+    const data = await client.get(`/v0/users/${userPathSegment2(username)}/collections`, params);
+    return c.json({ data: data.data || [], total: data.total || 0 });
+  } catch (err) {
+    const r = upstreamError(err.response?.status, err.response?.data, "\u83B7\u53D6\u6536\u85CF\u5217\u8868\u5931\u8D25");
+    return c.json({ error: r.error }, r.code);
+  }
+});
+app4.get("/stats", async (c) => {
+  try {
+    const token = extractToken(c);
+    const username = extractUsername(c);
+    if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
+    if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
+    const guard = await guardUsername(c, token, username);
+    if (guard) return guard;
+    const client = getClient(token, isChina4(c));
+    const fetchTotal = (type) => client.get(`/v0/users/${userPathSegment2(username)}/collections`, { type, limit: 1 }).then((r) => {
+      const total2 = Number(r?.total);
+      return Number.isSafeInteger(total2) && total2 >= 0 ? total2 : null;
+    }).catch(() => null);
+    const [wish, collect, doing, on_hold, dropped] = await Promise.all([
+      fetchTotal(1),
+      fetchTotal(2),
+      fetchTotal(3),
+      fetchTotal(4),
+      fetchTotal(5)
+    ]);
+    const values = [wish, collect, doing, on_hold, dropped];
+    const total = values.every((value) => value !== null) ? values.reduce((sum, value) => sum + value, 0) : null;
+    return c.json({
+      data: { want: wish, completed: collect, watching: doing, on_hold, dropped, total }
+    });
+  } catch (err) {
+    const r = upstreamError(err.response?.status, err.response?.data, "\u83B7\u53D6\u7EDF\u8BA1\u5931\u8D25");
+    return c.json({ error: r.error }, r.code);
+  }
+});
+app4.get("/:animeId", async (c) => {
+  try {
+    const token = extractToken(c);
+    const username = extractUsername(c);
+    if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
+    if (!username) return c.json({ error: "\u7F3A\u5C11\u7528\u6237\u540D" }, 400);
+    const guard = await guardUsername(c, token, username);
+    if (guard) return guard;
+    const animeId = parseAnimeId(c.req.param("animeId"));
+    if (animeId === null) return c.json({ error: "\u756A\u5267 ID \u4E0D\u5408\u6CD5" }, 400);
+    const client = getClient(token, isChina4(c));
+    const collection = await client.get(
+      `/v0/users/${userPathSegment2(username)}/collections/${animeId}`
+    );
+    return c.json({
+      data: {
+        anime_id: collection.subject_id,
+        status: collection.type,
+        rating: collection.rate || 0,
+        comment: collection.comment || "",
+        ep_status: collection.ep_status || 0,
+        episode: collection.ep_status || 0,
+        subject: collection.subject || null,
+        updated_at: collection.updated_at
+      }
+    });
+  } catch (err) {
+    const r = upstreamError(err.response?.status, err.response?.data, "\u83B7\u53D6\u6536\u85CF\u72B6\u6001\u5931\u8D25");
+    if (r.code === 404) return c.json({ data: null });
+    return c.json({ error: r.error }, r.code);
+  }
+});
+app4.post("/:animeId", async (c) => {
+  try {
+    const token = extractToken(c);
+    const username = extractUsername(c);
+    if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
+    if (username) {
+      const guard = await guardUsername(c, token, username);
+      if (guard) return guard;
+    }
+    const animeId = parseAnimeId(c.req.param("animeId"));
+    if (animeId === null) return c.json({ error: "\u756A\u5267 ID \u4E0D\u5408\u6CD5" }, 400);
+    const client = getClient(token, isChina4(c));
+    const body = await c.req.json().catch(() => ({}));
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return c.json({ error: "\u8BF7\u6C42\u53C2\u6570\u4E0D\u5408\u6CD5" }, 400);
+    }
+    const payload = {};
+    if (body.status !== void 0) {
+      const status = parseBoundedInteger2(body.status, { min: 1, max: 5 });
+      if (status === null || !COLLECTION_STATUS.has(status)) {
+        return c.json({ error: "\u6536\u85CF\u72B6\u6001\u4E0D\u5408\u6CD5" }, 400);
+      }
+      payload.type = status;
+    }
+    if (body.rating !== void 0) {
+      const rating = parseBoundedInteger2(body.rating, { min: 0, max: 10 });
+      if (rating === null) return c.json({ error: "\u8BC4\u5206\u5FC5\u987B\u662F 0 \u5230 10 \u7684\u6574\u6570" }, 400);
+      payload.rate = rating;
+    }
+    if (body.comment !== void 0 && body.comment !== null) {
+      const comment = String(body.comment);
+      if (comment.length > 2e3) return c.json({ error: "\u8BC4\u8BBA\u4E0D\u80FD\u8D85\u8FC7 2000 \u4E2A\u5B57\u7B26" }, 400);
+      payload.comment = comment;
+    }
+    if (body.episode !== void 0 || body.ep_status !== void 0) {
+      const episode = parseBoundedInteger2(body.episode ?? body.ep_status, { min: 0, max: 1e4 });
+      if (episode === null) return c.json({ error: "\u89C2\u770B\u8FDB\u5EA6\u4E0D\u5408\u6CD5" }, 400);
+      payload.ep_status = episode;
+    }
+    if (!payload.type) {
+      if (username) {
+        try {
+          const current = await client.get(
+            `/v0/users/${userPathSegment2(username)}/collections/${animeId}`
+          );
+          if (current?.type) {
+            payload.type = current.type;
+          } else {
+            return c.json({ error: "\u8BF7\u5148\u9009\u62E9\u6536\u85CF\u72B6\u6001" }, 400);
+          }
+        } catch (err) {
+          if (err?.response?.status === 404) {
+            return c.json({ error: "\u8BF7\u5148\u9009\u62E9\u6536\u85CF\u72B6\u6001" }, 400);
+          }
+          return c.json({ error: "\u65E0\u6CD5\u786E\u8BA4\u5F53\u524D\u6536\u85CF\u72B6\u6001\uFF0C\u8BF7\u5148\u9009\u62E9\u6536\u85CF\u72B6\u6001" }, 400);
+        }
+      } else {
+        return c.json({ error: "\u8BF7\u5148\u9009\u62E9\u6536\u85CF\u72B6\u6001" }, 400);
+      }
+    }
+    await client.post(`/v0/users/-/collections/${animeId}`, payload);
+    if (username) {
+      try {
+        const collection = await client.get(
+          `/v0/users/${userPathSegment2(username)}/collections/${animeId}`
+        );
+        return c.json({
+          data: {
+            anime_id: collection.subject_id,
+            status: collection.type,
+            rating: collection.rate || 0,
+            comment: collection.comment || "",
+            ep_status: collection.ep_status || 0,
+            episode: collection.ep_status || 0,
+            subject: collection.subject || null,
+            updated_at: collection.updated_at
+          }
+        });
+      } catch {
+        return c.json({
+          data: {
+            status: payload.type,
+            rating: payload.rate || 0,
+            comment: payload.comment || "",
+            ep_status: payload.ep_status || 0,
+            episode: payload.ep_status || 0,
+            updated: true
+          }
+        });
+      }
+    } else {
+      return c.json({
+        data: {
+          status: payload.type,
+          rating: payload.rate || 0,
+          comment: payload.comment || "",
+          updated: true
+        }
+      });
+    }
+  } catch (err) {
+    const r = upstreamError(err.response?.status, err.response?.data, "\u4FDD\u5B58\u6536\u85CF\u5931\u8D25");
+    return c.json({ error: r.error }, r.code);
+  }
+});
+app4.delete("/:animeId", async (c) => {
+  try {
+    const token = extractToken(c);
+    if (!token) return c.json({ error: "\u672A\u767B\u5F55" }, 401);
+    const animeId = parseAnimeId(c.req.param("animeId"));
+    if (animeId === null) return c.json({ error: "\u756A\u5267 ID \u4E0D\u5408\u6CD5" }, 400);
+    const client = getClient(token, isChina4(c));
+    await client.delete(`/v0/users/-/collections/${animeId}`);
+    return c.json({ message: "\u5DF2\u5220\u9664" });
+  } catch (err) {
+    const r = upstreamError(err.response?.status, err.response?.data, "\u5220\u9664\u6536\u85CF\u5931\u8D25");
+    return c.json({ error: r.error }, r.code);
+  }
+});
+var collection_default = app4;
+
 // server/src/utils/cache.js
 function createCache(ttl, maxEntries = 500) {
   const store = /* @__PURE__ */ new Map();
@@ -16989,7 +16952,7 @@ function createCache(ttl, maxEntries = 500) {
 var app5 = new Hono3();
 var cache = createCache(CACHE_TTL_COMMENTS);
 var BGM_TV = "https://bgm.tv";
-var BGM_PROXY2 = "https://bangumi.pro";
+var BGM_PROXY2 = "https://bgm.lat";
 function getBase(isChina7) {
   return isChina7 ? BGM_PROXY2 : BGM_TV;
 }
@@ -16999,8 +16962,7 @@ function invalidateCacheFor(prefix, id) {
 function absoluteAvatar(raw2) {
   const value = String(raw2 || "").trim();
   if (!value) return "";
-  const normalized = value.startsWith("//") ? `https:${value}` : value;
-  return normalized.replace("lain.bgm.tv", "lain.bangumi.pro");
+  return fixUrl(value, BGM_PROXY2);
 }
 function contentText(element) {
   if (!element) return "";
@@ -17060,7 +17022,7 @@ function parseSubReplies($doc, el) {
     const content = contentText(contentEl);
     if (user.username && content) {
       replies.push({
-        id: subEl.id?.replace("post_", "") || String(j),
+        id: subEl.id?.replace("post_", "") || (el.id || "post") + "-sub-" + j,
         floor,
         user,
         content,
@@ -17155,7 +17117,7 @@ function parseTopicPage(html) {
     user: $op ? parseUserLink($op) : { username: "", url: "", avatar: "" },
     content: $op ? contentText($op.querySelector(".topic_content")) : "",
     timestamp: $op ? ($op.querySelector(".post_actions .action small") || { textContent: "" }).textContent.replace(/#\d+\s*-?\s*/, "").trim() : "",
-    title: (document.querySelector("h1.nameSingle a, .headerNeueInner h1, title") || { textContent: "" }).textContent.trim()
+    title: (document.querySelector("h1.nameSingle a, .headerNeueInner h1, title") || { textContent: "" }).textContent.trim().replace(/\s*\(讨论[:：][^)]*\)$/, "")
   };
   const replies = [];
   const replyRows = document.querySelectorAll("#comment_list > .row_reply");
@@ -17167,6 +17129,7 @@ function parseTopicPage(html) {
     const user = parseUserLink(el);
     const contentEl = el.querySelector(".message");
     const content = contentText(contentEl);
+    const children = parseSubReplies(document, el);
     if (user.username && content) {
       replies.push({
         id: el.id?.replace("post_", "") || String(i),
@@ -17174,8 +17137,10 @@ function parseTopicPage(html) {
         user,
         content,
         timestamp,
-        replies: parseSubReplies(document, el)
+        replies: children
       });
+    } else {
+      replies.push(...children);
     }
   });
   return { op, replies };
@@ -17191,7 +17156,7 @@ app5.get("/character/:id", async (c) => {
     const key2 = `char_${id}_${isChina7}`;
     const cached = cache.get(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina7)}/character/${id}`);
+    const { html } = await fetchBangumiHTML(isChina7 ? [BGM_PROXY2, BGM_TV] : [BGM_TV, BGM_PROXY2], `/character/${id}`);
     const comments = parseTalkbox(html);
     cache.set(key2, comments);
     return c.json({ data: comments });
@@ -17207,7 +17172,7 @@ app5.get("/subject/:id", async (c) => {
     const key2 = `subj_${id}_${isChina7}`;
     const cached = cache.get(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina7)}/subject/${id}`);
+    const { html } = await fetchBangumiHTML(isChina7 ? [BGM_PROXY2, BGM_TV] : [BGM_TV, BGM_PROXY2], `/subject/${id}`);
     const comments = parseSubjectTalkbox(html);
     cache.set(key2, comments);
     return c.json({ data: comments });
@@ -17223,7 +17188,7 @@ app5.get("/subject/:id/topics", async (c) => {
     const key2 = `topics_${id}_${isChina7}`;
     const cached = cache.get(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina7)}/subject/${id}/board`);
+    const { html } = await fetchBangumiHTML(isChina7 ? [BGM_PROXY2, BGM_TV] : [BGM_TV, BGM_PROXY2], `/subject/${id}/board`);
     const topics = parseTopics(html).map((topic) => ({ ...topic, subject_id: id }));
     cache.set(key2, topics);
     return c.json({ data: topics });
@@ -17239,7 +17204,7 @@ app5.get("/topic/:topicId", async (c) => {
     const key2 = `topic_${topicId}_${isChina7}`;
     const cached = cache.get(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina7)}/subject/topic/${topicId}`);
+    const { html } = await fetchBangumiHTML(isChina7 ? [BGM_PROXY2, BGM_TV] : [BGM_TV, BGM_PROXY2], `/subject/topic/${topicId}`);
     const topic = parseTopicPage(html);
     cache.set(key2, topic);
     return c.json({ data: topic });
@@ -17255,7 +17220,7 @@ app5.get("/person/:id", async (c) => {
     const key2 = `person_${id}_${isChina7}`;
     const cached = cache.get(key2);
     if (cached) return c.json({ data: cached });
-    const html = await fetchHTML(`${getBase(isChina7)}/person/${id}`);
+    const { html } = await fetchBangumiHTML(isChina7 ? [BGM_PROXY2, BGM_TV] : [BGM_TV, BGM_PROXY2], `/person/${id}`);
     const comments = parseTalkbox(html);
     cache.set(key2, comments);
     return c.json({ data: comments });
@@ -17532,33 +17497,32 @@ var MOBILE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWeb
 function collapseSpace(s) {
   return (s || "").replace(/\s+/g, " ").trim();
 }
-async function fetchWithTimeout2(url, headers2 = {}) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8e3);
-  try {
-    return await fetch(url, { headers: headers2, signal: controller.signal, redirect: "follow" });
-  } finally {
-    clearTimeout(timer);
-  }
-}
 var MOBILE_HEADERS = {
   "User-Agent": MOBILE_UA,
   Referer: "https://m.douban.com/",
   Accept: "application/json, text/plain, */*",
   "Accept-Language": "zh-CN,zh;q=0.9"
 };
-async function fetchMobileJson(path) {
+async function fetchMobileJson(path, { strict = false, signal } = {}) {
+  const separator = path.includes("?") ? "&" : "?";
+  const url = `${MOBILE_API}/${path}${separator}for_mobile=1`;
   try {
-    const separator = path.includes("?") ? "&" : "?";
-    const res = await fetchWithTimeout2(
-      `${MOBILE_API}/${path}${separator}for_mobile=1`,
-      MOBILE_HEADERS
-    );
-    if (!res.ok) return null;
-    const contentType = res.headers.get("content-type") || "";
-    if (!contentType.includes("json")) return null;
-    return await res.json();
-  } catch {
+    return await withUpstreamCircuit(url, async () => {
+      signal?.throwIfAborted();
+      const res = await fetchWithTimeout(url, { headers: MOBILE_HEADERS, signal, redirect: "follow" }, 2500);
+      if ((!strict || !path.startsWith("search?")) && res.status === 404) return null;
+      if (!res.ok || !(res.headers.get("content-type") || "").includes("json")) {
+        const status = res.status === 429 ? 429 : 503;
+        throw Object.assign(new Error("Douban source unavailable"), { status });
+      }
+      const data = await res.json();
+      if (path.startsWith("search?") && !Array.isArray(data?.subjects?.items)) {
+        throw new Error("Invalid Douban search payload");
+      }
+      return data;
+    });
+  } catch (error) {
+    if (strict) throw error;
     return null;
   }
 }
@@ -17606,14 +17570,14 @@ function findDoubanCandidate(items, names, year = "") {
     };
   }).filter(Boolean).filter((match2) => !targetYear || !candidateYear(match2.item) || match2.yearDistance <= 3).sort((a, b) => a.yearDistance - b.yearDistance || a.titleIndex - b.titleIndex)[0]?.item;
 }
-async function searchDouban(name) {
+async function searchDouban(name, signal) {
   if (!name) return [];
-  const data = await fetchMobileJson(`search?q=${encodeURIComponent(name)}&start=0&count=10`);
+  const data = await fetchMobileJson(`search?q=${encodeURIComponent(name)}&start=0&count=10`, { strict: true, signal });
   return parseMobileSearch(data);
 }
-async function getDoubanAbstract(subjectId) {
+async function getDoubanAbstract(subjectId, signal) {
   if (!subjectId) return null;
-  const data = await fetchMobileJson(`movie/${encodeURIComponent(subjectId)}`);
+  const data = await fetchMobileJson(`movie/${encodeURIComponent(subjectId)}`, { signal });
   if (!data?.id) return null;
   return {
     id: String(data.id),
@@ -17919,9 +17883,9 @@ async function findDoubanMatch(detail) {
   const year = String(detail.date || detail.air_date || "").match(/(?:19|20)\d{2}/)?.[0] || "";
   return findDoubanCandidate([...suggestions.values()], names, year) || null;
 }
-async function buildDoubanResult(match2) {
+async function buildDoubanResult(match2, signal) {
   if (!match2) return null;
-  const abstract = await getDoubanAbstract(match2.id);
+  const abstract = signal?.aborted ? null : await getDoubanAbstract(match2.id, signal);
   return {
     id: match2.id,
     title: abstract?.title || match2.title,
@@ -17945,20 +17909,21 @@ app6.get("/by-name", async (c) => {
     const cacheKey2 = `douban_name_${JSON.stringify(names)}_${year}`;
     const cached = cache2.get(cacheKey2);
     if (cached) return c.json({ data: cached.notFound ? null : cached });
-    const suggestions = /* @__PURE__ */ new Map();
+    const signal = AbortSignal.timeout(4200);
+    let match2;
     for (const name of names.slice(0, 4)) {
-      for (const candidate of await searchDouban(name)) suggestions.set(candidate.id, candidate);
+      match2 = findDoubanCandidate(await searchDouban(name, signal), names, year);
+      if (match2) break;
     }
-    const match2 = findDoubanCandidate([...suggestions.values()], names, year);
     if (!match2) {
       cache2.set(cacheKey2, { notFound: true });
       return c.json({ data: null });
     }
-    const data = await buildDoubanResult(match2);
+    const data = await buildDoubanResult(match2, signal);
     cache2.set(cacheKey2, data);
     return c.json({ data });
   } catch {
-    return c.json({ data: null });
+    return c.json({ error: "\u8C46\u74E3\u8BC4\u5206\u6E90\u6682\u65F6\u4E0D\u53EF\u7528", degraded: true }, 502);
   }
 });
 app6.get("/:id", async (c) => {
@@ -18737,8 +18702,7 @@ var wikipedia_default = app9;
 var app10 = new Hono3();
 var HOSTS = {
   main: "https://bgm.tv",
-  mirror1: "https://bangumi.pro",
-  mirror2: "https://bangumi.one"
+  mirror1: "https://bgm.lat"
 };
 var cache6 = createCache(CACHE_TTL_GROUPS);
 var lastSuccessGroupListStore = createCache(30 * 60 * 1e3, 2);
@@ -18751,9 +18715,9 @@ async function invalidateGroupPages(paths) {
 }
 function getBaseUrls(isChina7) {
   if (isChina7) {
-    return [HOSTS.mirror1, HOSTS.mirror2, HOSTS.main];
+    return [HOSTS.mirror1, HOSTS.main];
   }
-  return [HOSTS.main, HOSTS.mirror1, HOSTS.mirror2];
+  return [HOSTS.main, HOSTS.mirror1];
 }
 function looksBlocked(html) {
   return /Just a moment|Attention Required|403 Forbidden|Access denied|请求过于频繁/i.test(
@@ -18774,7 +18738,8 @@ async function fetchGroupHTMLCached(urls) {
       }
     }
   }
-  const { html, url } = await fetchHTMLMulti(urls);
+  const first = new URL(urls[0]);
+  const { html, url } = await fetchBangumiHTML(urls.map((url2) => new URL(url2).origin), first.pathname + first.search);
   if (cache8 && html && html.length >= 500 && !looksBlocked(html)) {
     try {
       await cache8.put(
@@ -19128,7 +19093,6 @@ function parseMemberCount(document) {
       el.getAttribute("aria-label") || el.getAttribute("title") || el.textContent || ""
     );
   }
-  candidates.push(document.body?.textContent || "");
   for (const el of document.querySelectorAll("[class]")) {
     const className = el.getAttribute("class") || "";
     if (/(?:group[_-]?member|member[_-]?count|subscribers?|members?)/i.test(className)) {
@@ -19139,7 +19103,7 @@ function parseMemberCount(document) {
   }
   for (const text of candidates) {
     const normalized = collapseText(text);
-    const match2 = normalized.match(/([0-9][0-9,]*)\s*(?:位?成员|人|members?|subscribers?)/i) || normalized.match(/(?:成员(?:数|人数)?|members?|subscribers?)\s*[:：]?\s*([0-9][0-9,]*)/i);
+    const match2 = normalized.match(/([0-9][0-9,]*)\s*(?:位?成员|members?|subscribers?)/i) || normalized.match(/(?:成员(?:数|人数)?|members?|subscribers?)\s*[:：]?\s*([0-9][0-9,]*)/i);
     if (match2) {
       const count = parseNumber(match2[1]);
       if (count > 0) return count;
@@ -19239,9 +19203,7 @@ function parseGroupTopicHTML(html, id, base) {
     appendRow(container, rows.length + 1);
     for (const subReply of container.querySelectorAll(".topic_sub_reply > .sub_reply_bg")) {
       appendRow(subReply, rows.length + 1);
-      if (rows.length >= 50) break;
     }
-    if (rows.length >= 50) break;
   }
   if (!rows.length) {
     for (const user of authorLinks) {
@@ -19882,6 +19844,18 @@ var STALE_TTL = 7 * 24 * 60 * 60 * 1e3;
 var freshCache = createCache(FRESH_TTL, 500);
 var staleCache = createCache(STALE_TTL, 500);
 var searchCache = createCache(FRESH_TTL, 500);
+var PROVIDER_BUDGET_MS = 4200;
+async function fetchRatingBody(url, headers2, signal, read) {
+  return withUpstreamCircuit(url, async () => {
+    signal.throwIfAborted();
+    const response = await fetchWithTimeout(url, { headers: headers2, signal }, 2500);
+    if (response.status !== 200) {
+      const status = [202, 403].includes(response.status) ? 503 : response.status;
+      throw Object.assign(new Error("Rating provider unavailable"), { status });
+    }
+    return read(response);
+  });
+}
 function ratingCount(value) {
   if (value == null || String(value).trim() === "") return null;
   const count = Number(String(value ?? "").replace(/,/g, ""));
@@ -19962,20 +19936,23 @@ async function cachedRating({ source, id, url, load }) {
     return { data: staleCache.get(key2), degraded: true, url };
   }
 }
-async function getMalRating(id) {
+async function getMalRating(id, signal) {
   const url = `https://myanimelist.net/anime/${id}`;
   return cachedRating({
     source: "MyAnimeList",
     id,
     url,
     load: async () => {
-      const response = await fetch(`https://api.jikan.moe/v4/anime/${id}`, {
-        headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(5e3)
-      });
-      if (!response.ok)
-        throw Object.assign(new Error("MAL rating request failed"), { status: response.status });
-      const payload = await response.json();
+      const payload = await fetchRatingBody(
+        `https://api.jikan.moe/v4/anime/${id}`,
+        { Accept: "application/json" },
+        signal,
+        async (response) => {
+          const data = await response.json();
+          if (!data?.data) throw new Error("Invalid MAL rating payload");
+          return data;
+        }
+      );
       const score = numericScore(payload?.data?.score);
       return {
         id,
@@ -19986,7 +19963,7 @@ async function getMalRating(id) {
     }
   });
 }
-async function getMalRatingByTitle(titles, year) {
+async function getMalRatingByTitle(titles, year, signal) {
   if (!titles.length) return { data: null, degraded: false };
   const key2 = searchKey("mal", titles, year);
   const cached = searchCache.get(key2);
@@ -19995,13 +19972,16 @@ async function getMalRatingByTitle(titles, year) {
   try {
     for (const title of titles.slice(0, 3)) {
       const params = new URLSearchParams({ q: title, limit: "10", sfw: "true" });
-      const response = await fetch(`https://api.jikan.moe/v4/anime?${params}`, {
-        headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(5e3)
-      });
-      if (!response.ok)
-        throw Object.assign(new Error("MAL title search failed"), { status: response.status });
-      const payload = await response.json();
+      const payload = await fetchRatingBody(
+        `https://api.jikan.moe/v4/anime?${params}`,
+        { Accept: "application/json" },
+        signal,
+        async (response) => {
+          const data = await response.json();
+          if (!Array.isArray(data?.data)) throw new Error("Invalid MAL search payload");
+          return data;
+        }
+      );
       const match2 = chooseExactTitleMatch(payload?.data, titles, year);
       if (!match2) continue;
       const id = String(match2.mal_id || "");
@@ -20035,23 +20015,15 @@ async function getMalRatingByTitle(titles, year) {
     return { data: staleCache.get(`MyAnimeList:search:${key2}`), degraded: true };
   }
 }
-async function getImdbRating(id) {
+async function getImdbRating(id, signal) {
   const url = `https://www.imdb.com/title/${id}/`;
   return cachedRating({
     source: "IMDb",
     id,
     url,
     load: async () => {
-      const response = await fetch(url, {
-        headers: {
-          Accept: "text/html,application/xhtml+xml",
-          "User-Agent": "Mozilla/5.0 (compatible; Bangmio/1.0)"
-        },
-        signal: AbortSignal.timeout(5e3)
-      });
-      if (!response.ok)
-        throw Object.assign(new Error("IMDb rating request failed"), { status: response.status });
-      const { document } = parseHTML(await response.text());
+      const html = await fetchImdbPage(url, signal);
+      const { document } = parseHTML(html);
       let aggregateRating = null;
       for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
         try {
@@ -20071,6 +20043,19 @@ async function getImdbRating(id) {
     }
   });
 }
+function fetchImdbPage(url, signal) {
+  const headers2 = {
+    Accept: "text/html,application/xhtml+xml",
+    "User-Agent": "Mozilla/5.0 (compatible; Bangmio/1.0)"
+  };
+  return fetchRatingBody(url, headers2, signal, async (response) => {
+    const html = await response.text();
+    if (!html || /captcha|request blocked|just a moment|checking your browser/i.test(html.slice(0, 1800))) {
+      throw new Error("IMDb challenge page");
+    }
+    return html;
+  });
+}
 function imdbSearchCandidates(html) {
   const { document } = parseHTML(html);
   const candidates = [];
@@ -20088,23 +20073,15 @@ function imdbSearchCandidates(html) {
   }
   return candidates;
 }
-async function getImdbIdByTitle(titles, year) {
+async function getImdbIdByTitle(titles, year, signal) {
   if (!titles.length) return "";
   const key2 = searchKey("imdb", titles, year);
   const cached = searchCache.get(key2);
   if (cached) return cached.id || "";
   for (const title of titles.slice(0, 3)) {
     const params = new URLSearchParams({ q: title, s: "tt", exact: "true" });
-    const response = await fetch(`https://www.imdb.com/find/?${params}`, {
-      headers: {
-        Accept: "text/html,application/xhtml+xml",
-        "User-Agent": "Mozilla/5.0 (compatible; Bangmio/1.0)"
-      },
-      signal: AbortSignal.timeout(5e3)
-    });
-    if (!response.ok)
-      throw Object.assign(new Error("IMDb title search failed"), { status: response.status });
-    const match2 = chooseExactTitleMatch(imdbSearchCandidates(await response.text()), titles, year);
+    const html = await fetchImdbPage(`https://www.imdb.com/find/?${params}`, signal);
+    const match2 = chooseExactTitleMatch(imdbSearchCandidates(html), titles, year);
     if (!match2) continue;
     searchCache.set(key2, { id: match2.id });
     return match2.id;
@@ -20112,12 +20089,12 @@ async function getImdbIdByTitle(titles, year) {
   searchCache.set(key2, { notFound: true });
   return "";
 }
-async function getImdbRatingByTitle(titles, year) {
+async function getImdbRatingByTitle(titles, year, signal) {
   const startedAt = Date.now();
   try {
-    const id = await getImdbIdByTitle(titles, year);
+    const id = await getImdbIdByTitle(titles, year, signal);
     if (!id) return { data: null, degraded: false };
-    return getImdbRating(id);
+    return getImdbRating(id, signal);
   } catch (error) {
     logWarn("\u5916\u90E8\u8BC4\u5206\u6E90\u6807\u9898\u68C0\u7D22\u5931\u8D25", {
       source: "IMDb",
@@ -20130,10 +20107,11 @@ async function getImdbRatingByTitle(titles, year) {
   }
 }
 async function getRatingWithTitleFallback(id, titles, year, loadById, loadByTitle) {
-  if (!id) return loadByTitle(titles, year);
-  const linked = await loadById(id);
+  const signal = AbortSignal.timeout(PROVIDER_BUDGET_MS);
+  if (!id) return loadByTitle(titles, year, signal);
+  const linked = await loadById(id, signal);
   if (linked.data || !titles.length) return linked;
-  const searched = await loadByTitle(titles, year);
+  const searched = await loadByTitle(titles, year, signal);
   return {
     data: searched.data || linked.data || null,
     degraded: searched.degraded || !searched.data && linked.degraded
@@ -20192,8 +20170,7 @@ app15.use(
 );
 app15.use("*", async (c, next) => {
   const country = c.req.header("cf-ipcountry") || "";
-  c.env = c.env || {};
-  c.env.CF_IP_COUNTRY = country;
+  c.env = { ...c.env, CF_IP_COUNTRY: country };
   await next();
 });
 app15.use("*", securityHeaders());
@@ -20203,8 +20180,10 @@ var aiLimiter = rateLimit(RATE_LIMIT_AI_WINDOW, RATE_LIMIT_MAX_AI, { fallback: "
 app15.use("/api/v1/*", async (c, next) => {
   const method = c.req.method.toUpperCase();
   if (method === "POST" && c.req.path.startsWith("/api/v1/ai/")) return aiLimiter(c, next);
-  const limiter = method === "POST" || method === "PUT" || method === "DELETE" ? postLimiter : getLimiter;
-  return limiter(c, next);
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) return postLimiter(c, next);
+  if (method === "GET" && /^\/api\/v1\/(auth|user|collection)(\/|$)/.test(c.req.path))
+    return getLimiter(c, next);
+  await next();
 });
 var authLimiter = rateLimit(RATE_LIMIT_WINDOW, 5, { fallback: "reject" });
 app15.use("/api/v1/auth/*", async (c, next) => {

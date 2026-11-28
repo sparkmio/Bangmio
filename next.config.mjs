@@ -21,11 +21,17 @@ const nextConfig = {
   ],
   poweredByHeader: false,
   compress: true,
+  async redirects() {
+    return [{ source: '/sitemap_index.xml', destination: '/sitemap.xml', permanent: true }]
+  },
+  async rewrites() {
+    return [{ source: '/sitemap-:name.xml', destination: '/sitemaps/:name.xml' }]
+  },
   images: {
     // 仅允许 Bangumi 主站/镜像图片域名；普通 <img> 仍由业务 URL 校验负责。
     remotePatterns: [
       { protocol: 'https', hostname: 'lain.bgm.tv', pathname: '/**' },
-      { protocol: 'https', hostname: 'lain.bangumi.pro', pathname: '/**' }
+      { protocol: 'https', hostname: 'lain.bgm.lat', pathname: '/**' }
     ],
     formats: ['image/avif', 'image/webp']
   }

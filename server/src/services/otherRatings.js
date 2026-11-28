@@ -1,5 +1,7 @@
 import { parseHTML } from 'linkedom'
 import { createCache } from '../utils/cache.js'
+import { fetchWithTimeout } from '../utils/http.js'
+import { withUpstreamCircuit } from '../utils/upstreamCircuit.js'
 import { logWarn } from '../utils/logger.js'
 
 const FRESH_TTL = 6 * 60 * 60 * 1000
@@ -7,6 +9,20 @@ const STALE_TTL = 7 * 24 * 60 * 60 * 1000
 const freshCache = createCache(FRESH_TTL, 500)
 const staleCache = createCache(STALE_TTL, 500)
 const searchCache = createCache(FRESH_TTL, 500)
+
+const PROVIDER_BUDGET_MS = 4200
+
+async function fetchRatingBody(url, headers, signal, read) {
+  return withUpstreamCircuit(url, async () => {
+    signal.throwIfAborted()
+    const response = await fetchWithTimeout(url, { headers, signal }, 2500)
+    if (response.status !== 200) {
+      const status = [202, 403].includes(response.status) ? 503 : response.status
+      throw Object.assign(new Error('Rating provider unavailable'), { status })
+    }
+    return read(response)
+  })
+}
 
 function ratingCount(value) {
   if (value == null || String(value).trim() === '') return null
@@ -113,20 +129,19 @@ async function cachedRating({ source, id, url, load }) {
   }
 }
 
-async function getMalRating(id) {
+async function getMalRating(id, signal) {
   const url = `https://myanimelist.net/anime/${id}`
   return cachedRating({
     source: 'MyAnimeList',
     id,
     url,
     load: async () => {
-      const response = await fetch(`https://api.jikan.moe/v4/anime/${id}`, {
-        headers: { Accept: 'application/json' },
-        signal: AbortSignal.timeout(5000)
-      })
-      if (!response.ok)
-        throw Object.assign(new Error('MAL rating request failed'), { status: response.status })
-      const payload = await response.json()
+      const payload = await fetchRatingBody(`https://api.jikan.moe/v4/anime/${id}`,
+        { Accept: 'application/json' }, signal, async response => {
+          const data = await response.json()
+          if (!data?.data) throw new Error('Invalid MAL rating payload')
+          return data
+        })
       const score = numericScore(payload?.data?.score)
       return {
         id,
@@ -138,7 +153,7 @@ async function getMalRating(id) {
   })
 }
 
-async function getMalRatingByTitle(titles, year) {
+async function getMalRatingByTitle(titles, year, signal) {
   if (!titles.length) return { data: null, degraded: false }
   const key = searchKey('mal', titles, year)
   const cached = searchCache.get(key)
@@ -148,13 +163,12 @@ async function getMalRatingByTitle(titles, year) {
   try {
     for (const title of titles.slice(0, 3)) {
       const params = new URLSearchParams({ q: title, limit: '10', sfw: 'true' })
-      const response = await fetch(`https://api.jikan.moe/v4/anime?${params}`, {
-        headers: { Accept: 'application/json' },
-        signal: AbortSignal.timeout(5000)
-      })
-      if (!response.ok)
-        throw Object.assign(new Error('MAL title search failed'), { status: response.status })
-      const payload = await response.json()
+      const payload = await fetchRatingBody(`https://api.jikan.moe/v4/anime?${params}`,
+        { Accept: 'application/json' }, signal, async response => {
+          const data = await response.json()
+          if (!Array.isArray(data?.data)) throw new Error('Invalid MAL search payload')
+          return data
+        })
       const match = chooseExactTitleMatch(payload?.data, titles, year)
       if (!match) continue
       const id = String(match.mal_id || '')
@@ -191,23 +205,15 @@ async function getMalRatingByTitle(titles, year) {
   }
 }
 
-async function getImdbRating(id) {
+async function getImdbRating(id, signal) {
   const url = `https://www.imdb.com/title/${id}/`
   return cachedRating({
     source: 'IMDb',
     id,
     url,
     load: async () => {
-      const response = await fetch(url, {
-        headers: {
-          Accept: 'text/html,application/xhtml+xml',
-          'User-Agent': 'Mozilla/5.0 (compatible; Bangmio/1.0)'
-        },
-        signal: AbortSignal.timeout(5000)
-      })
-      if (!response.ok)
-        throw Object.assign(new Error('IMDb rating request failed'), { status: response.status })
-      const { document } = parseHTML(await response.text())
+      const html = await fetchImdbPage(url, signal)
+      const { document } = parseHTML(html)
       let aggregateRating = null
       for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
         try {
@@ -226,6 +232,20 @@ async function getImdbRating(id) {
         url
       }
     }
+  })
+}
+
+function fetchImdbPage(url, signal) {
+  const headers = {
+    Accept: 'text/html,application/xhtml+xml',
+    'User-Agent': 'Mozilla/5.0 (compatible; Bangmio/1.0)'
+  }
+  return fetchRatingBody(url, headers, signal, async response => {
+    const html = await response.text()
+    if (!html || /captcha|request blocked|just a moment|checking your browser/i.test(html.slice(0, 1800))) {
+      throw new Error('IMDb challenge page')
+    }
+    return html
   })
 }
 
@@ -249,7 +269,7 @@ function imdbSearchCandidates(html) {
   return candidates
 }
 
-async function getImdbIdByTitle(titles, year) {
+async function getImdbIdByTitle(titles, year, signal) {
   if (!titles.length) return ''
   const key = searchKey('imdb', titles, year)
   const cached = searchCache.get(key)
@@ -257,16 +277,8 @@ async function getImdbIdByTitle(titles, year) {
 
   for (const title of titles.slice(0, 3)) {
     const params = new URLSearchParams({ q: title, s: 'tt', exact: 'true' })
-    const response = await fetch(`https://www.imdb.com/find/?${params}`, {
-      headers: {
-        Accept: 'text/html,application/xhtml+xml',
-        'User-Agent': 'Mozilla/5.0 (compatible; Bangmio/1.0)'
-      },
-      signal: AbortSignal.timeout(5000)
-    })
-    if (!response.ok)
-      throw Object.assign(new Error('IMDb title search failed'), { status: response.status })
-    const match = chooseExactTitleMatch(imdbSearchCandidates(await response.text()), titles, year)
+    const html = await fetchImdbPage(`https://www.imdb.com/find/?${params}`, signal)
+    const match = chooseExactTitleMatch(imdbSearchCandidates(html), titles, year)
     if (!match) continue
     searchCache.set(key, { id: match.id })
     return match.id
@@ -275,12 +287,12 @@ async function getImdbIdByTitle(titles, year) {
   return ''
 }
 
-async function getImdbRatingByTitle(titles, year) {
+async function getImdbRatingByTitle(titles, year, signal) {
   const startedAt = Date.now()
   try {
-    const id = await getImdbIdByTitle(titles, year)
+    const id = await getImdbIdByTitle(titles, year, signal)
     if (!id) return { data: null, degraded: false }
-    return getImdbRating(id)
+    return getImdbRating(id, signal)
   } catch (error) {
     logWarn('外部评分源标题检索失败', {
       source: 'IMDb',
@@ -294,11 +306,12 @@ async function getImdbRatingByTitle(titles, year) {
 }
 
 async function getRatingWithTitleFallback(id, titles, year, loadById, loadByTitle) {
-  if (!id) return loadByTitle(titles, year)
-  const linked = await loadById(id)
+  const signal = AbortSignal.timeout(PROVIDER_BUDGET_MS)
+  if (!id) return loadByTitle(titles, year, signal)
+  const linked = await loadById(id, signal)
   if (linked.data || !titles.length) return linked
 
-  const searched = await loadByTitle(titles, year)
+  const searched = await loadByTitle(titles, year, signal)
   return {
     data: searched.data || linked.data || null,
     degraded: searched.degraded || (!searched.data && linked.degraded)

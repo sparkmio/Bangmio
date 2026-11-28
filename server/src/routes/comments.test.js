@@ -42,12 +42,12 @@ describe('comment form helpers', () => {
 describe('comment author parsing', () => {
   it('accepts absolute user profile links and keeps the real nickname/avatar', () => {
     const html =
-      '<div class="postTopic"><a href="https://bangumi.pro/user/alice"><img src="//lain.bgm.tv/pic/user/l/000/00/01.jpg">爱丽丝</a><div class="topic_content"><div class="message">正文</div></div></div>'
+      '<div class="postTopic"><a href="https://bgm.lat/user/alice"><img src="//lain.bgm.tv/pic/user/l/000/00/01.jpg">爱丽丝</a><div class="topic_content"><div class="message">正文</div></div></div>'
     const topic = parseTopicPage(html)
     expect(topic.op.user.username).toBe('alice')
     expect(topic.op.user.nickname).toBe('爱丽丝')
-    expect(topic.op.user.url).toBe('https://bangumi.pro/user/alice')
-    expect(topic.op.user.avatar).toBe('https://lain.bangumi.pro/pic/user/l/000/00/01.jpg')
+    expect(topic.op.user.url).toBe('https://bgm.lat/user/alice')
+    expect(topic.op.user.avatar).toBe('https://lain.bgm.lat/pic/user/l/000/00/01.jpg')
   })
 
   it('does not treat unrelated links as a community author', () => {

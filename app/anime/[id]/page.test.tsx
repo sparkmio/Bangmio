@@ -37,6 +37,6 @@ describe('detail failure boundaries', () => {
     vi.mocked(apiFetchServer).mockResolvedValue({ data: { id: 42, name: 'fixture' } })
     vi.mocked(safeApiFetchServer).mockResolvedValue(null)
     const result = await Page({ params: Promise.resolve({ id: '42' }) })
-    expect(result.props.episodesFailed).toBe(true)
+    expect(result.props.children.props.episodesFailed).toBe(true)
   })
 })
