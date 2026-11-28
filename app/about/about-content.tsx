@@ -20,9 +20,8 @@ const sections = [
     content: (
       <>
         <p>
-          注册 Bangmio 账号时会处理邮箱、密码哈希和账号资料；绑定 Bangumi 后，Bangumi 用户 ID
-          与加密后的授权凭证保存在服务端数据库中。Bangumi OAuth 会话通过 HttpOnly Cookie
-          传递，Bangmio 账号会话令牌及账号资料保存在当前浏览器的 localStorage。
+          Bangmio 不再提供邮箱注册或独立账号。你可以通过 Bangumi OAuth 或 Access Token 登录，
+          登录凭证通过 HttpOnly Cookie 保存，不写入 Bangmio 数据库。
         </p>
         <p>
           主题、动效等界面偏好、AI 对话记录和讨论草稿会保存在当前浏览器的

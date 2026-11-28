@@ -1,48 +1,118 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { AuthProvider, useAuth } from './auth-provider'
 
-function AuthState() {
-  const { ready, isAuthenticated, user } = useAuth()
-  return <output>{ready ? `${isAuthenticated}:${user?.username || ''}` : 'restoring'}</output>
+let root: Root
+let auth: ReturnType<typeof useAuth>
+const retired = {
+  bangmio_token: 'old.email.jwt',
+  bangmio_user: JSON.stringify({ email: 'old@example.test' }),
+  bgm_token_cached: 'old-linked-token',
+  bgm_user_profile: JSON.stringify({ username: 'old-linked-user' })
 }
 
-let container: HTMLDivElement
-let root: Root
+function Probe() {
+  auth = useAuth()
+  return null
+}
+
+async function render() {
+  await act(async () =>
+    root.render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>
+    )
+  )
+}
 
 beforeEach(() => {
-  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   localStorage.clear()
-  container = document.createElement('div')
-  document.body.append(container)
-  root = createRoot(container)
+  root = createRoot(document.createElement('div'))
 })
 
 afterEach(async () => {
   await act(async () => root.unmount())
-  container.remove()
   vi.unstubAllGlobals()
+  localStorage.clear()
 })
 
-describe('auth restoration state', () => {
-  it('keeps the UI neutral until the cookie session check completes', async () => {
-    let resolveResponse!: (response: unknown) => void
-    const fetchMock = vi.fn(() => new Promise(resolve => (resolveResponse = resolve)))
-    vi.stubGlobal('fetch', fetchMock)
-
-    await act(async () =>
-      root.render(
-        <AuthProvider>
-          <AuthState />
-        </AuthProvider>
-      )
+it('keeps the UI neutral until the cookie session check completes', async () => {
+  let respond!: (response: Response) => void
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      () =>
+        new Promise<Response>(resolve => {
+          respond = resolve
+        })
     )
-    expect(container.textContent).toBe('restoring')
-
-    await act(async () =>
-      resolveResponse({ ok: true, json: async () => ({ data: { username: 'fixture-user' } }) })
-    )
-    expect(container.textContent).toBe('true:fixture-user')
+  )
+  await render()
+  expect(auth).toMatchObject({ ready: false, user: null })
+  await act(async () => respond(Response.json({ data: { username: 'cookie-user' } })))
+  expect(auth).toMatchObject({
+    ready: true,
+    isAuthenticated: true,
+    user: { username: 'cookie-user' }
   })
+})
+
+it.each([true, false])(
+  'removes retired email data and checks the Bangumi cookie (valid: %s)',
+  async valid => {
+    for (const [key, value] of Object.entries(retired)) localStorage.setItem(key, value)
+    localStorage.setItem('bangumi_user', JSON.stringify({ username: 'cookie-user' }))
+    localStorage.setItem('unrelated-preference', 'dark')
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 410 }))
+      .mockResolvedValueOnce(
+        valid
+          ? Response.json({ data: { username: 'cookie-user' } })
+          : new Response(null, { status: 401 })
+      )
+    vi.stubGlobal('fetch', fetch)
+
+    await render()
+
+    expect(fetch.mock.calls.map(([path]) => path)).toEqual([
+      '/api/v1/auth/bgm-token',
+      '/api/v1/user/me'
+    ])
+    expect(fetch.mock.calls[1][1]).toMatchObject({
+      credentials: 'include',
+      headers: { Accept: 'application/json' }
+    })
+    expect(fetch.mock.calls[1][1].headers).not.toHaveProperty('Authorization')
+    for (const key of Object.keys(retired)) expect(localStorage.getItem(key)).toBeNull()
+    expect(localStorage.getItem('unrelated-preference')).toBe('dark')
+    expect(localStorage.getItem('bangumi_user')).toContain('cookie-user')
+    expect(auth).toMatchObject({
+      ready: true,
+      kind: valid ? 'bangumi' : null,
+      account: null,
+      isAuthenticated: valid
+    })
+    expect(auth.user).toEqual(valid ? { username: 'cookie-user' } : null)
+  }
+)
+
+it('does not replace a new login with a stale recovery result', async () => {
+  let respond!: (response: Response) => void
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      () =>
+        new Promise<Response>(resolve => {
+          respond = resolve
+        })
+    )
+  )
+  await render()
+  await act(async () => auth.setAuth('', { id: 2, username: 'fresh-login' }, 'bangumi'))
+  await act(async () => respond(Response.json({ data: { username: 'older-session' } })))
+  expect(auth).toMatchObject({ ready: true, kind: 'bangumi', user: { username: 'fresh-login' } })
 })

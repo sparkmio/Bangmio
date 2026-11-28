@@ -20174,6 +20174,16 @@ app15.use("*", async (c, next) => {
   await next();
 });
 app15.use("*", securityHeaders());
+app15.use("/api/v1/auth/*", async (c, next) => {
+  if (!c.env?.DB) {
+    return c.json(
+      { data: null, error: "Bangmio \u90AE\u7BB1\u8D26\u53F7\u5DF2\u505C\u7528\uFF0C\u8BF7\u4F7F\u7528 Bangumi \u767B\u5F55", code: 410 },
+      410,
+      { "Cache-Control": "no-store" }
+    );
+  }
+  await next();
+});
 var postLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_POST);
 var getLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_GET);
 var aiLimiter = rateLimit(RATE_LIMIT_AI_WINDOW, RATE_LIMIT_MAX_AI, { fallback: "reject" });

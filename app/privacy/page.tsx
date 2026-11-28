@@ -10,14 +10,14 @@ const sections: Array<[string, string[]]> = [
   [
     '处理的数据',
     [
-      '注册 Bangmio 账号时，服务端处理邮箱、密码哈希和账号资料。绑定 Bangumi 后，服务端保存 Bangumi 用户 ID 与加密后的授权凭证；授权访问使用 HttpOnly Cookie。',
+      'Bangmio 不再提供邮箱注册或独立账号。通过 Bangumi OAuth 或 Access Token 登录时，登录凭证通过 HttpOnly Cookie 保存。',
       '你的收藏、评分、评论和讨论等操作会按你的请求提交给 Bangumi。Bangmio 不会把这些内容自动发送给 AI 助手。'
     ]
   ],
   [
     '浏览器本地存储',
     [
-      'Bangmio 账号会话令牌及账号资料保存在当前浏览器的 localStorage。主题、动效和玻璃效果偏好、AI 对话记录及讨论草稿也保存在 localStorage；这些数据留在该浏览器中，清除本站点数据可将其删除。'
+      'Bangumi 用户资料、界面偏好、AI 对话记录和讨论草稿可保存在当前浏览器的 localStorage；清除本站点数据可删除这些本地记录。'
     ]
   ],
   [

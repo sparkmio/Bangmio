@@ -20,15 +20,7 @@ BANGMIO_API_ORIGIN = 'https://bangmio.site'
 OAUTH_REDIRECT_URI = "https://bangmio.site/login/callback"
 TURNSTILE_HOSTNAMES = "bangmio.site,www.bangmio.site,bangmio-next.sparkmio.workers.dev"
 TURNSTILE_SITE_KEY = "0x4AAAAAAEd1MmT7-jbdtWBA"
-VITE_REQUIRE_EMAIL_CODE = "true"
-RESEND_FROM = "Bangmio <signup@bangmio.site>"
 ZHIPU_MODEL = "glm-5.3-flash"
-
-[[d1_databases]]
-binding = "DB"
-database_name = "bangmio-users"
-database_id = "3ef95a1c-a66a-4572-9522-39ed1961dbb8"
-migrations_dir = "server/db/migrations"
 
 [[durable_objects.bindings]]
 name = "RATE_LIMITS"

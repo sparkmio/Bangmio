@@ -52,7 +52,7 @@ it('1,000 public anime reads do not touch either rate-limit store', async () => 
 })
 
 it('keeps the stricter authentication window and Retry-After', async () => {
-  const env = { RATE_LIMITS: createRateLimitBinding() }
+  const env = { DB: { prepare: vi.fn() }, RATE_LIMITS: createRateLimitBinding() }
   const request = () => app.request('/api/v1/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'cf-connecting-ip': '198.51.100.43' },
@@ -62,6 +62,78 @@ it('keeps the stricter authentication window and Retry-After', async () => {
   const blocked = await request()
   expect(blocked.status).toBe(429)
   expect(Number(blocked.headers.get('Retry-After'))).toBeGreaterThan(0)
+})
+
+describe('production without D1', () => {
+  it.each([
+    ['POST', 'login'],
+    ['POST', 'register'],
+    ['POST', 'send-code'],
+    ['POST', 'reset-password'],
+    ['POST', 'oauth-bind-callback'],
+    ['GET', 'bgm-token']
+  ])('retires %s /auth/%s before hitting the shared quota', async (method, path) => {
+    const RATE_LIMITS = createRateLimitBinding()
+    const response = await app.request(`/api/v1/auth/${path}`, { method }, { RATE_LIMITS })
+    expect(response.status).toBe(410)
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    await expect(response.json()).resolves.toMatchObject({ code: 410 })
+    expect(RATE_LIMITS.getByName).not.toHaveBeenCalled()
+  })
+
+  it('starts direct OAuth with the configured callback', async () => {
+    const OAUTH_REDIRECT_URI = 'https://bangmio.site/login/callback'
+    const response = await app.request('/api/v1/user/oauth-url', undefined, {
+      BGM_APP_SECRET: 'mock-secret-for-unit-test',
+      OAUTH_REDIRECT_URI,
+      RATE_LIMITS: createRateLimitBinding()
+    })
+    expect(response.status).toBe(200)
+    const url = new URL((await response.json()).data)
+    expect(`${url.origin}${url.pathname}`).toBe('https://bgm.tv/oauth/authorize')
+    expect(url.searchParams.get('redirect_uri')).toBe(OAUTH_REDIRECT_URI)
+    expect(response.headers.get('Set-Cookie')).toContain(`bangmio_oauth_state=${url.searchParams.get('state')}`)
+  })
+
+  it('authenticates an Access Token and uses the session to read collections', async () => {
+    const user = { id: 1, username: 'db-free-test' }
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const path = new URL(input).pathname
+      if (path === '/v0/me') return Response.json(user)
+      if (path === '/v0/users/db-free-test/collections') return Response.json({ data: [], total: 0 })
+      throw new Error(`Unexpected upstream path: ${path}`)
+    })
+    try {
+      const env = { RATE_LIMITS: createRateLimitBinding() }
+      const login = await app.request('/api/v1/user/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'mock-bangumi-access-token' })
+      }, env)
+      expect(login.status).toBe(200)
+      await expect(login.json()).resolves.toMatchObject({ data: { user, authenticated: true } })
+      const session = login.headers.get('Set-Cookie')
+      expect(session).toContain('HttpOnly')
+      const headers = { Cookie: session.split(';')[0], 'X-Bangumi-Username': user.username }
+      const me = await app.request('/api/v1/user/me', { headers }, env)
+      await expect(me.json()).resolves.toEqual({ data: user })
+      const collections = await app.request('/api/v1/collection/list', { headers }, env)
+      expect(collections.status).toBe(200)
+      await expect(collections.json()).resolves.toEqual({ data: [], total: 0 })
+    } finally {
+      fetch.mockRestore()
+    }
+  })
+
+  it('still limits collection writes through the Durable Object', async () => {
+    const env = { RATE_LIMITS: createRateLimitBinding() }
+    const request = () => app.request('/api/v1/collection/1424', {
+      method: 'POST',
+      headers: { 'cf-connecting-ip': '198.51.100.44' }
+    }, env)
+    for (let count = 0; count < 10; count++) expect((await request()).status).toBe(401)
+    expect((await request()).status).toBe(429)
+  })
 })
 
 describe('AI request quota', () => {

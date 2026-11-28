@@ -59,6 +59,18 @@ app.use('*', async (c, next) => {
 // 安全响应头：为所有响应添加安全相关 HTTP 头
 app.use('*', securityHeaders())
 
+// Production uses Bangumi directly. Retired email routes should not consume a rate-limit write.
+app.use('/api/v1/auth/*', async (c, next) => {
+  if (!c.env?.DB) {
+    return c.json(
+      { data: null, error: 'Bangmio 邮箱账号已停用，请使用 Bangumi 登录', code: 410 },
+      410,
+      { 'Cache-Control': 'no-store' }
+    )
+  }
+  await next()
+})
+
 // 写操作 10 次/分钟，账号及收藏读取 60 次/分钟。公开页面数据跳过共享计数。
 // 本地开发的内存兜底需要复用同一个 limiter 实例。
 const postLimiter = rateLimit(RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_POST)

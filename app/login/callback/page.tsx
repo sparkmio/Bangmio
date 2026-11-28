@@ -14,58 +14,52 @@ function safeRedirect(value: string | null) {
 function CallbackContent() {
   const router = useRouter()
   const search = useSearchParams()
-  const { setAuth, fetchBgmToken, fetchBgmUserProfile, token } = useAuth()
+  const { setAuth } = useAuth()
   const [message, setMessage] = useState('正在完成 Bangumi 授权…')
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     const code = search.get('code')
     const state = search.get('state')
-    const flow = localStorage.getItem('bangmio_oauth_flow') || 'login'
+    const wasBinding = localStorage.getItem('bangmio_oauth_flow') === 'bind'
     const redirect = safeRedirect(localStorage.getItem('bangmio_oauth_redirect'))
     if (!code || !state) {
       setFailed(true)
       setMessage(search.get('error_description') || '授权回调缺少必要参数，请重新登录。')
       return
     }
-    const endpoint =
-      flow === 'bind' ? '/api/v1/auth/oauth-bind-callback' : '/api/v1/user/oauth-callback'
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    const bindToken = token || localStorage.getItem('bangmio_token') || ''
-    if (flow === 'bind' && bindToken) headers.Authorization = `Bearer ${bindToken}`
-
     let alive = true
-    void fetch(endpoint, { method: 'POST', headers, body: JSON.stringify({ code, state }) })
+    void fetch('/api/v1/user/oauth-callback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, state })
+    })
       .then(async response => {
-        const payload = (await response.json().catch(() => ({}))) as ApiResult<{
-          token?: string
-          user?: User
-        }>
+        const payload = (await response.json().catch(() => ({}))) as ApiResult<{ user?: User }>
+        if (!alive) return
         if (!response.ok || !payload.data?.user)
           throw new Error(payload.error || 'Bangumi 授权失败')
-        if (!alive) return
-        if (flow === 'bind') {
-          if (payload.data.token) setAuth(payload.data.token, payload.data.user, 'bangmio')
-          await fetchBgmToken()
-          await fetchBgmUserProfile()
-          router.replace('/profile')
-        } else {
-          setAuth('', payload.data.user, 'bangumi')
-          router.replace(redirect)
-        }
+        setAuth('', payload.data.user, 'bangumi')
         localStorage.removeItem('bangmio_oauth_flow')
         localStorage.removeItem('bangmio_oauth_redirect')
+        router.replace(redirect)
         router.refresh()
       })
       .catch(error => {
         if (!alive) return
         setFailed(true)
-        setMessage(error instanceof Error ? error.message : 'Bangumi 授权失败')
+        if (wasBinding) {
+          localStorage.removeItem('bangmio_oauth_flow')
+          localStorage.removeItem('bangmio_oauth_redirect')
+          setMessage('旧账号绑定已停用，请直接使用 Bangumi 重新登录。')
+        } else {
+          setMessage(error instanceof Error ? error.message : 'Bangumi 授权失败')
+        }
       })
     return () => {
       alive = false
     }
-  }, [fetchBgmToken, fetchBgmUserProfile, router, search, setAuth, token])
+  }, [router, search, setAuth])
 
   return (
     <div className="bm-auth-page">

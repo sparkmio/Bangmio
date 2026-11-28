@@ -49,6 +49,8 @@ type AuthContextValue = {
 
 const COOKIE_AUTH = '__bangumi_cookie__'
 
+class EmailAccountsDisabled extends Error {}
+
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 function readJson<T>(value: string | null): T | null {
@@ -78,6 +80,21 @@ function apiPath(path: string) {
   return path.startsWith('/api/') ? path : `/api/v1${path}`
 }
 
+async function readBangumiProfile(accessToken = '', signal?: AbortSignal) {
+  const response = await fetch(apiPath('/user/me'), {
+    credentials: 'include',
+    cache: 'no-store',
+    signal,
+    headers: {
+      Accept: 'application/json',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+    }
+  })
+  if (!response.ok) return null
+  const payload = (await response.json().catch(() => ({}))) as ApiResult<User>
+  return payload.data?.username ? payload.data : null
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false)
   const [token, setToken] = useState('')
@@ -87,46 +104,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [kind, setKind] = useState<AuthKind | null>(null)
   const [showBindModal, setShowBindModal] = useState(false)
   const refreshPromise = useRef<Promise<string | null> | null>(null)
+  const recoveryRef = useRef<AbortController | null>(null)
 
   const persistBgmToken = useCallback((nextToken: string) => {
     localStorage.removeItem(KEYS.bgmToken)
     setBgmToken(nextToken)
   }, [])
 
-  const fetchBgmToken = useCallback(async () => {
-    const jwt = localStorage.getItem(KEYS.bangmioToken) || ''
-    if (!jwt) return null
-    const response = await fetch(apiPath('/auth/bgm-token'), {
-      credentials: 'include',
-      headers: { Accept: 'application/json', Authorization: `Bearer ${jwt}` }
-    })
-    const payload = (await response.json().catch(() => ({}))) as ApiResult<{
-      available?: boolean
-      bgmToken?: string
-    }>
-    if (!response.ok || (!payload.data?.available && !payload.data?.bgmToken)) return null
-    const legacyToken = payload.data?.bgmToken || ''
-    persistBgmToken(legacyToken)
-    return legacyToken
-  }, [persistBgmToken])
+  const fetchBgmToken = useCallback(
+    async (signal?: AbortSignal) => {
+      const jwt = localStorage.getItem(KEYS.bangmioToken) || ''
+      if (!jwt) return null
+      const response = await fetch(apiPath('/auth/bgm-token'), {
+        credentials: 'include',
+        signal,
+        headers: { Accept: 'application/json', Authorization: `Bearer ${jwt}` }
+      })
+      if (response.status === 410) throw new EmailAccountsDisabled('请使用 Bangumi 登录')
+      const payload = (await response.json().catch(() => ({}))) as ApiResult<{
+        available?: boolean
+        bgmToken?: string
+      }>
+      if (signal?.aborted || !response.ok || (!payload.data?.available && !payload.data?.bgmToken))
+        return null
+      const legacyToken = payload.data?.bgmToken || ''
+      persistBgmToken(legacyToken)
+      return legacyToken
+    },
+    [persistBgmToken]
+  )
 
   const fetchBgmUserProfile = useCallback(async () => {
-    const jwt = localStorage.getItem(KEYS.bangmioToken) || ''
-    let currentBgmToken = bgmToken
-    if (!jwt) return null
-    if (!currentBgmToken) currentBgmToken = (await fetchBgmToken()) || ''
-    const response = await fetch(apiPath('/user/me'), {
-      credentials: 'include',
-      headers: {
-        Accept: 'application/json',
-        ...(currentBgmToken ? { Authorization: `Bearer ${currentBgmToken}` } : {})
-      }
-    })
-    const payload = (await response.json().catch(() => ({}))) as ApiResult<User>
-    if (!response.ok || !payload.data?.username) return null
-    localStorage.setItem(KEYS.bgmProfile, JSON.stringify(payload.data))
-    setUser(payload.data)
-    return payload.data
+    if (!localStorage.getItem(KEYS.bangmioToken)) return null
+    const profile = await readBangumiProfile(bgmToken || (await fetchBgmToken()) || '')
+    if (!profile) return null
+    localStorage.setItem(KEYS.bgmProfile, JSON.stringify(profile))
+    setUser(profile)
+    return profile
   }, [bgmToken, fetchBgmToken])
 
   const refreshBangmioToken = useCallback(async () => {
@@ -209,6 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const setAuth = useCallback(
     (nextToken: string, nextUser: User, nextKind: AuthKind = 'bangmio') => {
+      recoveryRef.current?.abort()
       if (nextKind === 'bangmio') {
         localStorage.setItem(KEYS.bangmioToken, nextToken)
         localStorage.setItem(KEYS.bangmioUser, JSON.stringify(nextUser))
@@ -231,6 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setKind('bangumi')
         setUser(nextUser)
       }
+      setReady(true)
     },
     []
   )
@@ -277,6 +293,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return payload.data.url
   }, [])
   const logout = useCallback(() => {
+    recoveryRef.current?.abort()
     void fetch(apiPath('/user/logout'), { method: 'POST', credentials: 'include' })
     Object.values(KEYS).forEach(key => localStorage.removeItem(key))
     localStorage.removeItem('bangmio_oauth_flow')
@@ -286,61 +303,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccount(null)
     setKind(null)
     setShowBindModal(false)
+    setReady(true)
   }, [])
 
   useEffect(() => {
     migrateLegacyStorage()
-    const storedBangmioToken = localStorage.getItem(KEYS.bangmioToken) || ''
-    const storedBangumiToken = localStorage.getItem(KEYS.bangumiToken) || ''
-    if (storedBangmioToken) {
-      const storedAccount = readJson<User>(localStorage.getItem(KEYS.bangmioUser))
-      setKind('bangmio')
-      setToken(storedBangmioToken)
-      setAccount(storedAccount)
-      setBgmToken('')
-      setUser(readJson<User>(localStorage.getItem(KEYS.bgmProfile)) || storedAccount)
-      void fetchBgmUserProfile().catch(() => null)
-      setReady(true)
-      return
-    } else if (storedBangumiToken) {
-      void fetch(apiPath('/user/auth'), {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ token: storedBangumiToken })
-      })
-        .then(response => response.json().catch(() => ({})))
-        .then(payload => {
+    const recovery = new AbortController()
+    recoveryRef.current = recovery
+    const requestSignal = () => AbortSignal.any([recovery.signal, AbortSignal.timeout(8000)])
+
+    void (async () => {
+      const storedBangmioToken = localStorage.getItem(KEYS.bangmioToken) || ''
+      if (storedBangmioToken) {
+        let retired = false
+        let profile: User | null = null
+        try {
+          const signal = requestSignal()
+          const accessToken = await fetchBgmToken(signal)
+          if (!signal.aborted) profile = await readBangumiProfile(accessToken || '', signal)
+        } catch (error) {
+          retired = error instanceof EmailAccountsDisabled
+        }
+        if (recovery.signal.aborted) return
+        if (!retired) {
+          if (profile) localStorage.setItem(KEYS.bgmProfile, JSON.stringify(profile))
+          const storedAccount = readJson<User>(localStorage.getItem(KEYS.bangmioUser))
+          setKind('bangmio')
+          setToken(storedBangmioToken)
+          setAccount(storedAccount)
+          setUser(profile || readJson<User>(localStorage.getItem(KEYS.bgmProfile)) || storedAccount)
+          return
+        }
+        for (const key of [KEYS.bangmioToken, KEYS.bangmioUser, KEYS.bgmToken, KEYS.bgmProfile])
+          localStorage.removeItem(key)
+      }
+
+      const storedBangumiToken = localStorage.getItem(KEYS.bangumiToken) || ''
+      if (storedBangumiToken) {
+        const response = await fetch(apiPath('/user/auth'), {
+          method: 'POST',
+          credentials: 'include',
+          signal: requestSignal(),
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ token: storedBangumiToken })
+        }).catch(() => null)
+        const payload = (await response?.json().catch(() => null)) as ApiResult<{
+          user: User
+        }> | null
+        if (recovery.signal.aborted) return
+        if (response?.ok && payload?.data?.user) {
+          setAuth('', payload.data.user, 'bangumi')
+          return
+        }
+        if (response?.status === 401) {
           localStorage.removeItem(KEYS.bangumiToken)
-          if (payload?.data?.user) setAuth('', payload.data.user, 'bangumi')
-          else localStorage.removeItem(KEYS.bangumiUser)
-        })
-        .catch(() => {})
-        .finally(() => setReady(true))
-      return
-    } else {
-      const recovery = new AbortController()
-      void fetch(apiPath('/user/me'), {
-        credentials: 'include',
-        cache: 'no-store',
-        signal: AbortSignal.any([recovery.signal, AbortSignal.timeout(8000)])
+          localStorage.removeItem(KEYS.bangumiUser)
+        }
+      }
+
+      const profile = await readBangumiProfile('', requestSignal())
+      if (!recovery.signal.aborted && profile) setAuth('', profile, 'bangumi')
+    })()
+      .catch(() => null)
+      .finally(() => {
+        if (!recovery.signal.aborted) setReady(true)
+        if (recoveryRef.current === recovery) recoveryRef.current = null
       })
-        .then(response => (response.ok ? response.json() : null))
-        .then(payload => {
-          if (!recovery.signal.aborted && payload?.data?.username) {
-            setKind('bangumi')
-            setToken(COOKIE_AUTH)
-            setBgmToken('')
-            setUser(payload.data)
-          }
-        })
-        .catch(() => null)
-        .finally(() => {
-          if (!recovery.signal.aborted) setReady(true)
-        })
-      return () => recovery.abort()
-    }
-  }, [fetchBgmToken, fetchBgmUserProfile, setAuth])
+    return () => recovery.abort()
+  }, [fetchBgmToken, setAuth])
 
   const value = useMemo<AuthContextValue>(
     () => ({

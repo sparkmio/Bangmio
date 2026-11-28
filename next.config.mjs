@@ -22,7 +22,14 @@ const nextConfig = {
   poweredByHeader: false,
   compress: true,
   async redirects() {
-    return [{ source: '/sitemap_index.xml', destination: '/sitemap.xml', permanent: true }]
+    return [
+      { source: '/sitemap_index.xml', destination: '/sitemap.xml', permanent: true },
+      ...['/register', '/forgot-password', '/reset-password', '/bind-bangumi'].map(source => ({
+        source,
+        destination: '/login',
+        permanent: false
+      }))
+    ]
   },
   async rewrites() {
     return [{ source: '/sitemap-:name.xml', destination: '/sitemaps/:name.xml' }]
