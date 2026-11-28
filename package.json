@@ -37,7 +37,7 @@
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-vue": "^5.2.4",
     "@vue/test-utils": "^2.4.6",
-    "concurrently": "^9.1.0",
+    "concurrently": "^9.2.5",
     "esbuild": "^0.28.1",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^10.1.8",
